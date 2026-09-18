@@ -22,7 +22,7 @@ const STAGE_TEXT: Record<JobState, string> = {
 };
 
 export function GenerationScreen({ jobId, onReady, onCancel }: GenerationScreenProps) {
-  const { job, connectionIssue, polling } = useJobPolling(jobId);
+  const { job, connectionIssue, polling, restart } = useJobPolling(jobId);
   const elapsed = useElapsedSeconds(job?.startedAt ?? job?.createdAt);
   const [retrying, setRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
@@ -38,6 +38,10 @@ export function GenerationScreen({ jobId, onReady, onCancel }: GenerationScreenP
     setRetryError(null);
     try {
       await retryJob(jobId);
+      // The poll loop already stopped after the terminal `failed` state;
+      // explicitly resume it so the now-restarted job's progress shows up
+      // instead of leaving the screen stuck on the old failure.
+      restart();
     } catch (error) {
       setRetryError(describeApiError(error));
     } finally {

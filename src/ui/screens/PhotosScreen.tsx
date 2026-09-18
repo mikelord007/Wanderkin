@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type {
-  PhotoReference,
-  ProviderCapabilityDescriptor,
-  ProviderInputPhoto,
-  PhotoViewSlot,
-} from "@shared/index.js";
+import type { PhotoReference, ProviderCapabilityDescriptor, PhotoViewSlot } from "@shared/index.js";
 import { describeApiError, getCapabilities, submitJob, uploadPhotos } from "../api.js";
 import { PhotoLightbox } from "../components/PhotoLightbox.js";
+import { buildProviderInputPhotos, deriveSelectionFromInputPhotos } from "../photoSelection.js";
+import {
+  clearPendingSubmission,
+  loadPendingSubmission,
+  saveActiveJob,
+  savePendingSubmission,
+  type PendingSubmission,
+} from "../jobStorage.js";
 
 interface PhotosScreenProps {
   onJobStarted: (jobId: string) => void;
@@ -20,24 +23,44 @@ function newIdempotencyKey(): string {
   return `key-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+/** A submission in localStorage before its POST /api/jobs response ever
+ * arrived (reload, tab close, timeout) — the server may already have
+ * accepted it, so resuming must reuse the same idempotencyKey and the same
+ * already-uploaded photo refs rather than re-uploading and minting new ids
+ * under that key. */
+function restoredFromPending(): PendingSubmission | null {
+  return loadPendingSubmission();
+}
+
 export function PhotosScreen({ onJobStarted, onBack }: PhotosScreenProps) {
-  const [photos, setPhotos] = useState<PhotoReference[]>([]);
+  const resumed = useRef(restoredFromPending()).current;
+
+  const [photos, setPhotos] = useState<PhotoReference[]>(resumed?.photos ?? []);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const [capabilities, setCapabilities] = useState<ProviderCapabilityDescriptor[] | null>(null);
   const [capabilitiesError, setCapabilitiesError] = useState<string | null>(null);
-  const [selectedCapabilityId, setSelectedCapabilityId] = useState<string | null>(null);
+  const [selectedCapabilityId, setSelectedCapabilityId] = useState<string | null>(
+    resumed?.capability ?? null,
+  );
 
-  const [includedPhotoIds, setIncludedPhotoIds] = useState<Set<string>>(new Set());
-  const [slotAssignments, setSlotAssignments] = useState<Record<string, string>>({});
+  const restoredSelection = resumed ? deriveSelectionFromInputPhotos(resumed.inputPhotos) : null;
+  const [includedPhotoIds, setIncludedPhotoIds] = useState<Set<string>>(
+    restoredSelection?.includedPhotoIds ?? new Set(),
+  );
+  const [slotAssignments, setSlotAssignments] = useState<Record<string, string>>(
+    restoredSelection?.slotAssignments ?? {},
+  );
 
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [resuming, setResuming] = useState(!!resumed);
 
-  const idempotencyKeyRef = useRef(newIdempotencyKey());
+  const idempotencyKeyRef = useRef(resumed?.idempotencyKey ?? newIdempotencyKey());
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const autoResumeAttempted = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,7 +68,7 @@ export function PhotosScreen({ onJobStarted, onBack }: PhotosScreenProps) {
       .then((list) => {
         if (cancelled) return;
         setCapabilities(list);
-        if (list.length > 0) {
+        if (!resumed && list.length > 0) {
           const first = list[0];
           if (first) setSelectedCapabilityId(first.id);
         }
@@ -57,6 +80,8 @@ export function PhotosScreen({ onJobStarted, onBack }: PhotosScreenProps) {
     return () => {
       cancelled = true;
     };
+    // Only ever runs once — `resumed` is a ref snapshot from mount time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const selectedCapability = useMemo(
@@ -110,86 +135,55 @@ export function PhotosScreen({ onJobStarted, onBack }: PhotosScreenProps) {
 
   const usesViewSlots = !!selectedCapability?.requiredViewOrder?.length;
 
-  const { inputPhotos, validationError } = useMemo<{
-    inputPhotos: ProviderInputPhoto[];
-    validationError: string | null;
-  }>(() => {
-    if (!selectedCapability) {
-      return { inputPhotos: [], validationError: "Select a generation model first." };
-    }
-    const photoById = new Map(photos.map((p) => [p.id, p] as const));
-
-    if (usesViewSlots) {
-      const order = selectedCapability.requiredViewOrder!;
-      const filled: ProviderInputPhoto[] = [];
-      let sawGap = false;
-      for (const slot of order) {
-        const photoId = slotAssignments[slot];
-        if (!photoId) {
-          sawGap = true;
-          continue;
-        }
-        if (sawGap) {
-          return {
-            inputPhotos: [],
-            validationError: `Fill views in order (${order.join(" → ")}) starting from the first — no gaps.`,
-          };
-        }
-        const photo = photoById.get(photoId);
-        if (!photo) continue;
-        filled.push({ photoId: photo.id, sourceIndex: photo.order, viewSlot: slot });
-      }
-      if (filled.length < selectedCapability.minPhotos) {
-        return {
-          inputPhotos: [],
-          validationError: `${selectedCapability.displayName} needs at least ${selectedCapability.minPhotos} view${selectedCapability.minPhotos === 1 ? "" : "s"} assigned.`,
-        };
-      }
-      if (filled.length > selectedCapability.maxPhotos) {
-        return {
-          inputPhotos: [],
-          validationError: `${selectedCapability.displayName} accepts at most ${selectedCapability.maxPhotos} views.`,
-        };
-      }
-      return { inputPhotos: filled, validationError: null };
-    }
-
-    const included = photos
-      .filter((p) => includedPhotoIds.has(p.id))
-      .sort((a, b) => a.order - b.order)
-      .map((p): ProviderInputPhoto => ({ photoId: p.id, sourceIndex: p.order }));
-
-    if (included.length < selectedCapability.minPhotos) {
-      return {
-        inputPhotos: [],
-        validationError: `${selectedCapability.displayName} needs at least ${selectedCapability.minPhotos} photo${selectedCapability.minPhotos === 1 ? "" : "s"} selected.`,
-      };
-    }
-    if (included.length > selectedCapability.maxPhotos) {
-      return {
-        inputPhotos: [],
-        validationError: `${selectedCapability.displayName} accepts at most ${selectedCapability.maxPhotos} photos — deselect some.`,
-      };
-    }
-    return { inputPhotos: included, validationError: null };
-  }, [selectedCapability, usesViewSlots, slotAssignments, includedPhotoIds, photos]);
+  const { inputPhotos, validationError } = useMemo(
+    () => buildProviderInputPhotos(selectedCapability, photos, includedPhotoIds, slotAssignments),
+    [selectedCapability, slotAssignments, includedPhotoIds, photos],
+  );
 
   async function handleSubmit() {
     if (!selectedCapability || validationError) return;
     setSubmitting(true);
     setSubmitError(null);
+
+    // Persist BEFORE the network call: if the response never arrives
+    // (timeout/reload/tab close), the server may already have accepted
+    // this request. A reload must retry with this exact key and these
+    // exact already-uploaded photo refs, never re-upload and mint new ids.
+    savePendingSubmission({
+      idempotencyKey: idempotencyKeyRef.current,
+      capability: selectedCapability.id,
+      inputPhotos,
+      photos,
+    });
+
     try {
       const job = await submitJob(
         { capability: selectedCapability.id, photos: inputPhotos, idempotencyKey: idempotencyKeyRef.current },
         idempotencyKeyRef.current,
       );
+      // Durable job id confirmed — the pending submission phase is over.
+      clearPendingSubmission();
+      saveActiveJob({ jobId: job.id, photos });
       onJobStarted(job.id);
     } catch (error) {
+      // Leave the pending submission in place: this attempt is still
+      // reconcilable under the same key on retry or after a reload.
       setSubmitError(describeApiError(error));
     } finally {
       setSubmitting(false);
+      setResuming(false);
     }
   }
+
+  useEffect(() => {
+    if (!resumed || autoResumeAttempted.current) return;
+    if (!selectedCapability || validationError) return;
+    autoResumeAttempted.current = true;
+    handleSubmit();
+    // handleSubmit closes over current state; only fire once selection is
+    // valid again after restoring it from the pending submission.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumed, selectedCapability, validationError]);
 
   return (
     <div className="oq-screen oq-screen--photos">
@@ -203,6 +197,15 @@ export function PhotosScreen({ onJobStarted, onBack }: PhotosScreenProps) {
           generate a 3D level.
         </p>
       </header>
+
+      {resuming ? (
+        <div className="oq-panel">
+          <p className="oq-warning-text">
+            Resuming a submission that didn't finish confirming last time — retrying now without
+            re-uploading your photos.
+          </p>
+        </div>
+      ) : null}
 
       <section className="oq-panel">
         <div className="oq-upload-row">

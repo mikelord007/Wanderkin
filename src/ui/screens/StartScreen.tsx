@@ -4,6 +4,7 @@ import { describeApiError, importAsset, listLevels } from "../api.js";
 
 interface StartScreenProps {
   onPlaySample: (manifest: SceneManifest) => void;
+  onEditSample: (manifest: SceneManifest) => void;
   onPlaySavedLevel: (manifest: SceneManifest) => void;
   onEditSavedLevel: (manifest: SceneManifest) => void;
   onCreateFromPhotos: () => void;
@@ -12,6 +13,7 @@ interface StartScreenProps {
 
 export function StartScreen({
   onPlaySample,
+  onEditSample,
   onPlaySavedLevel,
   onEditSavedLevel,
   onCreateFromPhotos,
@@ -90,13 +92,22 @@ export function StartScreen({
                 <p className="oq-level-card__meta">
                   {manifest.checkpoints.length} checkpoint{manifest.checkpoints.length === 1 ? "" : "s"}
                 </p>
-                <button
-                  type="button"
-                  className="oq-button oq-button--primary"
-                  onClick={() => onPlaySample(manifest)}
-                >
-                  Play now
-                </button>
+                <div className="oq-actions">
+                  <button
+                    type="button"
+                    className="oq-button oq-button--primary"
+                    onClick={() => onPlaySample(manifest)}
+                  >
+                    Play now
+                  </button>
+                  <button
+                    type="button"
+                    className="oq-button oq-button--secondary"
+                    onClick={() => onEditSample(manifest)}
+                  >
+                    Edit
+                  </button>
+                </div>
               </article>
             ))}
           </div>
