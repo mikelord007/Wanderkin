@@ -6,21 +6,21 @@ course has been completed in a browser.
 
 ## Current verification status (2026-09-18)
 
-- `npm test`: **245 passed** across 26 unit/headless test files on the
+- `npm test`: **253 passed** across 29 unit/headless test files on the
   integrated scene/editor/game/server revision.
-- `npm run test:e2e:http`: **23 passed** across 4 HTTP integration files.
+- `npm run test:e2e:http`: **24 passed** across 5 HTTP integration files.
 - `npm run typecheck`: **passed**.
 - `npm run build`: **passed**; Vite emitted the client and TypeScript
   emitted the server. Vite reports a non-fatal large-chunk warning.
-- `npm run test:e2e:browser`: **5 passed** in real headless Chrome. Both
-  sample courses reached the visible finish screen and replayed using held
-  keyboard controls, mouse camera movement, and read-only diagnostics.
+- `npm run test:e2e:browser` with `OBJECTQUEST_GENERATED_GLB_PATH` set to the
+  accepted local artifact: **6 passed** in real headless Chrome. Both sample
+  courses reached the visible finish screen and replayed using held keyboard
+  controls, mouse camera movement, and read-only diagnostics.
 - Real Livepeer generation: **not run by QA**. The HTTP suite points only
   at a local fake MCP endpoint and cannot spend provider allowance.
-- Targeted candidate checks passed against `origin/main` at `25f7260` before
-  QA integration: a full server with relative `STORAGE_DIR` served uploaded
-  photo/GLB bytes, and the existing real Rodin result from provider job
-  `mjob_cfb2286bf2b5` completed isolated preparation/editor/save acceptance.
+- A full server with relative `STORAGE_DIR` served uploaded photo/GLB bytes,
+  and the existing real Rodin result from provider job `mjob_cfb2286bf2b5`
+  completed isolated preparation/editor/save acceptance.
 
 ## Automated commands
 
@@ -45,6 +45,16 @@ npm run test:e2e:http
 Run real-browser gameplay and UI acceptance:
 
 ```sh
+npm run test:e2e:browser
+```
+
+That default command runs the five repository-contained cases and reports the
+generated-artifact case as skipped, not passed. To run all six without a new
+generation request, point the optional environment variable at an existing
+local GLB first. The accepted Windows run used:
+
+```powershell
+$env:OBJECTQUEST_GENERATED_GLB_PATH = "C:/Users/manuj/code_barely_runs/Objectquest/storage/assets/71d05f8c75bec0a46b5225640e94cdf5f2ac252fb49b81d8183f98eefba65c42.glb"
 npm run test:e2e:browser
 ```
 
@@ -74,6 +84,8 @@ Current route coverage includes:
   size, empty uploads, and mixed valid/invalid batches.
 - Imported Rodin and Tripo GLBs, SHA-256 content addressing, deduplication,
   byte-identical durable URLs, GLB header validation, and path rejection.
+- Relative `STORAGE_DIR` startup through the actual server process, followed
+  by byte-identical photo and GLB downloads from the returned durable URLs.
 - Live capability filtering and a safe 503 when no capability can be
   confirmed by the fake provider.
 - Concurrent same-key job submissions: both callers receive the same job

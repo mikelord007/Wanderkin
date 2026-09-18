@@ -159,8 +159,8 @@ write must not mutate the in-memory snapshot.
 
 `env.storageDir` is required to be an absolute path before constructing these
 stores because Express `sendFile` rejects relative filenames. The minimal fix
-is committed as `fee23ab` and remains pending main integration at the time of
-this document refresh.
+originated as `fee23ab` and is integrated on main as `c445875`, with a
+full-server relative-`STORAGE_DIR` regression test.
 
 ## Server API (owner: Livepeer integration for provider/job routes; Level
 tools for persistence routes)
@@ -215,6 +215,7 @@ fresh IDs/URLs, and never overwrite an existing level.
 - The viewport/root layout and oversized-request response defects are fixed.
   Precise automated counts, browser evidence, and caveats are maintained in
   `docs/QA.md` rather than duplicated here.
-- Portable import/export controls are implemented on main at `ac4bae8`; their
-  final browser round-trip remains pending and must not be inferred from route
-  or unit tests.
+- Portable import/export controls completed a real Chrome
+  save/download/import/reload round trip against isolated storage. The existing
+  real Rodin GLB also completed preparation, stable candidate switching,
+  editor save, and reload without a new provider submission.

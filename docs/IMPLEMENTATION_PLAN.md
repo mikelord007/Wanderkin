@@ -41,19 +41,19 @@ triangle colliders use the same geometry and entity transform.
 | --- | --- | --- |
 | A. Shared foundation | Complete | Scaffold, contracts, dependencies, sample assets, API shell, and private GitHub repository are established. |
 | B. Playable existing assets | Browser-accepted | Both GLBs normalize to authored five-checkpoint manifests, use real triangle collision, added floors/helpers, and the same game runtime. Both courses were completed to the visible finish screen and replayed in real Chromium. The earlier viewport/root layout defect is fixed. |
-| C. Photos to saved playable level | Implemented; final portable-UI acceptance open | Uploads, live capability discovery, durable idempotent jobs, stored provenance/assets, scene preparation, editor/drafts, saved levels, and portable bundle UI exist. A bounded real Rodin job succeeded and its local GLB hash was verified. Generic course output remains explicitly uncertain and editable. Portable UI landed on main at `ac4bae8`, but its final browser round-trip still belongs to QA. |
-| D. Verification and handoff | Final integration/QA | Typecheck, production build, unit/headless, HTTP, and real-Chromium gameplay evidence are green; exact counts and caveats live in `docs/QA.md`. The oversized-request behavior is fixed. Remaining work is the portable UI browser check, final QA synthesis, deployment handoff, and integration of the relative-storage fix `fee23ab`. |
+| C. Photos to saved playable level | Implemented; artifact workflow browser-accepted | Uploads, live capability discovery, durable idempotent jobs, stored provenance/assets, scene preparation, stable course candidates, editor/drafts, saved levels, and portable bundles are integrated. A bounded real Rodin job succeeded and its verified local GLB completed isolated preparation, candidate switching, save, and reload. Portable export/import completed a real Chrome download/import/reload round trip. Generic course output remains explicitly uncertain and editable. |
+| D. Verification and handoff | Complete | Typecheck, production build, 253 unit/headless tests, 24 full-server HTTP tests, and six real-Chrome cases passed on the integrated revision. Oversized-request and relative-storage serving regressions are covered. Deployment topology and remaining product limits are documented in `docs/DEPLOYMENT.md` and `docs/QA.md`. |
 
 ## Active workstreams
 
 | Workstream | Current owner/model | State |
 | --- | --- | --- |
-| Scene loading/preparation and bundled levels | Scene Sol | Integrated; final owned documentation refresh |
-| Player/runtime/browser layout | Game Sol | Shared loader and viewport fix integrated; both sample courses browser-completed/replayed |
-| Editor, level persistence, portable bundles | Editor Sol | Portable UI integrated at `ac4bae8`; owns main and final browser round-trip acceptance |
-| Stored-file path quick fix | Scene Sol | `fee23ab` committed/pushed; awaiting editor-owned main integration |
-| Independent QA and root dependencies | QA Sol | Owns precise test counts, browser evidence, deployment documentation, and final report |
-| Coordination and main ownership | Astra lead | Sol is the default worker model; integration order remains explicit |
+| Scene loading/preparation and bundled levels | Scene Sol | Complete and integrated |
+| Player/runtime/browser layout | Game Sol | Complete; both sample courses browser-completed and replayed |
+| Editor, level persistence, portable bundles | Editor Sol | Complete; candidate switching, save, and portable round trip accepted |
+| Stored-file path resolution | Scene/Editor Sol | Integrated as `c445875`; full-server relative-storage regression passes |
+| Independent QA and root dependencies | QA Sol | Complete; exact evidence is recorded in `docs/QA.md` |
+| Coordination and main ownership | Astra lead | Handoff ready; Sol remains the default worker model |
 
 ## Bounded real generation evidence
 
@@ -75,7 +75,7 @@ controller. That evidence is limited to the authored samples: automatically
 prepared courses still carry validation evidence and uncertainty notes and may
 need manual editing. Results must continue to distinguish fixture-backed MCP
 tests from the one bounded real provider call above. Exact verification counts
-and the remaining portable-UI browser check belong in `docs/QA.md`.
+and all final browser evidence belong in `docs/QA.md`.
 
 ## Deployment boundary
 

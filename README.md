@@ -41,6 +41,9 @@ prepare its course, edit the manifest, save it, and play.
 
 - `npm run typecheck` — strict client and server TypeScript checks
 - `npm test` — Vitest suites
+- `npm run test:e2e:http` — isolated full-server HTTP integration tests
+- `npm run test:e2e:browser` — five repository-contained Chrome acceptance
+  cases; the optional generated-artifact case is skipped unless its path is set
 - `npm run build` — typecheck, production client bundle, and server compile
 - `npx tsx src/scene/tools/verify-samples.ts` — conservative real-GLB route
   validation for both bundled courses
@@ -50,6 +53,11 @@ UI in Chromium. The acceptance run used normal keyboard/mouse controls and
 read-only diagnostics rather than teleporting or mutating checkpoints. See
 [`docs/QA.md`](docs/QA.md) for the exact automated counts, browser protocol,
 and remaining manual caveats.
+
+To include the already-generated Rodin artifact in browser acceptance without
+submitting another generation job, set `OBJECTQUEST_GENERATED_GLB_PATH` to its
+local `.glb` path before running `npm run test:e2e:browser`. The final accepted
+run used the 5,029,388-byte artifact identified below and passed all six cases.
 
 A single bounded real Rodin generation also succeeded. The first submission
 failed because its seed was invalid; that input was corrected before the
@@ -66,9 +74,10 @@ not return a direct `served_model_id`.
 - The authored Rodin and Tripo samples are browser-completed, but that does not
   prove an arbitrary generated course is reachable. Generic preparation uses a
   conservative validator, reports uncertainty, and may require creator edits.
-- Portable level export/import controls are implemented. Their final browser
-  round-trip acceptance remains open; follow the current QA report rather than
-  treating route or unit coverage as a browser pass.
+- Portable level export/import completed a real Chrome
+  save/download/import/reload round trip against an isolated API. The existing
+  real Rodin result also completed preparation, candidate switching, editor
+  save, and reload without another provider call.
 - Local storage under `STORAGE_DIR` is durable for one server installation;
   localhost asset URLs are not public sharing links.
 - Desktop keyboard, mouse, and pointer lock are supported; mobile/touch and
