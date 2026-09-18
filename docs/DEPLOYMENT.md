@@ -23,17 +23,15 @@ credentials. `LIVEPEER_API_KEY` is optional and must never be exposed as a
 
 ## Current production readiness
 
-There is not yet a complete single-process production deployment:
+The production build now succeeds, but there is not yet a complete
+single-process production deployment:
 
-1. On the current branch, `npm run typecheck` fails because
-   `src/scene/index.ts` and `src/scene/samples.ts` have not been integrated.
-   Consequently `npm run build` does not finish.
-2. Once those modules land, the build is designed to emit the Vite client
-   to `dist/` and the Node API entry point to
+1. `npm run typecheck` and `npm run build` pass. The build emits the Vite
+   client to `dist/` and the Node API entry point to
    `dist-server/server/index.js`.
-3. The Node API currently registers only API routes. It does not call
+2. The Node API currently registers only API routes. It does not call
    `express.static`, serve `dist/index.html`, or provide an SPA fallback.
-4. There is no production `start` script. `npm run preview` is only the
+3. There is no production `start` script. `npm run preview` is only the
    Vite frontend preview and is not a complete frontend-plus-API runtime.
 
 Do not describe `node dist-server/server/index.js` by itself as a deployed

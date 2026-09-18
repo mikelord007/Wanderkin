@@ -6,16 +6,17 @@ course has been completed in a browser.
 
 ## Current verification status (2026-09-18)
 
-- `npm test`: **221 passed** across 22 unit/headless test files.
+- `npm test`: **225 passed** across 24 unit/headless test files after the
+  scene runtime and bundled manifests were integrated.
 - `npm run test:e2e:http`: **23 completed** across 4 HTTP integration files.
   One of the 23 is an explicit expected-failure regression for the upload
   limit bug below; therefore this is not 23 clean acceptance checks.
-- `npm run typecheck`: **blocked** only by the not-yet-integrated scene
-  preparation exports: `src/scene/index.js` and `src/scene/samples.js`.
-- Production build: **not complete**, because `npm run build` starts with
-  the failing typecheck above.
-- Real browser play-through: **not run yet**. Neither sample course has
-  been claimed complete through real keyboard/mouse input.
+- `npm run typecheck`: **passed**.
+- `npm run build`: **passed**; Vite emitted the client and TypeScript
+  emitted the server. Vite reports a non-fatal large-chunk warning.
+- `npm run test:e2e:browser`: **4 passed** in real headless Chrome. Both
+  sample courses reached the visible finish screen and replayed using held
+  keyboard controls, mouse camera movement, and read-only diagnostics.
 - Real Livepeer generation: **not run by QA**. The HTTP suite points only
   at a local fake MCP endpoint and cannot spend provider allowance.
 
@@ -37,6 +38,12 @@ Run the HTTP route integration suite:
 
 ```sh
 npm run test:e2e:http
+```
+
+Run real-browser gameplay and UI acceptance:
+
+```sh
+npm run test:e2e:browser
 ```
 
 Run static and production checks after scene integration:
@@ -90,7 +97,46 @@ regression is marked `it.fails`; this keeps the desired behavior visible
 without treating the current 500 as correct. Remove that marker when the
 server-owned fix lands.
 
-## Real-browser acceptance protocol
+## Real-browser acceptance evidence
+
+The Playwright suite launches the real Vite application on port 5174 using
+the installed Chrome channel. API-dependent UI tests start the actual
+`server/index.ts` on an assigned port with isolated temporary storage and
+forward browser `/api` traffic there. That API points only to the local fake
+MCP endpoint.
+
+Verified in-browser:
+
+- Rodin: pointer lock, mouse yaw, ordered checkpoints, visible pause and
+  resume, `R` respawn, measured jump, out-of-bounds fall/automatic respawn,
+  contextual mantle onto elevated furniture, finish screen, and replay to
+  zero checkpoints.
+- Tripo: the same gameplay code and controls, including jump, pause/resume,
+  contextual mantle onto the elevated course, finish, and replay.
+- Photo lightbox: two real sample JPEGs uploaded to the isolated local API;
+  `ArrowRight`, `ArrowLeft`, and `Escape` changed/closed the dialog.
+- Editor: scale, spawn X, checkpoint trigger radius, and helper width were
+  changed, saved through the real isolated API, then verified after a page
+  reload and reopening the saved level.
+
+No teleport, checkpoint mutation, completion callback, or game-state write
+is present in the suite. `window.__objectquest.get()` is read only and is
+used for steering and assertions. The final checkpoint naturally unmounts
+GameView and displays the finish screen.
+
+One automation-specific caveat remains: synthetic `Escape` reaches the app
+and visibly pauses it, but Chromium automation does not perform the browser
+chrome's native pointer-lock release. The test explicitly releases only the
+browser pointer lock before clicking the real Resume button; it does not
+change game state. Physical-Escape pointer-lock release remains a manual
+check and is not claimed by automation.
+
+Portable export/import is **not browser-accepted** because the current UI
+has no export or bundle-import control. Server routes and unit coverage
+exist, but using those routes directly would not prove the missing browser
+workflow. This is a product integration blocker, not a QA pass.
+
+## Manual browser protocol
 
 Run this only from a fully integrated branch where typecheck/build pass and
 the sample manifests are available. Use a separate browser profile/session
@@ -138,8 +184,7 @@ Additional browser checks:
 - Export the saved level, import it as a new level, and verify the remapped
   asset/photo URLs load before playing it.
 
-Browser acceptance remains blocked until scene integration lands. Portable
-export/import browser acceptance also requires a UI trigger; the current
-editor documentation records server routes but no client control. Record
-these as blockers, not passes, if they are still absent at execution time.
+The automated evidence above covers the gameplay path. A final manual pass
+should still confirm physical-Escape pointer-lock release and visual feel.
+Portable export/import remains blocked until a client control is integrated.
 
