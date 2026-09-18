@@ -64,9 +64,10 @@ export class McpClient {
 
   /**
    * Calls one MCP tool and returns its `structuredContent` (falling back to
-   * the raw `content` text block when a tool has no structured output).
-   * Throws `McpToolError` for a tool-level error/`isError` result, or
-   * `McpTransportError` for a network/HTTP/timeout failure.
+   * the raw `content` text block, JSON-parsed when possible, when a tool has
+   * no structured output). Throws `McpToolError` for a tool-level
+   * error/`isError` result, or `McpTransportError` for a network/HTTP/
+   * timeout failure.
    */
   async callTool<T = Record<string, unknown>>(
     name: string,
@@ -81,85 +82,147 @@ export class McpClient {
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     const id = `objectquest-${Date.now()}-${++requestCounter}`;
 
-    let response: Response;
+    // The abort timer stays armed for the whole call, including body
+    // decode — a slow/stalled response body must time out too, not just
+    // the initial fetch() header round-trip.
     try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-        Accept: "application/json, text/event-stream",
-      };
-      if (this.apiKey) {
-        headers.Authorization = `Bearer ${this.apiKey}`;
+      let response: Response;
+      try {
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+          Accept: "application/json, text/event-stream",
+        };
+        if (this.apiKey) {
+          headers.Authorization = `Bearer ${this.apiKey}`;
+        }
+        response = await fetch(this.endpoint, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id,
+            method: "tools/call",
+            params: { name, arguments: args },
+          }),
+          signal: controller.signal,
+        });
+      } catch (err) {
+        if (controller.signal.aborted) {
+          throw new McpTransportError(
+            `MCP call to "${name}" timed out after ${timeoutMs}ms (provider may still complete the job)`,
+            err,
+          );
+        }
+        throw new McpTransportError(`MCP call to "${name}" failed: ${(err as Error).message}`, err);
       }
-      response = await fetch(this.endpoint, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id,
-          method: "tools/call",
-          params: { name, arguments: args },
-        }),
-        signal: controller.signal,
-      });
-    } catch (err) {
-      if (controller.signal.aborted) {
+
+      if (!response.ok) {
+        const bodyText = await this.readBodyText(response, controller, timeoutMs, name);
         throw new McpTransportError(
-          `MCP call to "${name}" timed out after ${timeoutMs}ms (provider may still complete the job)`,
-          err,
+          `MCP endpoint returned HTTP ${response.status} for "${name}": ${bodyText.slice(0, 500)}`,
         );
       }
-      throw new McpTransportError(`MCP call to "${name}" failed: ${(err as Error).message}`, err);
+
+      const bodyText = await this.readBodyText(response, controller, timeoutMs, name);
+      const contentType = response.headers.get("content-type") ?? "";
+      const payload = contentType.includes("text/event-stream")
+        ? parseSseJsonRpc(bodyText, name)
+        : parseJson(bodyText, name);
+
+      const envelope = payload as {
+        error?: { message?: string; code?: number };
+        result?: {
+          isError?: boolean;
+          structuredContent?: unknown;
+          content?: Array<{ type: string; text?: string }>;
+        };
+      };
+
+      if (envelope.error) {
+        throw new McpToolError(
+          envelope.error.message ?? `MCP JSON-RPC error calling "${name}"`,
+          name,
+          false,
+          envelope.error,
+        );
+      }
+
+      const result = envelope.result;
+      if (!result) {
+        throw new McpTransportError(`MCP response for "${name}" had no result`);
+      }
+      if (result.isError) {
+        const text = result.content?.find((c) => c.type === "text")?.text;
+        throw new McpToolError(text ?? `Tool "${name}" reported an error`, name, false, result);
+      }
+
+      if (result.structuredContent !== undefined) {
+        return result.structuredContent as T;
+      }
+      const text = result.content?.find((c) => c.type === "text")?.text;
+      if (text === undefined) return {} as T;
+      try {
+        return JSON.parse(text) as T;
+      } catch {
+        return text as unknown as T;
+      }
     } finally {
       clearTimeout(timer);
     }
-
-    if (!response.ok) {
-      const bodyText = await response.text().catch(() => "");
-      throw new McpTransportError(
-        `MCP endpoint returned HTTP ${response.status} for "${name}": ${bodyText.slice(0, 500)}`,
-      );
-    }
-
-    let payload: unknown;
-    try {
-      payload = await response.json();
-    } catch (err) {
-      throw new McpTransportError(`MCP response for "${name}" was not valid JSON`, err);
-    }
-
-    const envelope = payload as {
-      error?: { message?: string; code?: number };
-      result?: {
-        isError?: boolean;
-        structuredContent?: unknown;
-        content?: Array<{ type: string; text?: string }>;
-      };
-    };
-
-    if (envelope.error) {
-      throw new McpToolError(
-        envelope.error.message ?? `MCP JSON-RPC error calling "${name}"`,
-        name,
-        false,
-        envelope.error,
-      );
-    }
-
-    const result = envelope.result;
-    if (!result) {
-      throw new McpTransportError(`MCP response for "${name}" had no result`);
-    }
-    if (result.isError) {
-      const text = result.content?.find((c) => c.type === "text")?.text;
-      throw new McpToolError(text ?? `Tool "${name}" reported an error`, name, false, result);
-    }
-
-    if (result.structuredContent !== undefined) {
-      return result.structuredContent as T;
-    }
-    const text = result.content?.find((c) => c.type === "text")?.text;
-    return (text as unknown as T) ?? ({} as T);
   }
+
+  private async readBodyText(
+    response: Response,
+    controller: AbortController,
+    timeoutMs: number,
+    name: string,
+  ): Promise<string> {
+    try {
+      return await response.text();
+    } catch (err) {
+      if (controller.signal.aborted) {
+        throw new McpTransportError(
+          `MCP response body for "${name}" timed out after ${timeoutMs}ms (provider may still complete the job)`,
+          err,
+        );
+      }
+      throw new McpTransportError(`Failed to read MCP response body for "${name}": ${(err as Error).message}`, err);
+    }
+  }
+}
+
+function parseJson(text: string, toolName: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    throw new McpTransportError(`MCP response for "${toolName}" was not valid JSON`, err);
+  }
+}
+
+/** Parses an `Accept: text/event-stream` response's `data:` frames as
+ * JSON-RPC. Multiple `data:` lines in one event are joined per the SSE
+ * spec; the last event that parses as JSON wins (keepalive/comment frames
+ * earlier in the stream are ignored). */
+function parseSseJsonRpc(text: string, toolName: string): unknown {
+  const events = text
+    .split(/\r?\n\r?\n+/)
+    .map((block) =>
+      block
+        .split(/\r?\n/)
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice("data:".length).trimStart())
+        .join("\n"),
+    )
+    .filter((data) => data.length > 0);
+
+  for (let i = events.length - 1; i >= 0; i--) {
+    try {
+      return JSON.parse(events[i] as string);
+    } catch {
+      continue;
+    }
+  }
+  throw new McpTransportError(`MCP SSE response for "${toolName}" had no parseable JSON-RPC event`);
 }
 
 export const mcpClient = new McpClient();

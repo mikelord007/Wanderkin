@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type { ProviderAdapter } from "../../shared/provider.js";
+import { logServerError } from "../util/sanitize.js";
 
 export function createCapabilitiesRouter(adapter: ProviderAdapter): Router {
   const router = Router();
@@ -9,7 +10,8 @@ export function createCapabilitiesRouter(adapter: ProviderAdapter): Router {
       const descriptors = await adapter.discoverCapabilities();
       res.json(descriptors);
     } catch (err) {
-      res.status(502).json({ error: "Failed to discover provider capabilities", detail: (err as Error).message });
+      logServerError("GET /api/capabilities", err);
+      res.status(502).json({ message: "Could not reach the model provider right now. Please try again." });
     }
   });
 

@@ -28,7 +28,7 @@ const photoStore = new PhotoStore(env.storageDir);
 const assetStore = new AssetStore(env.storageDir);
 const adapter = new LivepeerAdapter(mcpClient, photoStore);
 const jobStore = new JobStore(env.storageDir);
-const jobManager = new JobManager(jobStore, adapter, assetStore);
+const jobManager = new JobManager(jobStore, adapter, assetStore, photoStore);
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
