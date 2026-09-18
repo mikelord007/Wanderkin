@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import type { PhotoStore } from "../persistence/photoStore.js";
 import { InvalidFileError, MAX_PHOTO_BYTES } from "../persistence/validate.js";
+import { logServerError } from "../util/sanitize.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -14,7 +15,7 @@ export function createUploadsRouter(photos: PhotoStore): Router {
   router.post("/api/uploads", upload.array("photos", 10), async (req, res) => {
     const files = (req.files as Express.Multer.File[] | undefined) ?? [];
     if (files.length === 0) {
-      res.status(400).json({ error: 'No photos received (expected multipart field "photos")' });
+      res.status(400).json({ message: 'No photos received (expected multipart field "photos")' });
       return;
     }
     try {
@@ -24,10 +25,11 @@ export function createUploadsRouter(photos: PhotoStore): Router {
       res.status(201).json(references);
     } catch (err) {
       if (err instanceof InvalidFileError) {
-        res.status(400).json({ error: err.message });
+        res.status(400).json({ message: err.message });
         return;
       }
-      res.status(500).json({ error: "Failed to store uploaded photos", detail: (err as Error).message });
+      logServerError("POST /api/uploads", err);
+      res.status(500).json({ message: "Failed to store the uploaded photos. Please try again." });
     }
   });
 

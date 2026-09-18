@@ -3,6 +3,7 @@ import { Router } from "express";
 import multer from "multer";
 import type { AssetStore } from "../persistence/assetStore.js";
 import { InvalidFileError, MAX_GLB_BYTES } from "../persistence/validate.js";
+import { logServerError } from "../util/sanitize.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -15,7 +16,7 @@ export function createAssetsRouter(assets: AssetStore): Router {
   router.get("/api/assets/:id", async (req, res) => {
     const asset = await assets.get(req.params.id as string);
     if (!asset) {
-      res.status(404).json({ error: "Asset not found" });
+      res.status(404).json({ message: "Asset not found" });
       return;
     }
     res.json(asset);
@@ -24,18 +25,21 @@ export function createAssetsRouter(assets: AssetStore): Router {
   router.post("/api/assets/import", upload.single("file"), async (req, res) => {
     const file = req.file;
     if (!file) {
-      res.status(400).json({ error: 'No file received (expected multipart field "file")' });
+      res.status(400).json({ message: 'No file received (expected multipart field "file")' });
       return;
     }
     try {
+      // Hand-imported assets carry no provenance and no source photos —
+      // they never went through generation.
       const asset = await assets.store(file.buffer);
       res.status(201).json(asset);
     } catch (err) {
       if (err instanceof InvalidFileError) {
-        res.status(400).json({ error: err.message });
+        res.status(400).json({ message: err.message });
         return;
       }
-      res.status(500).json({ error: "Failed to import asset", detail: (err as Error).message });
+      logServerError("POST /api/assets/import", err);
+      res.status(500).json({ message: "Failed to import the asset. Please try again." });
     }
   });
 

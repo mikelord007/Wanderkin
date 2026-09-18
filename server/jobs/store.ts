@@ -2,6 +2,7 @@ import { join } from "node:path";
 import type { GenerationJob } from "../../shared/job.js";
 import type { ProviderInputPhoto } from "../../shared/provider.js";
 import { JsonFileStore } from "../persistence/jsonStore.js";
+import { sanitizeMessage } from "../util/sanitize.js";
 
 /** Server-only bookkeeping kept out of the shared `GenerationJob` shape —
  * poll scheduling, raw provider diagnostics, and the original submit request
@@ -51,7 +52,14 @@ export class JobStore {
   }
 }
 
-/** Strips server-only fields before a job crosses the API boundary. */
+/** Strips server-only fields and sanitizes `lastError.message` (redacting
+ * URLs, capping length) before a job crosses the API boundary — raw
+ * provider error text/URLs must never reach client JSON. Applied here (the
+ * single read-boundary function every public return goes through) as
+ * defense in depth even though `toJobError`/callers should already sanitize
+ * at write time. */
 export function toPublicJob(record: JobRecord): GenerationJob {
-  return record.job;
+  const { job } = record;
+  if (!job.lastError) return job;
+  return { ...job, lastError: { ...job.lastError, message: sanitizeMessage(job.lastError.message) } };
 }
