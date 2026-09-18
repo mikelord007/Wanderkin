@@ -1,7 +1,8 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import type { SceneManifest } from "@shared/index.js";
+import type { PhotoReference, SceneManifest } from "@shared/index.js";
 import { describeApiError, getAsset } from "../api.js";
 import { LoadingScreen } from "../components/LoadingScreen.js";
+import { attachProvenance, withRetryBust } from "../manifestProvenance.js";
 
 /**
  * Scene preparation owns `src/scene`; this screen assumes a barrel export
@@ -16,7 +17,7 @@ const LevelEditor = lazy(() =>
 );
 
 export type PreparationSource =
-  | { kind: "asset"; assetId: string }
+  | { kind: "asset"; assetId: string; sourcePhotos?: PhotoReference[] }
   | { kind: "manifest"; manifest: SceneManifest };
 
 interface PreparationScreenProps {
@@ -40,24 +41,28 @@ export function PreparationScreen({ source, onPlay, onSave, onBack }: Preparatio
   const [candidates, setCandidates] = useState<SceneManifest[]>([]);
   const [stage, setStage] = useState<string>("Preparing…");
   const [error, setError] = useState<string | null>(null);
+  const [retryAttempt, setRetryAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (source.kind === "manifest") return;
     let cancelled = false;
+    const { assetId, sourcePhotos } = source;
 
     async function run() {
       try {
+        setError(null);
         setStage("Locating the generated asset…");
-        const asset = await getAsset((source as { kind: "asset"; assetId: string }).assetId);
+        const asset = await getAsset(assetId);
         if (cancelled) return;
 
         const { prepareAsset } = await scenePreparationModule();
         if (cancelled) return;
 
+        const loadUrl = withRetryBust(asset.url, retryAttempt);
         const result = await prepareAsset(
-          asset.url,
+          loadUrl,
           {},
           (nextStage: "downloading" | "decoding" | "analyzing" | "validating") => {
             if (!cancelled) setStage(STAGE_TEXT[nextStage]);
@@ -65,8 +70,12 @@ export function PreparationScreen({ source, onPlay, onSave, onBack }: Preparatio
         );
         if (cancelled) return;
 
-        setManifest(result.manifest);
-        setCandidates(result.courseCandidates ?? []);
+        setManifest(attachProvenance(result.manifest, asset, sourcePhotos));
+        setCandidates(
+          (result.courseCandidates ?? []).map((candidate: SceneManifest) =>
+            attachProvenance(candidate, asset, sourcePhotos),
+          ),
+        );
       } catch (err) {
         if (!cancelled) setError(describeApiError(err));
       }
@@ -76,7 +85,7 @@ export function PreparationScreen({ source, onPlay, onSave, onBack }: Preparatio
     return () => {
       cancelled = true;
     };
-  }, [source]);
+  }, [source, retryAttempt]);
 
   const candidateOptions = useMemo(() => {
     if (!manifest) return [];
@@ -103,6 +112,13 @@ export function PreparationScreen({ source, onPlay, onSave, onBack }: Preparatio
         <div className="oq-panel oq-panel--error">
           <p className="oq-error-text">{error}</p>
           <div className="oq-actions">
+            <button
+              type="button"
+              className="oq-button oq-button--primary"
+              onClick={() => setRetryAttempt((n) => n + 1)}
+            >
+              Retry
+            </button>
             <button type="button" className="oq-button oq-button--ghost" onClick={onBack}>
               Back
             </button>

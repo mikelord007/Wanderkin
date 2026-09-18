@@ -6,7 +6,7 @@ import { GenerationScreen } from "./ui/screens/GenerationScreen.js";
 import { PreparationScreen, type PreparationSource } from "./ui/screens/PreparationScreen.js";
 import { PlayScreen } from "./ui/screens/PlayScreen.js";
 import { FinishScreen } from "./ui/screens/FinishScreen.js";
-import { clearActiveJobId, loadActiveJobId, saveActiveJobId } from "./ui/jobStorage.js";
+import { clearActiveJob, clearPendingSubmission, loadActiveJob, resolveResumeState } from "./ui/jobStorage.js";
 import { createLevel, saveLevel } from "./ui/api.js";
 
 type Screen =
@@ -18,8 +18,10 @@ type Screen =
   | { name: "finish"; manifest: SceneManifest };
 
 function initialScreen(): Screen {
-  const resumeJobId = loadActiveJobId();
-  return resumeJobId ? { name: "generation", jobId: resumeJobId } : { name: "start" };
+  const resume = resolveResumeState();
+  if (resume.screen === "generation") return { name: "generation", jobId: resume.jobId };
+  if (resume.screen === "photos") return { name: "photos" };
+  return { name: "start" };
 }
 
 /**
@@ -33,25 +35,36 @@ export function App() {
   const goStart = useCallback(() => setScreen({ name: "start" }), []);
 
   const handleJobStarted = useCallback((jobId: string) => {
-    saveActiveJobId(jobId);
+    // PhotosScreen already persisted the ActiveJob record (with its source
+    // photos) and cleared the PendingSubmission the moment the POST
+    // response confirmed a durable job id — navigation is all that's left.
     setScreen({ name: "generation", jobId });
   }, []);
 
   const handleJobReady = useCallback((job: GenerationJob) => {
-    clearActiveJobId();
+    // Read the source photos before clearing — they only live in this
+    // transient record, and Preparation needs them to attach provenance.
+    const sourcePhotos = loadActiveJob()?.photos;
+    clearActiveJob();
     if (!job.resultAssetId) {
       setScreen({ name: "start" });
       return;
     }
     setScreen({
       name: "preparation",
-      source: { kind: "asset", assetId: job.resultAssetId },
+      source: sourcePhotos
+        ? { kind: "asset", assetId: job.resultAssetId, sourcePhotos }
+        : { kind: "asset", assetId: job.resultAssetId },
       isNew: true,
     });
   }, []);
 
   const handleJobCancelled = useCallback(() => {
-    clearActiveJobId();
+    // Deliberately abandoning this job (not a reload) — clear both so the
+    // next submission from Photos gets a fresh idempotency key instead of
+    // resuming this one.
+    clearActiveJob();
+    clearPendingSubmission();
     setScreen({ name: "photos" });
   }, []);
 
@@ -69,6 +82,9 @@ export function App() {
       return (
         <StartScreen
           onPlaySample={(manifest) => setScreen({ name: "play", manifest })}
+          onEditSample={(manifest) =>
+            setScreen({ name: "preparation", source: { kind: "manifest", manifest }, isNew: true })
+          }
           onPlaySavedLevel={(manifest) => setScreen({ name: "play", manifest })}
           onEditSavedLevel={(manifest) =>
             setScreen({ name: "preparation", source: { kind: "manifest", manifest }, isNew: false })
