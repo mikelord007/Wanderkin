@@ -171,8 +171,9 @@ the lowest collidable surface, or 10 m outside its horizontal extent.
 
 **Replay** is supported two ways: the built-in "Play again" resets the
 simulation and checkpoints in place, and remounting `GameView` (a new React
-`key`) rebuilds the level from scratch. The asset cache means a remount
-does not re-download the GLB.
+`key`) rebuilds the level from scratch. Scene preparation, the editor, game
+startup and replay all use the one cache in `src/scene/loader.ts`, so crossing
+those screen boundaries does not re-download or re-decode the GLB.
 
 ## Camera
 
@@ -201,6 +202,12 @@ on the second.
 A download percentage is only shown when the server reported a real
 content length. Otherwise the indicator is indeterminate and says so,
 rather than fabricating a percentage.
+
+The game imports the scene worker's runtime loader directly. Downloading,
+decoding, collision extraction, cache state and failure eviction therefore
+have one implementation across preparation, the editor and play. Unsupported
+Draco, Meshopt and sparse-accessor assets are rejected explicitly by scene
+loading rather than being given approximate collision.
 
 ## Authoring a level for this runtime
 
@@ -249,7 +256,7 @@ controller cannot actually complete.
 
 ## Tested behaviour and known limitations
 
-Covered by `npm test` (69 tests):
+Covered by the automated game tests:
 
 - Stable grounding, no jitter (< 1 mm over 300 steps), no sinking or
   hovering, grounded throughout a walk.
@@ -285,17 +292,16 @@ Covered by `npm test` (69 tests):
 
 Known limitations:
 
-- **Not yet verified in a real browser.** Every result above is from the
-  headless simulation and a production bundle build. Browser end-to-end
-  play-through is a separate step.
-- **No sample manifests yet.** `src/scene/samples.ts` (scene-preparation
-  worker) is not implemented, so nothing yet renders the bundled GLBs in
-  the app. The sample-asset tests construct their own normalised transform
-  to work around this.
-- **Asset loading is temporary.** `src/game/assets/loadSceneAsset.ts`
-  duplicates work that belongs to `src/scene`. It caches per URL so a
-  remount never re-downloads, and the handover shape has been proposed to
-  the lead.
+- **No full browser course completion yet.** Chrome has rendered the first
+  game frame at full viewport size, and the start/editor layouts have been
+  checked at desktop and narrow widths. The movement and route results above
+  are still from headless simulation; an input-driven end-to-end play-through
+  of both sample courses remains separate acceptance work.
+- **The authored sample manifests have not had a browser play-through.**
+  Their data and headless controller checks do not substitute for completing
+  both checkpoint routes with real keyboard and mouse input.
+- **Compressed GLBs are not accepted yet.** They fail clearly instead of
+  silently producing incomplete collision.
 - **Textures do not decode under Node.** The sample tests log
   `THREE.GLTFLoader: Couldn't load texture` because Node has no image
   decoding. Geometry and collision are unaffected; this does not occur in

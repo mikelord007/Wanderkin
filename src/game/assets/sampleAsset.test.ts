@@ -27,7 +27,7 @@ import {
   type GeneratedMeshEntity,
   type SceneManifest,
 } from "@shared/index.js";
-import { parseSceneAsset, type LoadedSceneAsset } from "./loadSceneAsset.js";
+import { parseSceneAsset, type ParsedSceneAsset } from "./loadSceneAsset.js";
 import { GameSimulation, NEUTRAL_INPUT } from "../core/simulation.js";
 import { initRapier } from "../core/physicsWorld.js";
 import { buildSceneCollision } from "../core/sceneCollision.js";
@@ -43,7 +43,7 @@ function readSample(name: string): ArrayBuffer {
   return file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer;
 }
 
-const decoded = new Map<string, LoadedSceneAsset>();
+const decoded = new Map<string, ParsedSceneAsset>();
 
 beforeAll(async () => {
   await initRapier();
@@ -58,7 +58,7 @@ beforeAll(async () => {
  * asset onto y = 0. Recomputed here from the decoded geometry so the test
  * does not depend on a hand-written transform.
  */
-function normalisedEntity(asset: LoadedSceneAsset): GeneratedMeshEntity {
+function normalisedEntity(asset: ParsedSceneAsset): GeneratedMeshEntity {
   const bounds = soupBounds(asset.collision)!;
   const width = bounds.max.x - bounds.min.x;
   const depth = bounds.max.z - bounds.min.z;
@@ -89,7 +89,7 @@ interface SampleLevel {
   spawnX: number;
 }
 
-function levelFor(asset: LoadedSceneAsset): SampleLevel {
+function levelFor(asset: ParsedSceneAsset): SampleLevel {
   const entity = normalisedEntity(asset);
   const collision = buildSceneCollision(
     { ...makeManifest({ entities: [], spawn: standingSpawn(0) }), entities: [entity] },
