@@ -86,56 +86,78 @@ export interface BoundedDownloadResult {
   contentType: string | null;
 }
 
+const MAX_REDIRECTS = 5;
+
 /** Downloads a URL with SSRF validation, a hard byte cap (aborting the
- * stream rather than buffering unbounded), and no automatic redirect
- * following (a redirect target gets its own SSRF check by calling this
- * function again with the `Location` header rather than being trusted). */
+ * stream rather than buffering unbounded), and manual (never automatic)
+ * redirect following — each hop gets its own SSRF check via
+ * `assertSafeHttpsUrl` rather than trusting a `Location` header. A single
+ * `AbortController`/timeout spans the WHOLE call, including every redirect
+ * hop (not reset per hop), and a redirect chain longer than `MAX_REDIRECTS`
+ * is refused — otherwise a redirect loop (or long chain) would never
+ * terminate, or would keep resetting its own deadline forever. */
 export async function downloadBounded(
   rawUrl: string,
   maxBytes: number,
   timeoutMs = 60_000,
 ): Promise<BoundedDownloadResult> {
-  const url = await assertSafeHttpsUrl(rawUrl);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, { redirect: "manual", signal: controller.signal });
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("location");
-      if (!location) {
-        throw new UnsafeUrlError(`Redirect from "${rawUrl}" had no Location header`);
-      }
-      clearTimeout(timer);
-      return downloadBounded(new URL(location, url).toString(), maxBytes, timeoutMs);
-    }
-    if (!response.ok) {
-      throw new Error(`Download failed: HTTP ${response.status} for "${rawUrl}"`);
-    }
-    const declaredLength = Number(response.headers.get("content-length") ?? "0");
-    if (declaredLength > maxBytes) {
-      throw new DownloadTooLargeError(
-        `"${rawUrl}" declares ${declaredLength} bytes, exceeding the ${maxBytes}-byte limit`,
-      );
-    }
-    if (!response.body) {
-      const buffer = Buffer.from(await response.arrayBuffer());
-      if (buffer.byteLength > maxBytes) {
-        throw new DownloadTooLargeError(`"${rawUrl}" exceeded the ${maxBytes}-byte limit`);
-      }
-      return { buffer, contentType: response.headers.get("content-type") };
-    }
-    const chunks: Uint8Array[] = [];
-    let total = 0;
-    for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
-      total += chunk.byteLength;
-      if (total > maxBytes) {
-        controller.abort();
-        throw new DownloadTooLargeError(`"${rawUrl}" exceeded the ${maxBytes}-byte limit while streaming`);
-      }
-      chunks.push(chunk);
-    }
-    return { buffer: Buffer.concat(chunks), contentType: response.headers.get("content-type") };
+    return await downloadBoundedStep(rawUrl, maxBytes, controller.signal, MAX_REDIRECTS);
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function downloadBoundedStep(
+  rawUrl: string,
+  maxBytes: number,
+  signal: AbortSignal,
+  redirectsLeft: number,
+): Promise<BoundedDownloadResult> {
+  const url = await assertSafeHttpsUrl(rawUrl);
+  const response = await fetch(url, { redirect: "manual", signal });
+
+  if (response.status >= 300 && response.status < 400) {
+    // Redirect responses carry no body we want; drop it explicitly rather
+    // than leaving the connection to be reclaimed implicitly.
+    await response.body?.cancel().catch(() => undefined);
+    if (redirectsLeft <= 0) {
+      throw new UnsafeUrlError(`Too many redirects while fetching "${rawUrl}" (exceeded ${MAX_REDIRECTS})`);
+    }
+    const location = response.headers.get("location");
+    if (!location) {
+      throw new UnsafeUrlError(`Redirect from "${rawUrl}" had no Location header`);
+    }
+    return downloadBoundedStep(new URL(location, url).toString(), maxBytes, signal, redirectsLeft - 1);
+  }
+
+  if (!response.ok) {
+    throw new Error(`Download failed: HTTP ${response.status} for "${rawUrl}"`);
+  }
+  const declaredLength = Number(response.headers.get("content-length") ?? "0");
+  if (declaredLength > maxBytes) {
+    throw new DownloadTooLargeError(
+      `"${rawUrl}" declares ${declaredLength} bytes, exceeding the ${maxBytes}-byte limit`,
+    );
+  }
+  if (!response.body) {
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.byteLength > maxBytes) {
+      throw new DownloadTooLargeError(`"${rawUrl}" exceeded the ${maxBytes}-byte limit`);
+    }
+    return { buffer, contentType: response.headers.get("content-type") };
+  }
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
+    total += chunk.byteLength;
+    if (total > maxBytes) {
+      await response.body.cancel().catch(() => undefined);
+      throw new DownloadTooLargeError(`"${rawUrl}" exceeded the ${maxBytes}-byte limit while streaming`);
+    }
+    chunks.push(chunk);
+  }
+  return { buffer: Buffer.concat(chunks), contentType: response.headers.get("content-type") };
 }

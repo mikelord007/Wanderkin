@@ -194,3 +194,45 @@ describe("LivepeerAdapter.getStatus", () => {
     expect(status.error?.message).toBe("Upstream provider timed out");
   });
 });
+
+describe("LivepeerAdapter.discoverCapabilities", () => {
+  it("returns only capabilities confirmed available via a live describe_capability call", async () => {
+    const mcp = fakeMcp({
+      describe_capability: (args) => ({
+        found: true,
+        availability: "available",
+        status: "active",
+        model_id: args.name === "rodin-i3d" ? "fal-ai/hyper3d/rodin/v2.5" : "tripo3d/h3.1/multiview-to-3d",
+        fallback_chain: args.name === "rodin-i3d" ? ["tripo-i3d", "triposplat"] : null,
+      }),
+    });
+    const adapter = new LivepeerAdapter(mcp, fakePhotos());
+    const descriptors = await adapter.discoverCapabilities();
+    expect(descriptors.map((d) => d.id).sort()).toEqual(["rodin-i3d", "tripo-mv3d"]);
+    expect(descriptors.every((d) => d.notes?.includes("Confirmed available"))).toBe(true);
+  });
+
+  it("drops a capability the provider reports as degraded rather than returning it as usable", async () => {
+    const mcp = fakeMcp({
+      describe_capability: (args) => ({
+        found: true,
+        availability: args.name === "rodin-i3d" ? "available" : "unavailable",
+        status: args.name === "rodin-i3d" ? "active" : "disabled",
+        model_id: "whatever",
+      }),
+    });
+    const adapter = new LivepeerAdapter(mcp, fakePhotos());
+    const descriptors = await adapter.discoverCapabilities();
+    expect(descriptors.map((d) => d.id)).toEqual(["rodin-i3d"]);
+  });
+
+  it("throws (does not silently return static descriptors) when no capability can be confirmed", async () => {
+    const mcp = fakeMcp({
+      describe_capability: () => {
+        throw new McpTransportError("network unreachable");
+      },
+    });
+    const adapter = new LivepeerAdapter(mcp, fakePhotos());
+    await expect(adapter.discoverCapabilities()).rejects.toBeInstanceOf(McpTransportError);
+  });
+});
