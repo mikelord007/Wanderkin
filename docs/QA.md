@@ -17,6 +17,10 @@ course has been completed in a browser.
   keyboard controls, mouse camera movement, and read-only diagnostics.
 - Real Livepeer generation: **not run by QA**. The HTTP suite points only
   at a local fake MCP endpoint and cannot spend provider allowance.
+- Targeted candidate checks passed against `origin/main` at `25f7260` before
+  QA integration: a full server with relative `STORAGE_DIR` served uploaded
+  photo/GLB bytes, and the existing real Rodin result from provider job
+  `mjob_cfb2286bf2b5` completed isolated preparation/editor/save acceptance.
 
 ## Automated commands
 
@@ -95,10 +99,10 @@ MCP endpoint.
 
 Verified in-browser:
 
-- Rodin: pointer lock, mouse yaw, ordered checkpoints, visible pause and
-  resume, `R` respawn, measured jump, out-of-bounds fall/automatic respawn,
-  contextual mantle onto elevated furniture, finish screen, and replay to
-  zero checkpoints.
+- Rodin: pointer lock, mouse yaw, ordered checkpoints, `Escape` pause and
+  pointer-lock release, resume, `R` respawn, measured jump, out-of-bounds
+  fall/automatic respawn, observed mantle state onto elevated furniture,
+  finish screen, and replay to zero checkpoints.
 - Tripo: the same gameplay code and controls, including jump, pause/resume,
   contextual mantle onto the elevated course, finish, and replay.
 - Photo lightbox: two real sample JPEGs uploaded to the isolated local API;
@@ -110,18 +114,17 @@ Verified in-browser:
   action, produced an actual `.objectquest.json` browser download, and was
   uploaded through **Import level bundle**. The imported editor restored the
   changed value, and a full reload rediscovered both distinct durable copies.
+- Previously generated Rodin artifact: the 5,029,388-byte GLB with SHA-256
+  `71d05f8c75bec0a46b5225640e94cdf5f2ac252fb49b81d8183f98eefba65c42`
+  was imported into the isolated API, prepared into three course candidates,
+  switched between candidates with independent drafts, saved through the
+  editor, and reopened after reload. This reused the already-downloaded result;
+  QA did not submit or retry generation.
 
 No teleport, checkpoint mutation, completion callback, or game-state write
 is present in the suite. `window.__objectquest.get()` is read only and is
 used for steering and assertions. The final checkpoint naturally unmounts
 GameView and displays the finish screen.
-
-One automation-specific caveat remains: synthetic `Escape` reaches the app
-and visibly pauses it, but Chromium automation does not perform the browser
-chrome's native pointer-lock release. The test explicitly releases only the
-browser pointer lock before clicking the real Resume button; it does not
-change game state. Physical-Escape pointer-lock release remains a manual
-check and is not claimed by automation.
 
 ## Manual browser protocol
 
@@ -171,8 +174,8 @@ Additional browser checks:
 - Export the saved level, import it as a new level, and verify the remapped
   asset/photo URLs load before playing it.
 
-The automated evidence above covers the gameplay path. A final manual pass
-should still confirm physical-Escape pointer-lock release and visual feel.
+The automated evidence above covers the gameplay path, including Escape
+pointer-lock release. A final manual pass should still confirm visual feel.
 The portable export/import workflow is covered by the isolated real-browser
 test above; no direct-route shortcut is used for that acceptance claim.
 

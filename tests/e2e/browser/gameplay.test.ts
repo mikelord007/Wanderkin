@@ -107,10 +107,20 @@ async function driveToPoint(
       if (distance <= radius) return { mantleObserved, maxY };
 
       if (options.mantle && diagnostics.mantleAvailable) {
-        await releaseMovementKeys(page, held);
+        // Keep the approach keys held while pressing E. The simulation does a
+        // fresh mantle probe on the key edge using the current movement-facing
+        // direction, so releasing movement first can legitimately reject the
+        // mantle even though the previous read advertised one.
         await page.keyboard.press("e");
-        mantleObserved = true;
-        await page.waitForTimeout(380);
+        const sampleUntil = Date.now() + 380;
+        while (Date.now() < sampleUntil) {
+          const transition = await readDiagnostics(page);
+          if (transition) {
+            mantleObserved ||= transition.mantling;
+            maxY = Math.max(maxY, transition.playerPosition[1]);
+          }
+          await page.waitForTimeout(25);
+        }
         continue;
       }
 
@@ -155,12 +165,6 @@ async function collectNextCheckpoint(
 async function verifyPauseAndResume(page: Page): Promise<void> {
   await page.keyboard.press("Escape");
   await expect(page.getByRole("heading", { name: "Paused" })).toBeVisible();
-  // Synthetic Escape reaches the app but does not trigger Chromium's
-  // browser-chrome pointer-lock release behavior. The visible pause state is
-  // the browser-automation assertion; release the browser lock explicitly so
-  // the real Resume button can receive a mouse click. Manual acceptance still
-  // checks that a physical Escape key releases it without this workaround.
-  await page.evaluate(() => document.exitPointerLock());
   await expect.poll(() => page.evaluate(() => document.pointerLockElement)).toBeNull();
   await page.getByRole("button", { name: "Resume" }).click();
   await expect.poll(() => page.evaluate(() => document.pointerLockElement !== null)).toBe(true);

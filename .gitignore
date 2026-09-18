@@ -7,3 +7,5 @@ dist-server/
 .DS_Store
 Thumbs.db
 storage/
+test-results/
+playwright-report/

@@ -2,11 +2,12 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { REPO_ROOT } from "./repoRoot.js";
 
 const TSX_CLI = join(REPO_ROOT, "node_modules", "tsx", "dist", "cli.mjs");
-const SERVER_ENTRY = join(REPO_ROOT, "server", "index.ts");
+export const E2E_SERVER_ROOT = resolve(process.env.OBJECTQUEST_E2E_SERVER_ROOT ?? REPO_ROOT);
+const SERVER_ENTRY = join(E2E_SERVER_ROOT, "server", "index.ts");
 
 async function getFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -45,17 +46,21 @@ export async function startApiServer(opts: {
   storageDir?: string;
   /** Defaults to true for helper-created storage and false for supplied storage. */
   removeStorageOnStop?: boolean;
+  /** Pass STORAGE_DIR relatively to exercise production path resolution. */
+  useRelativeStoragePath?: boolean;
 }): Promise<ApiServerHandle> {
   const port = await getFreePort();
   const storageDir = opts.storageDir ?? mkdtempSync(join(tmpdir(), "objectquest-e2e-"));
   const removeStorageOnStop = opts.removeStorageOnStop ?? opts.storageDir === undefined;
 
   const child: ChildProcessWithoutNullStreams = spawn(process.execPath, [TSX_CLI, SERVER_ENTRY], {
-    cwd: REPO_ROOT,
+    cwd: E2E_SERVER_ROOT,
     env: {
       ...process.env,
       PORT: String(port),
-      STORAGE_DIR: storageDir,
+      STORAGE_DIR: opts.useRelativeStoragePath
+        ? relative(E2E_SERVER_ROOT, storageDir)
+        : storageDir,
       LIVEPEER_MCP_ENDPOINT: opts.mcpEndpoint,
       LIVEPEER_API_KEY: "",
     },

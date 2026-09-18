@@ -141,3 +141,69 @@ test("portable level export downloads and imports through the browser", async ({
 
   expect(mcp.callsFor("run_capability")).toHaveLength(0);
 });
+
+test("a real generated GLB prepares, switches candidates, and saves through the isolated API", async ({ page }) => {
+  const generatedGlbPath = process.env.OBJECTQUEST_GENERATED_GLB_PATH;
+  test.skip(!generatedGlbPath, "Set OBJECTQUEST_GENERATED_GLB_PATH to a previously generated local GLB artifact.");
+
+  await page.goto("/");
+  await page.getByLabel("Import a GLB file").setInputFiles(generatedGlbPath!);
+
+  const candidates = page.getByRole("radiogroup", { name: "Course candidate" });
+  await expect(candidates).toBeVisible({ timeout: 60_000 });
+  const radios = candidates.getByRole("radio");
+  await expect(radios).toHaveCount(3);
+  await expect(radios.nth(0)).toBeChecked();
+
+  const orientation = page.getByRole("heading", { name: "Model orientation" }).locator("..");
+  const originalScale = await orientation.getByLabel("Uniform scale").inputValue();
+  await orientation.getByLabel("Uniform scale").fill("6.25");
+
+  await radios.nth(1).check();
+  await expect(radios.nth(1)).toBeChecked();
+  await expect(orientation.getByLabel("Uniform scale")).toHaveValue(originalScale);
+  await orientation.getByLabel("Uniform scale").fill("7.5");
+
+  // Returning to the first option proves the primary did not disappear or
+  // get replaced by the selected alternate. Candidate-specific drafts remain
+  // independent: the primary's edit returns instead of the alternate's edit.
+  await radios.nth(0).check();
+  await expect(radios.nth(0)).toBeChecked();
+  await expect(orientation.getByLabel("Uniform scale")).toHaveValue("6.25");
+
+  await orientation.getByLabel("Uniform scale").fill("3.25");
+  const spawn = page.getByRole("heading", { name: "Spawn & checkpoints" }).locator("..");
+  await spawn.locator(".oq-editor__vec3").first().getByLabel("X").fill("2.75");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
+
+  await page.reload();
+  const savedSection = page.getByRole("heading", { name: "Your saved levels" }).locator("..");
+  const savedCard = savedSection.locator("article").filter({ hasText: "Imported level" });
+  await expect(savedCard).toHaveCount(1);
+  await savedCard.getByRole("button", { name: "Edit" }).click();
+  await expect(page.getByRole("heading", { name: "Model orientation" }).locator("..").getByLabel("Uniform scale"))
+    .toHaveValue("3.25");
+  await expect(
+    page.getByRole("heading", { name: "Spawn & checkpoints" })
+      .locator("..")
+      .locator(".oq-editor__vec3")
+      .first()
+      .getByLabel("X"),
+  ).toHaveValue("2.75");
+
+  const levelsResponse = await fetch(`${api.baseUrl}/api/levels`);
+  const levels = (await levelsResponse.json()) as Array<{
+    name: string;
+    assets: Array<{ sha256: string; url: string; sizeBytes: number }>;
+  }>;
+  const savedGeneratedLevel = levels.find((level) => level.name === "Imported level");
+  expect(savedGeneratedLevel?.assets[0]).toMatchObject({
+    sha256: "71d05f8c75bec0a46b5225640e94cdf5f2ac252fb49b81d8183f98eefba65c42",
+    sizeBytes: 5_029_388,
+  });
+  const storedGlb = await fetch(`${api.baseUrl}${savedGeneratedLevel!.assets[0]!.url}`);
+  expect(storedGlb.status).toBe(200);
+  expect((await storedGlb.arrayBuffer()).byteLength).toBe(5_029_388);
+  expect(mcp.callsFor("run_capability")).toHaveLength(0);
+});
