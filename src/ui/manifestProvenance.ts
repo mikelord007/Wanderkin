@@ -34,3 +34,21 @@ export function attachProvenance(
     photos: sourcePhotos ?? manifest.photos,
   };
 }
+
+/**
+ * GET /api/assets/:id additionally returns `photos` for a generated asset
+ * (absent for a hand-imported one) — the server's authoritative record of
+ * which source photos it came from, independent of whatever the client's
+ * own localStorage record still has. Splits that extra field off before
+ * the asset becomes a manifest AssetReference entry (that shape has no
+ * such field; the photos belong in manifest.photos instead), and resolves
+ * which source-photo list wins: the server's when present, otherwise the
+ * client's locally-cached one.
+ */
+export function resolveAssetForManifest(
+  asset: AssetReference & { photos?: PhotoReference[] },
+  locallyCachedPhotos: PhotoReference[] | undefined,
+): { cleanAsset: AssetReference; sourcePhotos: PhotoReference[] | undefined } {
+  const { photos: serverPhotos, ...cleanAsset } = asset;
+  return { cleanAsset, sourcePhotos: serverPhotos ?? locallyCachedPhotos };
+}

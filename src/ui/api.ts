@@ -94,8 +94,17 @@ export function retryJob(jobId: string): Promise<GenerationJob> {
   });
 }
 
-export function getAsset(assetId: string): Promise<AssetReference> {
-  return request<AssetReference>(`/api/assets/${encodeURIComponent(assetId)}`);
+/** For a generated asset, the server additionally returns the ordered
+ * source photos it came from (absent for a hand-imported asset via
+ * /api/assets/import, which has no provenance). Lets Preparation recover
+ * the original photo set from the server alone, without relying on the
+ * client's own localStorage record surviving the reload. */
+export interface AssetWithSourcePhotos extends AssetReference {
+  photos?: PhotoReference[];
+}
+
+export function getAsset(assetId: string): Promise<AssetWithSourcePhotos> {
+  return request<AssetWithSourcePhotos>(`/api/assets/${encodeURIComponent(assetId)}`);
 }
 
 export async function importAsset(file: File): Promise<AssetReference> {
