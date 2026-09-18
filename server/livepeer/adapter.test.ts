@@ -1,0 +1,196 @@
+import { describe, expect, it, vi } from "vitest";
+import type { McpToolCaller, McpToolCallOptions } from "./mcpClient.js";
+import { McpToolError, McpTransportError } from "./mcpClient.js";
+import { LivepeerAdapter, type PhotoBytesProvider } from "./adapter.js";
+
+/** Fixture payloads mirror the reference workspace's real 2026-09-17
+ * responses (outputs/room-corner-comparison/rodin-response.json /
+ * tripo-response.json), trimmed to the fields the adapter reads. */
+const RODIN_DONE_FIXTURE = {
+  job_id: "mjob_5c57ebc49690",
+  status: "done",
+  capability: "rodin-i3d",
+  capability_used: "rodin-i3d",
+  fallback_fired: null,
+  url: "https://agent.livepeer.org/a/fake/rodin.glb",
+  served_model_id: "fal-ai/hyper3d/rodin/v2.5",
+  error: null,
+};
+
+const TRIPO_RUNNING_FIXTURE = {
+  job_id: "mjob_c91e623855ae",
+  status: "running",
+  capability: "tripo-mv3d",
+  capability_used: null,
+  fallback_fired: null,
+  url: null,
+};
+
+const FAILED_FIXTURE = {
+  job_id: "mjob_deadbeef0000",
+  status: "failed",
+  error: "Upstream provider timed out",
+  error_code: "provider_timeout",
+  error_retryable: true,
+};
+
+function fakePhotos(): PhotoBytesProvider {
+  return {
+    getPhotoBytes: vi.fn(async (photoId: string) => ({
+      buffer: Buffer.from(`bytes-for-${photoId}`),
+      mimeType: "image/jpeg",
+      filename: `${photoId}.jpg`,
+    })),
+  };
+}
+
+function fakeMcp(
+  handlers: Record<string, (args: Record<string, unknown>) => unknown>,
+): McpToolCaller & { calls: Array<{ name: string; args: Record<string, unknown> }> } {
+  const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
+  return {
+    calls,
+    async callTool<T>(name: string, args: Record<string, unknown>, _options?: McpToolCallOptions): Promise<T> {
+      calls.push({ name, args });
+      const handler = handlers[name];
+      if (!handler) throw new Error(`Unexpected tool call "${name}"`);
+      return handler(args) as T;
+    },
+  };
+}
+
+describe("LivepeerAdapter.validateInput", () => {
+  const adapter = new LivepeerAdapter(fakeMcp({}), fakePhotos());
+
+  it("accepts 1-5 rodin photos with no view slots", () => {
+    const result = adapter.validateInput("rodin-i3d", [
+      { photoId: "a", sourceIndex: 4 },
+      { photoId: "b", sourceIndex: 1 },
+    ]);
+    expect(result.valid).toBe(true);
+  });
+
+  it("rejects more than 5 rodin photos", () => {
+    const photos = Array.from({ length: 6 }, (_, i) => ({ photoId: `p${i}`, sourceIndex: i + 1 }));
+    const result = adapter.validateInput("rodin-i3d", photos);
+    expect(result.valid).toBe(false);
+    expect(result.errors[0]).toMatch(/between 1 and 5/);
+  });
+
+  it("rejects tripo photos missing a view slot", () => {
+    const result = adapter.validateInput("tripo-mv3d", [
+      { photoId: "a", sourceIndex: 4, viewSlot: "front" },
+      { photoId: "b", sourceIndex: 2 },
+    ]);
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(" ")).toMatch(/missing a required view slot/);
+  });
+
+  it("rejects duplicate tripo view slots", () => {
+    const result = adapter.validateInput("tripo-mv3d", [
+      { photoId: "a", sourceIndex: 4, viewSlot: "front" },
+      { photoId: "b", sourceIndex: 2, viewSlot: "front" },
+    ]);
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(" ")).toMatch(/assigned to more than one photo/);
+  });
+
+  it("accepts a 2-photo tripo submission (front+left), matching the real 2026-09-17 test", () => {
+    const result = adapter.validateInput("tripo-mv3d", [
+      { photoId: "a", sourceIndex: 4, viewSlot: "front" },
+      { photoId: "b", sourceIndex: 2, viewSlot: "left" },
+    ]);
+    expect(result.valid).toBe(true);
+  });
+
+  it("rejects an unknown capability", () => {
+    const result = adapter.validateInput("worldgen-mystery", [{ photoId: "a", sourceIndex: 1 }]);
+    expect(result.valid).toBe(false);
+  });
+});
+
+describe("LivepeerAdapter.submit", () => {
+  it("uploads photos in tripo's required view order and calls run_capability with async:true", async () => {
+    const mcp = fakeMcp({
+      upload: (args) => ({ url: `https://agent.livepeer.org/a/${args.filename}` }),
+      run_capability: () => ({ job_id: "mjob_new", status: "submitted", capability_used: "tripo-mv3d" }),
+    });
+    const adapter = new LivepeerAdapter(mcp, fakePhotos());
+
+    const result = await adapter.submit({
+      capability: "tripo-mv3d",
+      idempotencyKey: "idem-1",
+      photos: [
+        { photoId: "right-photo", sourceIndex: 3, viewSlot: "right" },
+        { photoId: "front-photo", sourceIndex: 4, viewSlot: "front" },
+      ],
+    });
+
+    expect(result).toEqual({ providerJobId: "mjob_new", capabilityUsed: "tripo-mv3d", fallbackFired: null });
+
+    const uploadCalls = mcp.calls.filter((c) => c.name === "upload");
+    // front must be uploaded (and therefore appear in image_urls) before
+    // right, even though the caller passed right first.
+    expect(uploadCalls[0]?.args.filename).toBe("front-photo.jpg");
+    expect(uploadCalls[1]?.args.filename).toBe("right-photo.jpg");
+
+    const runCall = mcp.calls.find((c) => c.name === "run_capability");
+    expect(runCall?.args.async).toBe(true);
+    expect(runCall?.args.idempotency_key).toBe("idem-1");
+    const inputs = runCall?.args.inputs as { image_urls: string[] };
+    expect(inputs.image_urls).toEqual([
+      "https://agent.livepeer.org/a/front-photo.jpg",
+      "https://agent.livepeer.org/a/right-photo.jpg",
+    ]);
+  });
+
+  it("throws McpTransportError when run_capability returns no job_id", async () => {
+    const mcp = fakeMcp({
+      upload: () => ({ url: "https://agent.livepeer.org/a/x.jpg" }),
+      run_capability: () => ({ status: "queued" }),
+    });
+    const adapter = new LivepeerAdapter(mcp, fakePhotos());
+    await expect(
+      adapter.submit({ capability: "rodin-i3d", idempotencyKey: "k", photos: [{ photoId: "a", sourceIndex: 1 }] }),
+    ).rejects.toBeInstanceOf(McpTransportError);
+  });
+
+  it("rejects before calling the provider when input validation fails", async () => {
+    const mcp = fakeMcp({});
+    const adapter = new LivepeerAdapter(mcp, fakePhotos());
+    await expect(
+      adapter.submit({ capability: "tripo-mv3d", idempotencyKey: "k", photos: [{ photoId: "a", sourceIndex: 1 }] }),
+    ).rejects.toBeInstanceOf(McpToolError);
+    expect(mcp.calls).toHaveLength(0);
+  });
+});
+
+describe("LivepeerAdapter.getStatus", () => {
+  it("maps a done response to ready with the result URL and served model", async () => {
+    const mcp = fakeMcp({ get_create_media: () => RODIN_DONE_FIXTURE });
+    const adapter = new LivepeerAdapter(mcp, fakePhotos());
+    const status = await adapter.getStatus("mjob_5c57ebc49690");
+    expect(status.state).toBe("ready");
+    expect(status.resultAssetUrl).toBe(RODIN_DONE_FIXTURE.url);
+    expect(status.actualRegisteredModel).toBe("fal-ai/hyper3d/rodin/v2.5");
+    expect(status.actualFallbackFired).toBeNull();
+  });
+
+  it("maps a running response to generating with unknown progress", async () => {
+    const mcp = fakeMcp({ get_create_media: () => TRIPO_RUNNING_FIXTURE });
+    const adapter = new LivepeerAdapter(mcp, fakePhotos());
+    const status = await adapter.getStatus("mjob_c91e623855ae");
+    expect(status.state).toBe("generating");
+    expect(status.progress.known).toBe(false);
+    expect(status.resultAssetUrl).toBeUndefined();
+  });
+
+  it("maps a failed response to failed with a retryable error", async () => {
+    const mcp = fakeMcp({ get_create_media: () => FAILED_FIXTURE });
+    const adapter = new LivepeerAdapter(mcp, fakePhotos());
+    const status = await adapter.getStatus("mjob_deadbeef0000");
+    expect(status.state).toBe("failed");
+    expect(status.error?.retryable).toBe(true);
+    expect(status.error?.message).toBe("Upstream provider timed out");
+  });
+});
