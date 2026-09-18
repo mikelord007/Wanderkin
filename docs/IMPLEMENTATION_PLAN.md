@@ -46,14 +46,25 @@ colliders reuse that same transform rather than a separate one.
 
 | Task | Owner | Model | Depends on | Status |
 | --- | --- | --- | --- | --- |
-| Scaffold, root config, shared contracts, sample assets, base commit | Foundation/integration | Sonnet | — | **Active** |
-| GLB import, calibration, collider generation, course validation | Scene preparation | Opus | Shared contracts | Queued |
-| Character controller, camera, mantle, checkpoints/respawn | Player and camera | Opus | Shared contracts | Queued |
-| Start/upload/progress/preparation/play/finish screens | Product UI | Sonnet | Shared contracts | Queued |
-| Provider adapters, durable jobs, uploads, provenance | Livepeer integration | Sonnet | Shared contracts | Queued |
-| Manifest persistence, spawn/checkpoint editor, import/export | Level tools and persistence | Sonnet | Shared contracts, scene + editor UI | Later |
+| Scaffold, root config, shared contracts, sample assets, base commit | Foundation/integration | Claude Code Sonnet | — | Complete: `5f6c216` |
+| GLB import, calibration, collider generation, course validation | Scene preparation / `worktree/dim-otter` | Claude Code Opus | Shared contracts | Active |
+| Character controller, camera, mantle, checkpoints/respawn | Player and camera / `worktree/sudden-moose` | Claude Code Opus | Shared contracts | Active |
+| Start/upload/progress/preparation/play/finish screens | Product UI / `worktree/molten-bear` | Claude Code Sonnet | Shared contracts | Integrated through `504b201`; awaiting full-app verification |
+| Provider adapters, durable jobs, uploads, provenance | Livepeer integration / `worktree/clever-path` | Claude Code Sonnet | Shared contracts | Active; lifecycle review fixes assigned |
+| Manifest persistence, spawn/checkpoint editor, import/export | Level tools and persistence / `worktree/molten-bear` | Claude Code Sonnet | Shared contracts, scene + editor UI | Active after UI completion |
 | Independent smoke tests, gameplay verification | QA and integration support | Sonnet | Playable milestone B | Later |
 
 Astra approves any change to `shared/*` or root config/dependencies and
 assigns it to the foundation worker; other workers request changes instead
 of editing those files concurrently.
+
+The installed runtime permits four active spawned workers. The UI worker
+continues as the editor worker; independent QA waits for capacity. All four implementation worktrees began at
+`5f6c216`. Astra reviews code and runs checks; Claude Code workers own all
+code changes and integration edits. Livepeer's worker has temporary,
+exclusive ownership of the package manifest and lockfile for the approved
+Multer 2.x upload dependency.
+
+The first commit required the user's Source Control action because the
+Nimbalyst commit tool rejected the repository before it had a HEAD commit.
+Normal tool-based commits succeeded after that initial commit.
