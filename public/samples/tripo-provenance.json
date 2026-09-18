@@ -1,0 +1,39 @@
+{
+  "model": "Tripo H3.1",
+  "job_id": "mjob_c91e623855ae",
+  "capability": "tripo-mv3d",
+  "capability_used": "tripo-mv3d",
+  "fallback_fired": null,
+  "status": "done",
+  "source_order": [
+    4,
+    2
+  ],
+  "model_url": "https://agent.livepeer.org/a/aHR0cHM6Ly92M2IuZmFsLm1lZGlhL2ZpbGVzL2IvMGFhYWNiNDkvYWp6SjYwbmc5SUNKeml5WEhjN2pFX21vZGVsLmdsYg.c48d8ef6104dc0be/ajzJ60ng9ICJziyXHc7jE_model.glb",
+  "size_bytes": 1993644,
+  "sha256": "e473288cd9e4b999aaf01631e228510ab24e114a2707eb718d3e5381c240cb64",
+  "stats": {
+    "geometry_count": 1,
+    "vertices": 27020,
+    "triangles": 45042,
+    "bounds": [
+      [
+        -0.2974130504700949,
+        -0.18816767632961273,
+        -0.5151710935899121
+      ],
+      [
+        0.3049571766332833,
+        0.18816767632961273,
+        0.523855428595026
+      ]
+    ],
+    "extents": [
+      0.6023702271033782,
+      0.37633535265922546,
+      1.0390265221849382
+    ],
+    "scale_note": "Generated model coordinates; physical scale has not been measured."
+  },
+  "provider_response_recovered_from_error": false
+}

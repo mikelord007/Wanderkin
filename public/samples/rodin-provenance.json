@@ -1,0 +1,42 @@
+{
+  "model": "Rodin 2.5",
+  "job_id": "mjob_5c57ebc49690",
+  "capability": "rodin-i3d",
+  "capability_used": "rodin-i3d",
+  "fallback_fired": null,
+  "status": "done",
+  "source_order": [
+    4,
+    1,
+    2,
+    3,
+    5
+  ],
+  "model_url": "https://agent.livepeer.org/a/aHR0cHM6Ly92M2IuZmFsLm1lZGlhL2ZpbGVzL2IvMGFhYWNiNDIvNnFvc2Z6MlQ5QU55bEMyQ1pUem5qX2Jhc2VfYmFzaWNfc2hhZGVkLmdsYg.9564715327c7db0e/6qosfz2T9ANylC2CZTznj_base_basic_shaded.glb",
+  "size_bytes": 4979900,
+  "sha256": "c750cb2c1fcd2197f8c373b791703bc90073075e11d08cafb0be4d84012d54b8",
+  "stats": {
+    "geometry_count": 1,
+    "vertices": 47618,
+    "triangles": 50000,
+    "bounds": [
+      [
+        -0.9469588994979858,
+        -0.3057381212711334,
+        -0.3387344479560852
+      ],
+      [
+        0.9484190940856934,
+        0.2973068058490753,
+        0.33712702989578247
+      ]
+    ],
+    "extents": [
+      1.8953779935836792,
+      0.6030449271202087,
+      0.6758614778518677
+    ],
+    "scale_note": "Generated model coordinates; physical scale has not been measured."
+  },
+  "provider_response_recovered_from_error": false
+}
