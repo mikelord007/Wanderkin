@@ -1,0 +1,208 @@
+# Level editor & manifest persistence
+
+Owner: Level tools and persistence worker. Covers `src/editor/**`,
+`server/levels.ts`, `server/levels.test.ts`.
+
+## Client: `src/editor`
+
+| File | Purpose |
+| --- | --- |
+| `LevelEditor.tsx` | Named export `LevelEditor`, the contract component from `docs/CONTRACTS.md` (`{ manifest, onSave, onPlay, onBack }`). Orchestrates the panels below and the 3D preview. |
+| `Preview3D.tsx` | React Three Fiber canvas: renders every manifest entity (generated mesh + helper geometry), spawn/checkpoint markers, and reports click-to-place hits and generated-mesh bounding boxes back up to `LevelEditor`. |
+| `geometry.ts` | Pure math: capsule-center ⇄ surface-Y conversion, heading ⇄ quaternion, floor-align delta, calibration scale factor. Fully unit-tested. |
+| `manifestEdits.ts` | Pure, immutable `SceneManifest` mutators (spawn, checkpoints, helper geometry, transforms, calibration). Every mutation calls `markManuallyAdjusted`, which flips `courseValidation.status` to `"manually-adjusted"` with an honest note — this editor cannot itself re-run controller/physics validation (that lives in `src/game`), so it never claims a course is still `"validated"` after an edit. |
+| `draftStorage.ts` | localStorage draft persistence, keyed by `levelId` and the manifest's `updatedAt` at the time editing started (see "Unsaved draft persistence" below). |
+
+### Capsule-center convention
+
+Every `SpawnPoint.position` / `Checkpoint.position` in `shared/manifest.ts`
+is the **capsule center**, not the standing surface: `surfaceY +
+characterHalfHeight + characterRadius + a small skin margin`
+(`shared/movement.ts` `DEFAULT_MOVEMENT_CONFIG`). `geometry.ts`'s
+`capsuleCenterYAboveSurface` / `surfaceYBelowCapsuleCenter` implement this
+conversion; `Preview3D`'s click-to-place raycast always reports a raw
+surface hit point, and `LevelEditor.handleSurfaceClick` is the only place
+that converts it to a capsule-center Y before writing it into the
+manifest. Numeric position inputs edit the capsule-center Y directly (as
+documented on the type).
+
+### Preview loader
+
+The 3D preview loads each `generated-mesh` entity's GLB with
+`@react-three/drei`'s `useGLTF` (which wraps three.js's `GLTFLoader` with
+its own caching/eviction) rather than a hand-rolled loader — this is a
+generic three.js-ecosystem utility, not scene preparation's normalization
+algorithm (bounds analysis, floor detection, course generation), so it
+doesn't duplicate anything scene-owned. A failed or still-loading mesh
+renders a wireframe placeholder box (`PlaceholderBox`) so the editor stays
+usable for arbitrary imperfect/unreachable assets; floor-align and
+calibrate are disabled (not faked) until a real bounding box is available
+from a successfully loaded mesh, since inventing numbers from an arbitrary
+placeholder box would be dishonest, not just approximate.
+
+### Unsaved draft persistence
+
+`draftStorage.ts` persists in-progress edits to `localStorage` under
+`objectquest:editorDraft:<levelId>`, stamped with the manifest's
+`updatedAt` **at the moment editing started** (`baseUpdatedAt`) — not the
+in-progress draft's own content, which never gets a fresh `updatedAt`
+until an actual save (server-stamped, see below).
+
+On mount, `LevelEditor` calls `resolveDraft(levelId, manifest.updatedAt)`:
+
+- **`fresh`** — the draft's `baseUpdatedAt` still matches the manifest
+  just passed in; safe to auto-resume (shown as a light "restored your
+  edits" banner with a Discard option).
+- **`stale`** — the saved level's `updatedAt` has moved on since the
+  draft was based off it (saved elsewhere, e.g. another tab/device).
+  Resuming blind could silently overwrite that newer save, so the editor
+  shows an explicit choice instead of picking for the user: "Resume my
+  unsaved draft anyway" vs. "Discard it, use the latest saved version."
+- **`none`** — nothing to restore.
+
+The draft clears on a successful Save (the edits are now durable inside
+the saved `SceneManifest`) or when the user explicitly discards it or
+backs out of an unsaved (asset-sourced) preparation.
+
+Known gap: this only guards the generation → preparation → save window.
+Reloading mid-edit on an *already-saved* level you're re-editing
+(`isNew: false`) uses the same mechanism and is covered; what's not
+covered is detecting a save that happened in another tab of the *same*
+browser while this tab is still open (no live polling for that) — the
+staleness check only runs once, at mount.
+
+## Server: `server/levels.ts`
+
+Routes (per `docs/CONTRACTS.md`):
+
+| Route | Method | Notes |
+| --- | --- | --- |
+| `/api/levels` | GET | `SceneManifest[]` |
+| `/api/levels` | POST | Validates the body, assigns a fresh `levelId` if the one supplied is missing/unsafe/colliding, stamps `createdAt`/`updatedAt`, never overwrites an existing level. Returns 201. |
+| `/api/levels/:id` | GET | 404 if unknown. |
+| `/api/levels/:id` | PUT | Upserts at `:id`. Rejects an unsafe `:id` or a body whose `levelId` doesn't match the URL before validating anything else. Bumps `updatedAt` server-side. |
+| `/api/levels/:id/export` | GET | Portable bundle (see below). |
+| `/api/levels/import` | POST | Portable bundle → a **new** level (never overwrites). See the content-type note below — this is not a plain JSON request. |
+
+### Validation and storage
+
+`sceneManifestSchema` (zod) mirrors `shared/manifest.ts` field-for-field,
+including a refinement that rejects checkpoints whose `order` isn't
+unique and ascending from 0. Every write route rejects anything that
+doesn't parse before it's ever persisted.
+
+All levels live in one atomically-written index file,
+`STORAGE_DIR/levels.json` (write-to-temp-then-rename, serialized through
+an in-process queue so concurrent requests can't interleave a
+read-modify-write — same durability guarantee as the Livepeer worker's
+`JsonFileStore`). The in-memory index is a `Map`, not a plain object, so a
+malicious or accidental `levelId` like `"__proto__"` can never pollute a
+prototype; `isSafeLevelId` additionally bounds length/charset and
+blocklists `__proto__`/`constructor`/`prototype` as defense in depth.
+
+**This file is intentionally self-contained.** `server/persistence/*`
+(the real `JsonFileStore`, GLB/photo magic-byte validators) is owned by
+the Livepeer integration worker and exists on `worktree/clever-path`,
+not yet merged into this branch — so `server/levels.ts` carries its own
+small, independently-correct copies of the same small pieces (atomic
+write-then-rename, magic-byte sniffing) rather than importing files that
+don't exist here. **Once merged, these are natural candidates to
+consolidate** with `server/persistence/jsonStore.ts` and
+`server/persistence/validate.ts` — flagged to the Livepeer worker.
+
+**Not yet wired into `server/index.ts`** (owned by the Livepeer worker,
+out of this worker's ownership) — that file already has the exact
+integration point commented in:
+
+```ts
+// TODO(Level tools worker): app.use(levelsRouter) from ./levels.js once it
+// exists — see docs/CONTRACTS.md "Server API" for the /api/levels contract.
+```
+
+Wiring needed: `app.use(createLevelsRouter(new LevelStore(env.storageDir)))`.
+
+### Import/export bundle format
+
+```ts
+interface LevelBundle {
+  bundleVersion: 1;
+  manifest: SceneManifest;
+  assets: { filename: string; base64: string }[]; // GLBs referenced by manifest.assets
+  photos: { filename: string; base64: string }[]; // source photos referenced by manifest.photos
+}
+```
+
+Plain JSON, no zip dependency, per the brief. Export skips any
+asset/photo whose file is missing on disk rather than failing the whole
+export (a level can legitimately outlive a pruned asset). Import:
+
+- Validates the bundle (including the embedded manifest) with the same
+  strict schema used everywhere else.
+- Writes each embedded asset into content-addressed storage
+  (`STORAGE_DIR/assets/<sha256>.glb`) — re-importing the same bytes lands
+  on the same file, deduplicated, matching the Livepeer worker's asset
+  storage convention exactly, so an imported asset is immediately
+  servable at `/api/assets/files/<sha256>.glb` with zero extra wiring.
+- Writes each embedded photo into `STORAGE_DIR/photos/<uuid>.<ext>`
+  (photos are never content-addressed, matching the existing convention —
+  a re-import always mints a fresh id).
+- Remaps the manifest's `assets[].id/url`, `photos[].id/url`, and every
+  `generated-mesh` entity's `assetId` to the freshly-stored values before
+  creating the imported level as a **new** level (never overwrites).
+- Validates GLB/photo magic bytes and per-file size caps
+  (150MB/20MB, matching `MAX_GLB_BYTES`/`MAX_PHOTO_BYTES`) on every
+  embedded file before writing anything to disk.
+
+**Content-type note (important for any client wiring this up):** import
+is deliberately **not** `application/json`. `server/index.ts`'s global
+`express.json({ limit: "10mb" })` body parser (owned by the Livepeer
+worker, out of scope to edit) would reject any bundle embedding a
+realistic GLB — even the bundled Tripo sample's ~2MB GLB becomes ~2.7MB
+of base64, and Rodin's ~5MB becomes ~6.7MB, before the manifest/photos are
+even added, so the combined bundle sits right at or over that 10MB cap.
+Since `express.json()` only engages for `Content-Type: application/json`,
+this route accepts the bundle as raw text under
+`Content-Type: application/octet-stream` instead, bypassing the global
+parser entirely and applying its own considerably larger bound
+(`MAX_BUNDLE_TEXT_BYTES`, 220MB) via a route-scoped `express.text()`. A
+client must `JSON.stringify` the bundle and POST it as the raw body with
+that content-type, not via `fetch(url, { body: JSON.stringify(...) })`'s
+default JSON content-type.
+
+No export/import UI has been wired into `src/ui` — Product UI work was
+marked complete/frozen before this feature landed. These routes are
+ready for whichever worker adds that trigger.
+
+## Testing
+
+`server/levels.test.ts` (28 tests): id safety (including
+prototype-pollution-shaped ids), zod validation (valid/missing
+fields/wrong schema version/corrupt checkpoint ordering/garbage input),
+`LevelStore` CRUD, atomicity under 20 concurrent creates, corrupted
+`levels.json` surfacing as a real error rather than silent data loss,
+export/import round-tripping (including dedup-by-sha256 and a
+byte-identical re-materialized file), and full HTTP-level tests
+(`app.listen(0)` + real `fetch`, no new test dependency) covering every
+route including the 400s for invalid bodies, mismatched PUT ids, and an
+unsafe `:id`.
+
+`src/editor/*.test.ts` (30 tests): the pure logic in `geometry.ts`,
+`manifestEdits.ts`, and `draftStorage.ts`. `LevelEditor.tsx` and
+`Preview3D.tsx` themselves aren't unit-tested — no DOM/React-Three-Fiber
+testing library is installed and adding one is a dependency change out of
+this worker's scope; this mirrors the same limitation already documented
+for `src/ui`'s screen components.
+
+## Known limitations
+
+- No production build verification possible yet: `vite build` fails on
+  the still-missing `scene/index.ts` / `scene/samples.ts` / `game/GameView.tsx`
+  (pre-existing gap from before this work, not introduced by it).
+- `server/levels.ts` isn't registered in `server/index.ts` yet — needs a
+  one-line change from the Livepeer worker (see above).
+- No in-canvas text labels on preview placeholders (would need a
+  font-loading dependency); the "loading…" / "preview unavailable" state
+  surfaces via a DOM banner instead.
+- Ramp helper geometry only supports a single X-axis tilt, not arbitrary
+  orientation.
+- No manifest/asset export-import UI trigger yet (routes only, see above).
