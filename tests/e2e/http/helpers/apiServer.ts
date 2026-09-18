@@ -39,9 +39,16 @@ export interface ApiServerHandle {
  * local FakeMcpServer (see fakeMcpServer.ts) — never the real Livepeer
  * endpoint, per QA's no-real-generation-calls constraint.
  */
-export async function startApiServer(opts: { mcpEndpoint: string }): Promise<ApiServerHandle> {
+export async function startApiServer(opts: {
+  mcpEndpoint: string;
+  /** Reuse an existing durable store to exercise process-restart recovery. */
+  storageDir?: string;
+  /** Defaults to true for helper-created storage and false for supplied storage. */
+  removeStorageOnStop?: boolean;
+}): Promise<ApiServerHandle> {
   const port = await getFreePort();
-  const storageDir = mkdtempSync(join(tmpdir(), "objectquest-e2e-"));
+  const storageDir = opts.storageDir ?? mkdtempSync(join(tmpdir(), "objectquest-e2e-"));
+  const removeStorageOnStop = opts.removeStorageOnStop ?? opts.storageDir === undefined;
 
   const child: ChildProcessWithoutNullStreams = spawn(process.execPath, [TSX_CLI, SERVER_ENTRY], {
     cwd: REPO_ROOT,
@@ -93,7 +100,9 @@ export async function startApiServer(opts: { mcpEndpoint: string }): Promise<Api
               }
               child.once("exit", () => resolve());
             });
-            rmSync(storageDir, { recursive: true, force: true });
+            if (removeStorageOnStop) {
+              rmSync(storageDir, { recursive: true, force: true });
+            }
           },
         };
       }
@@ -104,7 +113,9 @@ export async function startApiServer(opts: { mcpEndpoint: string }): Promise<Api
   }
 
   child.kill();
-  rmSync(storageDir, { recursive: true, force: true });
+  if (removeStorageOnStop) {
+    rmSync(storageDir, { recursive: true, force: true });
+  }
   throw new Error(
     `Timed out waiting for the objectquest API process to become healthy at ${baseUrl}/api/health.\n` +
       `Last error: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}\n` +

@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p server/tsconfig.json --noEmit",
     "test": "vitest run",
+    "test:e2e:http": "vitest run --config tests/e2e/http/vitest.config.ts",
     "test:watch": "vitest"
   },
   "dependencies": {

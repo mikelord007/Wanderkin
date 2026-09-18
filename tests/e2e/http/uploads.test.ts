@@ -70,6 +70,38 @@ describe("POST /api/uploads + GET /api/photos/files/:name", () => {
     expect(Object.keys(body)).toEqual(["message"]);
   });
 
+  it("rejects a recognized image header below the 512-byte minimum", async () => {
+    const tooSmall = Buffer.alloc(511);
+    tooSmall.set([0xff, 0xd8, 0xff]);
+    const form = new FormData();
+    form.append("photos", new Blob([tooSmall], { type: "image/jpeg" }), "too-small.jpg");
+
+    const res = await fetch(`${api.baseUrl}/api/uploads`, { method: "POST", body: form });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { message: string };
+    expect(body.message).toMatch(/too small|512/i);
+    expect(Object.keys(body)).toEqual(["message"]);
+  });
+
+  // Known server bug (reported to Astra 2026-09-18): Multer rejects before
+  // the route handler and there is no terminal JSON error middleware, so
+  // this currently returns 500. `fails` keeps the desired contract
+  // executable and will make the suite fail as soon as the API is fixed,
+  // prompting removal of the marker rather than normalizing the bad shape.
+  it.fails("rejects a photo above the 20 MiB limit with a safe JSON error", async () => {
+    const tooLarge = Buffer.alloc(20 * 1024 * 1024 + 1);
+    tooLarge.set([0xff, 0xd8, 0xff]);
+    const form = new FormData();
+    form.append("photos", new Blob([tooLarge], { type: "image/jpeg" }), "too-large.jpg");
+
+    const res = await fetch(`${api.baseUrl}/api/uploads`, { method: "POST", body: form });
+    expect([400, 413]).toContain(res.status);
+    expect(res.headers.get("content-type")).toMatch(/application\/json/i);
+    const body = (await res.json()) as { message: string };
+    expect(Object.keys(body)).toEqual(["message"]);
+    expect(body.message).toMatch(/limit|large|20/i);
+  });
+
   it("rejects a request with no files under the expected field name", async () => {
     const form = new FormData();
     form.append("notPhotos", "irrelevant");
