@@ -3,7 +3,7 @@ import type { PhotoReference, ProviderCapabilityId, ProviderInputPhoto } from "@
 /**
  * Persists everything needed to survive a reload without ever launching a
  * duplicate generation job or losing source-photo/provenance metadata,
- * across three distinct phases:
+ * across two distinct phases:
  *
  * 1. `PendingSubmission` — saved BEFORE the POST /api/jobs call fires. If the
  *    response never arrives (timeout, tab closed, network drop), the server
@@ -11,24 +11,24 @@ import type { PhotoReference, ProviderCapabilityId, ProviderInputPhoto } from "@
  *    with the SAME idempotencyKey and the SAME already-uploaded photo refs
  *    (never re-upload — that would mint new photo ids under the same key
  *    and could desync from whatever the server already accepted).
- * 2. `ActiveJob` — saved once the POST response confirms a durable job id.
- *    From here a reload just resumes polling GET /api/jobs/:id.
- * 3. `ActivePreparation` — saved once a job reaches `ready` (or a GLB import
- *    completes) and the flow moves into Preparation, before the user has
- *    saved a level. `AssetReference` (shared/manifest.ts) has no photo
- *    refs of its own, so without this record a reload between "asset
- *    ready" and "level saved" would silently drop which source photos the
- *    asset came from. Cleared once a level is actually saved (the photos
- *    are then durable inside the saved SceneManifest) or the user
- *    deliberately abandons this preparation.
+ * 2. `ActiveSource` — saved once the POST response confirms a durable job
+ *    id (kind "job"), or once a direct GLB import completes (kind
+ *    "import"). The SAME record carries the flow all the way from
+ *    generation through Preparation: `resultAssetId` starts unset, gets
+ *    filled in once the job reaches `ready` (never cleared at that point —
+ *    `AssetReference` has no photo refs of its own, so dropping this
+ *    record on the ready→Preparation transition would silently lose which
+ *    source photos the asset came from). It's only cleared once a level is
+ *    actually saved (the photos are then durable inside the saved
+ *    SceneManifest) or the user deliberately leaves an unsaved
+ *    preparation.
  *
- * Exactly one of the three (or none) should be present at a time; clearing
- * one never implicitly touches the others.
+ * The two are mutually exclusive by construction; clearing one never
+ * implicitly touches the other.
  */
 
 const PENDING_SUBMISSION_KEY = "objectquest:pendingSubmission";
-const ACTIVE_JOB_KEY = "objectquest:activeJob";
-const ACTIVE_PREPARATION_KEY = "objectquest:activePreparation";
+const ACTIVE_SOURCE_KEY = "objectquest:activeSource";
 
 export interface PendingSubmission {
   idempotencyKey: string;
@@ -40,19 +40,17 @@ export interface PendingSubmission {
   photos: PhotoReference[];
 }
 
-export interface ActiveJob {
-  jobId: string;
-  /** Carried forward so Preparation can attach real source-photo references
-   * and provenance to the resulting manifest once the job is ready. */
-  photos: PhotoReference[];
-}
-
-export interface ActivePreparation {
-  assetId: string;
-  /** Same source-photo refs carried over from ActiveJob (empty for a
-   * direct GLB import, which has none). */
-  photos: PhotoReference[];
-}
+export type ActiveSource =
+  | {
+      kind: "job";
+      jobId: string;
+      /** Carried forward so Preparation can attach real source-photo
+       * references and provenance to the resulting manifest. */
+      photos: PhotoReference[];
+      /** Unset while still generating; set once the job reaches `ready`. */
+      resultAssetId?: string;
+    }
+  | { kind: "import"; assetId: string };
 
 function readJson<T>(key: string): T | null {
   try {
@@ -93,51 +91,39 @@ export function clearPendingSubmission(): void {
   remove(PENDING_SUBMISSION_KEY);
 }
 
-export function loadActiveJob(): ActiveJob | null {
-  return readJson<ActiveJob>(ACTIVE_JOB_KEY);
+export function loadActiveSource(): ActiveSource | null {
+  return readJson<ActiveSource>(ACTIVE_SOURCE_KEY);
 }
 
-export function saveActiveJob(job: ActiveJob): void {
-  writeJson(ACTIVE_JOB_KEY, job);
+export function saveActiveSource(source: ActiveSource): void {
+  writeJson(ACTIVE_SOURCE_KEY, source);
 }
 
-export function clearActiveJob(): void {
-  remove(ACTIVE_JOB_KEY);
-}
-
-export function loadActivePreparation(): ActivePreparation | null {
-  return readJson<ActivePreparation>(ACTIVE_PREPARATION_KEY);
-}
-
-export function saveActivePreparation(preparation: ActivePreparation): void {
-  writeJson(ACTIVE_PREPARATION_KEY, preparation);
-}
-
-export function clearActivePreparation(): void {
-  remove(ACTIVE_PREPARATION_KEY);
+export function clearActiveSource(): void {
+  remove(ACTIVE_SOURCE_KEY);
 }
 
 export type ResumeState =
+  | { screen: "preparation"; assetId: string; photos: PhotoReference[] }
   | { screen: "generation"; jobId: string }
-  | { screen: "preparation"; preparation: ActivePreparation }
   | { screen: "photos"; pending: PendingSubmission }
   | { screen: "start" };
 
-/** Pure decision used on app boot, most-advanced-phase-first (these are
- * expected to be mutually exclusive by construction — each phase clears
- * the previous one's record on transition — so the ordering below is only
- * a defensive tie-break, not load-bearing in the normal flow):
- * ActivePreparation (closest to a save) beats ActiveJob (still generating)
- * beats an unresolved PendingSubmission (the submission itself is still in
- * doubt). */
+/** Pure decision used on app boot. An ActiveSource always wins over a
+ * PendingSubmission: a "job" with a resultAssetId, or an "import", both
+ * mean the flow already reached Preparation and should resume there
+ * directly rather than re-polling; a "job" without one is still
+ * generating and resumes on the Generation screen. */
 export function resolveResumeState(): ResumeState {
-  const preparation = loadActivePreparation();
-  if (preparation) {
-    return { screen: "preparation", preparation };
-  }
-  const activeJob = loadActiveJob();
-  if (activeJob) {
-    return { screen: "generation", jobId: activeJob.jobId };
+  const active = loadActiveSource();
+  if (active) {
+    if (active.kind === "import") {
+      return { screen: "preparation", assetId: active.assetId, photos: [] };
+    }
+    if (active.resultAssetId) {
+      return { screen: "preparation", assetId: active.resultAssetId, photos: active.photos };
+    }
+    return { screen: "generation", jobId: active.jobId };
   }
   const pending = loadPendingSubmission();
   if (pending) {

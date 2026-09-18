@@ -6,7 +6,7 @@ import { buildProviderInputPhotos, deriveSelectionFromInputPhotos } from "../pho
 import {
   clearPendingSubmission,
   loadPendingSubmission,
-  saveActiveJob,
+  saveActiveSource,
   savePendingSubmission,
   type PendingSubmission,
 } from "../jobStorage.js";
@@ -163,7 +163,7 @@ export function PhotosScreen({ onJobStarted, onBack }: PhotosScreenProps) {
       );
       // Durable job id confirmed — the pending submission phase is over.
       clearPendingSubmission();
-      saveActiveJob({ jobId: job.id, photos });
+      saveActiveSource({ kind: "job", jobId: job.id, photos });
       onJobStarted(job.id);
     } catch (error) {
       // Leave the pending submission in place: this attempt is still

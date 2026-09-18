@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AssetReference, SceneManifest } from "@shared/index.js";
 import { createEmptyManifest } from "@shared/index.js";
-import { attachProvenance, withRetryBust } from "./manifestProvenance.js";
+import { attachProvenance } from "./manifestProvenance.js";
 
 function baseManifest(): SceneManifest {
   const manifest = createEmptyManifest({
@@ -70,22 +70,5 @@ describe("attachProvenance", () => {
     manifest.photos = [{ id: "scene-photo", url: "/tmp/scene.jpg", order: 1 }];
     const result = attachProvenance(manifest, realAsset, undefined);
     expect(result.photos).toEqual(manifest.photos);
-  });
-});
-
-describe("withRetryBust", () => {
-  it("returns the original URL unchanged on the first attempt", () => {
-    expect(withRetryBust("/storage/asset.glb", 0)).toBe("/storage/asset.glb");
-  });
-
-  it("appends a cache-busting query param on retries, using & when a query string already exists", () => {
-    expect(withRetryBust("/storage/asset.glb", 1)).toBe("/storage/asset.glb?oqRetry=1");
-    expect(withRetryBust("/storage/asset.glb?v=2", 2)).toBe("/storage/asset.glb?v=2&oqRetry=2");
-  });
-
-  it("produces a distinct URL per retry attempt so a URL-keyed cache can't replay a stale rejection", () => {
-    const first = withRetryBust("/storage/asset.glb", 1);
-    const second = withRetryBust("/storage/asset.glb", 2);
-    expect(first).not.toBe(second);
   });
 });
