@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import type { PhotoReference, SceneManifest } from "@shared/index.js";
 import { describeApiError, getAsset } from "../api.js";
 import { LoadingScreen } from "../components/LoadingScreen.js";
+import { courseCandidateOptions, replaceSavedCandidate } from "../courseCandidates.js";
 import { attachProvenance, resolveAssetForManifest } from "../manifestProvenance.js";
 
 /**
@@ -37,6 +38,9 @@ const STAGE_TEXT: Record<"downloading" | "decoding" | "analyzing" | "validating"
 };
 
 export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onBack }: PreparationScreenProps) {
+  const [primaryManifest, setPrimaryManifest] = useState<SceneManifest | null>(
+    source.kind === "manifest" ? source.manifest : null,
+  );
   const [manifest, setManifest] = useState<SceneManifest | null>(
     source.kind === "manifest" ? source.manifest : null,
   );
@@ -79,12 +83,13 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
         );
         if (cancelled) return;
 
-        setManifest(attachProvenance(result.manifest, cleanAsset, resolvedSourcePhotos));
-        setCandidates(
-          (result.courseCandidates ?? []).map((candidate: SceneManifest) =>
-            attachProvenance(candidate, cleanAsset, resolvedSourcePhotos),
-          ),
+        const preparedPrimary = attachProvenance(result.manifest, cleanAsset, resolvedSourcePhotos);
+        const preparedCandidates = (result.courseCandidates ?? []).map((candidate: SceneManifest) =>
+          attachProvenance(candidate, cleanAsset, resolvedSourcePhotos),
         );
+        setPrimaryManifest(preparedPrimary);
+        setManifest(preparedPrimary);
+        setCandidates(preparedCandidates);
       } catch (err) {
         if (!cancelled) setError(describeApiError(err));
       }
@@ -97,16 +102,16 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
   }, [source, retryAttempt]);
 
   const candidateOptions = useMemo(() => {
-    if (!manifest) return [];
-    const primary = manifest;
-    return [primary, ...candidates.filter((c) => c !== primary)];
-  }, [manifest, candidates]);
+    return courseCandidateOptions(primaryManifest, candidates);
+  }, [primaryManifest, candidates]);
 
   async function handleSave(next: SceneManifest): Promise<SceneManifest> {
     setSaving(true);
     setSaveError(null);
     try {
       const saved = await onSave(next);
+      setPrimaryManifest((current) => (current?.levelId === next.levelId ? saved : current));
+      setCandidates((current) => replaceSavedCandidate(current, next.levelId, saved));
       setManifest(saved);
       return saved;
     } catch (err) {
@@ -188,6 +193,7 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
 
       <Suspense fallback={<LoadingScreen stage="Loading the level editor…" />}>
         <LevelEditor
+          key={manifest.levelId}
           manifest={manifest}
           isPersisted={!isNew}
           onSave={handleSave}
