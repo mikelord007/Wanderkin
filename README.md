@@ -45,21 +45,30 @@ prepare its course, edit the manifest, save it, and play.
 - `npx tsx src/scene/tools/verify-samples.ts` — conservative real-GLB route
   validation for both bundled courses
 
-The current integrated parent was confirmed with a full build and 225 passing
-tests. Those are headless/build results, not browser acceptance. A real Chrome
-run exposed a viewport/root flex boot-layout bug now assigned to the game
-workstream, and no complete browser play-through has yet been recorded. An
-oversized HTTP request returning 500 instead of the intended client error is
-also assigned to the editor/server integration workstream.
+Both bundled courses have now been completed and replayed through the real game
+UI in Chromium. The acceptance run used normal keyboard/mouse controls and
+read-only diagnostics rather than teleporting or mutating checkpoints. See
+[`docs/QA.md`](docs/QA.md) for the exact automated counts, browser protocol,
+and remaining manual caveats.
+
+A single bounded real Rodin generation also succeeded. The first submission
+failed because its seed was invalid; that input was corrected before the
+second submission. The successful application job was `411dc7d9`, backed by
+provider job `mjob_cfb2286bf2b5`, and produced a locally stored 5,029,388-byte
+GLB with SHA-256
+`71d05f8c75bec0a46b5225640e94cdf5f2ac252fb49b81d8183f98eefba65c42`.
+The local bytes were re-hashed to verify the stored asset. Registered-model
+provenance was resolved from live capability metadata; the provider result did
+not return a direct `served_model_id`.
 
 ## Current limits
 
-- The Rodin helper climb is completed by the real headless Rapier simulation;
-  both sample courses pass conservative geometry validation. Neither result
-  substitutes for a full browser completion, especially for Tripo.
-- Generic generated courses report uncertainty and may need creator adjustment.
-- Livepeer adapter tests use fixtures. No new paid generation was run for the
-  current acceptance cycle.
+- The authored Rodin and Tripo samples are browser-completed, but that does not
+  prove an arbitrary generated course is reachable. Generic preparation uses a
+  conservative validator, reports uncertainty, and may require creator edits.
+- Portable level export/import controls are implemented. Their final browser
+  round-trip acceptance remains open; follow the current QA report rather than
+  treating route or unit coverage as a browser pass.
 - Local storage under `STORAGE_DIR` is durable for one server installation;
   localhost asset URLs are not public sharing links.
 - Desktop keyboard, mouse, and pointer lock are supported; mobile/touch and
@@ -68,6 +77,11 @@ also assigned to the editor/server integration workstream.
 Architecture and current milestone state are in
 [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md). Integration
 contracts are in [`docs/CONTRACTS.md`](docs/CONTRACTS.md).
+
+Deployment uses separate frontend and API processes behind one public origin:
+serve the built client statically, route `/api/*` to one Node process, and mount
+durable storage for that API. The complete topology and release checks live in
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ## Separate reference deployment
 
