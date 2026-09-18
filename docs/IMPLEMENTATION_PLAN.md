@@ -40,33 +40,48 @@ triangle colliders use the same geometry and entity transform.
 | Milestone | State | Evidence and remaining work |
 | --- | --- | --- |
 | A. Shared foundation | Complete | Scaffold, contracts, dependencies, sample assets, API shell, and private GitHub repository are established. |
-| B. Playable existing assets | Implemented; browser acceptance open | Both GLBs normalize to authored five-checkpoint manifests, use real triangle collision, added floors/helpers, and the same game runtime. The real headless controller completes the Rodin climb; both courses pass conservative real-GLB validation. Chrome exposed a viewport/root flex boot bug assigned to game Sol, and neither complete browser course has been accepted yet. |
-| C. Photos to saved playable level | Integrated foundation; hardening active | Uploads, capability discovery, durable idempotent jobs, stored provenance/assets, scene preparation, editor, drafts, saved levels, and bundle routes exist. Editor Sol is hardening strict import/export and shared-store wiring. The oversized-request 500 response is assigned there. No new paid provider job is part of this verification cycle. |
-| D. Verification and handoff | In progress | The integrated parent passed strict typecheck, a production build, and 225 tests. This is not release acceptance: browser end-to-end course completion, the Chrome layout fix, HTTP error hardening, final integrated QA, and separate game deployment remain open. QA owns deployment documentation/reporting. |
+| B. Playable existing assets | Browser-accepted | Both GLBs normalize to authored five-checkpoint manifests, use real triangle collision, added floors/helpers, and the same game runtime. Both courses were completed to the visible finish screen and replayed in real Chromium. The earlier viewport/root layout defect is fixed. |
+| C. Photos to saved playable level | Implemented; final portable-UI acceptance open | Uploads, live capability discovery, durable idempotent jobs, stored provenance/assets, scene preparation, editor/drafts, saved levels, and portable bundle UI exist. A bounded real Rodin job succeeded and its local GLB hash was verified. Generic course output remains explicitly uncertain and editable. Portable UI landed on main at `ac4bae8`, but its final browser round-trip still belongs to QA. |
+| D. Verification and handoff | Final integration/QA | Typecheck, production build, unit/headless, HTTP, and real-Chromium gameplay evidence are green; exact counts and caveats live in `docs/QA.md`. The oversized-request behavior is fixed. Remaining work is the portable UI browser check, final QA synthesis, deployment handoff, and integration of the relative-storage fix `fee23ab`. |
 
 ## Active workstreams
 
 | Workstream | Current owner/model | State |
 | --- | --- | --- |
-| Scene loading/preparation and bundled levels | Scene Sol | Integrated and pushed; API/docs follow-up only |
-| Player/runtime/browser layout | Game Sol | Shared scene-loader adoption and Chrome viewport/root fix active |
-| Editor, level persistence, portable bundles | Editor Sol | Validation, shared `AssetStore`/`PhotoStore` wiring, and oversize HTTP behavior active |
-| Independent QA and root dependencies | QA Sol | HTTP/browser/integration review active; owns root dependency changes and QA deployment/report docs |
-| Coordination and main ownership | Astra lead | Assigns integration order; editor owns the current integration window |
+| Scene loading/preparation and bundled levels | Scene Sol | Integrated; final owned documentation refresh |
+| Player/runtime/browser layout | Game Sol | Shared loader and viewport fix integrated; both sample courses browser-completed/replayed |
+| Editor, level persistence, portable bundles | Editor Sol | Portable UI integrated at `ac4bae8`; owns main and final browser round-trip acceptance |
+| Stored-file path quick fix | Scene Sol | `fee23ab` committed/pushed; awaiting editor-owned main integration |
+| Independent QA and root dependencies | QA Sol | Owns precise test counts, browser evidence, deployment documentation, and final report |
+| Coordination and main ownership | Astra lead | Sol is the default worker model; integration order remains explicit |
+
+## Bounded real generation evidence
+
+The first authorized Rodin submission failed because it used an invalid seed.
+The seed was corrected before a second, separate submission. That run completed
+as application job `411dc7d9` / provider job `mjob_cfb2286bf2b5` and stored a
+5,029,388-byte GLB whose local SHA-256 was independently verified as
+`71d05f8c75bec0a46b5225640e94cdf5f2ac252fb49b81d8183f98eefba65c42`.
+The registered model came from the live capability descriptor used for the
+request; no direct `served_model_id` was present in the result. This is one
+bounded success, not a general availability or quality guarantee.
 
 ## Verification boundary
 
-Passing typecheck, unit/integration tests, a production bundle, a rendered
-screenshot, or the conservative course validator does not prove a player can
-complete a course in Chrome. Browser acceptance requires driving the actual
-controls and controller through every ordered checkpoint on each sample without
-diagnostic shortcuts. Results must continue to distinguish fixture-backed
-Livepeer tests from a bounded real provider call.
+Passing typecheck, route tests, a production bundle, a rendered screenshot, or
+the conservative course validator alone does not prove playability. The sample
+claim is now supported by real Chromium completion and replay using the actual
+controller. That evidence is limited to the authored samples: automatically
+prepared courses still carry validation evidence and uncertainty notes and may
+need manual editing. Results must continue to distinguish fixture-backed MCP
+tests from the one bounded real provider call above. Exact verification counts
+and the remaining portable-UI browser check belong in `docs/QA.md`.
 
 ## Deployment boundary
 
 ObjectQuest needs its own deployment and public asset base. Do not deploy it
 over the preserved comparison site at
 <https://livepeer-room-mesh-comparison.lordmike007.chatgpt.site/>. Detailed
-deployment instructions and the final QA report are intentionally owned by QA,
-not duplicated here.
+deployment instructions are intentionally owned by QA in `docs/DEPLOYMENT.md`.
+The supported topology is a static client plus one Node API behind the same
+public origin, with `/api/*` routed to the API and a durable storage volume.

@@ -85,7 +85,9 @@ sample `SceneManifest`s for the bundled Rodin/Tripo GLBs in
 ```ts
 interface LevelEditorProps {
   manifest: SceneManifest;
-  onSave: (manifest: SceneManifest) => void;
+  isPersisted?: boolean;
+  onSave: (manifest: SceneManifest) => SceneManifest | Promise<SceneManifest>;
+  onExport?: (manifest: SceneManifest) => void | Promise<void>;
   onPlay: (manifest: SceneManifest) => void;
   onBack: () => void;
 }
@@ -93,6 +95,11 @@ interface LevelEditorProps {
 
 Edits are immutable `SceneManifest` changes. Any course-affecting edit changes
 validation to `manually-adjusted`; the editor does not claim physics validation.
+`onSave` returns the authoritative saved manifest, including server-assigned IDs
+and timestamps, and the editor adopts that value before clearing its draft or
+exporting. `isPersisted` distinguishes an unsaved prepared level from an
+existing server level. When `onExport` is supplied, dirty levels are saved and
+the authoritative result is exported; export never races a stale client copy.
 Unsaved drafts are a client-side convenience in `localStorage`, keyed by level
 ID and the saved manifest's `updatedAt`. They are not an authoritative server
 store.
@@ -102,6 +109,12 @@ store.
 Owns top-level routing between start/photos/generation/preparation/play/
 finish screens and composes `GameView` and `LevelEditor` from the contracts
 above.
+
+Portable level UI is implemented: the start screen imports a bundle as a new
+level and exports saved levels, while the editor offers Export or Save & export.
+The client sends imports as `application/octet-stream` so the route-specific
+bundle limit applies. This implemented contract is not yet a browser-acceptance
+claim; the final round-trip result belongs in `docs/QA.md`.
 
 `AssetReference` remains the shared manifest asset shape. The server may return
 the additive transport shape below from `GET /api/assets/:id`:
@@ -144,6 +157,11 @@ app.use(
 Server JSON indexes use serialized, temp-file-then-rename writes. A failed
 write must not mutate the in-memory snapshot.
 
+`env.storageDir` is required to be an absolute path before constructing these
+stores because Express `sendFile` rejects relative filenames. The minimal fix
+is committed as `fee23ab` and remains pending main integration at the time of
+this document refresh.
+
 ## Server API (owner: Livepeer integration for provider/job routes; Level
 tools for persistence routes)
 
@@ -168,12 +186,17 @@ resolve and validate. Imports preserve provenance, verify declared asset
 hashes/sizes, reject ambiguous mappings, store through the shared stores, remap
 fresh IDs/URLs, and never overwrite an existing level.
 
-## Status notes from live verification (2026-09-18)
+## Verification status (2026-09-18)
 
 - Both `rodin-i3d` and `tripo-mv3d` capabilities are confirmed available
   today against the Livepeer MCP endpoint.
-- Keyless `spend_cap` read reports $100 remaining / $0 spent. No caps were
-  changed and no generation job was submitted during foundation work.
+- A bounded real Rodin run succeeded after an initial submission failed due to
+  an invalid seed and the input was corrected. Application job `411dc7d9` /
+  provider job `mjob_cfb2286bf2b5` produced a 5,029,388-byte local GLB with
+  verified SHA-256
+  `71d05f8c75bec0a46b5225640e94cdf5f2ac252fb49b81d8183f98eefba65c42`.
+  Registered-model provenance was resolved from live capability metadata; the
+  result did not provide a direct `served_model_id`.
 - Observed sample bounds (source: `rodin-provenance.json` /
   `tripo-provenance.json`): Rodin extents width 1.895m / height 0.603m /
   depth 0.676m; Tripo extents width 0.602m / height 0.376m / depth 1.039m
@@ -185,9 +208,13 @@ fresh IDs/URLs, and never overwrite an existing level.
   documented, arbitrary game-scale choice, not a measured room scale.
 
 - Both sample manifests contain five checkpoints and elevated furniture routes.
-  They pass real-GLB conservative validation; the Rodin helper climb also passes
-  the real headless game simulation. No complete browser play-through has been
-  accepted yet.
-- The integrated parent passed strict typecheck, a production build, and 225
-  tests. A Chrome viewport/root flex issue and an oversized-request 500 response
-  remain assigned fixes, so the build is not marked accepted.
+  Each course was completed to the finish screen and replayed in real Chromium
+  with the actual controller. This acceptance applies to the authored samples,
+  not arbitrary generated courses; generic preparation remains conservative,
+  records uncertainty, and may require editor adjustment.
+- The viewport/root layout and oversized-request response defects are fixed.
+  Precise automated counts, browser evidence, and caveats are maintained in
+  `docs/QA.md` rather than duplicated here.
+- Portable import/export controls are implemented on main at `ac4bae8`; their
+  final browser round-trip remains pending and must not be inferred from route
+  or unit tests.
