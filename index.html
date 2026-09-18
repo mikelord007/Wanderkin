@@ -4,9 +4,53 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ObjectQuest</title>
+    <style>
+      /* Inline so the boot screen paints before any bundled CSS/JS loads. */
+      html, body { margin: 0; padding: 0; background: #171224; }
+      #root {
+        min-height: 100vh;
+        display: flex;
+      }
+      .oq-boot {
+        margin: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.75rem;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        color: #f3eefc;
+      }
+      .oq-boot__mark {
+        font-size: 1.5rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+      .oq-boot__spinner {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 3px solid rgba(243, 238, 252, 0.25);
+        border-top-color: #f5a623;
+        animation: oq-boot-spin 0.8s linear infinite;
+      }
+      .oq-boot p {
+        margin: 0;
+        font-size: 0.9rem;
+        opacity: 0.75;
+      }
+      @keyframes oq-boot-spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="oq-boot" role="status" aria-live="polite">
+        <div class="oq-boot__mark">ObjectQuest</div>
+        <div class="oq-boot__spinner" aria-hidden="true"></div>
+        <p>Loading…</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
