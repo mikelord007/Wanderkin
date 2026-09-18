@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProviderAdapter, ProviderStatusResult, ProviderSubmitResult } from "../../shared/provider.js";
+import { McpToolError, McpTransportError } from "../livepeer/mcpClient.js";
 import { AssetStore } from "../persistence/assetStore.js";
 import { PhotoStore } from "../persistence/photoStore.js";
 import { JobStore } from "./store.js";
@@ -51,6 +52,22 @@ function fakeAdapter(overrides: Partial<ProviderAdapter> = {}): ProviderAdapter 
 }
 
 const REQUEST = { capability: "rodin-i3d", photos: [{ photoId: "p1", sourceIndex: 1 }] } as const;
+
+/** Sanitized shape observed from the 2026-09-18 live smoke poll. The MCP
+ * endpoint returned this as `result.isError`, so McpClient throws before the
+ * adapter can return a normal `{ state: "failed" }` status object. */
+const TERMINAL_STATUS_TEXT =
+  "Media job mjob_68bae8dfd271: failed (19s)\n" +
+  "Capability: rodin-i3d\n" +
+  "Action: run_capability\n" +
+  "Runner: host agent.livepeer.org · entered · http 200 · err detached_failed\n" +
+  "Submitted via: run_capability\n" +
+  "Error: {'error': 'pymthouse path is pinned to the live-runner provider node; LR dispatcher failed'}";
+
+const TERMINAL_STATUS_ENVELOPE = {
+  isError: true,
+  content: [{ type: "text", text: TERMINAL_STATUS_TEXT }],
+};
 
 describe("JobManager", () => {
   let dir: string;
@@ -177,12 +194,56 @@ describe("JobManager", () => {
   });
 
   it("a poll failure backs off instead of marking the job failed on a transient blip", async () => {
-    const adapter = fakeAdapter({ getStatus: vi.fn(async () => { throw new Error("network blip"); }) });
+    const adapter = fakeAdapter({ getStatus: vi.fn(async () => { throw new McpTransportError("network blip"); }) });
     const manager = build(adapter);
 
     const outcome = await manager.submitOrReconcile(REQUEST, "idem-key-5");
     const updated = await manager.pollAndAdvance(outcome.job.id);
     expect(updated?.state).toBe("generating");
+  });
+
+  it("marks a non-retryable get_create_media isError envelope failed without losing the provider job id", async () => {
+    const getStatus = vi.fn(async (): Promise<ProviderStatusResult> => {
+      throw new McpToolError(
+        TERMINAL_STATUS_TEXT,
+        "get_create_media",
+        false,
+        TERMINAL_STATUS_ENVELOPE,
+      );
+    });
+    const adapter = fakeAdapter({
+      submit: vi.fn(async (): Promise<ProviderSubmitResult> => ({
+        providerJobId: "mjob_68bae8dfd271",
+        capabilityUsed: "rodin-i3d",
+        fallbackFired: null,
+      })),
+      getStatus,
+    });
+    const jobStore = new JobStore(dir);
+    const manager = new JobManager(jobStore, adapter, new AssetStore(dir), new PhotoStore(dir));
+
+    const outcome = await manager.submitOrReconcile(REQUEST, "objectquest-smoke-terminal-fixture");
+    const updated = await manager.pollAndAdvance(outcome.job.id);
+
+    expect(updated?.state).toBe("failed");
+    expect(updated?.providerJobId).toBe("mjob_68bae8dfd271");
+    expect(updated?.lastError).toMatchObject({
+      code: "get_create_media",
+      retryable: false,
+    });
+    expect(updated?.lastError?.message).toContain("failed (19s)");
+    expect(updated?.completedAt).toBeTruthy();
+
+    const stored = await jobStore.get(outcome.job.id);
+    expect(stored?.internal.lastProviderStatusRaw).toMatchObject({
+      code: "get_create_media",
+      retryable: false,
+    });
+
+    // Terminal means subsequent reads return the stored failure and do not
+    // keep hammering get_create_media forever.
+    await manager.getPublic(outcome.job.id);
+    expect(getStatus).toHaveBeenCalledTimes(1);
   });
 
   it("resumeOnBoot schedules an immediate poll for a job restored from disk mid-flight (providerJobId already set)", async () => {
