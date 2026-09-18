@@ -1,4 +1,5 @@
-import express from "express";
+import express, { type ErrorRequestHandler } from "express";
+import multer from "multer";
 import { DEFAULT_MOVEMENT_CONFIG } from "../shared/movement.js";
 import { env } from "./env.js";
 import { mcpClient } from "./livepeer/mcpClient.js";
@@ -13,6 +14,7 @@ import { createPhotosRouter } from "./routes/photos.js";
 import { createAssetsRouter } from "./routes/assets.js";
 import { createJobsRouter } from "./routes/jobs.js";
 import { createLevelsRouter, LevelStore } from "./levels.js";
+import { logServerError } from "./util/sanitize.js";
 
 /**
  * Foundation API shell plus the Livepeer provider/job/asset routes (owned by
@@ -43,6 +45,54 @@ app.use(createPhotosRouter(photoStore));
 app.use(createAssetsRouter(assetStore));
 app.use(createJobsRouter(jobManager, adapter, photoStore));
 app.use(createLevelsRouter(new LevelStore(env.storageDir, assetStore, photoStore)));
+
+const terminalErrorHandler: ErrorRequestHandler = (error, req, res, next) => {
+  if (res.headersSent) {
+    next(error);
+    return;
+  }
+
+  if (error instanceof multer.MulterError) {
+    if (error.code === "LIMIT_FILE_SIZE") {
+      res.status(413).json({ message: "Uploaded file exceeds the allowed size limit." });
+      return;
+    }
+    res.status(400).json({ message: "The multipart upload is invalid or exceeds an upload limit." });
+    return;
+  }
+
+  const requestError = error as { type?: unknown; status?: unknown; expose?: unknown };
+  if (requestError.type === "entity.too.large") {
+    res.status(413).json({ message: "Request body exceeds the allowed size limit." });
+    return;
+  }
+  if (requestError.type === "entity.parse.failed") {
+    res.status(400).json({ message: "Request body is not valid JSON." });
+    return;
+  }
+  if (
+    req.is("multipart/form-data") &&
+    error instanceof Error &&
+    /boundary|multipart|unexpected end of form/i.test(error.message)
+  ) {
+    res.status(400).json({ message: "The multipart upload is malformed." });
+    return;
+  }
+  if (
+    typeof requestError.status === "number" &&
+    requestError.status >= 400 &&
+    requestError.status < 500 &&
+    requestError.expose === true
+  ) {
+    res.status(requestError.status).json({ message: "Request body could not be processed." });
+    return;
+  }
+
+  logServerError(`${req.method} ${req.path}`, error);
+  res.status(500).json({ message: "Something went wrong. Please try again." });
+};
+
+app.use(terminalErrorHandler);
 
 await jobManager.resumeOnBoot();
 

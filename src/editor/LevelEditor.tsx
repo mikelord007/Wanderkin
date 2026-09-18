@@ -283,28 +283,40 @@ export function LevelEditor({ manifest, onSave, onPlay, onBack }: LevelEditorPro
 // --- Panels -----------------------------------------------------------
 
 function ValidationPanel({ manifest }: { manifest: SceneManifest }) {
-  const { status, method, checkedAt, evidence, uncertaintyNotes } = manifest.courseValidation;
+  const { status, checkedAt, evidence, uncertaintyNotes } = manifest.courseValidation;
   const label =
     status === "validated"
-      ? "Validated"
+      ? "Automated check passed"
       : status === "failed"
-        ? "Validation failed"
+        ? "Needs adjustment"
         : status === "manually-adjusted"
-          ? "Manually adjusted (not re-validated)"
-          : "Not yet validated";
+          ? "Play-test recommended"
+          : "Not checked yet";
+  const summary =
+    status === "validated"
+      ? "Automated reachability checks passed. A real play-test is still recommended."
+      : status === "failed"
+        ? "Automated checks found a route problem. Adjust the course before relying on it."
+        : status === "manually-adjusted"
+          ? "This course includes manual edits. Confirm the route in Play mode before relying on it."
+          : "Reachability has not been checked. Play-test this course before relying on it.";
+  const displayEvidence = evidence?.replace(/\s*\(see\s+[^)]+\)\.?/gi, ".");
+  const hasTechnicalDetails = Boolean(displayEvidence || uncertaintyNotes || checkedAt);
   return (
     <section className="oq-panel oq-editor-panel">
       <h2>Course status</h2>
       <p className={`oq-editor__status-badge oq-editor__status-badge--${status}`}>{label}</p>
-      {status === "unvalidated" ? (
-        <p className="oq-warning-text">
-          This course hasn't been proven completable. Play-test it before relying on it.
-        </p>
+      <p className="oq-editor__validation-summary">{summary}</p>
+      {hasTechnicalDetails ? (
+        <details className="oq-editor__technical">
+          <summary>Technical validation details</summary>
+          <div className="oq-editor__technical-content">
+            {uncertaintyNotes ? <p>{uncertaintyNotes}</p> : null}
+            {displayEvidence ? <p>Evidence: {displayEvidence}</p> : null}
+            {checkedAt ? <p>Checked: {new Date(checkedAt).toLocaleString()}</p> : null}
+          </div>
+        </details>
       ) : null}
-      {uncertaintyNotes ? <p className="oq-subtitle">{uncertaintyNotes}</p> : null}
-      {method ? <p className="oq-editor__meta">Method: {method}</p> : null}
-      {evidence ? <p className="oq-editor__meta">Evidence: {evidence}</p> : null}
-      {checkedAt ? <p className="oq-editor__meta">Checked: {new Date(checkedAt).toLocaleString()}</p> : null}
     </section>
   );
 }
