@@ -16,7 +16,7 @@ Environment variables (`server/env.ts`):
 
 | Var | Default | Notes |
 | --- | --- | --- |
-| `LIVEPEER_MCP_ENDPOINT` | `https://agent.livepeer.org/api/mcp/full` | Server-only; never sent to the browser bundle. |
+| `LIVEPEER_MCP_ENDPOINT` | `https://agent.livepeer.org/api/mcp/full` | Server-only; never sent to the browser bundle. `server/env.ts` falls back to this exact known endpoint in code (not just in `.env.example`), so a checkout that never copied `.env` still works. |
 | `LIVEPEER_API_KEY` | empty | Optional bearer token. Not exercised against a real key — the reference workspace's successful 2026-09-17 test used the **keyless demo path** with no `Authorization` header at all (see `mcpClient.ts`). |
 | `PORT` | `8787` | Node API port. |
 | `STORAGE_DIR` | `./storage` | Durable jobs/photos/assets JSON + file storage. Created on first write. |
@@ -38,7 +38,16 @@ during this work (both `rodin-i3d` and `tripo-mv3d` confirmed
 assumed from the cached `work/livepeer-full-endpoint-tools.json` alone.
 `GET /api/capabilities` triggers this same live `describe_capability` check
 (5-minute in-process cache) on every request past the cache TTL — it never
-serves stale/hardcoded capability data as if it were current.
+serves stale/hardcoded capability data as if it were current. A capability
+that can't be live-confirmed (network failure, not found, or the provider
+itself reports it degraded) is **dropped from the result**, never returned
+alongside a note claiming it's a fallback — the static descriptor list
+(`server/livepeer/capabilities.ts`) is only ever the template for *what* to
+check, never a value served in place of a real check. If nothing can be
+confirmed at all, the route returns **503** with a plain
+`{message: "..."}` body rather than silently serving stale data as current;
+the bundled sample level and GLB import stay usable regardless (they don't
+call this route).
 
 The client honors `Accept: application/json, text/event-stream` two ways:
 a normal `application/json` body, or `text/event-stream` framed `data:`
@@ -122,9 +131,12 @@ generation happens server-side.
 - Provider result downloads (`server/persistence/fetchSafe.ts`): https-only,
   DNS-resolved and rejected if the address is loopback/link-local
   (including the `169.254.169.254` cloud metadata address)/RFC1918/CGNAT,
-  redirects re-validated rather than followed blindly, and the response body
-  is aborted mid-stream if it exceeds the byte cap rather than buffered
-  unbounded.
+  each redirect hop re-validated (never followed blindly) and capped at 5
+  hops so a redirect loop is refused instead of hanging forever, one
+  `AbortController`/timeout spans the *entire* call including every hop
+  (not reset per redirect, so a chain can't keep extending its own
+  deadline), and the response body is cancelled and the read aborted
+  mid-stream if it exceeds the byte cap rather than buffered unbounded.
 - Files are served back out at content-addressed URLs
   (`/api/assets/files/{sha256}.glb`, `/api/photos/files/{uuid}.{ext}`) with
   a strict filename pattern check, so a request can never escape the storage
@@ -190,7 +202,7 @@ which has no provenance either.
   2026-09-18. Keyless `spend_cap`: $100 remaining / $0 spent (per lead's
   prior check); no cap was changed and no spend was made by this worker.
 - **Not run**: no real `run_capability` (generation) call was submitted by
-  this worker. All adapter/job-manager/mcpClient tests (52 total —
+  this worker. All adapter/job-manager/mcpClient/fetchSafe tests (59 total —
   `npx vitest run`) use fixtures modeled on the reference workspace's actual
   completed responses (`outputs/room-corner-comparison/rodin-response.json`,
   `tripo-response.json`) and a fake/mocked transport

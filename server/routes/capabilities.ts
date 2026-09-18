@@ -11,7 +11,12 @@ export function createCapabilitiesRouter(adapter: ProviderAdapter): Router {
       res.json(descriptors);
     } catch (err) {
       logServerError("GET /api/capabilities", err);
-      res.status(502).json({ message: "Could not reach the model provider right now. Please try again." });
+      // No capability could be live-confirmed — the sample level and GLB
+      // import must stay usable, so this is a clear "unavailable" signal
+      // rather than silently serving static/stale descriptors as current.
+      res.status(503).json({
+        message: "3D generation is temporarily unavailable. You can still play the sample level or import a GLB.",
+      });
     }
   });
 

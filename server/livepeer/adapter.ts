@@ -103,46 +103,59 @@ export class LivepeerAdapter implements ProviderAdapter {
     private readonly photos: PhotoBytesProvider,
   ) {}
 
+  /** Live-confirms each known capability via `describe_capability`. A
+   * capability that can't be confirmed available right now (network
+   * failure, not found, or the provider itself reports it degraded) is
+   * DROPPED from the result rather than returned as if it were usable —
+   * the static descriptor list is only ever the input template for what to
+   * check, never a fallback value served in place of a real check. If
+   * nothing can be confirmed, throws so the caller (the /api/capabilities
+   * route) can surface a clear "unavailable" response instead of silently
+   * presenting stale/assumed data as current. */
   async discoverCapabilities(): Promise<ProviderCapabilityDescriptor[]> {
     if (this.discoveryCache && Date.now() - this.discoveryCache.at < DISCOVERY_CACHE_TTL_MS) {
       return this.discoveryCache.value;
     }
 
-    const results = await Promise.all(
+    const settled = await Promise.allSettled(
       STATIC_CAPABILITY_DESCRIPTORS.map(async (base): Promise<ProviderCapabilityDescriptor> => {
-        try {
-          const info = await this.mcp.callTool<DescribeCapabilityResponse>(
-            "describe_capability",
-            { name: base.id },
-            { timeoutMs: DESCRIBE_HTTP_TIMEOUT_MS },
-          );
-          if (!info.found) {
-            return { ...base, notes: `${base.notes ?? ""} Live discovery: capability not found.`.trim() };
-          }
-          const isAvailable = info.availability === "available" && info.status === "active";
-          const fallbackNote = info.fallback_chain?.length
-            ? ` fallback_chain: ${info.fallback_chain.join(", ")}.`
-            : "";
-          return {
-            ...base,
-            registeredModel: info.model_id ?? base.registeredModel,
-            notes:
-              (isAvailable
-                ? "Confirmed available via live describe_capability."
-                : `Live describe_capability reports availability="${info.availability}", status="${info.status}" — may not currently serve requests.`) +
-              fallbackNote,
-          };
-        } catch (err) {
-          return {
-            ...base,
-            notes: `${base.notes ?? ""} Live discovery failed (${(err as Error).message}); using static descriptor.`.trim(),
-          };
+        const info = await this.mcp.callTool<DescribeCapabilityResponse>(
+          "describe_capability",
+          { name: base.id },
+          { timeoutMs: DESCRIBE_HTTP_TIMEOUT_MS },
+        );
+        if (!info.found) {
+          throw new Error(`"${base.id}" not found by describe_capability`);
         }
+        const isAvailable = info.availability === "available" && info.status === "active";
+        if (!isAvailable) {
+          throw new Error(`"${base.id}" reports availability="${info.availability}", status="${info.status}"`);
+        }
+        const fallbackNote = info.fallback_chain?.length
+          ? ` fallback_chain: ${info.fallback_chain.join(", ")}.`
+          : "";
+        return {
+          ...base,
+          registeredModel: info.model_id ?? base.registeredModel,
+          notes: `Confirmed available via live describe_capability.${fallbackNote}`,
+        };
       }),
     );
 
-    this.discoveryCache = { at: Date.now(), value: results };
-    return results;
+    const available = settled
+      .filter((r): r is PromiseFulfilledResult<ProviderCapabilityDescriptor> => r.status === "fulfilled")
+      .map((r) => r.value);
+
+    if (available.length === 0) {
+      const reasons = settled
+        .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+        .map((r) => (r.reason as Error).message)
+        .join("; ");
+      throw new McpTransportError(`No capabilities could be confirmed available right now (${reasons})`);
+    }
+
+    this.discoveryCache = { at: Date.now(), value: available };
+    return available;
   }
 
   validateInput(
