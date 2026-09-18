@@ -255,6 +255,24 @@ describe("LivepeerAdapter.getStatus", () => {
     expect(status.actualRegisteredModel).toBeUndefined();
   });
 
+  it("uses the reported fallback capability for both job provenance and live model lookup", async () => {
+    const fallbackFixture = { ...RODIN_DONE_FIXTURE, fallback_fired: "tripo-i3d" };
+    const mcp = fakeMcp({
+      get_create_media: () => fallbackFixture,
+      describe_capability: (args) => ({
+        name: args.name,
+        found: true,
+        model_id: "tripo3d/h3.1/image-to-3d",
+      }),
+    });
+
+    const status = await new LivepeerAdapter(mcp, fakePhotos()).getStatus("mjob_fallback");
+    expect(status.actualCapabilityUsed).toBe("tripo-i3d");
+    expect(status.actualFallbackFired).toBe("tripo-i3d");
+    expect(status.actualRegisteredModel).toBe("tripo3d/h3.1/image-to-3d");
+    expect(mcp.calls.find((call) => call.name === "describe_capability")?.args).toEqual({ name: "tripo-i3d" });
+  });
+
   it("maps a running response to generating with unknown progress", async () => {
     const mcp = fakeMcp({ get_create_media: () => TRIPO_RUNNING_FIXTURE });
     const adapter = new LivepeerAdapter(mcp, fakePhotos());

@@ -23,7 +23,8 @@ export class AssetStore {
   /** Validates GLB magic bytes/size, stores content-addressed by sha256 (so
    * re-downloading the same result is a safe no-op), and records optional
    * generation provenance plus the ordered source photos (for generated
-   * assets — omitted for hand-imported ones). */
+   * assets — omitted for hand-imported ones). When bytes already exist,
+   * omitted metadata preserves the existing authoritative values. */
   async store(buffer: Buffer, provenance?: AssetProvenance, photos?: PhotoReference[]): Promise<StoredAssetRecord> {
     assertValidGlb(buffer);
     const sha256 = createHash("sha256").update(buffer).digest("hex");
@@ -32,13 +33,15 @@ export class AssetStore {
     await writeFile(join(this.dir, filename), buffer);
 
     const existing = await this.findBySha(sha256);
+    const retainedProvenance = provenance ?? existing?.provenance;
+    const retainedPhotos = photos ?? existing?.photos;
     const record: StoredAssetRecord = {
       id: existing?.id ?? randomUUID(),
       url: `/api/assets/files/${filename}`,
       sha256,
       sizeBytes: buffer.byteLength,
-      ...(provenance !== undefined ? { provenance } : {}),
-      ...(photos !== undefined && photos.length > 0 ? { photos } : {}),
+      ...(retainedProvenance !== undefined ? { provenance: retainedProvenance } : {}),
+      ...(retainedPhotos !== undefined && retainedPhotos.length > 0 ? { photos: retainedPhotos } : {}),
     };
     await this.index.update((current) => {
       current[record.id] = record;
