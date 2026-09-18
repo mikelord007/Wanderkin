@@ -1,15 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProviderInputPhoto } from "@shared/index.js";
 import {
-  clearActiveJob,
-  clearActivePreparation,
+  clearActiveSource,
   clearPendingSubmission,
-  loadActiveJob,
-  loadActivePreparation,
+  loadActiveSource,
   loadPendingSubmission,
   resolveResumeState,
-  saveActiveJob,
-  saveActivePreparation,
+  saveActiveSource,
   savePendingSubmission,
 } from "./jobStorage.js";
 
@@ -47,7 +44,7 @@ describe("jobStorage", () => {
   const inputPhotos: ProviderInputPhoto[] = [{ photoId: "p1", sourceIndex: 1 }];
   const photos = [{ id: "p1", url: "/uploads/p1.jpg", order: 1 }];
 
-  it("round-trips a pending submission and clears it independently of the active job", () => {
+  it("round-trips a pending submission and clears it independently of the active source", () => {
     expect(loadPendingSubmission()).toBeNull();
     savePendingSubmission({ idempotencyKey: "key-1", capability: "rodin-i3d", inputPhotos, photos });
     expect(loadPendingSubmission()).toEqual({
@@ -57,44 +54,57 @@ describe("jobStorage", () => {
       photos,
     });
 
-    saveActiveJob({ jobId: "job-1", photos });
+    saveActiveSource({ kind: "job", jobId: "job-1", photos });
     clearPendingSubmission();
     expect(loadPendingSubmission()).toBeNull();
-    expect(loadActiveJob()).toEqual({ jobId: "job-1", photos });
+    expect(loadActiveSource()).toEqual({ kind: "job", jobId: "job-1", photos });
 
-    clearActiveJob();
-    expect(loadActiveJob()).toBeNull();
+    clearActiveSource();
+    expect(loadActiveSource()).toBeNull();
   });
 
-  it("round-trips an active preparation and clears it independently of the other records", () => {
-    expect(loadActivePreparation()).toBeNull();
-    saveActivePreparation({ assetId: "asset-1", photos });
-    expect(loadActivePreparation()).toEqual({ assetId: "asset-1", photos });
-    clearActivePreparation();
-    expect(loadActivePreparation()).toBeNull();
-  });
+  it("updates the same active-source record in place when a job goes ready, rather than clearing it", () => {
+    saveActiveSource({ kind: "job", jobId: "job-1", photos });
+    expect(loadActiveSource()).toEqual({ kind: "job", jobId: "job-1", photos });
 
-  it("resolves resume state: active job wins over a pending submission", () => {
-    savePendingSubmission({ idempotencyKey: "key-1", capability: "rodin-i3d", inputPhotos, photos });
-    saveActiveJob({ jobId: "job-1", photos });
-    expect(resolveResumeState()).toEqual({ screen: "generation", jobId: "job-1" });
-  });
-
-  it("resolves resume state: active preparation wins over an active job and a pending submission", () => {
-    savePendingSubmission({ idempotencyKey: "key-1", capability: "rodin-i3d", inputPhotos, photos });
-    saveActiveJob({ jobId: "job-1", photos });
-    saveActivePreparation({ assetId: "asset-1", photos });
-    expect(resolveResumeState()).toEqual({
-      screen: "preparation",
-      preparation: { assetId: "asset-1", photos },
+    saveActiveSource({ kind: "job", jobId: "job-1", photos, resultAssetId: "asset-1" });
+    expect(loadActiveSource()).toEqual({
+      kind: "job",
+      jobId: "job-1",
+      photos,
+      resultAssetId: "asset-1",
     });
   });
 
-  it("resolves to the Preparation screen with source photos when only an active preparation survived a reload", () => {
-    saveActivePreparation({ assetId: "asset-1", photos });
+  it("round-trips an import-sourced active record", () => {
+    saveActiveSource({ kind: "import", assetId: "asset-imported" });
+    expect(loadActiveSource()).toEqual({ kind: "import", assetId: "asset-imported" });
+    clearActiveSource();
+    expect(loadActiveSource()).toBeNull();
+  });
+
+  it("resolves resume state: a still-generating job (no resultAssetId yet) resumes on Generation", () => {
+    savePendingSubmission({ idempotencyKey: "key-1", capability: "rodin-i3d", inputPhotos, photos });
+    saveActiveSource({ kind: "job", jobId: "job-1", photos });
+    expect(resolveResumeState()).toEqual({ screen: "generation", jobId: "job-1" });
+  });
+
+  it("resolves resume state: a ready job (resultAssetId set) resumes straight to Preparation, beating a pending submission", () => {
+    savePendingSubmission({ idempotencyKey: "key-1", capability: "rodin-i3d", inputPhotos, photos });
+    saveActiveSource({ kind: "job", jobId: "job-1", photos, resultAssetId: "asset-1" });
     expect(resolveResumeState()).toEqual({
       screen: "preparation",
-      preparation: { assetId: "asset-1", photos },
+      assetId: "asset-1",
+      photos,
+    });
+  });
+
+  it("resolves resume state: an imported asset resumes straight to Preparation with no source photos", () => {
+    saveActiveSource({ kind: "import", assetId: "asset-imported" });
+    expect(resolveResumeState()).toEqual({
+      screen: "preparation",
+      assetId: "asset-imported",
+      photos: [],
     });
   });
 

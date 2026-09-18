@@ -34,12 +34,3 @@ export function attachProvenance(
     photos: sourcePhotos ?? manifest.photos,
   };
 }
-
-/** Cache-busts the URL passed into prepareAsset on a retry, so a scene
- * loader that caches (rejected or otherwise) by URL string re-fetches
- * instead of replaying a stale failure. */
-export function withRetryBust(url: string, attempt: number): string {
-  if (attempt === 0) return url;
-  const separator = url.includes("?") ? "&" : "?";
-  return `${url}${separator}oqRetry=${attempt}`;
-}

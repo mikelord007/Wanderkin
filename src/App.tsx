@@ -7,12 +7,11 @@ import { PreparationScreen, type PreparationSource } from "./ui/screens/Preparat
 import { PlayScreen } from "./ui/screens/PlayScreen.js";
 import { FinishScreen } from "./ui/screens/FinishScreen.js";
 import {
-  clearActiveJob,
-  clearActivePreparation,
+  clearActiveSource,
   clearPendingSubmission,
-  loadActiveJob,
+  loadActiveSource,
   resolveResumeState,
-  saveActivePreparation,
+  saveActiveSource,
 } from "./ui/jobStorage.js";
 import { createLevel, saveLevel } from "./ui/api.js";
 
@@ -28,7 +27,7 @@ function initialScreen(): Screen {
   const resume = resolveResumeState();
   if (resume.screen === "generation") return { name: "generation", jobId: resume.jobId };
   if (resume.screen === "preparation") {
-    const { assetId, photos } = resume.preparation;
+    const { assetId, photos } = resume;
     return {
       name: "preparation",
       source: photos.length > 0 ? { kind: "asset", assetId, sourcePhotos: photos } : { kind: "asset", assetId },
@@ -50,25 +49,27 @@ export function App() {
   const goStart = useCallback(() => setScreen({ name: "start" }), []);
 
   const handleJobStarted = useCallback((jobId: string) => {
-    // PhotosScreen already persisted the ActiveJob record (with its source
-    // photos) and cleared the PendingSubmission the moment the POST
-    // response confirmed a durable job id — navigation is all that's left.
+    // PhotosScreen already persisted the ActiveSource record (kind "job",
+    // with its source photos) and cleared the PendingSubmission the moment
+    // the POST response confirmed a durable job id — navigation is all
+    // that's left.
     setScreen({ name: "generation", jobId });
   }, []);
 
   const handleJobReady = useCallback((job: GenerationJob) => {
-    // Read the source photos before clearing — they only live in this
-    // transient record, and Preparation needs them to attach provenance.
-    const sourcePhotos = loadActiveJob()?.photos ?? [];
-    clearActiveJob();
+    const current = loadActiveSource();
+    const sourcePhotos = current?.kind === "job" ? current.photos : [];
     if (!job.resultAssetId) {
+      clearActiveSource();
       setScreen({ name: "start" });
       return;
     }
-    // AssetReference itself carries no photo refs, so without persisting
-    // this a reload between "asset ready" and "level saved" would silently
-    // drop which source photos the asset came from.
-    saveActivePreparation({ assetId: job.resultAssetId, photos: sourcePhotos });
+    // Update the SAME record in place rather than clearing it — it stays
+    // durable until the level is saved or the user explicitly leaves, so a
+    // reload of a ready job returns straight to Preparation from this same
+    // persisted asset instead of losing which source photos it came from
+    // (AssetReference itself carries no photo refs).
+    saveActiveSource({ kind: "job", jobId: job.id, photos: sourcePhotos, resultAssetId: job.resultAssetId });
     setScreen({
       name: "preparation",
       source:
@@ -83,7 +84,7 @@ export function App() {
     // Deliberately abandoning this job (not a reload) — clear both so the
     // next submission from Photos gets a fresh idempotency key instead of
     // resuming this one.
-    clearActiveJob();
+    clearActiveSource();
     clearPendingSubmission();
     setScreen({ name: "photos" });
   }, []);
@@ -94,7 +95,7 @@ export function App() {
       const saved = screen.isNew ? await createLevel(manifest) : await saveLevel(manifest.levelId, manifest);
       // The source photos are now durable inside the saved SceneManifest —
       // the transient reload-recovery record is no longer needed.
-      clearActivePreparation();
+      clearActiveSource();
       setScreen({ name: "preparation", source: { kind: "manifest", manifest: saved }, isNew: false });
     },
     [screen],
@@ -103,7 +104,7 @@ export function App() {
   const handlePreparationBack = useCallback(() => {
     // Only ever set for an unsaved asset-sourced preparation; a no-op
     // otherwise. Leaving without saving is a deliberate abandonment.
-    clearActivePreparation();
+    clearActiveSource();
     setScreen({ name: "start" });
   }, []);
 
@@ -121,7 +122,7 @@ export function App() {
           }
           onCreateFromPhotos={() => setScreen({ name: "photos" })}
           onImportGlbReady={(assetId) => {
-            saveActivePreparation({ assetId, photos: [] });
+            saveActiveSource({ kind: "import", assetId });
             setScreen({ name: "preparation", source: { kind: "asset", assetId }, isNew: true });
           }}
         />
