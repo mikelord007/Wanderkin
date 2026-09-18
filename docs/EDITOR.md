@@ -7,7 +7,7 @@ Owner: Level tools and persistence worker. Covers `src/editor/**`,
 
 | File | Purpose |
 | --- | --- |
-| `LevelEditor.tsx` | Named export `LevelEditor`, the contract component from `docs/CONTRACTS.md` (`{ manifest, onSave, onPlay, onBack }`). Orchestrates the panels below and the 3D preview. |
+| `LevelEditor.tsx` | Named export `LevelEditor`, the contract component from `docs/CONTRACTS.md` (`{ manifest, onSave, onPlay, onBack }`) plus optional `isPersisted`/`onExport` hooks for the portable-bundle UI. Orchestrates the panels below and the 3D preview. |
 | `Preview3D.tsx` | React Three Fiber canvas: renders every manifest entity (generated mesh + helper geometry), spawn/checkpoint markers, and reports click-to-place hits and generated-mesh bounding boxes back up to `LevelEditor`. |
 | `geometry.ts` | Pure math: capsule-center ⇄ surface-Y conversion, heading ⇄ quaternion, floor-align delta, calibration scale factor. Fully unit-tested. |
 | `manifestEdits.ts` | Pure, immutable `SceneManifest` mutators (spawn, checkpoints, helper geometry, transforms, calibration). Every mutation calls `markManuallyAdjusted`, which flips `courseValidation.status` to `"manually-adjusted"` with an honest note — this editor cannot itself re-run controller/physics validation (that lives in `src/game`), so it never claims a course is still `"validated"` after an edit. |
@@ -161,9 +161,13 @@ client must `JSON.stringify` the bundle and POST it as the raw body with
 that content-type, not via `fetch(url, { body: JSON.stringify(...) })`'s
 default JSON content-type.
 
-No export/import UI has been wired into `src/ui` — Product UI work was
-marked complete/frozen before this feature landed. These routes are
-ready for whichever worker adds that trigger.
+The start screen exposes **Import level bundle** beside the existing photo
+and GLB creation paths. A successful import opens the newly persisted,
+validated manifest in the editor; it never overwrites the source level.
+Saved-level cards expose **Export**, and the editor exposes **Export** for a
+saved state or **Save & export** when the level is new or has draft edits.
+The latter always waits for the save to succeed before requesting the bundle,
+so a failed save cannot silently download an older version.
 
 ## Testing
 
@@ -194,4 +198,3 @@ for `src/ui`'s screen components.
   font-loading dependency); the "loading…" / "preview unavailable" state
   surfaces via a DOM banner instead.
 - Ramp helpers expose heading around Y; their rise/run comes from dimensions.
-- No manifest/asset export-import UI trigger yet (routes only, see above).

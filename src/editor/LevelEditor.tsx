@@ -35,7 +35,9 @@ import "./editor.css";
 
 export interface LevelEditorProps {
   manifest: SceneManifest;
-  onSave: (manifest: SceneManifest) => void;
+  isPersisted?: boolean;
+  onSave: (manifest: SceneManifest) => void | Promise<void>;
+  onExport?: (manifest: SceneManifest) => void | Promise<void>;
   onPlay: (manifest: SceneManifest) => void;
   onBack: () => void;
 }
@@ -51,11 +53,21 @@ function initialEditorState(manifest: SceneManifest) {
   return { manifest, stalePrompt: null as EditorDraft | null, restoredFresh: false };
 }
 
-export function LevelEditor({ manifest, onSave, onPlay, onBack }: LevelEditorProps) {
+export function LevelEditor({
+  manifest,
+  isPersisted = true,
+  onSave,
+  onExport,
+  onPlay,
+  onBack,
+}: LevelEditorProps) {
   const initial = useState(() => initialEditorState(manifest))[0];
   const baseUpdatedAtRef = useRef(manifest.updatedAt);
 
   const [workingManifest, setWorkingManifest] = useState<SceneManifest>(initial.manifest);
+  const [savedManifestSnapshot, setSavedManifestSnapshot] = useState<SceneManifest | null>(
+    isPersisted ? manifest : null,
+  );
   const [stalePromptDraft, setStalePromptDraft] = useState<EditorDraft | null>(initial.stalePrompt);
   const [restoredFreshNotice, setRestoredFreshNotice] = useState(initial.restoredFresh);
 
@@ -70,6 +82,8 @@ export function LevelEditor({ manifest, onSave, onPlay, onBack }: LevelEditorPro
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
 
   const didMountRef = useRef(false);
   useEffect(() => {
@@ -77,6 +91,7 @@ export function LevelEditor({ manifest, onSave, onPlay, onBack }: LevelEditorPro
       didMountRef.current = true;
       return;
     }
+    setExportNotice(null);
     saveDraft({
       levelId: workingManifest.levelId,
       baseUpdatedAt: baseUpdatedAtRef.current,
@@ -90,6 +105,7 @@ export function LevelEditor({ manifest, onSave, onPlay, onBack }: LevelEditorPro
     [workingManifest.entities, selectedEntityId],
   );
   const selectedBounds = selectedEntityId ? entityBounds[selectedEntityId] : undefined;
+  const hasUnsavedChanges = savedManifestSnapshot !== workingManifest;
 
   function handleSurfaceClick(point: Vec3, walkable: boolean) {
     if (!placementMode) return;
@@ -134,15 +150,38 @@ export function LevelEditor({ manifest, onSave, onPlay, onBack }: LevelEditorPro
   async function handleSave() {
     setSaving(true);
     setSaveError(null);
+    setExportNotice(null);
     try {
       await Promise.resolve(onSave(workingManifest));
       clearDraft(workingManifest.levelId);
+      setSavedManifestSnapshot(workingManifest);
       setSavedNotice(true);
       setTimeout(() => setSavedNotice(false), 2500);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Could not save this level. Please try again.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleExport() {
+    if (!onExport) return;
+    setExporting(true);
+    setSaveError(null);
+    setExportNotice(hasUnsavedChanges ? "Saving the latest changes before export…" : "Preparing bundle…");
+    try {
+      if (hasUnsavedChanges) {
+        await Promise.resolve(onSave(workingManifest));
+        clearDraft(workingManifest.levelId);
+        setSavedManifestSnapshot(workingManifest);
+      }
+      await Promise.resolve(onExport(workingManifest));
+      setExportNotice("Bundle downloaded.");
+    } catch (err) {
+      setExportNotice(null);
+      setSaveError(err instanceof Error ? err.message : "Could not export this level. Please try again.");
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -253,6 +292,10 @@ export function LevelEditor({ manifest, onSave, onPlay, onBack }: LevelEditorPro
 
           {saveError ? <p className="oq-error-text">{saveError}</p> : null}
           {savedNotice ? <p className="oq-editor__saved-notice">Saved.</p> : null}
+          {exportNotice ? <p className="oq-editor__saved-notice">{exportNotice}</p> : null}
+          {onExport && hasUnsavedChanges ? (
+            <p className="oq-editor__meta">Export will save these changes first so the bundle is complete.</p>
+          ) : null}
 
           <div className="oq-actions">
             <button type="button" className="oq-button oq-button--ghost" onClick={onBack}>
@@ -262,14 +305,25 @@ export function LevelEditor({ manifest, onSave, onPlay, onBack }: LevelEditorPro
               type="button"
               className="oq-button oq-button--secondary"
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || exporting}
             >
               {saving ? "Saving…" : "Save"}
             </button>
+            {onExport ? (
+              <button
+                type="button"
+                className="oq-button oq-button--secondary"
+                onClick={handleExport}
+                disabled={saving || exporting}
+              >
+                {exporting ? "Exporting…" : hasUnsavedChanges ? "Save & export" : "Export"}
+              </button>
+            ) : null}
             <button
               type="button"
               className="oq-button oq-button--primary"
               onClick={() => onPlay(workingManifest)}
+              disabled={saving || exporting}
             >
               Play
             </button>

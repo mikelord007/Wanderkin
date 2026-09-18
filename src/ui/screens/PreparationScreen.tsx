@@ -22,8 +22,10 @@ export type PreparationSource =
 
 interface PreparationScreenProps {
   source: PreparationSource;
+  isNew: boolean;
   onPlay: (manifest: SceneManifest) => void;
   onSave: (manifest: SceneManifest) => Promise<void>;
+  onExport: (manifest: SceneManifest) => Promise<void>;
   onBack: () => void;
 }
 
@@ -34,7 +36,7 @@ const STAGE_TEXT: Record<"downloading" | "decoding" | "analyzing" | "validating"
   validating: "Validating the checkpoint route…",
 };
 
-export function PreparationScreen({ source, onPlay, onSave, onBack }: PreparationScreenProps) {
+export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onBack }: PreparationScreenProps) {
   const [manifest, setManifest] = useState<SceneManifest | null>(
     source.kind === "manifest" ? source.manifest : null,
   );
@@ -108,6 +110,7 @@ export function PreparationScreen({ source, onPlay, onSave, onBack }: Preparatio
       setManifest(next);
     } catch (err) {
       setSaveError(describeApiError(err));
+      throw err;
     } finally {
       setSaving(false);
     }
@@ -183,7 +186,14 @@ export function PreparationScreen({ source, onPlay, onSave, onBack }: Preparatio
       {saveError ? <p className="oq-error-text">{saveError}</p> : null}
 
       <Suspense fallback={<LoadingScreen stage="Loading the level editor…" />}>
-        <LevelEditor manifest={manifest} onSave={handleSave} onPlay={onPlay} onBack={onBack} />
+        <LevelEditor
+          manifest={manifest}
+          isPersisted={!isNew}
+          onSave={handleSave}
+          onExport={onExport}
+          onPlay={onPlay}
+          onBack={onBack}
+        />
       </Suspense>
       {saving ? <p className="oq-warning-text">Saving…</p> : null}
     </div>
