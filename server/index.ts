@@ -5,7 +5,7 @@ import { mcpClient } from "./livepeer/mcpClient.js";
 import { LivepeerAdapter } from "./livepeer/adapter.js";
 import { PhotoStore } from "./persistence/photoStore.js";
 import { AssetStore } from "./persistence/assetStore.js";
-import { JobStore } from "./jobs/store.js";
+import { JobStore, JobStoreUploadUrlCache } from "./jobs/store.js";
 import { JobManager } from "./jobs/manager.js";
 import { createCapabilitiesRouter } from "./routes/capabilities.js";
 import { createUploadsRouter } from "./routes/uploads.js";
@@ -26,8 +26,8 @@ app.use(express.json({ limit: "10mb" }));
 
 const photoStore = new PhotoStore(env.storageDir);
 const assetStore = new AssetStore(env.storageDir);
-const adapter = new LivepeerAdapter(mcpClient, photoStore);
 const jobStore = new JobStore(env.storageDir);
+const adapter = new LivepeerAdapter(mcpClient, photoStore, new JobStoreUploadUrlCache(jobStore));
 const jobManager = new JobManager(jobStore, adapter, assetStore, photoStore);
 
 app.get("/api/health", (_req, res) => {

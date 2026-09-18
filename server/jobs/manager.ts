@@ -34,6 +34,19 @@ export type SubmitOutcome =
 const MAX_RETRIES = 3;
 const PROVIDER_ID = "livepeer-agent-mcp";
 
+/** Livepeer's documented `idempotency_key` cache retention is 24h — a
+ * resubmit past that window can no longer rely on the provider deduping a
+ * request that actually landed, so it risks starting a second real
+ * generation. A margin is subtracted so a slow boot/restart sequence can't
+ * straddle the exact boundary. Below this age, an ambiguous (no
+ * `providerJobId`) job is safe to auto-resubmit; at or beyond it, automatic
+ * resubmission is refused and the job is left for manual reconciliation. */
+const CONFIRMED_IDEMPOTENCY_RETENTION_MS = 23 * 60 * 60 * 1000;
+
+function isWithinConfirmedIdempotencyRetention(job: GenerationJob): boolean {
+  return Date.now() - new Date(job.createdAt).getTime() < CONFIRMED_IDEMPOTENCY_RETENTION_MS;
+}
+
 function friendlyMessage(state: GenerationJob["state"]): string {
   switch (state) {
     case "queued":
@@ -108,6 +121,25 @@ export class JobManager {
     private readonly photos: PhotoStore,
   ) {}
 
+  /** Marks a job whose submit outcome is permanently ambiguous (no
+   * `providerJobId`, and past the provider's confirmed idempotency
+   * retention) as failed-and-non-retryable with an explicit diagnostic,
+   * instead of silently guessing by resubmitting. */
+  private async markIdempotencyRetentionExpired(record: JobRecord): Promise<GenerationJob> {
+    record.job.state = "failed";
+    record.job.uiMessage = friendlyMessage("failed");
+    record.job.lastError = {
+      message:
+        "Provider outcome unknown; cannot safely resubmit after the provider's idempotency retention window. Manual reconciliation required.",
+      code: "idempotency_retention_expired",
+      retryable: false,
+      occurredAt: new Date().toISOString(),
+    };
+    record.job.updatedAt = new Date().toISOString();
+    await this.store.put(record);
+    return toPublicJob(record);
+  }
+
   private runExclusive<T>(key: string, fn: () => Promise<T>): Promise<T> {
     const prior = this.locks.get(key) ?? Promise.resolve();
     const run = prior.then(fn, fn);
@@ -143,6 +175,10 @@ export class JobManager {
         await this.runExclusive(`job:${jobId}`, async () => {
           const current = await this.store.get(jobId);
           if (!current || current.job.providerJobId || isTerminalJobState(current.job.state)) return;
+          if (!isWithinConfirmedIdempotencyRetention(current.job)) {
+            await this.markIdempotencyRetentionExpired(current);
+            return;
+          }
           await this.submitToProvider(current, {
             capability: current.job.capabilityRequested,
             photos: current.internal.originalRequest.photos,
@@ -409,6 +445,10 @@ export class JobManager {
 
       if (record.job.retryCount >= record.job.maxRetries) {
         return toPublicJob(record);
+      }
+
+      if (!isWithinConfirmedIdempotencyRetention(record.job)) {
+        return this.markIdempotencyRetentionExpired(record);
       }
 
       record.job.retryCount += 1;

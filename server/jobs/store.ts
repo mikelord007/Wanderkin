@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import type { GenerationJob } from "../../shared/job.js";
 import type { ProviderInputPhoto } from "../../shared/provider.js";
+import type { UploadUrlCache } from "../livepeer/adapter.js";
 import { JsonFileStore } from "../persistence/jsonStore.js";
 import { sanitizeMessage } from "../util/sanitize.js";
 
@@ -16,6 +17,10 @@ export interface JobInternal {
     photos: readonly ProviderInputPhoto[];
     scenePrompt?: string;
   };
+  /** Set once the first submit attempt's photos are re-hosted; reused by
+   * `LivepeerAdapter.submit` on any later attempt for the same job so a
+   * retry/resubmit sends the provider byte-identical `image_urls`. */
+  resolvedImageUrls?: string[];
 }
 
 export interface JobRecord {
@@ -49,6 +54,25 @@ export class JobStore {
     await this.file.update((current) => {
       current[record.job.id] = record;
     });
+  }
+}
+
+/** Durable `UploadUrlCache` backed by the job record itself, keyed by
+ * idempotency key — survives a process restart, which is exactly when a
+ * resubmit (resumeOnBoot's ambiguous-recovery path) is most likely. */
+export class JobStoreUploadUrlCache implements UploadUrlCache {
+  constructor(private readonly store: JobStore) {}
+
+  async get(idempotencyKey: string): Promise<string[] | undefined> {
+    const record = await this.store.findByIdempotencyKey(idempotencyKey);
+    return record?.internal.resolvedImageUrls;
+  }
+
+  async set(idempotencyKey: string, imageUrls: string[]): Promise<void> {
+    const record = await this.store.findByIdempotencyKey(idempotencyKey);
+    if (!record) return; // job record always exists by the time submit() runs (see JobManager)
+    record.internal.resolvedImageUrls = imageUrls;
+    await this.store.put(record);
   }
 }
 

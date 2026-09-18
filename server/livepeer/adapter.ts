@@ -20,6 +20,20 @@ export interface PhotoBytesProvider {
   ): Promise<{ buffer: Buffer; mimeType: string; filename: string }>;
 }
 
+/** Durable cache for the image URLs a photo set was re-hosted to, keyed by
+ * idempotency key. `upload` mints a fresh timestamped URL on every call —
+ * without this, a retry/resubmit that reuses the same `idempotency_key`
+ * would still send DIFFERENT `image_urls` to `run_capability`. If the
+ * provider's own idempotency matching fingerprints the request body (not
+ * just the key), that mismatch could defeat it and start a second real
+ * generation. Backed by the durable job record (not just in-memory) so it
+ * survives a process restart, which is exactly when a resubmit is most
+ * likely to happen (see JobManager.resumeOnBoot). */
+export interface UploadUrlCache {
+  get(idempotencyKey: string): Promise<string[] | undefined>;
+  set(idempotencyKey: string, imageUrls: string[]): Promise<void>;
+}
+
 interface RunCapabilitySubmitResponse {
   job_id?: string;
   status?: string;
@@ -101,6 +115,7 @@ export class LivepeerAdapter implements ProviderAdapter {
   constructor(
     private readonly mcp: McpToolCaller,
     private readonly photos: PhotoBytesProvider,
+    private readonly uploadCache?: UploadUrlCache,
   ) {}
 
   /** Live-confirms each known capability via `describe_capability`. A
@@ -211,23 +226,31 @@ export class LivepeerAdapter implements ProviderAdapter {
     }
 
     const orderedPhotos = orderPhotosForCapability(request.capability, request.photos);
-    const imageUrls: string[] = [];
-    for (const photo of orderedPhotos) {
-      const bytes = await this.photos.getPhotoBytes(photo.photoId);
-      const uploaded = await this.mcp.callTool<{ url?: string }>(
-        "upload",
-        {
-          data: bytes.buffer.toString("base64"),
-          mime_type: bytes.mimeType,
-          kind: "image",
-          filename: bytes.filename,
-        },
-        { timeoutMs: STATUS_HTTP_TIMEOUT_MS },
-      );
-      if (!uploaded.url) {
-        throw new McpTransportError(`Livepeer "upload" did not return a URL for photo ${photo.photoId}`);
+
+    // Reuse a prior submit attempt's re-hosted URLs on retry/resubmit for
+    // the same idempotency key, rather than re-uploading (which mints a
+    // fresh timestamped URL every call) — see UploadUrlCache above.
+    let imageUrls = await this.uploadCache?.get(request.idempotencyKey);
+    if (!imageUrls) {
+      imageUrls = [];
+      for (const photo of orderedPhotos) {
+        const bytes = await this.photos.getPhotoBytes(photo.photoId);
+        const uploaded = await this.mcp.callTool<{ url?: string }>(
+          "upload",
+          {
+            data: bytes.buffer.toString("base64"),
+            mime_type: bytes.mimeType,
+            kind: "image",
+            filename: bytes.filename,
+          },
+          { timeoutMs: STATUS_HTTP_TIMEOUT_MS },
+        );
+        if (!uploaded.url) {
+          throw new McpTransportError(`Livepeer "upload" did not return a URL for photo ${photo.photoId}`);
+        }
+        imageUrls.push(uploaded.url);
       }
-      imageUrls.push(uploaded.url);
+      await this.uploadCache?.set(request.idempotencyKey, imageUrls);
     }
 
     const inputs: Record<string, unknown> =
