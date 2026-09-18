@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AssetReference, SceneManifest } from "@shared/index.js";
 import { createEmptyManifest } from "@shared/index.js";
-import { attachProvenance } from "./manifestProvenance.js";
+import { attachProvenance, resolveAssetForManifest } from "./manifestProvenance.js";
 
 function baseManifest(): SceneManifest {
   const manifest = createEmptyManifest({
@@ -70,5 +70,33 @@ describe("attachProvenance", () => {
     manifest.photos = [{ id: "scene-photo", url: "/tmp/scene.jpg", order: 1 }];
     const result = attachProvenance(manifest, realAsset, undefined);
     expect(result.photos).toEqual(manifest.photos);
+  });
+});
+
+describe("resolveAssetForManifest", () => {
+  const locallyCachedPhotos = [{ id: "local-1", url: "/uploads/local-1.jpg", order: 1 }];
+  const serverPhotos = [{ id: "server-1", url: "/storage/server-1.jpg", order: 1 }];
+
+  it("prefers the server's photos over the client's locally-cached ones when both are present", () => {
+    const asset = { ...realAsset, photos: serverPhotos };
+    const result = resolveAssetForManifest(asset, locallyCachedPhotos);
+    expect(result.sourcePhotos).toEqual(serverPhotos);
+  });
+
+  it("falls back to the locally-cached photos when the server doesn't return any", () => {
+    const result = resolveAssetForManifest(realAsset, locallyCachedPhotos);
+    expect(result.sourcePhotos).toEqual(locallyCachedPhotos);
+  });
+
+  it("resolves to undefined when neither the server nor the client has photos (a plain GLB import)", () => {
+    const result = resolveAssetForManifest(realAsset, undefined);
+    expect(result.sourcePhotos).toBeUndefined();
+  });
+
+  it("strips the photos field off the asset so it never leaks into a manifest AssetReference entry", () => {
+    const asset = { ...realAsset, photos: serverPhotos };
+    const result = resolveAssetForManifest(asset, undefined);
+    expect(result.cleanAsset).toEqual(realAsset);
+    expect(result.cleanAsset).not.toHaveProperty("photos");
   });
 });

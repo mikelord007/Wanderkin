@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import type { PhotoReference, SceneManifest } from "@shared/index.js";
 import { describeApiError, getAsset } from "../api.js";
 import { LoadingScreen } from "../components/LoadingScreen.js";
-import { attachProvenance } from "../manifestProvenance.js";
+import { attachProvenance, resolveAssetForManifest } from "../manifestProvenance.js";
 
 /**
  * Scene preparation owns `src/scene`; this screen assumes a barrel export
@@ -57,6 +57,11 @@ export function PreparationScreen({ source, onPlay, onSave, onBack }: Preparatio
         const asset = await getAsset(assetId);
         if (cancelled) return;
 
+        const { cleanAsset, sourcePhotos: resolvedSourcePhotos } = resolveAssetForManifest(
+          asset,
+          sourcePhotos,
+        );
+
         const { prepareAsset } = await scenePreparationModule();
         if (cancelled) return;
 
@@ -72,10 +77,10 @@ export function PreparationScreen({ source, onPlay, onSave, onBack }: Preparatio
         );
         if (cancelled) return;
 
-        setManifest(attachProvenance(result.manifest, asset, sourcePhotos));
+        setManifest(attachProvenance(result.manifest, cleanAsset, resolvedSourcePhotos));
         setCandidates(
           (result.courseCandidates ?? []).map((candidate: SceneManifest) =>
-            attachProvenance(candidate, asset, sourcePhotos),
+            attachProvenance(candidate, cleanAsset, resolvedSourcePhotos),
           ),
         );
       } catch (err) {
