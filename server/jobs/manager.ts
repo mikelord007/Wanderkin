@@ -371,11 +371,26 @@ export class JobManager {
         record.job.updatedAt = new Date().toISOString();
       }
     } catch (err) {
-      // A poll failure does not mean the provider job died — back off and
-      // try again rather than marking the job failed on a transient blip.
-      record.internal.backoffMs = Math.min(record.internal.backoffMs * 1.6, MAX_BACKOFF_MS);
-      record.internal.nextPollAt = Date.now() + record.internal.backoffMs;
-      record.internal.lastProviderStatusRaw = toJobError(err);
+      const jobError = toJobError(err);
+      record.internal.lastProviderStatusRaw = jobError;
+
+      if (!jobError.retryable) {
+        // MCP reports a terminal provider outcome (including an `isError`
+        // get_create_media response) by throwing McpToolError. Do not treat
+        // that explicit non-retryable result like a network blip or the job
+        // will remain "generating" forever.
+        record.job.state = "failed";
+        record.job.uiMessage = friendlyMessage("failed");
+        record.job.lastError = jobError;
+        record.job.completedAt = new Date().toISOString();
+        record.job.updatedAt = record.job.completedAt;
+      } else {
+        // A transport/unknown poll failure does not prove the provider job
+        // died. Preserve the existing provider id and reconcile again after
+        // bounded backoff rather than starting another generation.
+        record.internal.backoffMs = Math.min(record.internal.backoffMs * 1.6, MAX_BACKOFF_MS);
+        record.internal.nextPollAt = Date.now() + record.internal.backoffMs;
+      }
     }
 
     await this.store.put(record);
