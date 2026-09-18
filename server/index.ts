@@ -12,14 +12,13 @@ import { createUploadsRouter } from "./routes/uploads.js";
 import { createPhotosRouter } from "./routes/photos.js";
 import { createAssetsRouter } from "./routes/assets.js";
 import { createJobsRouter } from "./routes/jobs.js";
+import { createLevelsRouter, LevelStore } from "./levels.js";
 
 /**
  * Foundation API shell plus the Livepeer provider/job/asset routes (owned by
- * the Livepeer integration worker). Manifest persistence
- * (`/api/levels`, `/api/levels/:id`) is owned by the Level tools worker and
- * lands as `server/levels.ts` exporting an Express router; register it here
- * once that file exists — do not stub it in the meantime (see
- * docs/CONTRACTS.md).
+ * the Livepeer integration worker) and the manifest persistence routes
+ * (`/api/levels`, `/api/levels/:id`), owned by the Level tools worker and
+ * registered from their `server/levels.ts`.
  */
 const app = express();
 app.use(express.json({ limit: "10mb" }));
@@ -43,9 +42,7 @@ app.use(createUploadsRouter(photoStore));
 app.use(createPhotosRouter(photoStore));
 app.use(createAssetsRouter(assetStore));
 app.use(createJobsRouter(jobManager, adapter, photoStore));
-
-// TODO(Level tools worker): app.use(levelsRouter) from ./levels.js once it
-// exists — see docs/CONTRACTS.md "Server API" for the /api/levels contract.
+app.use(createLevelsRouter(new LevelStore(env.storageDir)));
 
 await jobManager.resumeOnBoot();
 
