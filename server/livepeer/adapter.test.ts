@@ -3,17 +3,21 @@ import type { McpToolCaller, McpToolCallOptions } from "./mcpClient.js";
 import { McpToolError, McpTransportError } from "./mcpClient.js";
 import { LivepeerAdapter, type PhotoBytesProvider } from "./adapter.js";
 
-/** Fixture payloads mirror the reference workspace's real 2026-09-17
- * responses (outputs/room-corner-comparison/rodin-response.json /
- * tripo-response.json), trimmed to the fields the adapter reads. */
+/** Successful wire fixture captured read-only from mjob_cfb2286bf2b5 on
+ * 2026-09-18, trimmed to fields relevant to adapter normalization. Notably,
+ * the job result names the capability but contains no model-id field. */
 const RODIN_DONE_FIXTURE = {
-  job_id: "mjob_5c57ebc49690",
+  submitted_via: "run_capability",
+  job_id: "mjob_cfb2286bf2b5",
   status: "done",
   capability: "rodin-i3d",
-  capability_used: "rodin-i3d",
+  capability_used: null,
   fallback_fired: null,
   url: "https://agent.livepeer.org/a/fake/rodin.glb",
-  served_model_id: "fal-ai/hyper3d/rodin/v2.5",
+  model_note: null,
+  run_output: null,
+  output_kind: "3d",
+  seed: null,
   error: null,
 };
 
@@ -221,14 +225,34 @@ describe("LivepeerAdapter.submit", () => {
 });
 
 describe("LivepeerAdapter.getStatus", () => {
-  it("maps a done response to ready with the result URL and served model", async () => {
-    const mcp = fakeMcp({ get_create_media: () => RODIN_DONE_FIXTURE });
+  it("maps the actual done envelope to ready and resolves its capability's live registered model", async () => {
+    const mcp = fakeMcp({
+      get_create_media: () => RODIN_DONE_FIXTURE,
+      describe_capability: (args) => ({
+        name: args.name,
+        found: true,
+        availability: "available",
+        status: "active",
+        model_id: "fal-ai/hyper3d/rodin/v2.5",
+      }),
+    });
     const adapter = new LivepeerAdapter(mcp, fakePhotos());
-    const status = await adapter.getStatus("mjob_5c57ebc49690");
+    const status = await adapter.getStatus("mjob_cfb2286bf2b5");
     expect(status.state).toBe("ready");
     expect(status.resultAssetUrl).toBe(RODIN_DONE_FIXTURE.url);
     expect(status.actualRegisteredModel).toBe("fal-ai/hyper3d/rodin/v2.5");
     expect(status.actualFallbackFired).toBeNull();
+    expect(mcp.calls.find((call) => call.name === "describe_capability")?.args).toEqual({ name: "rodin-i3d" });
+  });
+
+  it("leaves the model absent instead of guessing when live capability evidence is unavailable", async () => {
+    const mcp = fakeMcp({
+      get_create_media: () => RODIN_DONE_FIXTURE,
+      describe_capability: () => ({ found: false }),
+    });
+    const status = await new LivepeerAdapter(mcp, fakePhotos()).getStatus("mjob_cfb2286bf2b5");
+    expect(status.state).toBe("ready");
+    expect(status.actualRegisteredModel).toBeUndefined();
   });
 
   it("maps a running response to generating with unknown progress", async () => {
