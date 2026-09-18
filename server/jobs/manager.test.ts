@@ -234,6 +234,58 @@ describe("JobManager", () => {
     expect(finalRecord?.job.providerJobId).toBe("provider-job-1");
   });
 
+  it("resumeOnBoot refuses to auto-resubmit an ambiguous job older than the provider's confirmed idempotency retention", async () => {
+    const jobStore = new JobStore(dir);
+    const photoStore = new PhotoStore(dir);
+    const assetStore = new AssetStore(dir);
+    const crashedAdapter = fakeAdapter({ submit: vi.fn(async () => { throw new Error("never got here before crash"); }) });
+    const crashedManager = new JobManager(jobStore, crashedAdapter, assetStore, photoStore);
+    const failedOutcome = await crashedManager.submitOrReconcile(REQUEST, "idem-key-stale");
+
+    // Simulate a crash left this job ambiguous, and it's now well past
+    // Livepeer's documented 24h idempotency_key cache retention.
+    const record = await jobStore.get(failedOutcome.job.id);
+    record!.job.state = "uploading";
+    record!.job.createdAt = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    delete record!.job.lastError;
+    await jobStore.put(record!);
+
+    const recoveredAdapter = fakeAdapter();
+    const recoveredManager = new JobManager(jobStore, recoveredAdapter, assetStore, photoStore);
+    await recoveredManager.resumeOnBoot();
+    recoveredManager.stopScheduler();
+
+    expect(recoveredAdapter.submit).not.toHaveBeenCalled(); // never guesses by resubmitting past the safe window
+    const finalRecord = await jobStore.get(failedOutcome.job.id);
+    expect(finalRecord?.job.state).toBe("failed");
+    expect(finalRecord?.job.lastError?.code).toBe("idempotency_retention_expired");
+    expect(finalRecord?.job.lastError?.retryable).toBe(false);
+  });
+
+  it("retry refuses to resubmit an ambiguous job older than the provider's confirmed idempotency retention", async () => {
+    // NOTE: JsonFileStore caches in-memory per instance, so the manager
+    // must be built on the SAME JobStore instance the test mutates through
+    // (matching the resumeOnBoot recovery tests above) — a second
+    // `new JobStore(dir)` would write to disk but the manager's own cached
+    // copy would never see it.
+    const jobStore = new JobStore(dir);
+    const adapter = fakeAdapter({ submit: vi.fn(async () => { throw new Error("never reached provider"); }) });
+    const manager = new JobManager(jobStore, adapter, new AssetStore(dir), new PhotoStore(dir));
+    const outcome = await manager.submitOrReconcile(REQUEST, "idem-key-stale-retry");
+    expect(outcome.job.providerJobId).toBeNull();
+
+    const record = await jobStore.get(outcome.job.id);
+    record!.job.createdAt = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    delete record!.job.lastError;
+    await jobStore.put(record!);
+
+    const submitCallsBefore = vi.mocked(adapter.submit).mock.calls.length;
+    const retried = await manager.retry(outcome.job.id);
+    expect(retried?.state).toBe("failed");
+    expect(retried?.lastError?.code).toBe("idempotency_retention_expired");
+    expect(vi.mocked(adapter.submit).mock.calls.length).toBe(submitCallsBefore); // no resubmit attempt
+  });
+
   it("retry reconciles an existing provider job instead of submitting a second generation", async () => {
     const adapter = fakeAdapter({
       getStatus: vi.fn(async (): Promise<ProviderStatusResult> => ({ state: "generating", progress: { known: false } })),

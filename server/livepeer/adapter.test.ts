@@ -163,6 +163,35 @@ describe("LivepeerAdapter.submit", () => {
     ).rejects.toBeInstanceOf(McpToolError);
     expect(mcp.calls).toHaveLength(0);
   });
+
+  it("reuses cached image URLs on a second submit for the same idempotency key instead of re-uploading", async () => {
+    const mcp = fakeMcp({
+      upload: (args) => ({ url: `https://agent.livepeer.org/a/${Date.now()}-${args.filename}` }),
+      run_capability: () => ({ job_id: "mjob_new", status: "submitted", capability_used: "rodin-i3d" }),
+    });
+    const cacheStore = new Map<string, string[]>();
+    const uploadCache = {
+      get: vi.fn(async (key: string) => cacheStore.get(key)),
+      set: vi.fn(async (key: string, urls: string[]) => {
+        cacheStore.set(key, urls);
+      }),
+    };
+    const adapter = new LivepeerAdapter(mcp, fakePhotos(), uploadCache);
+    const request = { capability: "rodin-i3d", idempotencyKey: "idem-retry", photos: [{ photoId: "a", sourceIndex: 1 }] } as const;
+
+    await adapter.submit(request);
+    const firstUploadCount = mcp.calls.filter((c) => c.name === "upload").length;
+    expect(firstUploadCount).toBe(1);
+
+    await adapter.submit(request); // simulates a retry/resubmit reusing the same idempotencyKey
+    const secondUploadCount = mcp.calls.filter((c) => c.name === "upload").length;
+    expect(secondUploadCount).toBe(1); // no second upload — cached URL reused
+
+    const runCalls = mcp.calls.filter((c) => c.name === "run_capability");
+    const firstInputs = runCalls[0]?.args.inputs as { image_urls: string[] };
+    const secondInputs = runCalls[1]?.args.inputs as { image_urls: string[] };
+    expect(secondInputs.image_urls).toEqual(firstInputs.image_urls); // byte-identical request on retry
+  });
 });
 
 describe("LivepeerAdapter.getStatus", () => {

@@ -118,9 +118,29 @@ generation happens server-side.
   `submit`, so whether it reached the provider is ambiguous) is re-driven
   through `submitToProvider` reusing the exact same persisted idempotency
   key, relying on Livepeer's own idempotency cache to make that safe even if
-  the original call did land. A background poller (`setInterval`, ~4s tick,
-  per-job exponential backoff 5s→60s) also advances jobs without waiting for
-  a client `GET`.
+  the original call did land — **but only within a confirmed retention
+  window** (`CONFIRMED_IDEMPOTENCY_RETENTION_MS`, 23h — a safety margin
+  under Livepeer's documented 24h `idempotency_key` cache). Past that
+  window, the same idempotency key is no longer guaranteed to dedupe a
+  request that actually landed, so auto-resubmitting risks starting a real
+  second generation; instead the job is marked `failed`,
+  `lastError.retryable: false`, `lastError.code:
+  "idempotency_retention_expired"`, with an explicit "provider outcome
+  unknown; cannot safely resubmit... manual reconciliation required"
+  message — an honest "we don't know" rather than a guess. `retry()`'s own
+  no-`providerJobId` resubmit path applies the identical bound. A background
+  poller (`setInterval`, ~4s tick, per-job exponential backoff 5s→60s) also
+  advances jobs without waiting for a client `GET`.
+- Retries/resubmits for the **same job** send the provider a **byte-identical
+  request**, not just the same `idempotency_key` string: `LivepeerAdapter`
+  caches the photos' re-hosted `image_urls` durably (in the job's internal
+  record, via `JobStoreUploadUrlCache`) after the first upload, and reuses
+  them on any later attempt instead of re-uploading (the `upload` tool mints
+  a fresh timestamped URL every call). This guards against the provider's
+  idempotency matching fingerprinting the request body rather than trusting
+  the key alone. `deterministicSeed(idempotencyKey)` (unchanged from the
+  first version) already gave `seed`/`model_seed`/`texture_seed` the same
+  stability.
 
 ## Upload / download safety
 
@@ -202,7 +222,7 @@ which has no provenance either.
   2026-09-18. Keyless `spend_cap`: $100 remaining / $0 spent (per lead's
   prior check); no cap was changed and no spend was made by this worker.
 - **Not run**: no real `run_capability` (generation) call was submitted by
-  this worker. All adapter/job-manager/mcpClient/fetchSafe tests (59 total —
+  this worker. All adapter/job-manager/mcpClient/fetchSafe tests (62 total —
   `npx vitest run`) use fixtures modeled on the reference workspace's actual
   completed responses (`outputs/room-corner-comparison/rodin-response.json`,
   `tripo-response.json`) and a fake/mocked transport
