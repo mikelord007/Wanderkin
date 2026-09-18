@@ -100,8 +100,12 @@ export async function prepareAsset(
   onProgress?.("analyzing");
   const normalization = normalizeAsset(loaded.triangles, loaded.inspection, {
     targetExtentMeters,
-    upAxisOverride: options.upAxisOverride,
-    extraYawRadians: options.extraYawRadians,
+    ...(options.upAxisOverride
+      ? { upAxisOverride: options.upAxisOverride }
+      : {}),
+    ...(options.extraYawRadians !== undefined
+      ? { extraYawRadians: options.extraYawRadians }
+      : {}),
   });
 
   const worldTriangles = transformTriangleSoup(

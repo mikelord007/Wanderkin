@@ -203,7 +203,9 @@ export function sampleSurfaces(
   }
   const raw: RawPatch[] = [];
   for (const [key, accumulator] of cells) {
-    const [cellX, cellZ] = key.split(":").map(Number);
+    const [cellXText, cellZText] = key.split(":") as [string, string];
+    const cellX = Number(cellXText);
+    const cellZ = Number(cellZText);
     const order = accumulator.ys
       .map((_, index) => index)
       .sort((a, b) => accumulator.ys[a]! - accumulator.ys[b]!);

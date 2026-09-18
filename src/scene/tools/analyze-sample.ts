@@ -149,8 +149,9 @@ function largestCluster(patches: SurfacePatch[], cellSize: number) {
   const remaining = new Map(patches.map((patch) => [key(patch), patch]));
   let best: SurfacePatch[] = [];
   while (remaining.size > 0) {
-    const [firstKey] = remaining.keys();
-    const seed = remaining.get(firstKey) as SurfacePatch;
+    const firstKey = remaining.keys().next().value;
+    if (firstKey === undefined) break;
+    const seed = remaining.get(firstKey)!;
     remaining.delete(firstKey);
     const group = [seed];
     const queue = [seed];

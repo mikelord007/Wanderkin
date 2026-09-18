@@ -31,7 +31,7 @@ const DEFAULT_FLOOR_THICKNESS = 0.4;
 
 /** Local-space triangles for a helper, before its transform is applied. */
 export function helperLocalTriangles(
-  kind: HelperEntity["kind"]!,
+  kind: HelperEntity["kind"],
   dimensions: Vec3,
 ): TriangleSoup {
   const [w, h, d] = dimensions;

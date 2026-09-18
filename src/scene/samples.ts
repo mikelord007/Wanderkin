@@ -431,7 +431,7 @@ const TRIPO_SAMPLE: SceneManifest = {
 
 /** Bundled sample levels, playable with no Livepeer credentials and no new
  * inference job. */
-export const SAMPLE_LEVELS: readonly SceneManifest[] = [
+export const SAMPLE_LEVELS: SceneManifest[] = [
   RODIN_SAMPLE,
   TRIPO_SAMPLE,
 ];
