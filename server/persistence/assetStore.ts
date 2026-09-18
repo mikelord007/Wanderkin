@@ -51,6 +51,43 @@ export class AssetStore {
     return current[id];
   }
 
+  /** Repairs only placeholder model provenance on an existing generated
+   * asset. Both identifiers must match the stored record, and a concrete
+   * model can never be overwritten with a different value. */
+  async repairRegisteredModel(
+    id: string,
+    providerJobId: string,
+    registeredModel: string,
+  ): Promise<StoredAssetRecord> {
+    const model = registeredModel.trim();
+    if (!model || model === "unknown") {
+      throw new Error("Recovery requires an authoritative registered model");
+    }
+
+    return this.index.update((current) => {
+      const existing = current[id];
+      if (!existing?.provenance) {
+        throw new Error(`Generated asset "${id}" with provenance was not found`);
+      }
+      if (existing.provenance.providerJobId !== providerJobId) {
+        throw new Error(`Asset "${id}" does not belong to provider job "${providerJobId}"`);
+      }
+      if (existing.provenance.registeredModel !== "unknown") {
+        if (existing.provenance.registeredModel !== model) {
+          throw new Error(`Asset "${id}" already has different concrete model provenance`);
+        }
+        return existing;
+      }
+
+      const repaired: StoredAssetRecord = {
+        ...existing,
+        provenance: { ...existing.provenance, registeredModel: model },
+      };
+      current[id] = repaired;
+      return repaired;
+    });
+  }
+
   private async findBySha(sha256: string): Promise<StoredAssetRecord | undefined> {
     const current = await this.index.read();
     return Object.values(current).find((a) => a.sha256 === sha256);

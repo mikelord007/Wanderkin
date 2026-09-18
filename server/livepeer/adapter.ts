@@ -341,13 +341,14 @@ export class LivepeerAdapter implements ProviderAdapter {
           error: { message: `Provider reported "${status}" but returned no result URL`, retryable: true },
         };
       }
+      const registeredModel = await this.resolveRegisteredModel(response);
       return {
         state: "ready",
         progress: { known: false },
         resultAssetUrl: response.url,
         ...(response.capability_used ? { actualCapabilityUsed: response.capability_used as ProviderCapabilityId } : {}),
         actualFallbackFired: (response.fallback_fired ?? null) as ProviderCapabilityId | null,
-        ...(response.served_model_id ? { actualRegisteredModel: response.served_model_id } : {}),
+        ...(registeredModel ? { actualRegisteredModel: registeredModel } : {}),
       };
     }
 
@@ -358,5 +359,30 @@ export class LivepeerAdapter implements ProviderAdapter {
       ...(response.capability_used ? { actualCapabilityUsed: response.capability_used as ProviderCapabilityId } : {}),
       actualFallbackFired: (response.fallback_fired ?? null) as ProviderCapabilityId | null,
     };
+  }
+
+  /** A completed job may report the concrete model directly. The observed
+   * 2026-09-18 success envelope did not, but it did name the capability
+   * that ran, so ask the provider for that capability's registered model.
+   * Never fall back to our static catalog: missing live evidence stays
+   * missing rather than becoming fabricated provenance. */
+  private async resolveRegisteredModel(response: GetCreateMediaResponse): Promise<string | undefined> {
+    if (response.served_model_id) return response.served_model_id;
+
+    const capability = response.capability_used ?? response.fallback_fired ?? response.capability;
+    if (!capability) return undefined;
+
+    try {
+      const descriptor = await this.mcp.callTool<DescribeCapabilityResponse>(
+        "describe_capability",
+        { name: capability },
+        { timeoutMs: DESCRIBE_HTTP_TIMEOUT_MS },
+      );
+      return descriptor.found && descriptor.model_id ? descriptor.model_id : undefined;
+    } catch {
+      // Provenance enrichment must not turn a successfully completed asset
+      // into a failed job when the descriptor endpoint is temporarily down.
+      return undefined;
+    }
   }
 }

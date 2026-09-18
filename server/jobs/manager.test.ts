@@ -214,6 +214,49 @@ describe("JobManager", () => {
     expect(asset?.photos?.[0]?.id).toBe(stored.id);
   });
 
+  it("repairs unknown model provenance from the existing provider job without resubmitting or downloading", async () => {
+    vi.mocked(downloadBounded).mockResolvedValue({ buffer: minimalGlb(), contentType: "model/gltf-binary" });
+    const getStatus = vi
+      .fn<ProviderAdapter["getStatus"]>()
+      .mockResolvedValueOnce({
+        state: "ready",
+        progress: { known: false },
+        resultAssetUrl: "https://example.invalid/model.glb",
+      })
+      .mockResolvedValueOnce({
+        state: "ready",
+        progress: { known: false },
+        resultAssetUrl: "https://example.invalid/model.glb",
+        actualRegisteredModel: "fal-ai/hyper3d/rodin/v2.5",
+      });
+    const adapter = fakeAdapter({ getStatus });
+    const photoStore = new PhotoStore(dir);
+    const jobStore = new JobStore(dir);
+    const assetStore = new AssetStore(dir);
+    const manager = new JobManager(jobStore, adapter, assetStore, photoStore);
+    const storedPhoto = await photoStore.store(minimalJpeg(), 1, "p1.jpg");
+    const outcome = await manager.submitOrReconcile(
+      { capability: "rodin-i3d", photos: [{ photoId: storedPhoto.id, sourceIndex: 1 }] },
+      "objectquest-success-provenance-repair",
+    );
+    const ready = await manager.pollAndAdvance(outcome.job.id);
+    const assetId = ready?.resultAssetId;
+    expect(assetId).toBeTruthy();
+    expect((await assetStore.get(assetId!))?.provenance?.registeredModel).toBe("unknown");
+
+    const repaired = await manager.repairReadyAssetProvenance(outcome.job.id);
+    expect(repaired?.id).toBe(assetId);
+    expect(repaired?.provenance?.registeredModel).toBe("fal-ai/hyper3d/rodin/v2.5");
+    expect(adapter.submit).toHaveBeenCalledTimes(1);
+    expect(getStatus).toHaveBeenCalledTimes(2);
+    expect(downloadBounded).toHaveBeenCalledTimes(1);
+
+    // Re-running recovery is a no-op and does not hit the provider again.
+    await expect(manager.repairReadyAssetProvenance(outcome.job.id)).resolves.toMatchObject({ id: assetId });
+    expect(getStatus).toHaveBeenCalledTimes(2);
+    expect(downloadBounded).toHaveBeenCalledTimes(1);
+  });
+
   it("a poll failure backs off instead of marking the job failed on a transient blip", async () => {
     const adapter = fakeAdapter({ getStatus: vi.fn(async () => { throw new McpTransportError("network blip"); }) });
     const manager = build(adapter);

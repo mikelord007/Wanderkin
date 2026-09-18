@@ -5,6 +5,7 @@ import { JOB_SCHEMA_VERSION } from "../../shared/schema-version.js";
 import type { ProviderAdapter, ProviderInputPhoto } from "../../shared/provider.js";
 import { McpToolError, McpTransportError } from "../livepeer/mcpClient.js";
 import { AssetStore } from "../persistence/assetStore.js";
+import type { StoredAssetRecord } from "../persistence/assetStore.js";
 import { downloadBounded, UnsafeUrlError, DownloadTooLargeError } from "../persistence/fetchSafe.js";
 import { MAX_GLB_BYTES } from "../persistence/validate.js";
 import type { PhotoStore } from "../persistence/photoStore.js";
@@ -456,6 +457,41 @@ export class JobManager {
       record.job.lastError = toJobError(err);
       record.job.updatedAt = new Date().toISOString();
     }
+  }
+
+  /** Repairs an already-ready asset whose original success poll lacked a
+   * concrete model field. This only re-reads the existing provider job and
+   * patches matching `unknown` provenance; it never submits or downloads. */
+  async repairReadyAssetProvenance(jobId: string): Promise<StoredAssetRecord | undefined> {
+    return this.runExclusive(`job:${jobId}`, async () => {
+      const record = await this.store.get(jobId);
+      if (
+        !record ||
+        record.job.state !== "ready" ||
+        !record.job.providerJobId ||
+        !record.job.resultAssetId
+      ) {
+        return undefined;
+      }
+
+      const asset = await this.assets.get(record.job.resultAssetId);
+      if (!asset?.provenance) return undefined;
+      if (asset.provenance.registeredModel !== "unknown") return asset;
+
+      const status = await this.adapter.getStatus(record.job.providerJobId);
+      record.internal.lastProviderStatusRaw = status;
+      if (status.state !== "ready" || !status.actualRegisteredModel) {
+        throw new Error("Provider did not return authoritative model provenance for the completed job");
+      }
+
+      const repaired = await this.assets.repairRegisteredModel(
+        record.job.resultAssetId,
+        record.job.providerJobId,
+        status.actualRegisteredModel,
+      );
+      await this.store.put(record);
+      return repaired;
+    });
   }
 
   /** Reconciles/recovers a job, serialized per job id:
