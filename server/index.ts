@@ -42,7 +42,7 @@ app.use(createUploadsRouter(photoStore));
 app.use(createPhotosRouter(photoStore));
 app.use(createAssetsRouter(assetStore));
 app.use(createJobsRouter(jobManager, adapter, photoStore));
-app.use(createLevelsRouter(new LevelStore(env.storageDir)));
+app.use(createLevelsRouter(new LevelStore(env.storageDir, assetStore, photoStore)));
 
 await jobManager.resumeOnBoot();
 

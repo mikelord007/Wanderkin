@@ -63,8 +63,8 @@ On mount, `LevelEditor` calls `resolveDraft(levelId, manifest.updatedAt)`:
 - **`none`** — nothing to restore.
 
 The draft clears on a successful Save (the edits are now durable inside
-the saved `SceneManifest`) or when the user explicitly discards it or
-backs out of an unsaved (asset-sourced) preparation.
+the saved `SceneManifest`) or when the user explicitly discards it. Ordinary
+navigation does not silently destroy recoverable work.
 
 Known gap: this only guards the generation → preparation → save window.
 Reloading mid-edit on an *already-saved* level you're re-editing
@@ -190,8 +190,6 @@ for `src/ui`'s screen components.
 
 ## Known limitations
 
-- This branch intentionally does not edit shared `server/index.ts`; integration
-  must pass its existing asset/photo stores as shown above.
 - No in-canvas text labels on preview placeholders (would need a
   font-loading dependency); the "loading…" / "preview unavailable" state
   surfaces via a DOM banner instead.
