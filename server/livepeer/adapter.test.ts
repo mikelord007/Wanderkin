@@ -142,6 +142,32 @@ describe("LivepeerAdapter.submit", () => {
       "https://agent.livepeer.org/a/front-photo.jpg",
       "https://agent.livepeer.org/a/right-photo.jpg",
     ]);
+    expect(inputs).toMatchObject({
+      model_seed: 1_979_602_288,
+      texture_seed: 2_109_681_439,
+    });
+  });
+
+  it("keeps the deterministic Rodin seed within fal's documented 0-65535 range", async () => {
+    const mcp = fakeMcp({
+      upload: () => ({ url: "https://agent.livepeer.org/a/x.jpg" }),
+      run_capability: () => ({ job_id: "mjob_new", status: "submitted", capability_used: "rodin-i3d" }),
+    });
+    const adapter = new LivepeerAdapter(mcp, fakePhotos());
+
+    await adapter.submit({
+      capability: "rodin-i3d",
+      // This exact live-smoke key previously produced the rejected
+      // int32 seed 463045388.
+      idempotencyKey: "objectquest-smoke-20260918-rodin-01",
+      photos: [{ photoId: "a", sourceIndex: 1 }],
+    });
+
+    const runCall = mcp.calls.find((call) => call.name === "run_capability");
+    const inputs = runCall?.args.inputs as { seed: number };
+    expect(inputs.seed).toBe(33_548);
+    expect(inputs.seed).toBeGreaterThanOrEqual(0);
+    expect(inputs.seed).toBeLessThanOrEqual(65_535);
   });
 
   it("throws McpTransportError when run_capability returns no job_id", async () => {

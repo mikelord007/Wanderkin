@@ -81,14 +81,17 @@ const DESCRIBE_HTTP_TIMEOUT_MS = 8_000;
 
 const DISCOVERY_CACHE_TTL_MS = 5 * 60_000;
 
-function deterministicSeed(key: string): number {
-  // FNV-1a, folded into fal/Tripo's accepted int32 seed range.
+const TRIPO_SEED_MODULUS = 2_147_483_647;
+const RODIN_SEED_MODULUS = 65_536;
+
+function deterministicSeed(key: string, modulus = TRIPO_SEED_MODULUS): number {
+  // FNV-1a, folded into the provider-specific non-negative seed range.
   let hash = 0x811c9dc5;
   for (let i = 0; i < key.length; i++) {
     hash ^= key.charCodeAt(i);
     hash = Math.imul(hash, 0x01000193);
   }
-  return Math.abs(hash) % 2_147_483_647;
+  return Math.abs(hash) % modulus;
 }
 
 function orderPhotosForCapability(
@@ -272,7 +275,9 @@ export class LivepeerAdapter implements ProviderAdapter {
             material: "Shaded",
             quality_mesh_option: "50K Triangle",
             preview_render: true,
-            seed: deterministicSeed(request.idempotencyKey),
+            // fal's Rodin v2.5 schema accepts seed values from 0 through
+            // 65,535. Keep Tripo on its existing int32 sequence above.
+            seed: deterministicSeed(request.idempotencyKey, RODIN_SEED_MODULUS),
           };
 
     const response = await this.mcp.callTool<RunCapabilitySubmitResponse>(

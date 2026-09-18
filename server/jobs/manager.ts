@@ -33,6 +33,7 @@ export type SubmitOutcome =
 
 const MAX_RETRIES = 3;
 const PROVIDER_ID = "livepeer-agent-mcp";
+const TERMINAL_PROVIDER_STATUSES = new Set(["failed", "cancelled", "canceled"]);
 
 /** Livepeer's documented `idempotency_key` cache retention is 24h — a
  * resubmit past that window can no longer rely on the provider deduping a
@@ -84,6 +85,28 @@ function toJobError(err: unknown): JobError {
   }
   const message = err instanceof Error ? err.message : String(err);
   return { message: sanitizeMessage(message), code: "unknown", retryable: true, occurredAt };
+}
+
+function terminalProviderStatus(err: unknown): string | undefined {
+  if (!(err instanceof McpToolError) || typeof err.raw !== "object" || err.raw === null) return undefined;
+  const structuredContent = (err.raw as { structuredContent?: unknown }).structuredContent;
+  if (typeof structuredContent !== "object" || structuredContent === null) return undefined;
+  const status = (structuredContent as { status?: unknown }).status;
+  if (typeof status !== "string") return undefined;
+  const normalized = status.toLowerCase();
+  return TERMINAL_PROVIDER_STATUSES.has(normalized) ? normalized : undefined;
+}
+
+function safeProviderFailure(status: string): JobError {
+  return {
+    message:
+      status === "cancelled" || status === "canceled"
+        ? "The provider cancelled the generation request."
+        : "The provider rejected the generation request. Check the selected model settings and try again.",
+    code: "provider_failed",
+    retryable: false,
+    occurredAt: new Date().toISOString(),
+  };
 }
 
 function canonicalPhotos(photos: readonly ProviderInputPhoto[]): string {
@@ -372,16 +395,18 @@ export class JobManager {
       }
     } catch (err) {
       const jobError = toJobError(err);
-      record.internal.lastProviderStatusRaw = jobError;
+      const terminalStatus = terminalProviderStatus(err);
+      // McpClient retains the complete tool result on McpToolError.raw.
+      // Store it only in server-side bookkeeping so operators can diagnose
+      // typed validation failures without exposing runner internals to UI.
+      record.internal.lastProviderStatusRaw = err instanceof McpToolError ? err.raw : jobError;
 
-      if (!jobError.retryable) {
-        // MCP reports a terminal provider outcome (including an `isError`
-        // get_create_media response) by throwing McpToolError. Do not treat
-        // that explicit non-retryable result like a network blip or the job
-        // will remain "generating" forever.
+      if (terminalStatus) {
+        // `isError` alone is not enough to prove the provider job is dead:
+        // only the explicit typed provider status makes this terminal.
         record.job.state = "failed";
         record.job.uiMessage = friendlyMessage("failed");
-        record.job.lastError = jobError;
+        record.job.lastError = safeProviderFailure(terminalStatus);
         record.job.completedAt = new Date().toISOString();
         record.job.updatedAt = record.job.completedAt;
       } else {
