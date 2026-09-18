@@ -96,7 +96,7 @@ describe("helper geometry", () => {
       kind: "ramp",
       transform: identityTransform(),
       dimensions: [1, 0.5, 2],
-      collider: { kind: "box", halfExtents: [0.5, 0.25, 1] },
+      collider: { kind: "triangle-mesh" },
     });
     expect(result.entities).toHaveLength(1);
     expect(result.entities[0]).toMatchObject({ kind: "ramp", addedBy: "game" });
@@ -137,7 +137,10 @@ describe("helper geometry", () => {
 
     const result = updateHelperDimensions(withHelper, helperId, [2, 2, 2]);
     const updatedHelper = result.entities.find((e) => e.id === helperId);
-    expect(updatedHelper).toMatchObject({ dimensions: [2, 2, 2] });
+    expect(updatedHelper).toMatchObject({
+      dimensions: [2, 2, 2],
+      collider: { kind: "box", halfExtents: [1, 1, 1] },
+    });
 
     const untouchedMesh = result.entities.find((e) => e.id === "mesh-1");
     expect(untouchedMesh).toMatchObject({ kind: "generated-mesh" });
@@ -145,6 +148,21 @@ describe("helper geometry", () => {
     // Attempting to target the generated-mesh entity's id is a no-op.
     const noOp = updateHelperDimensions(result, "mesh-1", [9, 9, 9]);
     expect(noOp.entities.find((e) => e.id === "mesh-1")).toMatchObject({ kind: "generated-mesh" });
+  });
+
+  it("keeps a resized ramp on the same triangle-mesh collider used by its wedge preview", () => {
+    const manifest = addHelperEntity(baseManifest(), {
+      kind: "ramp",
+      transform: identityTransform(),
+      dimensions: [1, 0.5, 2],
+      collider: { kind: "triangle-mesh" },
+    });
+    const id = manifest.entities[0]!.id;
+    const result = updateHelperDimensions(manifest, id, [2, 1, 4]);
+    expect(result.entities[0]).toMatchObject({
+      dimensions: [2, 1, 4],
+      collider: { kind: "triangle-mesh" },
+    });
   });
 });
 

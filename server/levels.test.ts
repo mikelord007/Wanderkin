@@ -7,6 +7,9 @@ import express from "express";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createEmptyManifest } from "../shared/manifest.js";
 import type { SceneManifest } from "../shared/manifest.js";
+import { AssetStore } from "./persistence/assetStore.js";
+import { PhotoStore } from "./persistence/photoStore.js";
+import { createAssetsRouter } from "./routes/assets.js";
 import {
   LevelStore,
   createLevelsRouter,
@@ -25,7 +28,7 @@ function minimalGlb(byte = 0xaa): Buffer {
 }
 
 function minimalJpeg(): Buffer {
-  const buffer = Buffer.alloc(32, 0);
+  const buffer = Buffer.alloc(512, 0);
   buffer[0] = 0xff;
   buffer[1] = 0xd8;
   buffer[2] = 0xff;
@@ -40,6 +43,10 @@ function baseManifest(overrides: Partial<SceneManifest> = {}): SceneManifest {
     movementConfigId: "default-v1",
   });
   return { ...manifest, ...overrides };
+}
+
+function levelStore(storageDir: string, publicDir?: string): LevelStore {
+  return new LevelStore(storageDir, new AssetStore(storageDir), new PhotoStore(storageDir), publicDir);
 }
 
 describe("isSafeLevelId", () => {
@@ -102,6 +109,80 @@ describe("sceneManifestSchema", () => {
     expect(sceneManifestSchema.safeParse("not an object").success).toBe(false);
     expect(sceneManifestSchema.safeParse({}).success).toBe(false);
   });
+
+  it("rejects non-finite vectors, zero scale, and invalid quaternions", () => {
+    const withMesh = (transform: SceneManifest["entities"][number]["transform"]) =>
+      baseManifest({
+        assets: [{ id: "asset-1", url: "/samples/test.glb", sha256: "a".repeat(64), sizeBytes: 64 }],
+        entities: [
+          {
+            id: "mesh-1",
+            kind: "generated-mesh",
+            assetId: "asset-1",
+            transform,
+            collider: { kind: "triangle-mesh" },
+          },
+        ],
+      });
+    expect(
+      sceneManifestSchema.safeParse(
+        withMesh({ position: [Number.POSITIVE_INFINITY, 0, 0], rotation: [0, 0, 0, 1], scale: [1, 1, 1] }),
+      ).success,
+    ).toBe(false);
+    expect(
+      sceneManifestSchema.safeParse(
+        withMesh({ position: [0, 0, 0], rotation: [0, 0, 0, 1], scale: [1, 0, 1] }),
+      ).success,
+    ).toBe(false);
+    expect(
+      sceneManifestSchema.safeParse(
+        withMesh({ position: [0, 0, 0], rotation: [0, 0, 0, 0], scale: [1, 1, 1] }),
+      ).success,
+    ).toBe(false);
+  });
+
+  it("rejects non-positive helper dimensions and colliders that disagree with visible helper geometry", () => {
+    const helper = {
+      id: "helper-1",
+      kind: "box" as const,
+      transform: { position: [0, 0, 0] as const, rotation: [0, 0, 0, 1] as const, scale: [1, 1, 1] as const },
+      dimensions: [2, 1, 2] as const,
+      collider: { kind: "box" as const, halfExtents: [1, 0.5, 1] as const },
+      addedBy: "game" as const,
+    };
+    expect(sceneManifestSchema.safeParse(baseManifest({ entities: [{ ...helper, dimensions: [2, 0, 2] }] })).success).toBe(false);
+    expect(
+      sceneManifestSchema.safeParse(
+        baseManifest({ entities: [{ ...helper, collider: { kind: "box", halfExtents: [2, 0.5, 1] } }] }),
+      ).success,
+    ).toBe(false);
+    expect(
+      sceneManifestSchema.safeParse(
+        baseManifest({ entities: [{ ...helper, kind: "ramp", collider: { kind: "box", halfExtents: [1, 0.5, 1] } }] }),
+      ).success,
+    ).toBe(false);
+  });
+
+  it("rejects duplicate ids and dangling generated-mesh asset references", () => {
+    const asset = { id: "asset-1", url: "/samples/test.glb", sha256: "a".repeat(64), sizeBytes: 64 };
+    expect(sceneManifestSchema.safeParse(baseManifest({ assets: [asset, asset] })).success).toBe(false);
+    expect(
+      sceneManifestSchema.safeParse(
+        baseManifest({
+          assets: [asset],
+          entities: [
+            {
+              id: "mesh-1",
+              kind: "generated-mesh",
+              assetId: "missing-asset",
+              transform: { position: [0, 0, 0], rotation: [0, 0, 0, 1], scale: [1, 1, 1] },
+              collider: { kind: "triangle-mesh" },
+            },
+          ],
+        }),
+      ).success,
+    ).toBe(false);
+  });
 });
 
 describe("LevelStore", () => {
@@ -116,7 +197,7 @@ describe("LevelStore", () => {
   });
 
   it("creates a level, stamping timestamps and assigning an id when none is usable", async () => {
-    const store = new LevelStore(dir);
+    const store = levelStore(dir);
     const created = await store.create(baseManifest({ levelId: "" }));
     expect(created.levelId).toBeTruthy();
     expect(created.createdAt).toBeTruthy();
@@ -127,7 +208,7 @@ describe("LevelStore", () => {
   });
 
   it("lists every created level", async () => {
-    const store = new LevelStore(dir);
+    const store = levelStore(dir);
     await store.create(baseManifest({ levelId: "level-a" }));
     await store.create(baseManifest({ levelId: "level-b" }));
     const all = await store.list();
@@ -135,7 +216,7 @@ describe("LevelStore", () => {
   });
 
   it("never lets create() silently overwrite an existing level with a colliding id", async () => {
-    const store = new LevelStore(dir);
+    const store = levelStore(dir);
     const first = await store.create(baseManifest({ levelId: "level-1", name: "First" }));
     const second = await store.create(baseManifest({ levelId: "level-1", name: "Second" }));
     expect(second.levelId).not.toBe(first.levelId);
@@ -143,7 +224,7 @@ describe("LevelStore", () => {
   });
 
   it("save() upserts at the given id and bumps updatedAt", async () => {
-    const store = new LevelStore(dir);
+    const store = levelStore(dir);
     const created = await store.create(baseManifest({ levelId: "level-1" }));
     await new Promise((resolve) => setTimeout(resolve, 5));
     const saved = await store.save("level-1", { ...created, name: "Renamed" });
@@ -152,8 +233,16 @@ describe("LevelStore", () => {
     expect(saved.createdAt).toBe(created.createdAt);
   });
 
+  it("validates direct persistence calls instead of relying only on HTTP routes", async () => {
+    const store = levelStore(dir);
+    await expect(
+      store.create({ ...baseManifest(), spawn: { position: [Number.NaN, 0, 0], headingRadians: 0 } }),
+    ).rejects.toThrow(/Invalid level/);
+    await expect(store.save("../unsafe", baseManifest())).rejects.toThrow(/Invalid level id/);
+  });
+
   it("persists atomically across many concurrent creates without corrupting the index", async () => {
-    const store = new LevelStore(dir);
+    const store = levelStore(dir);
     const results = await Promise.all(
       Array.from({ length: 20 }, (_, i) => store.create(baseManifest({ levelId: `level-${i}`, name: `Level ${i}` }))),
     );
@@ -161,7 +250,7 @@ describe("LevelStore", () => {
     expect(ids.size).toBe(20);
 
     // A fresh store instance re-reading the file from disk sees everything.
-    const reopened = new LevelStore(dir);
+    const reopened = levelStore(dir);
     const all = await reopened.list();
     expect(all).toHaveLength(20);
   });
@@ -169,10 +258,20 @@ describe("LevelStore", () => {
   it("survives a corrupted levels.json by treating it as empty rather than throwing", async () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "levels.json"), "{not valid json", "utf-8");
-    const store = new LevelStore(dir);
+    const store = levelStore(dir);
     await expect(store.list()).rejects.toThrow();
     // Confirms corruption is surfaced (not silently ignored) rather than
     // masking data loss as an empty list — callers see a real error.
+  });
+
+  it("does not mutate its cached snapshot when an atomic write fails", async () => {
+    const store = levelStore(dir);
+    const created = await store.create(baseManifest({ levelId: "durable", name: "Durable" }));
+    rmSync(join(dir, "levels.json"));
+    mkdirSync(join(dir, "levels.json"));
+
+    await expect(store.save("durable", { ...created, name: "Must not leak into cache" })).rejects.toThrow();
+    expect(await store.get("durable")).toMatchObject({ name: "Durable" });
   });
 });
 
@@ -203,7 +302,7 @@ describe("exportLevelBundle / importLevelBundle", () => {
   it("exports a bundle embedding every referenced asset/photo as base64", async () => {
     const glb = minimalGlb();
     const asset = writeStoredAsset(glb);
-    const photo = writeStoredPhoto(minimalJpeg(), "photo-1");
+    const photo = writeStoredPhoto(minimalJpeg(), "00000000-0000-4000-8000-000000000001");
 
     const manifest = baseManifest({
       assets: [{ id: asset.id, url: asset.url, sha256: asset.id, sizeBytes: glb.byteLength }],
@@ -217,19 +316,37 @@ describe("exportLevelBundle / importLevelBundle", () => {
     expect(bundle.photos).toHaveLength(1);
   });
 
-  it("skips a reference whose file is missing on disk rather than failing the whole export", async () => {
+  it("exports safe bundled sample references from public/samples", async () => {
+    const publicDir = join(dir, "public");
+    const glb = minimalGlb(0xbb);
+    const photo = minimalJpeg();
+    mkdirSync(join(publicDir, "samples"), { recursive: true });
+    writeFileSync(join(publicDir, "samples", "sample.glb"), glb);
+    writeFileSync(join(publicDir, "samples", "photo.jpg"), photo);
+    const sha256 = createHash("sha256").update(glb).digest("hex");
     const manifest = baseManifest({
-      assets: [{ id: "missing", url: "/api/assets/files/missing.glb", sha256: "missing", sizeBytes: 10 }],
+      assets: [{ id: "sample-asset", url: "/samples/sample.glb", sha256, sizeBytes: glb.byteLength }],
+      photos: [{ id: "sample-photo", url: "/samples/photo.jpg", order: 1 }],
     });
-    const bundle = await exportLevelBundle(dir, manifest);
-    expect(bundle.assets).toHaveLength(0);
+
+    const bundle = await exportLevelBundle(dir, manifest, publicDir);
+    expect(bundle.assets.map((file) => file.filename)).toEqual(["sample.glb"]);
+    expect(bundle.photos.map((file) => file.filename)).toEqual(["photo.jpg"]);
+  });
+
+  it("fails explicitly rather than returning an incomplete bundle when a referenced file is missing", async () => {
+    const missingSha = "a".repeat(64);
+    const manifest = baseManifest({
+      assets: [{ id: "missing", url: `/api/assets/files/${missingSha}.glb`, sha256: missingSha, sizeBytes: 10 }],
+    });
+    await expect(exportLevelBundle(dir, manifest)).rejects.toThrow(/referenced file is missing/);
   });
 
   it("round-trips export -> import into a new level with remapped, deduplicated asset URLs", async () => {
-    const store = new LevelStore(dir);
+    const store = levelStore(dir);
     const glb = minimalGlb();
     const asset = writeStoredAsset(glb);
-    const photo = writeStoredPhoto(minimalJpeg(), "photo-1");
+    const photo = writeStoredPhoto(minimalJpeg(), "00000000-0000-4000-8000-000000000001");
 
     const manifest = baseManifest({
       levelId: "original-level",
@@ -248,12 +365,19 @@ describe("exportLevelBundle / importLevelBundle", () => {
     await store.create(manifest);
 
     const bundle = await exportLevelBundle(dir, manifest);
-    const imported = await importLevelBundle(store, dir, bundle);
+    const imported = await importLevelBundle(store, bundle);
 
     expect(imported.levelId).not.toBe("original-level"); // always a new level, never overwrites
     expect(imported.assets[0]!.url).toBe(asset.url); // same sha256 -> same content-addressed file, deduplicated
     expect(imported.entities[0]).toMatchObject({ assetId: imported.assets[0]!.id });
     expect(imported.photos[0]!.id).not.toBe(photo.id); // photos are never content-addressed, always minted fresh
+    expect(await store.assets.get(imported.assets[0]!.id)).toMatchObject({
+      id: imported.assets[0]!.id,
+      sha256: asset.id,
+      sizeBytes: glb.byteLength,
+      photos: imported.photos,
+    });
+    expect(await store.photos.get(imported.photos[0]!.id)).toEqual(imported.photos[0]);
 
     // The re-materialized asset file is byte-identical and servable at the
     // same conventional path the assets router already serves from.
@@ -261,22 +385,63 @@ describe("exportLevelBundle / importLevelBundle", () => {
   });
 
   it("rejects a bundle whose embedded asset bytes aren't actually a GLB", async () => {
-    const store = new LevelStore(dir);
+    const store = levelStore(dir);
+    const invalidBytes = Buffer.from("not a glb");
+    const invalidSha = createHash("sha256").update(invalidBytes).digest("hex");
     const manifest = baseManifest({
-      assets: [{ id: "a1", url: "/api/assets/files/a1.glb", sha256: "a1", sizeBytes: 4 }],
+      assets: [{ id: "a1", url: `/api/assets/files/${invalidSha}.glb`, sha256: invalidSha, sizeBytes: invalidBytes.byteLength }],
     });
     const bundle = {
       bundleVersion: 1,
       manifest,
-      assets: [{ filename: "a1.glb", base64: Buffer.from("not a glb").toString("base64") }],
+      assets: [{ filename: `${invalidSha}.glb`, base64: invalidBytes.toString("base64") }],
       photos: [],
     };
-    await expect(importLevelBundle(store, dir, bundle)).rejects.toThrow(/not a valid binary GLB/);
+    await expect(importLevelBundle(store, bundle)).rejects.toThrow(/valid GLB|glTF/);
   });
 
   it("rejects a structurally invalid bundle before touching disk", async () => {
-    const store = new LevelStore(dir);
-    await expect(importLevelBundle(store, dir, { bundleVersion: 1 })).rejects.toThrow(/Invalid bundle/);
+    const store = levelStore(dir);
+    await expect(importLevelBundle(store, { bundleVersion: 1 })).rejects.toThrow(/Invalid bundle/);
+  });
+
+  it("requires one unambiguous embedded mapping for every referenced file", async () => {
+    const store = levelStore(dir);
+    const glb = minimalGlb();
+    const sha256 = createHash("sha256").update(glb).digest("hex");
+    const manifest = baseManifest({
+      assets: [{ id: "asset-1", url: `/api/assets/files/${sha256}.glb`, sha256, sizeBytes: glb.byteLength }],
+    });
+    const file = { filename: `${sha256}.glb`, base64: glb.toString("base64") };
+
+    await expect(importLevelBundle(store, { bundleVersion: 1, manifest, assets: [], photos: [] })).rejects.toThrow(
+      /missing embedded asset/,
+    );
+    await expect(
+      importLevelBundle(store, { bundleVersion: 1, manifest, assets: [file, file], photos: [] }),
+    ).rejects.toThrow(/Duplicate embedded asset mapping/);
+  });
+
+  it("rejects embedded asset hash and size mismatches before indexing anything", async () => {
+    const store = levelStore(dir);
+    const glb = minimalGlb();
+    const actualSha = createHash("sha256").update(glb).digest("hex");
+    const filename = `${actualSha}.glb`;
+    const file = { filename, base64: glb.toString("base64") };
+    const wrongHashManifest = baseManifest({
+      assets: [{ id: "asset-1", url: `/api/assets/files/${filename}`, sha256: "b".repeat(64), sizeBytes: glb.byteLength }],
+    });
+    await expect(
+      importLevelBundle(store, { bundleVersion: 1, manifest: wrongHashManifest, assets: [file], photos: [] }),
+    ).rejects.toThrow(/does not match manifest sha256/);
+    expect(await store.assets.get("asset-1")).toBeUndefined();
+
+    const wrongSizeManifest = baseManifest({
+      assets: [{ id: "asset-1", url: `/api/assets/files/${filename}`, sha256: actualSha, sizeBytes: glb.byteLength + 1 }],
+    });
+    await expect(
+      importLevelBundle(store, { bundleVersion: 1, manifest: wrongSizeManifest, assets: [file], photos: [] }),
+    ).rejects.toThrow(/does not match manifest sizeBytes/);
   });
 });
 
@@ -290,7 +455,9 @@ describe("createLevelsRouter (HTTP)", () => {
     dir = mkdtempSync(join(tmpdir(), "objectquest-levels-http-"));
     const app = express();
     app.use(express.json({ limit: "10mb" }));
-    app.use(createLevelsRouter(new LevelStore(dir)));
+    const store = levelStore(dir);
+    app.use(createAssetsRouter(store.assets));
+    app.use(createLevelsRouter(store));
     const listener = app.listen(0);
     await new Promise<void>((resolve) => listener.once("listening", resolve));
     const { port } = listener.address() as AddressInfo;
@@ -404,6 +571,10 @@ describe("createLevelsRouter (HTTP)", () => {
     const importedBody = (await imported.json()) as SceneManifest;
     expect(importedBody.levelId).not.toBe("export-me");
     expect(importedBody.assets[0]!.url).toBe(`/api/assets/files/${sha256}.glb`);
+
+    const indexedAsset = await fetch(`${baseUrl}/api/assets/${importedBody.assets[0]!.id}`);
+    expect(indexedAsset.status).toBe(200);
+    expect(await indexedAsset.json()).toMatchObject({ sha256, sizeBytes: glb.byteLength });
   });
 
   it("rejects an oversized import payload before it ever reaches the handler", async () => {
