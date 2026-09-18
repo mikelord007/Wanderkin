@@ -13,7 +13,7 @@ import {
   resolveResumeState,
   saveActiveSource,
 } from "./ui/jobStorage.js";
-import { createLevel, saveLevel } from "./ui/api.js";
+import { createLevel, downloadLevelBundle, saveLevel } from "./ui/api.js";
 
 type Screen =
   | { name: "start" }
@@ -125,6 +125,11 @@ export function App() {
             saveActiveSource({ kind: "import", assetId });
             setScreen({ name: "preparation", source: { kind: "asset", assetId }, isNew: true });
           }}
+          onImportLevelBundleReady={(manifest) => {
+            clearActiveSource();
+            clearPendingSubmission();
+            setScreen({ name: "preparation", source: { kind: "manifest", manifest }, isNew: false });
+          }}
         />
       );
 
@@ -140,8 +145,10 @@ export function App() {
       return (
         <PreparationScreen
           source={screen.source}
+          isNew={screen.isNew}
           onPlay={(manifest) => setScreen({ name: "play", manifest })}
           onSave={handleSavePreparedLevel}
+          onExport={(manifest) => downloadLevelBundle(manifest.levelId, manifest.name)}
           onBack={handlePreparationBack}
         />
       );

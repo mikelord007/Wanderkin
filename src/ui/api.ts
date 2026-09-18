@@ -103,6 +103,13 @@ export interface AssetWithSourcePhotos extends AssetReference {
   photos?: PhotoReference[];
 }
 
+export interface LevelBundle {
+  bundleVersion: 1;
+  manifest: SceneManifest;
+  assets: { filename: string; base64: string }[];
+  photos: { filename: string; base64: string }[];
+}
+
 export function getAsset(assetId: string): Promise<AssetWithSourcePhotos> {
   return request<AssetWithSourcePhotos>(`/api/assets/${encodeURIComponent(assetId)}`);
 }
@@ -138,6 +145,52 @@ export function saveLevel(levelId: string, manifest: SceneManifest): Promise<Sce
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(manifest),
   });
+}
+
+export function exportLevelBundle(levelId: string): Promise<LevelBundle> {
+  return request<LevelBundle>(`/api/levels/${encodeURIComponent(levelId)}/export`);
+}
+
+export async function importLevelBundle(file: File): Promise<SceneManifest> {
+  let body: string;
+  try {
+    body = await file.text();
+  } catch (cause) {
+    throw new ApiError("Could not read this level bundle. Choose the file again and retry.", 0, cause);
+  }
+  return request<SceneManifest>("/api/levels/import", {
+    method: "POST",
+    // The route intentionally bypasses the global 10 MB JSON parser so a
+    // complete bundle can include its GLB and photos as base64.
+    headers: { "Content-Type": "application/octet-stream" },
+    body,
+  });
+}
+
+function safeBundleFilename(levelName: string): string {
+  const stem = levelName
+    .trim()
+    .replace(/[^a-z0-9._-]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  return `${stem || "objectquest-level"}.objectquest.json`;
+}
+
+export async function downloadLevelBundle(levelId: string, levelName: string): Promise<void> {
+  const bundle = await exportLevelBundle(levelId);
+  const url = URL.createObjectURL(
+    new Blob([JSON.stringify(bundle)], { type: "application/json;charset=utf-8" }),
+  );
+  try {
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = safeBundleFilename(levelName);
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+  } finally {
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
 }
 
 /** Friendly text for a caught ApiError/Error, never internal stack/code. */

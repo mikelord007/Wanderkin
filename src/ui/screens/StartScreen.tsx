@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { SceneManifest } from "@shared/index.js";
-import { describeApiError, importAsset, listLevels } from "../api.js";
+import {
+  describeApiError,
+  downloadLevelBundle,
+  importAsset,
+  importLevelBundle,
+  listLevels,
+} from "../api.js";
 
 interface StartScreenProps {
   onPlaySample: (manifest: SceneManifest) => void;
@@ -9,6 +15,7 @@ interface StartScreenProps {
   onEditSavedLevel: (manifest: SceneManifest) => void;
   onCreateFromPhotos: () => void;
   onImportGlbReady: (assetId: string) => void;
+  onImportLevelBundleReady: (manifest: SceneManifest) => void;
 }
 
 export function StartScreen({
@@ -18,6 +25,7 @@ export function StartScreen({
   onEditSavedLevel,
   onCreateFromPhotos,
   onImportGlbReady,
+  onImportLevelBundleReady,
 }: StartScreenProps) {
   const [sampleLevels, setSampleLevels] = useState<SceneManifest[] | null>(null);
   const [sampleError, setSampleError] = useState<string | null>(null);
@@ -25,9 +33,14 @@ export function StartScreen({
   const [savedLevels, setSavedLevels] = useState<SceneManifest[] | null>(null);
   const [savedError, setSavedError] = useState<string | null>(null);
 
-  const [importing, setImporting] = useState(false);
-  const [importError, setImportError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [importingGlb, setImportingGlb] = useState(false);
+  const [glbImportError, setGlbImportError] = useState<string | null>(null);
+  const [importingBundle, setImportingBundle] = useState(false);
+  const [bundleImportError, setBundleImportError] = useState<string | null>(null);
+  const [exportingLevelId, setExportingLevelId] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const glbInputRef = useRef<HTMLInputElement | null>(null);
+  const bundleInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     import("../../scene/samples.js")
@@ -51,18 +64,45 @@ export function StartScreen({
     };
   }, []);
 
-  async function handleImportFile(file: File | null) {
+  async function handleImportGlb(file: File | null) {
     if (!file) return;
-    setImporting(true);
-    setImportError(null);
+    setImportingGlb(true);
+    setGlbImportError(null);
     try {
       const asset = await importAsset(file);
       onImportGlbReady(asset.id);
     } catch (error) {
-      setImportError(describeApiError(error));
+      setGlbImportError(describeApiError(error));
     } finally {
-      setImporting(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      setImportingGlb(false);
+      if (glbInputRef.current) glbInputRef.current.value = "";
+    }
+  }
+
+  async function handleImportBundle(file: File | null) {
+    if (!file) return;
+    setImportingBundle(true);
+    setBundleImportError(null);
+    try {
+      const imported = await importLevelBundle(file);
+      onImportLevelBundleReady(imported);
+    } catch (error) {
+      setBundleImportError(describeApiError(error));
+    } finally {
+      setImportingBundle(false);
+      if (bundleInputRef.current) bundleInputRef.current.value = "";
+    }
+  }
+
+  async function handleExport(manifest: SceneManifest) {
+    setExportingLevelId(manifest.levelId);
+    setExportError(null);
+    try {
+      await downloadLevelBundle(manifest.levelId, manifest.name);
+    } catch (error) {
+      setExportError(describeApiError(error));
+    } finally {
+      setExportingLevelId(null);
     }
   }
 
@@ -146,11 +186,20 @@ export function StartScreen({
                   >
                     Edit
                   </button>
+                  <button
+                    type="button"
+                    className="oq-button oq-button--ghost"
+                    onClick={() => handleExport(manifest)}
+                    disabled={exportingLevelId !== null}
+                  >
+                    {exportingLevelId === manifest.levelId ? "Exporting…" : "Export"}
+                  </button>
                 </div>
               </article>
             ))}
           </div>
         )}
+        {exportError ? <p className="oq-error-text">{exportError}</p> : null}
       </section>
 
       <section className="oq-panel">
@@ -160,17 +209,30 @@ export function StartScreen({
             From photos
           </button>
           <label className="oq-button oq-button--secondary">
-            {importing ? "Importing…" : "Import a GLB file"}
+            {importingGlb ? "Importing GLB…" : "Import a GLB file"}
             <input
-              ref={fileInputRef}
+              ref={glbInputRef}
               type="file"
               accept=".glb,model/gltf-binary"
               className="oq-visually-hidden"
-              onChange={(event) => handleImportFile(event.target.files?.[0] ?? null)}
+              disabled={importingGlb || importingBundle}
+              onChange={(event) => handleImportGlb(event.target.files?.[0] ?? null)}
+            />
+          </label>
+          <label className="oq-button oq-button--secondary">
+            {importingBundle ? "Importing level…" : "Import level bundle"}
+            <input
+              ref={bundleInputRef}
+              type="file"
+              accept=".json,.objectquest.json,application/json,application/octet-stream"
+              className="oq-visually-hidden"
+              disabled={importingGlb || importingBundle}
+              onChange={(event) => handleImportBundle(event.target.files?.[0] ?? null)}
             />
           </label>
         </div>
-        {importError ? <p className="oq-error-text">{importError}</p> : null}
+        {glbImportError ? <p className="oq-error-text">{glbImportError}</p> : null}
+        {bundleImportError ? <p className="oq-error-text">{bundleImportError}</p> : null}
       </section>
     </div>
   );
