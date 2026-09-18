@@ -6,13 +6,13 @@ course has been completed in a browser.
 
 ## Current verification status (2026-09-18)
 
-- `npm test`: **240 passed** across 25 unit/headless test files on the
+- `npm test`: **245 passed** across 26 unit/headless test files on the
   integrated scene/editor/game/server revision.
 - `npm run test:e2e:http`: **23 passed** across 4 HTTP integration files.
 - `npm run typecheck`: **passed**.
 - `npm run build`: **passed**; Vite emitted the client and TypeScript
   emitted the server. Vite reports a non-fatal large-chunk warning.
-- `npm run test:e2e:browser`: **4 passed** in real headless Chrome. Both
+- `npm run test:e2e:browser`: **5 passed** in real headless Chrome. Both
   sample courses reached the visible finish screen and replayed using held
   keyboard controls, mouse camera movement, and read-only diagnostics.
 - Real Livepeer generation: **not run by QA**. The HTTP suite points only
@@ -106,6 +106,10 @@ Verified in-browser:
 - Editor: scale, spawn X, checkpoint trigger radius, and helper width were
   changed, saved through the real isolated API, then verified after a page
   reload and reopening the saved level.
+- Portable level: an edited Tripo sample used the visible **Save & export**
+  action, produced an actual `.objectquest.json` browser download, and was
+  uploaded through **Import level bundle**. The imported editor restored the
+  changed value, and a full reload rediscovered both distinct durable copies.
 
 No teleport, checkpoint mutation, completion callback, or game-state write
 is present in the suite. `window.__objectquest.get()` is read only and is
@@ -118,11 +122,6 @@ chrome's native pointer-lock release. The test explicitly releases only the
 browser pointer lock before clicking the real Resume button; it does not
 change game state. Physical-Escape pointer-lock release remains a manual
 check and is not claimed by automation.
-
-Portable export/import is **not browser-accepted** because the current UI
-has no export or bundle-import control. Server routes and unit coverage
-exist, but using those routes directly would not prove the missing browser
-workflow. This is a product integration blocker, not a QA pass.
 
 ## Manual browser protocol
 
@@ -174,5 +173,6 @@ Additional browser checks:
 
 The automated evidence above covers the gameplay path. A final manual pass
 should still confirm physical-Escape pointer-lock release and visual feel.
-Portable export/import remains blocked until a client control is integrated.
+The portable export/import workflow is covered by the isolated real-browser
+test above; no direct-route shortcut is used for that acceptance claim.
 

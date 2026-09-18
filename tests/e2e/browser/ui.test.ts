@@ -107,3 +107,37 @@ test("editor scale, spawn, checkpoint, and helper edits survive save and reload"
     "11.5",
   );
 });
+
+test("portable level export downloads and imports through the browser", async ({ page }) => {
+  await page.goto("/");
+  await openEditorForSample(page, "Room corner — Tripo");
+
+  const orientation = page.getByRole("heading", { name: "Model orientation" }).locator("..");
+  await orientation.getByLabel("Uniform scale").fill("6.75");
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Save & export", exact: true }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/\.objectquest\.json$/);
+  await expect(page.getByText("Bundle downloaded.", { exact: true })).toBeVisible();
+
+  const bundlePath = await download.path();
+  expect(bundlePath).not.toBeNull();
+
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await page.getByRole("heading", { name: "Create a new level" }).waitFor();
+  await page.getByLabel("Import level bundle").setInputFiles(bundlePath!);
+
+  await page.getByRole("heading", { name: "Model orientation" }).waitFor();
+  await expect(
+    page.getByRole("heading", { name: "Model orientation" }).locator("..").getByLabel("Uniform scale"),
+  ).toHaveValue("6.75");
+
+  // A full reload must rediscover both the original saved level and the
+  // newly imported copy from the isolated server's durable level index.
+  await page.reload();
+  const savedSection = page.getByRole("heading", { name: "Your saved levels" }).locator("..");
+  await expect(savedSection.locator("article").filter({ hasText: "Room corner — Tripo" })).toHaveCount(2);
+
+  expect(mcp.callsFor("run_capability")).toHaveLength(0);
+});
