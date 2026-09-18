@@ -2,11 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProviderInputPhoto } from "@shared/index.js";
 import {
   clearActiveJob,
+  clearActivePreparation,
   clearPendingSubmission,
   loadActiveJob,
+  loadActivePreparation,
   loadPendingSubmission,
   resolveResumeState,
   saveActiveJob,
+  saveActivePreparation,
   savePendingSubmission,
 } from "./jobStorage.js";
 
@@ -63,10 +66,36 @@ describe("jobStorage", () => {
     expect(loadActiveJob()).toBeNull();
   });
 
+  it("round-trips an active preparation and clears it independently of the other records", () => {
+    expect(loadActivePreparation()).toBeNull();
+    saveActivePreparation({ assetId: "asset-1", photos });
+    expect(loadActivePreparation()).toEqual({ assetId: "asset-1", photos });
+    clearActivePreparation();
+    expect(loadActivePreparation()).toBeNull();
+  });
+
   it("resolves resume state: active job wins over a pending submission", () => {
     savePendingSubmission({ idempotencyKey: "key-1", capability: "rodin-i3d", inputPhotos, photos });
     saveActiveJob({ jobId: "job-1", photos });
     expect(resolveResumeState()).toEqual({ screen: "generation", jobId: "job-1" });
+  });
+
+  it("resolves resume state: active preparation wins over an active job and a pending submission", () => {
+    savePendingSubmission({ idempotencyKey: "key-1", capability: "rodin-i3d", inputPhotos, photos });
+    saveActiveJob({ jobId: "job-1", photos });
+    saveActivePreparation({ assetId: "asset-1", photos });
+    expect(resolveResumeState()).toEqual({
+      screen: "preparation",
+      preparation: { assetId: "asset-1", photos },
+    });
+  });
+
+  it("resolves to the Preparation screen with source photos when only an active preparation survived a reload", () => {
+    saveActivePreparation({ assetId: "asset-1", photos });
+    expect(resolveResumeState()).toEqual({
+      screen: "preparation",
+      preparation: { assetId: "asset-1", photos },
+    });
   });
 
   it("resolves to the Photos screen with the same key when only a pending submission survived a reload", () => {
