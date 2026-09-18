@@ -341,12 +341,13 @@ export class LivepeerAdapter implements ProviderAdapter {
           error: { message: `Provider reported "${status}" but returned no result URL`, retryable: true },
         };
       }
-      const registeredModel = await this.resolveRegisteredModel(response);
+      const actualCapability = this.resolveActualCapability(response);
+      const registeredModel = await this.resolveRegisteredModel(response, actualCapability);
       return {
         state: "ready",
         progress: { known: false },
         resultAssetUrl: response.url,
-        ...(response.capability_used ? { actualCapabilityUsed: response.capability_used as ProviderCapabilityId } : {}),
+        ...(actualCapability ? { actualCapabilityUsed: actualCapability } : {}),
         actualFallbackFired: (response.fallback_fired ?? null) as ProviderCapabilityId | null,
         ...(registeredModel ? { actualRegisteredModel: registeredModel } : {}),
       };
@@ -366,16 +367,17 @@ export class LivepeerAdapter implements ProviderAdapter {
    * that ran, so ask the provider for that capability's registered model.
    * Never fall back to our static catalog: missing live evidence stays
    * missing rather than becoming fabricated provenance. */
-  private async resolveRegisteredModel(response: GetCreateMediaResponse): Promise<string | undefined> {
+  private async resolveRegisteredModel(
+    response: GetCreateMediaResponse,
+    actualCapability: ProviderCapabilityId | undefined,
+  ): Promise<string | undefined> {
     if (response.served_model_id) return response.served_model_id;
-
-    const capability = response.capability_used ?? response.fallback_fired ?? response.capability;
-    if (!capability) return undefined;
+    if (!actualCapability) return undefined;
 
     try {
       const descriptor = await this.mcp.callTool<DescribeCapabilityResponse>(
         "describe_capability",
-        { name: capability },
+        { name: actualCapability },
         { timeoutMs: DESCRIBE_HTTP_TIMEOUT_MS },
       );
       return descriptor.found && descriptor.model_id ? descriptor.model_id : undefined;
@@ -384,5 +386,10 @@ export class LivepeerAdapter implements ProviderAdapter {
       // into a failed job when the descriptor endpoint is temporarily down.
       return undefined;
     }
+  }
+
+  private resolveActualCapability(response: GetCreateMediaResponse): ProviderCapabilityId | undefined {
+    const capability = response.capability_used ?? response.fallback_fired ?? response.capability;
+    return capability ? (capability as ProviderCapabilityId) : undefined;
   }
 }

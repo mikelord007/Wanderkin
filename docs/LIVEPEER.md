@@ -49,6 +49,19 @@ confirmed at all, the route returns **503** with a plain
 the bundled sample level and GLB import stay usable regardless (they don't
 call this route).
 
+### Successful-job model provenance
+
+The read-only 2026-09-18 success response for provider job
+`mjob_cfb2286bf2b5` reported `status: "done"`, `capability: "rodin-i3d"`,
+and `fallback_fired: null`, but omitted any per-job `served_model_id` or
+other model-id field. The adapter therefore does not claim that the job
+response directly attested a model. It uses a direct `served_model_id` when
+one is present; otherwise it calls live `describe_capability` for the
+capability reported by that job and records the returned `model_id`. If the
+job reports a fallback, that fallback capability is used for both
+`capabilityUsed` and descriptor lookup. If live model evidence is missing,
+the adapter leaves it missing—there is no static-catalog guess.
+
 The client honors `Accept: application/json, text/event-stream` two ways:
 a normal `application/json` body, or `text/event-stream` framed `data:`
 lines (parsed and JSON-decoded, last parseable event wins). The abort/
