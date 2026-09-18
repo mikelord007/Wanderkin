@@ -91,12 +91,15 @@ export function App() {
 
   const handleSavePreparedLevel = useCallback(
     async (manifest: SceneManifest) => {
-      if (screen.name !== "preparation") return;
+      if (screen.name !== "preparation") {
+        throw new Error("Level saving is only available from the preparation screen.");
+      }
       const saved = screen.isNew ? await createLevel(manifest) : await saveLevel(manifest.levelId, manifest);
       // The source photos are now durable inside the saved SceneManifest —
       // the transient reload-recovery record is no longer needed.
       clearActiveSource();
       setScreen({ name: "preparation", source: { kind: "manifest", manifest: saved }, isNew: false });
+      return saved;
     },
     [screen],
   );

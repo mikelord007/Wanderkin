@@ -31,12 +31,13 @@ import {
   updateHelperDimensions,
 } from "./manifestEdits.js";
 import { clearDraft, resolveDraft, saveDraft, type EditorDraft } from "./draftStorage.js";
+import { saveThenExport } from "./exportFlow.js";
 import "./editor.css";
 
 export interface LevelEditorProps {
   manifest: SceneManifest;
   isPersisted?: boolean;
-  onSave: (manifest: SceneManifest) => void | Promise<void>;
+  onSave: (manifest: SceneManifest) => SceneManifest | Promise<SceneManifest>;
   onExport?: (manifest: SceneManifest) => void | Promise<void>;
   onPlay: (manifest: SceneManifest) => void;
   onBack: () => void;
@@ -86,9 +87,14 @@ export function LevelEditor({
   const [exportNotice, setExportNotice] = useState<string | null>(null);
 
   const didMountRef = useRef(false);
+  const skipNextDraftWriteRef = useRef(false);
   useEffect(() => {
     if (!didMountRef.current) {
       didMountRef.current = true;
+      return;
+    }
+    if (skipNextDraftWriteRef.current) {
+      skipNextDraftWriteRef.current = false;
       return;
     }
     setExportNotice(null);
@@ -106,6 +112,15 @@ export function LevelEditor({
   );
   const selectedBounds = selectedEntityId ? entityBounds[selectedEntityId] : undefined;
   const hasUnsavedChanges = savedManifestSnapshot !== workingManifest;
+
+  function acceptAuthoritativeSave(saved: SceneManifest, previousLevelId: string) {
+    clearDraft(previousLevelId);
+    if (saved.levelId !== previousLevelId) clearDraft(saved.levelId);
+    baseUpdatedAtRef.current = saved.updatedAt;
+    skipNextDraftWriteRef.current = true;
+    setWorkingManifest(saved);
+    setSavedManifestSnapshot(saved);
+  }
 
   function handleSurfaceClick(point: Vec3, walkable: boolean) {
     if (!placementMode) return;
@@ -152,9 +167,9 @@ export function LevelEditor({
     setSaveError(null);
     setExportNotice(null);
     try {
-      await Promise.resolve(onSave(workingManifest));
-      clearDraft(workingManifest.levelId);
-      setSavedManifestSnapshot(workingManifest);
+      const previousLevelId = workingManifest.levelId;
+      const saved = await Promise.resolve(onSave(workingManifest));
+      acceptAuthoritativeSave(saved, previousLevelId);
       setSavedNotice(true);
       setTimeout(() => setSavedNotice(false), 2500);
     } catch (err) {
@@ -170,12 +185,14 @@ export function LevelEditor({
     setSaveError(null);
     setExportNotice(hasUnsavedChanges ? "Saving the latest changes before export…" : "Preparing bundle…");
     try {
-      if (hasUnsavedChanges) {
-        await Promise.resolve(onSave(workingManifest));
-        clearDraft(workingManifest.levelId);
-        setSavedManifestSnapshot(workingManifest);
-      }
-      await Promise.resolve(onExport(workingManifest));
+      const previousLevelId = workingManifest.levelId;
+      await saveThenExport({
+        workingManifest,
+        needsSave: hasUnsavedChanges,
+        onSave,
+        onPersisted: (saved) => acceptAuthoritativeSave(saved, previousLevelId),
+        onExport,
+      });
       setExportNotice("Bundle downloaded.");
     } catch (err) {
       setExportNotice(null);

@@ -24,7 +24,7 @@ interface PreparationScreenProps {
   source: PreparationSource;
   isNew: boolean;
   onPlay: (manifest: SceneManifest) => void;
-  onSave: (manifest: SceneManifest) => Promise<void>;
+  onSave: (manifest: SceneManifest) => Promise<SceneManifest>;
   onExport: (manifest: SceneManifest) => Promise<void>;
   onBack: () => void;
 }
@@ -102,12 +102,13 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
     return [primary, ...candidates.filter((c) => c !== primary)];
   }, [manifest, candidates]);
 
-  async function handleSave(next: SceneManifest) {
+  async function handleSave(next: SceneManifest): Promise<SceneManifest> {
     setSaving(true);
     setSaveError(null);
     try {
-      await onSave(next);
-      setManifest(next);
+      const saved = await onSave(next);
+      setManifest(saved);
+      return saved;
     } catch (err) {
       setSaveError(describeApiError(err));
       throw err;
