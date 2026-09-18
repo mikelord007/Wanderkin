@@ -167,7 +167,10 @@ validated manifest in the editor; it never overwrites the source level.
 Saved-level cards expose **Export**, and the editor exposes **Export** for a
 saved state or **Save & export** when the level is new or has draft edits.
 The latter always waits for the save to succeed before requesting the bundle,
-so a failed save cannot silently download an older version.
+so a failed save cannot silently download an older version. Save returns the
+authoritative server manifest: if creation detects an existing id and mints a
+new one, export uses that new id and the editor resets its draft baseline to
+the server's `updatedAt`.
 
 ## Testing
 
