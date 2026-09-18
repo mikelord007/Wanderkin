@@ -89,3 +89,17 @@ export function uniformVec3(scale: number): Vec3 {
 export function averageScale(scale: Vec3): number {
   return (scale[0] + scale[1] + scale[2]) / 3;
 }
+
+/** True only for a finite, upward-facing unit normal within the movement
+ * system's walkable slope. Used before a preview click can become a spawn or
+ * safe-respawn pose; walls, undersides, and missing normals are never safe. */
+export function isWalkableSurfaceNormalY(normalY: number | null, maxSlopeRadians: number): boolean {
+  return (
+    normalY !== null &&
+    Number.isFinite(normalY) &&
+    Number.isFinite(maxSlopeRadians) &&
+    maxSlopeRadians >= 0 &&
+    maxSlopeRadians < Math.PI / 2 &&
+    normalY >= Math.cos(maxSlopeRadians)
+  );
+}

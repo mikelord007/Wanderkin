@@ -63,6 +63,7 @@ export function LevelEditor({ manifest, onSave, onPlay, onBack }: LevelEditorPro
     () => workingManifest.entities.find((e) => e.kind === "generated-mesh")?.id ?? null,
   );
   const [placementMode, setPlacementMode] = useState<PlacementMode>(null);
+  const [placementError, setPlacementError] = useState<string | null>(null);
   const [entityBounds, setEntityBounds] = useState<Record<string, EntityBounds>>({});
   const [previewErrors, setPreviewErrors] = useState<Set<string>>(new Set());
 
@@ -90,8 +91,13 @@ export function LevelEditor({ manifest, onSave, onPlay, onBack }: LevelEditorPro
   );
   const selectedBounds = selectedEntityId ? entityBounds[selectedEntityId] : undefined;
 
-  function handleSurfaceClick(point: Vec3) {
+  function handleSurfaceClick(point: Vec3, walkable: boolean) {
     if (!placementMode) return;
+    if (!walkable) {
+      setPlacementError("Choose a real upward-facing surface that is flat enough to stand on.");
+      return;
+    }
+    setPlacementError(null);
     const capsuleY = capsuleCenterYAboveSurface(point[1], DEFAULT_MOVEMENT_CONFIG);
     const position: Vec3 = [point[0], capsuleY, point[2]];
     if (placementMode === "spawn") {
@@ -99,7 +105,13 @@ export function LevelEditor({ manifest, onSave, onPlay, onBack }: LevelEditorPro
     } else {
       const checkpointId = placementMode.checkpointId;
       setWorkingManifest((m) =>
-        updateCheckpoint(m, checkpointId, { position, safeRespawn: { position, headingRadians: 0 } }),
+        updateCheckpoint(m, checkpointId, {
+          position,
+          safeRespawn: {
+            position,
+            headingRadians: m.checkpoints.find((checkpoint) => checkpoint.id === checkpointId)?.safeRespawn.headingRadians ?? 0,
+          },
+        }),
       );
     }
     setPlacementMode(null);
@@ -195,7 +207,15 @@ export function LevelEditor({ manifest, onSave, onPlay, onBack }: LevelEditorPro
             <div className="oq-editor__placement-hint">
               Click a surface in the view to place{" "}
               {placementMode === "spawn" ? "the spawn point" : "this checkpoint"}.
-              <button type="button" className="oq-button oq-button--ghost" onClick={() => setPlacementMode(null)}>
+              {placementError ? <span className="oq-error-text">{placementError}</span> : null}
+              <button
+                type="button"
+                className="oq-button oq-button--ghost"
+                onClick={() => {
+                  setPlacementMode(null);
+                  setPlacementError(null);
+                }}
+              >
                 Cancel
               </button>
             </div>
@@ -222,7 +242,10 @@ export function LevelEditor({ manifest, onSave, onPlay, onBack }: LevelEditorPro
           <SpawnCheckpointPanel
             manifest={workingManifest}
             placementMode={placementMode}
-            onSetPlacementMode={setPlacementMode}
+            onSetPlacementMode={(mode) => {
+              setPlacementError(null);
+              setPlacementMode(mode);
+            }}
             onChange={(next) => setWorkingManifest(next)}
           />
 
@@ -340,13 +363,14 @@ function EntityPanel({
               type="number"
               step={5}
               value={Math.round(heading)}
-              onChange={(e) =>
+              onChange={(e) => {
+                const degrees = finiteInput(e.target.value, heading);
                 onChange(
                   updateEntityTransform(manifest, selectedEntity.id, {
-                    rotation: quatFromHeading(degreesToRadians(Number(e.target.value))),
+                    rotation: quatFromHeading(degreesToRadians(degrees)),
                   }),
-                )
-              }
+                );
+              }}
             />
           </label>
 
@@ -357,9 +381,10 @@ function EntityPanel({
               step={0.05}
               min={0.01}
               value={Number(scale.toFixed(3))}
-              onChange={(e) =>
-                onChange(updateEntityTransform(manifest, selectedEntity.id, { scale: uniformVec3(Number(e.target.value)) }))
-              }
+              onChange={(e) => {
+                const nextScale = positiveInput(e.target.value, scale);
+                onChange(updateEntityTransform(manifest, selectedEntity.id, { scale: uniformVec3(nextScale) }));
+              }}
             />
           </label>
 
@@ -409,11 +434,17 @@ function EntityPanel({
             <button
               type="button"
               className="oq-button oq-button--secondary"
-              disabled={!selectedBounds || !calibrationInput || Number(calibrationInput) <= 0}
+              disabled={
+                !selectedBounds ||
+                !calibrationInput ||
+                !Number.isFinite(Number(calibrationInput)) ||
+                Number(calibrationInput) <= 0
+              }
               title={selectedBounds ? undefined : "Waiting for the preview to load"}
               onClick={() => {
                 if (!selectedBounds) return;
                 const desired = Number(calibrationInput);
+                if (!Number.isFinite(desired) || desired <= 0) return;
                 const currentExtent = Math.max(selectedBounds.sizeX, selectedBounds.sizeZ);
                 const newScale = calibratedUniformScale(scale, currentExtent, desired);
                 const withTransform = updateEntityTransform(manifest, selectedEntity.id, {
@@ -481,6 +512,24 @@ function SpawnCheckpointPanel({
         position={manifest.spawn.position}
         onChange={(position) => onChange(setSpawn(manifest, { position, headingRadians: manifest.spawn.headingRadians }))}
       />
+      <label className="oq-editor__field">
+        Spawn heading (degrees)
+        <input
+          type="number"
+          step={5}
+          value={Number(radiansToDegrees(manifest.spawn.headingRadians).toFixed(1))}
+          onChange={(event) =>
+            onChange(
+              setSpawn(manifest, {
+                position: manifest.spawn.position,
+                headingRadians: degreesToRadians(
+                  finiteInput(event.target.value, radiansToDegrees(manifest.spawn.headingRadians)),
+                ),
+              }),
+            )
+          }
+        />
+      </label>
 
       <h3>Checkpoints ({sortedCheckpoints.length})</h3>
       {sortedCheckpoints.length === 0 ? <p className="oq-empty-hint">No checkpoints yet.</p> : null}
@@ -535,7 +584,11 @@ function SpawnCheckpointPanel({
                   min={0.1}
                   value={checkpoint.triggerRadius}
                   onChange={(e) =>
-                    onChange(updateCheckpoint(manifest, checkpoint.id, { triggerRadius: Number(e.target.value) }))
+                    onChange(
+                      updateCheckpoint(manifest, checkpoint.id, {
+                        triggerRadius: positiveInput(e.target.value, checkpoint.triggerRadius),
+                      }),
+                    )
                   }
                 />
               </label>
@@ -566,7 +619,7 @@ function PositionInputs({ position, onChange }: { position: Vec3; onChange: (pos
             value={Number((position[index] ?? 0).toFixed(3))}
             onChange={(e) => {
               const next: Vec3 = [...position];
-              (next as [number, number, number])[index] = Number(e.target.value);
+              (next as [number, number, number])[index] = finiteInput(e.target.value, position[index] ?? 0);
               onChange(next);
             }}
           />
@@ -574,6 +627,16 @@ function PositionInputs({ position, onChange }: { position: Vec3; onChange: (pos
       ))}
     </div>
   );
+}
+
+function finiteInput(raw: string, fallback: number): number {
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function positiveInput(raw: string, fallback: number): number {
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
 const HELPER_KINDS = ["floor", "box", "ramp"] as const;
@@ -589,7 +652,7 @@ function HelperGeometryPanel({
   const [kind, setKind] = useState<(typeof HELPER_KINDS)[number]>("box");
   const [position, setPosition] = useState<Vec3>([0, 0.25, 0]);
   const [dimensions, setDimensions] = useState<Vec3>([1, 0.5, 1]);
-  const [tiltDegrees, setTiltDegrees] = useState(0);
+  const [headingDegrees, setHeadingDegrees] = useState(0);
 
   return (
     <section className="oq-panel oq-editor-panel">
@@ -618,7 +681,7 @@ function HelperGeometryPanel({
                         value={Number((dims[index] ?? 0).toFixed(2))}
                         onChange={(e) => {
                           const next: [number, number, number] = [dims[0] ?? 0, dims[1] ?? 0, dims[2] ?? 0];
-                          next[index] = Number(e.target.value);
+                          next[index] = positiveInput(e.target.value, dims[index] ?? 0.05);
                           onChange(updateHelperDimensions(manifest, entity.id, next));
                         }}
                       />
@@ -661,7 +724,10 @@ function HelperGeometryPanel({
                 value={dimensions[index]}
                 onChange={(e) => {
                   const next: Vec3 = [...dimensions];
-                  (next as [number, number, number])[index] = Number(e.target.value);
+                  (next as [number, number, number])[index] = positiveInput(
+                    e.target.value,
+                    dimensions[index] ?? 0.05,
+                  );
                   setDimensions(next);
                 }}
               />
@@ -670,12 +736,12 @@ function HelperGeometryPanel({
         </div>
         {kind === "ramp" ? (
           <label className="oq-editor__field">
-            Tilt (degrees, around X)
+            Heading (degrees, around Y)
             <input
               type="number"
               step={5}
-              value={tiltDegrees}
-              onChange={(e) => setTiltDegrees(Number(e.target.value))}
+              value={headingDegrees}
+              onChange={(e) => setHeadingDegrees(finiteInput(e.target.value, headingDegrees))}
             />
           </label>
         ) : null}
@@ -683,15 +749,16 @@ function HelperGeometryPanel({
           type="button"
           className="oq-button oq-button--secondary"
           onClick={() => {
-            const half = degreesToRadians(tiltDegrees) / 2;
-            const rotation: [number, number, number, number] =
-              kind === "ramp" ? [Math.sin(half), 0, 0, Math.cos(half)] : [0, 0, 0, 1];
+            const rotation = kind === "ramp" ? quatFromHeading(degreesToRadians(headingDegrees)) : [0, 0, 0, 1] as const;
             onChange(
               addHelperEntity(manifest, {
                 kind,
                 transform: { ...identityTransform(), position, rotation },
                 dimensions,
-                collider: { kind: "box", halfExtents: [dimensions[0] / 2, dimensions[1] / 2, dimensions[2] / 2] },
+                collider:
+                  kind === "ramp"
+                    ? { kind: "triangle-mesh" }
+                    : { kind: "box", halfExtents: [dimensions[0] / 2, dimensions[1] / 2, dimensions[2] / 2] },
               }),
             );
           }}

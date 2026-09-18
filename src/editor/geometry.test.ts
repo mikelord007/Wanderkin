@@ -7,6 +7,7 @@ import {
   degreesToRadians,
   floorAlignDeltaY,
   headingFromQuat,
+  isWalkableSurfaceNormalY,
   quatFromHeading,
   radiansToDegrees,
   surfaceYBelowCapsuleCenter,
@@ -83,5 +84,22 @@ describe("scale vector helpers", () => {
   it("averages a possibly non-uniform Vec3", () => {
     expect(averageScale([1, 2, 3])).toBeCloseTo(2, 10);
     expect(averageScale(uniformVec3(4))).toBeCloseTo(4, 10);
+  });
+});
+
+describe("walkable placement surfaces", () => {
+  const maxSlope = degreesToRadians(32);
+
+  it("accepts upward normals within the configured slope", () => {
+    expect(isWalkableSurfaceNormalY(1, maxSlope)).toBe(true);
+    expect(isWalkableSurfaceNormalY(Math.cos(maxSlope), maxSlope)).toBe(true);
+  });
+
+  it("rejects walls, over-steep faces, undersides, and missing/invalid normals", () => {
+    expect(isWalkableSurfaceNormalY(Math.cos(maxSlope) - 0.01, maxSlope)).toBe(false);
+    expect(isWalkableSurfaceNormalY(0, maxSlope)).toBe(false);
+    expect(isWalkableSurfaceNormalY(-1, maxSlope)).toBe(false);
+    expect(isWalkableSurfaceNormalY(null, maxSlope)).toBe(false);
+    expect(isWalkableSurfaceNormalY(Number.NaN, maxSlope)).toBe(false);
   });
 });

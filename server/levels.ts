@@ -1,21 +1,20 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import express, { Router } from "express";
 import { z } from "zod";
 import { SCENE_MANIFEST_SCHEMA_VERSION } from "../shared/schema-version.js";
 import type { SceneManifest } from "../shared/manifest.js";
+import { AssetStore } from "./persistence/assetStore.js";
+import { PhotoStore } from "./persistence/photoStore.js";
+import { assertValidGlb, assertValidPhoto, InvalidFileError } from "./persistence/validate.js";
 
 /**
- * Manifest persistence (owner: Level tools and persistence). Everything in
- * this file is self-contained on purpose: server/persistence/* (the atomic
- * JsonFileStore, GLB/photo magic-byte validation) is owned by the Livepeer
- * integration worker and lives on a different branch/worktree not merged
- * into this one yet, so this file carries its own small, independently
- * correct copies of the same small pieces of infrastructure (atomic
- * write-then-rename, magic-byte checks) rather than depending on files
- * that don't exist here. Once merged, these are natural candidates to
- * consolidate — see docs/EDITOR.md.
+ * Manifest persistence (owner: Level tools and persistence). Bundle imports
+ * deliberately use the same AssetStore and PhotoStore instances as the rest
+ * of the API. Besides sharing validation, this keeps their in-memory indexes
+ * coherent so an imported reference is immediately visible through the
+ * existing asset/photo routes.
  */
 
 // ---------------------------------------------------------------------
@@ -73,8 +72,13 @@ class AtomicLevelIndex {
   private async writeAll(map: Map<string, SceneManifest>): Promise<void> {
     await mkdir(dirname(this.filePath), { recursive: true });
     const tmpPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
-    await writeFile(tmpPath, JSON.stringify(Object.fromEntries(map), null, 2), "utf-8");
-    await rename(tmpPath, this.filePath);
+    try {
+      await writeFile(tmpPath, JSON.stringify(Object.fromEntries(map), null, 2), "utf-8");
+      await rename(tmpPath, this.filePath);
+    } catch (error) {
+      await unlink(tmpPath).catch(() => undefined);
+      throw error;
+    }
     this.cache = map;
   }
 
@@ -83,7 +87,9 @@ class AtomicLevelIndex {
    * same guarantee as server/persistence/jsonStore.ts's JsonFileStore. */
   private async withLock<R>(fn: (map: Map<string, SceneManifest>) => R | Promise<R>): Promise<R> {
     const run = async (): Promise<R> => {
-      const map = await this.readAll();
+      // Never mutate the cached map until the atomic rename succeeds. If the
+      // write fails, readers must continue seeing the last durable snapshot.
+      const map = new Map(await this.readAll());
       const result = await fn(map);
       await this.writeAll(map);
       return result;
@@ -135,9 +141,20 @@ class AtomicLevelIndex {
 export class LevelStore {
   private readonly index: AtomicLevelIndex;
   readonly storageDir: string;
+  readonly publicDir: string;
+  readonly assets: AssetStore;
+  readonly photos: PhotoStore;
 
-  constructor(storageDir: string) {
+  constructor(
+    storageDir: string,
+    assets: AssetStore,
+    photos: PhotoStore,
+    publicDir = join(process.cwd(), "public"),
+  ) {
     this.storageDir = storageDir;
+    this.publicDir = publicDir;
+    this.assets = assets;
+    this.photos = photos;
     this.index = new AtomicLevelIndex(storageDir);
   }
 
@@ -149,12 +166,15 @@ export class LevelStore {
     return this.index.get(id);
   }
 
-  create(manifest: SceneManifest): Promise<SceneManifest> {
-    return this.index.create(manifest);
+  async create(manifest: SceneManifest): Promise<SceneManifest> {
+    return this.index.create(requireValidManifest(manifest));
   }
 
-  save(id: string, manifest: SceneManifest): Promise<SceneManifest> {
-    return this.index.save(id, manifest);
+  async save(id: string, manifest: SceneManifest): Promise<SceneManifest> {
+    if (!isSafeLevelId(id)) throw new Error(`Invalid level id \"${id}\"`);
+    const validated = requireValidManifest(manifest);
+    if (validated.levelId !== id) throw new Error("Manifest levelId does not match the save id");
+    return this.index.save(id, validated);
   }
 }
 
@@ -163,42 +183,60 @@ export class LevelStore {
 // a malformed or corrupt manifest is rejected before it's ever persisted.
 // ---------------------------------------------------------------------
 
-const vec3Schema = z.tuple([z.number(), z.number(), z.number()]);
-const quatSchema = z.tuple([z.number(), z.number(), z.number(), z.number()]);
-const transformSchema = z.object({ position: vec3Schema, rotation: quatSchema, scale: vec3Schema });
+const finiteNumberSchema = z.number().finite();
+const referenceIdSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/, "must be a bounded reference id without whitespace or path separators");
+const vec3Schema = z.tuple([finiteNumberSchema, finiteNumberSchema, finiteNumberSchema]);
+const positiveVec3Schema = vec3Schema.refine((value) => value.every((component) => component > 0), {
+  message: "components must all be positive",
+});
+const nonZeroScaleSchema = vec3Schema.refine(
+  (value) => value.every((component) => Math.abs(component) > Number.EPSILON),
+  { message: "scale components must all be non-zero" },
+);
+const quatSchema = z
+  .tuple([finiteNumberSchema, finiteNumberSchema, finiteNumberSchema, finiteNumberSchema])
+  .refine((value) => {
+    const length = Math.hypot(value[0], value[1], value[2], value[3]);
+    return length > Number.EPSILON && Math.abs(length - 1) <= 1e-3;
+  }, { message: "must be a normalized, non-zero quaternion" });
+const transformSchema = z.object({ position: vec3Schema, rotation: quatSchema, scale: nonZeroScaleSchema });
 
 const colliderSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("triangle-mesh") }),
-  z.object({ kind: z.literal("box"), halfExtents: vec3Schema }),
-  z.object({ kind: z.literal("capsule"), radius: z.number().positive(), halfHeight: z.number().positive() }),
+  z.object({ kind: z.literal("box"), halfExtents: positiveVec3Schema }),
+  z.object({ kind: z.literal("capsule"), radius: finiteNumberSchema.positive(), halfHeight: finiteNumberSchema.positive() }),
 ]);
 
 const generatedMeshEntitySchema = z.object({
-  id: z.string().min(1),
+  id: referenceIdSchema,
   kind: z.literal("generated-mesh"),
-  assetId: z.string().min(1),
+  assetId: referenceIdSchema,
   transform: transformSchema,
   collider: colliderSchema,
 });
 
 const helperEntitySchema = z.object({
-  id: z.string().min(1),
+  id: referenceIdSchema,
   kind: z.enum(["floor", "box", "ramp"]),
   transform: transformSchema,
-  dimensions: vec3Schema,
+  dimensions: positiveVec3Schema,
   collider: colliderSchema,
   addedBy: z.literal("game"),
 });
 
 const sceneEntitySchema = z.union([generatedMeshEntitySchema, helperEntitySchema]);
 
-const spawnPointSchema = z.object({ position: vec3Schema, headingRadians: z.number() });
+const spawnPointSchema = z.object({ position: vec3Schema, headingRadians: finiteNumberSchema });
 
 const checkpointSchema = z.object({
-  id: z.string().min(1),
+  id: referenceIdSchema,
   order: z.number().int().nonnegative(),
   position: vec3Schema,
-  triggerRadius: z.number().positive(),
+  triggerRadius: finiteNumberSchema.positive(),
   safeRespawn: spawnPointSchema,
 });
 
@@ -213,23 +251,23 @@ const assetProvenanceSchema = z.object({
 });
 
 const assetReferenceSchema = z.object({
-  id: z.string().min(1),
+  id: referenceIdSchema,
   url: z.string().min(1),
-  sha256: z.string().min(1),
-  sizeBytes: z.number().nonnegative(),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/, "must be a lowercase sha256 digest"),
+  sizeBytes: finiteNumberSchema.int().positive(),
   provenance: assetProvenanceSchema.optional(),
 });
 
 const photoReferenceSchema = z.object({
-  id: z.string().min(1),
+  id: referenceIdSchema,
   url: z.string().min(1),
   order: z.number().int().positive(),
   label: z.string().optional(),
 });
 
 const calibrationSchema = z.object({
-  assumedExtentMeters: z.number().positive(),
-  measuredDimension: z.object({ description: z.string().min(1), meters: z.number().positive() }).optional(),
+  assumedExtentMeters: finiteNumberSchema.positive(),
+  measuredDimension: z.object({ description: z.string().min(1), meters: finiteNumberSchema.positive() }).optional(),
 });
 
 const courseValidationSchema = z.object({
@@ -262,16 +300,75 @@ export const sceneManifestSchema = z
     movementConfigId: z.string().min(1),
     courseValidation: courseValidationSchema,
   })
-  .refine(
-    (manifest) => {
-      const orders = manifest.checkpoints.map((c) => c.order).sort((a, b) => a - b);
-      return orders.every((order, index) => order === index);
-    },
-    { message: "checkpoints[].order must be unique and ascending starting at 0" },
-  );
+  .superRefine((manifest, context) => {
+    const orders = manifest.checkpoints.map((checkpoint) => checkpoint.order).sort((a, b) => a - b);
+    if (!orders.every((order, index) => order === index)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["checkpoints"],
+        message: "orders must be unique and ascending starting at 0",
+      });
+    }
+
+    const assertUniqueIds = (values: readonly { id: string }[], path: string): void => {
+      const seen = new Set<string>();
+      values.forEach((value, index) => {
+        if (seen.has(value.id)) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [path, index, "id"],
+            message: `duplicate id \"${value.id}\"`,
+          });
+        }
+        seen.add(value.id);
+      });
+    };
+    assertUniqueIds(manifest.assets, "assets");
+    assertUniqueIds(manifest.photos, "photos");
+    assertUniqueIds(manifest.entities, "entities");
+    assertUniqueIds(manifest.checkpoints, "checkpoints");
+
+    const assetIds = new Set(manifest.assets.map((asset) => asset.id));
+    manifest.entities.forEach((entity, index) => {
+      if (entity.kind === "generated-mesh" && !assetIds.has(entity.assetId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["entities", index, "assetId"],
+          message: `unknown asset reference \"${entity.assetId}\"`,
+        });
+      }
+      if (entity.kind === "ramp" && entity.collider.kind !== "triangle-mesh") {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["entities", index, "collider"],
+          message: "ramp helpers require a triangle-mesh collider matching the visible wedge",
+        });
+      }
+      if (entity.kind !== "generated-mesh" && entity.kind !== "ramp") {
+        const collider = entity.collider;
+        const expected = entity.dimensions.map((dimension) => dimension / 2);
+        if (
+          collider.kind !== "box" ||
+          !collider.halfExtents.every((halfExtent, axis) => Math.abs(halfExtent - expected[axis]!) <= 1e-6)
+        ) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["entities", index, "collider"],
+            message: "floor/box helper collider halfExtents must match half of its visible dimensions",
+          });
+        }
+      }
+    });
+  });
 
 function formatZodError(error: z.ZodError): string {
   return error.issues.map((issue) => `${issue.path.join(".") || "body"}: ${issue.message}`).join("; ");
+}
+
+function requireValidManifest(manifest: SceneManifest): SceneManifest {
+  const parsed = sceneManifestSchema.safeParse(manifest);
+  if (!parsed.success) throw new Error(`Invalid level: ${formatZodError(parsed.error)}`);
+  return parsed.data as SceneManifest;
 }
 
 // ---------------------------------------------------------------------
@@ -281,8 +378,6 @@ function formatZodError(error: z.ZodError): string {
 // the size-limit workaround (import is NOT application/json — see below).
 // ---------------------------------------------------------------------
 
-const MAX_ASSET_BYTES = 150 * 1024 * 1024; // matches the Livepeer worker's MAX_GLB_BYTES
-const MAX_PHOTO_BYTES = 20 * 1024 * 1024; // matches the Livepeer worker's MAX_PHOTO_BYTES
 const MAX_BUNDLE_TEXT_BYTES = 220 * 1024 * 1024; // base64 (~1.34x) plus manifest/JSON overhead
 
 interface BundleFile {
@@ -290,7 +385,7 @@ interface BundleFile {
   base64: string;
 }
 
-interface LevelBundle {
+export interface LevelBundle {
   bundleVersion: 1;
   manifest: SceneManifest;
   assets: BundleFile[];
@@ -305,76 +400,6 @@ const bundleSchema = z.object({
   photos: z.array(bundleFileSchema).max(64),
 });
 
-function detectGlb(buffer: Buffer): boolean {
-  return (
-    buffer.length >= 12 &&
-    buffer[0] === 0x67 &&
-    buffer[1] === 0x6c &&
-    buffer[2] === 0x54 &&
-    buffer[3] === 0x46 &&
-    buffer.readUInt32LE(4) === 2
-  );
-}
-
-const IMAGE_EXTENSION_BY_SNIFF: Array<{ ext: string; test: (b: Buffer) => boolean }> = [
-  { ext: "jpg", test: (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
-  {
-    ext: "png",
-    test: (b) =>
-      b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 && b[4] === 0x0d && b[5] === 0x0a,
-  },
-  {
-    ext: "webp",
-    test: (b) =>
-      b.length >= 12 &&
-      b[0] === 0x52 &&
-      b[1] === 0x49 &&
-      b[2] === 0x46 &&
-      b[3] === 0x46 &&
-      b[8] === 0x57 &&
-      b[9] === 0x45 &&
-      b[10] === 0x42 &&
-      b[11] === 0x50,
-  },
-];
-
-function detectPhotoExtension(buffer: Buffer): string | null {
-  return IMAGE_EXTENSION_BY_SNIFF.find((entry) => entry.test(buffer))?.ext ?? null;
-}
-
-async function readStoredFile(storageDir: string, subdir: "assets" | "photos", url: string): Promise<Buffer | null> {
-  const filename = safeFilenameFromUrl(url);
-  if (!filename) return null;
-  try {
-    return await readFile(join(storageDir, subdir, filename));
-  } catch {
-    return null;
-  }
-}
-
-async function writeContentAddressedAsset(storageDir: string, buffer: Buffer): Promise<{ id: string; url: string; sha256: string }> {
-  if (!detectGlb(buffer)) throw new InvalidBundleError("An embedded asset is not a valid binary GLB");
-  if (buffer.byteLength > MAX_ASSET_BYTES) throw new InvalidBundleError(`An embedded asset exceeds the ${MAX_ASSET_BYTES}-byte limit`);
-  const sha256 = createHash("sha256").update(buffer).digest("hex");
-  const filename = `${sha256}.glb`;
-  const dir = join(storageDir, "assets");
-  await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, filename), buffer);
-  return { id: sha256, url: `/api/assets/files/${filename}`, sha256 };
-}
-
-async function writeNewPhoto(storageDir: string, buffer: Buffer, order: number): Promise<{ id: string; url: string; order: number }> {
-  const ext = detectPhotoExtension(buffer);
-  if (!ext) throw new InvalidBundleError("An embedded photo is not a recognized JPEG, PNG, or WebP image");
-  if (buffer.byteLength > MAX_PHOTO_BYTES) throw new InvalidBundleError(`An embedded photo exceeds the ${MAX_PHOTO_BYTES}-byte limit`);
-  const id = randomUUID();
-  const filename = `${id}.${ext}`;
-  const dir = join(storageDir, "photos");
-  await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, filename), buffer);
-  return { id, url: `/api/photos/files/${filename}`, order };
-}
-
 export class InvalidBundleError extends Error {
   constructor(message: string) {
     super(message);
@@ -382,58 +407,221 @@ export class InvalidBundleError extends Error {
   }
 }
 
+type BundleReferenceKind = "asset" | "photo";
+
+function resolveBundleSource(
+  storageDir: string,
+  publicDir: string,
+  kind: BundleReferenceKind,
+  url: string,
+): { filename: string; path: string } {
+  // Export is intentionally local-only. Never turn a manifest URL into a
+  // network fetch or allow arbitrary paths outside the configured roots.
+  if (!url.startsWith("/")) {
+    throw new InvalidBundleError(`Cannot export ${kind} URL \"${url}\": only local API and /samples URLs are portable`);
+  }
+  const pathname = new URL(url, "http://objectquest.local").pathname;
+  const apiPattern =
+    kind === "asset"
+      ? /^\/api\/assets\/files\/([a-f0-9]{64}\.glb)$/
+      : /^\/api\/photos\/files\/([0-9a-f-]{36}\.(?:jpg|png|webp))$/;
+  const apiMatch = apiPattern.exec(pathname);
+  if (apiMatch) {
+    const filename = apiMatch[1]!;
+    return { filename, path: join(storageDir, kind === "asset" ? "assets" : "photos", filename) };
+  }
+  const samplePattern =
+    kind === "asset"
+      ? /^\/samples\/([a-zA-Z0-9][a-zA-Z0-9._-]*\.glb)$/
+      : /^\/samples\/([a-zA-Z0-9][a-zA-Z0-9._-]*\.(?:jpg|jpeg|png|webp))$/;
+  const sampleMatch = samplePattern.exec(pathname);
+  if (sampleMatch) {
+    const filename = sampleMatch[1]!;
+    return { filename, path: join(publicDir, "samples", filename) };
+  }
+  throw new InvalidBundleError(
+    `Cannot export ${kind} URL \"${url}\": expected a stored /api URL or a safe /samples filename`,
+  );
+}
+
+async function readBundleSource(path: string, kind: BundleReferenceKind, url: string): Promise<Buffer> {
+  try {
+    return await readFile(path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new InvalidBundleError(`Cannot export ${kind} \"${url}\": the referenced file is missing`);
+    }
+    throw error;
+  }
+}
+
+function decodeBase64(file: BundleFile): Buffer {
+  if (file.base64.length % 4 !== 0 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(file.base64)) {
+    throw new InvalidBundleError(`Embedded file \"${file.filename}\" is not canonical base64`);
+  }
+  const buffer = Buffer.from(file.base64, "base64");
+  if (buffer.toString("base64") !== file.base64) {
+    throw new InvalidBundleError(`Embedded file \"${file.filename}\" is not canonical base64`);
+  }
+  return buffer;
+}
+
 /** Builds a portable bundle for one level: manifest plus every asset/photo
- * it references, base64-embedded. Missing source files are skipped rather
- * than failing the whole export (a level can still legitimately reference
- * an asset that's since been pruned from disk). */
-export async function exportLevelBundle(storageDir: string, manifest: SceneManifest): Promise<LevelBundle> {
+ * it references, base64-embedded. Export is all-or-nothing: returning a
+ * bundle that silently omitted a referenced file would create a result that
+ * cannot be imported portably. */
+export async function exportLevelBundle(
+  storageDir: string,
+  manifest: SceneManifest,
+  publicDir = join(process.cwd(), "public"),
+): Promise<LevelBundle> {
   const assets: BundleFile[] = [];
+  const assetFilenames = new Set<string>();
   for (const asset of manifest.assets) {
-    const buffer = await readStoredFile(storageDir, "assets", asset.url);
-    const filename = safeFilenameFromUrl(asset.url);
-    if (buffer && filename) assets.push({ filename, base64: buffer.toString("base64") });
+    const source = resolveBundleSource(storageDir, publicDir, "asset", asset.url);
+    if (assetFilenames.has(source.filename)) {
+      throw new InvalidBundleError(`Cannot export duplicate asset mapping for \"${source.filename}\"`);
+    }
+    const buffer = await readBundleSource(source.path, "asset", asset.url);
+    try {
+      assertValidGlb(buffer);
+    } catch (error) {
+      if (error instanceof InvalidFileError) throw new InvalidBundleError(`Cannot export asset \"${asset.id}\": ${error.message}`);
+      throw error;
+    }
+    const sha256 = createHash("sha256").update(buffer).digest("hex");
+    if (sha256 !== asset.sha256) {
+      throw new InvalidBundleError(`Cannot export asset \"${asset.id}\": sha256 does not match the referenced file`);
+    }
+    if (buffer.byteLength !== asset.sizeBytes) {
+      throw new InvalidBundleError(`Cannot export asset \"${asset.id}\": sizeBytes does not match the referenced file`);
+    }
+    assetFilenames.add(source.filename);
+    assets.push({ filename: source.filename, base64: buffer.toString("base64") });
   }
   const photos: BundleFile[] = [];
+  const photoFilenames = new Set<string>();
   for (const photo of manifest.photos) {
-    const buffer = await readStoredFile(storageDir, "photos", photo.url);
-    const filename = safeFilenameFromUrl(photo.url);
-    if (buffer && filename) photos.push({ filename, base64: buffer.toString("base64") });
+    const source = resolveBundleSource(storageDir, publicDir, "photo", photo.url);
+    if (photoFilenames.has(source.filename)) {
+      throw new InvalidBundleError(`Cannot export duplicate photo mapping for \"${source.filename}\"`);
+    }
+    const buffer = await readBundleSource(source.path, "photo", photo.url);
+    try {
+      assertValidPhoto(buffer);
+    } catch (error) {
+      if (error instanceof InvalidFileError) throw new InvalidBundleError(`Cannot export photo \"${photo.id}\": ${error.message}`);
+      throw error;
+    }
+    photoFilenames.add(source.filename);
+    photos.push({ filename: source.filename, base64: buffer.toString("base64") });
   }
   return { bundleVersion: 1, manifest, assets, photos };
+}
+
+function mapEmbeddedFiles(
+  files: readonly BundleFile[],
+  referencedUrls: readonly string[],
+  kind: BundleReferenceKind,
+): Map<string, BundleFile> {
+  const byFilename = new Map<string, BundleFile>();
+  for (const file of files) {
+    if (safeFilenameFromUrl(file.filename) !== file.filename) {
+      throw new InvalidBundleError(`Embedded ${kind} filename \"${file.filename}\" is unsafe`);
+    }
+    if (byFilename.has(file.filename)) {
+      throw new InvalidBundleError(`Duplicate embedded ${kind} mapping for \"${file.filename}\"`);
+    }
+    byFilename.set(file.filename, file);
+  }
+
+  const referencedFilenames = new Set<string>();
+  for (const url of referencedUrls) {
+    const filename = safeFilenameFromUrl(url);
+    if (!filename) throw new InvalidBundleError(`Referenced ${kind} URL \"${url}\" has no safe filename`);
+    if (referencedFilenames.has(filename)) {
+      throw new InvalidBundleError(`Manifest has duplicate ${kind} mapping for \"${filename}\"`);
+    }
+    referencedFilenames.add(filename);
+    if (!byFilename.has(filename)) {
+      throw new InvalidBundleError(`Bundle is missing embedded ${kind} \"${filename}\"`);
+    }
+  }
+  for (const filename of byFilename.keys()) {
+    if (!referencedFilenames.has(filename)) {
+      throw new InvalidBundleError(`Bundle contains unreferenced embedded ${kind} \"${filename}\"`);
+    }
+  }
+  return byFilename;
 }
 
 /** Imports a bundle as a brand-new level (never overwrites an existing
  * one): writes every embedded asset/photo into this server's own
  * content-addressed storage (deduplicating assets by sha256) and remaps
  * the manifest's asset/photo ids and URLs to match. */
-export async function importLevelBundle(store: LevelStore, storageDir: string, rawBundle: unknown): Promise<SceneManifest> {
+export async function importLevelBundle(store: LevelStore, rawBundle: unknown): Promise<SceneManifest> {
   const parsed = bundleSchema.safeParse(rawBundle);
   if (!parsed.success) {
     throw new InvalidBundleError(`Invalid bundle: ${formatZodError(parsed.error)}`);
   }
   const bundle = parsed.data;
 
-  const assetByFilename = new Map(bundle.assets.map((a) => [a.filename, a] as const));
-  const photoByFilename = new Map(bundle.photos.map((p) => [p.filename, p] as const));
+  const assetByFilename = mapEmbeddedFiles(bundle.assets, bundle.manifest.assets.map((asset) => asset.url), "asset");
+  const photoByFilename = mapEmbeddedFiles(bundle.photos, bundle.manifest.photos.map((photo) => photo.url), "photo");
 
-  const assetIdRemap = new Map<string, { id: string; url: string }>();
-  for (const asset of bundle.manifest.assets) {
-    const filename = safeFilenameFromUrl(asset.url);
-    const embedded = filename ? assetByFilename.get(filename) : undefined;
-    if (!embedded) continue; // no embedded bytes for this reference — leave it pointing at its original URL
-    const buffer = Buffer.from(embedded.base64, "base64");
-    const stored = await writeContentAddressedAsset(storageDir, buffer);
-    assetIdRemap.set(asset.id, stored);
+  // Preflight every byte/hash/size/magic check before writing any file or
+  // index. A malformed photo must not leave earlier assets half-imported.
+  const preparedAssets = bundle.manifest.assets.map((asset) => {
+    const filename = safeFilenameFromUrl(asset.url)!;
+    const buffer = decodeBase64(assetByFilename.get(filename)!);
+    const sha256 = createHash("sha256").update(buffer).digest("hex");
+    if (sha256 !== asset.sha256) {
+      throw new InvalidBundleError(`Embedded asset \"${filename}\" does not match manifest sha256`);
+    }
+    if (buffer.byteLength !== asset.sizeBytes) {
+      throw new InvalidBundleError(`Embedded asset \"${filename}\" does not match manifest sizeBytes`);
+    }
+    try {
+      assertValidGlb(buffer);
+    } catch (error) {
+      if (error instanceof InvalidFileError) throw new InvalidBundleError(error.message);
+      throw error;
+    }
+    return { asset, buffer };
+  });
+  const preparedPhotos = bundle.manifest.photos.map((photo) => {
+    const filename = safeFilenameFromUrl(photo.url)!;
+    const buffer = decodeBase64(photoByFilename.get(filename)!);
+    try {
+      assertValidPhoto(buffer);
+    } catch (error) {
+      if (error instanceof InvalidFileError) throw new InvalidBundleError(error.message);
+      throw error;
+    }
+    return { photo, buffer };
+  });
+
+  const photoIdRemap = new Map<string, SceneManifest["photos"][number]>();
+  for (const { photo, buffer } of preparedPhotos) {
+    try {
+      const stored = await store.photos.store(buffer, photo.order, photo.label);
+      photoIdRemap.set(photo.id, stored);
+    } catch (error) {
+      if (error instanceof InvalidFileError) throw new InvalidBundleError(error.message);
+      throw error;
+    }
   }
 
-  const photoIdRemap = new Map<string, { id: string; url: string }>();
-  for (const photo of bundle.manifest.photos) {
-    const filename = safeFilenameFromUrl(photo.url);
-    const embedded = filename ? photoByFilename.get(filename) : undefined;
-    if (!embedded) continue;
-    const buffer = Buffer.from(embedded.base64, "base64");
-    const stored = await writeNewPhoto(storageDir, buffer, photo.order);
-    photoIdRemap.set(photo.id, stored);
+  const importedPhotos = Array.from(photoIdRemap.values());
+  const assetIdRemap = new Map<string, SceneManifest["assets"][number]>();
+  for (const { asset, buffer } of preparedAssets) {
+    try {
+      const stored = await store.assets.store(buffer, asset.provenance, importedPhotos);
+      assetIdRemap.set(asset.id, stored);
+    } catch (error) {
+      if (error instanceof InvalidFileError) throw new InvalidBundleError(error.message);
+      throw error;
+    }
   }
 
   // Rebuilt field-by-field rather than spread — zod's `.optional()` types
@@ -446,8 +634,8 @@ export async function importLevelBundle(store: LevelStore, storageDir: string, r
     return {
       id: remap?.id ?? asset.id,
       url: remap?.url ?? asset.url,
-      sha256: remap?.id ?? asset.sha256,
-      sizeBytes: asset.sizeBytes,
+      sha256: remap?.sha256 ?? asset.sha256,
+      sizeBytes: remap?.sizeBytes ?? asset.sizeBytes,
       ...(asset.provenance !== undefined ? { provenance: asset.provenance } : {}),
     };
   });
@@ -565,8 +753,16 @@ export function createLevelsRouter(store: LevelStore): Router {
         res.status(404).json({ message: "Level not found" });
         return;
       }
-      const bundle = await exportLevelBundle(store.storageDir, level);
-      res.json(bundle);
+      try {
+        const bundle = await exportLevelBundle(store.storageDir, level, store.publicDir);
+        res.json(bundle);
+      } catch (error) {
+        if (error instanceof InvalidBundleError) {
+          res.status(422).json({ message: error.message });
+          return;
+        }
+        throw error;
+      }
     }),
   );
 
@@ -590,7 +786,7 @@ export function createLevelsRouter(store: LevelStore): Router {
         return;
       }
       try {
-        const imported = await importLevelBundle(store, store.storageDir, rawBundle);
+        const imported = await importLevelBundle(store, rawBundle);
         res.status(201).json(imported);
       } catch (err) {
         if (err instanceof InvalidBundleError) {

@@ -1,9 +1,16 @@
-import { Component, Suspense, useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, type ThreeEvent } from "@react-three/fiber";
-import { OrbitControls, useGLTF } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
 import type { Object3D } from "three";
-import { Box3 } from "three";
+import { Box3, Matrix3 } from "three";
 import type { SceneManifest, SceneEntity, Checkpoint, SpawnPoint, Vec3 } from "@shared/index.js";
+import {
+  createHelperGeometry,
+  loadAsset,
+  MAX_WALKABLE_SLOPE_RADIANS,
+  type LoadedAsset,
+} from "../scene/index.js";
+import { isWalkableSurfaceNormalY } from "./geometry.js";
 
 /** What a click in the preview is currently placing, if anything. */
 export type PlacementMode = "spawn" | { checkpointId: string } | null;
@@ -22,7 +29,7 @@ interface Preview3DProps {
   manifest: SceneManifest;
   selectedEntityId: string | null;
   placementMode: PlacementMode;
-  onSurfaceClick: (point: Vec3) => void;
+  onSurfaceClick: (point: Vec3, walkable: boolean) => void;
   onLoadError: (entityId: string) => void;
   onBoundsReport: (entityId: string, bounds: EntityBounds) => void;
 }
@@ -79,19 +86,6 @@ export function Preview3D({
         />
       ))}
 
-      {/* Invisible ground plane so click-to-place still works over empty space. */}
-      <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, 0, 0]}
-        visible={false}
-        onClick={(event: ThreeEvent<MouseEvent>) => {
-          event.stopPropagation();
-          onSurfaceClick([event.point.x, event.point.y, event.point.z]);
-        }}
-      >
-        <planeGeometry args={[200, 200]} />
-        <meshBasicMaterial />
-      </mesh>
     </Canvas>
   );
 }
@@ -107,7 +101,7 @@ function GeneratedMeshNode({
   entity: Extract<SceneEntity, { kind: "generated-mesh" }>;
   manifest: SceneManifest;
   selected: boolean;
-  onSurfaceClick: (point: Vec3) => void;
+  onSurfaceClick: (point: Vec3, walkable: boolean) => void;
   onLoadError: (entityId: string) => void;
   onBoundsReport: (entityId: string, bounds: EntityBounds) => void;
 }) {
@@ -115,38 +109,84 @@ function GeneratedMeshNode({
   return (
     <group position={entity.transform.position} quaternion={[...entity.transform.rotation]} scale={entity.transform.scale}>
       {asset ? (
-        <PreviewErrorBoundary
-          onError={() => onLoadError(entity.id)}
-          fallback={<PlaceholderBox selected={selected} label="preview unavailable" onSurfaceClick={onSurfaceClick} />}
-        >
-          <Suspense fallback={<PlaceholderBox selected={selected} label="loading…" onSurfaceClick={onSurfaceClick} />}>
-            <LoadedGltf
-              url={asset.url}
-              entityId={entity.id}
-              onSurfaceClick={onSurfaceClick}
-              onBoundsReport={onBoundsReport}
-            />
-          </Suspense>
-        </PreviewErrorBoundary>
+        <SharedAssetNode
+          url={asset.url}
+          entityId={entity.id}
+          selected={selected}
+          onSurfaceClick={onSurfaceClick}
+          onLoadError={onLoadError}
+          onBoundsReport={onBoundsReport}
+        />
       ) : (
-        <PlaceholderBox selected={selected} label="no asset" onSurfaceClick={onSurfaceClick} />
+        <PlaceholderBox selected={selected} label="no asset" />
       )}
     </group>
   );
 }
 
-function LoadedGltf({
+function SharedAssetNode({
   url,
   entityId,
+  selected,
   onSurfaceClick,
+  onLoadError,
   onBoundsReport,
 }: {
   url: string;
   entityId: string;
-  onSurfaceClick: (point: Vec3) => void;
+  selected: boolean;
+  onSurfaceClick: (point: Vec3, walkable: boolean) => void;
+  onLoadError: (entityId: string) => void;
   onBoundsReport: (entityId: string, bounds: EntityBounds) => void;
 }) {
-  const gltf = useGLTF(url);
+  const [loaded, setLoaded] = useState<LoadedAsset | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setLoaded(null);
+    setFailed(false);
+    void loadAsset(url).then(
+      (asset) => {
+        if (active) setLoaded(asset);
+      },
+      () => {
+        if (!active) return;
+        setFailed(true);
+        onLoadError(entityId);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [entityId, url]);
+
+  // The scene loader cache owns the decoded source graph. Every manifest
+  // entity gets its own object tree so transforms/selection in one entity can
+  // never mutate another entity (geometry/material buffers remain shared).
+  const object = useMemo(() => loaded?.scene.clone(true) ?? null, [loaded]);
+  if (!object) return <PlaceholderBox selected={selected} label={failed ? "preview unavailable" : "loading…"} />;
+  return (
+    <LoadedAssetObject
+      object={object}
+      entityId={entityId}
+      onSurfaceClick={onSurfaceClick}
+      onBoundsReport={onBoundsReport}
+    />
+  );
+}
+
+function LoadedAssetObject({
+  object,
+  entityId,
+  onSurfaceClick,
+  onBoundsReport,
+}: {
+  object: Object3D;
+  entityId: string;
+  onSurfaceClick: (point: Vec3, walkable: boolean) => void;
+  onBoundsReport: (entityId: string, bounds: EntityBounds) => void;
+}) {
   const ref = useRef<Object3D>(null);
 
   // Runs after every commit (transform changes re-render the parent
@@ -166,10 +206,10 @@ function LoadedGltf({
   return (
     <primitive
       ref={ref}
-      object={gltf.scene}
+      object={object}
       onClick={(event: ThreeEvent<MouseEvent>) => {
         event.stopPropagation();
-        onSurfaceClick([event.point.x, event.point.y, event.point.z]);
+        reportSurfaceClick(event, onSurfaceClick);
       }}
     />
   );
@@ -181,11 +221,9 @@ function LoadedGltf({
 function PlaceholderBox({
   selected,
   label,
-  onSurfaceClick,
 }: {
   selected: boolean;
   label: string;
-  onSurfaceClick: (point: Vec3) => void;
 }) {
   return (
     <mesh
@@ -195,10 +233,6 @@ function PlaceholderBox({
       // actually shows "loading…" / "preview unavailable" / "no asset" to
       // the user.
       userData={{ placeholderReason: label }}
-      onClick={(event: ThreeEvent<MouseEvent>) => {
-        event.stopPropagation();
-        onSurfaceClick([event.point.x, event.point.y, event.point.z]);
-      }}
     >
       <boxGeometry args={[2, 2, 2]} />
       <meshStandardMaterial color={selected ? "#f5a623" : "#4a4266"} wireframe transparent opacity={0.85} />
@@ -213,11 +247,14 @@ function HelperNode({
 }: {
   entity: Extract<SceneEntity, { kind: "floor" | "box" | "ramp" }>;
   selected: boolean;
-  onSurfaceClick: (point: Vec3) => void;
+  onSurfaceClick: (point: Vec3, walkable: boolean) => void;
 }) {
   const color = entity.kind === "floor" ? "#2f6f5e" : entity.kind === "ramp" ? "#a06b2f" : "#3a5a8f";
+  const geometry = useMemo(() => createHelperGeometry(entity.kind, entity.dimensions), [entity.kind, entity.dimensions]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
   return (
     <mesh
+      geometry={geometry}
       position={entity.transform.position}
       quaternion={[...entity.transform.rotation]}
       scale={entity.transform.scale}
@@ -225,13 +262,25 @@ function HelperNode({
       receiveShadow
       onClick={(event: ThreeEvent<MouseEvent>) => {
         event.stopPropagation();
-        onSurfaceClick([event.point.x, event.point.y, event.point.z]);
+        reportSurfaceClick(event, onSurfaceClick);
       }}
     >
-      <boxGeometry args={entity.dimensions as unknown as [number, number, number]} />
       <meshStandardMaterial color={selected ? "#f5a623" : color} />
     </mesh>
   );
+}
+
+function reportSurfaceClick(
+  event: ThreeEvent<MouseEvent>,
+  onSurfaceClick: (point: Vec3, walkable: boolean) => void,
+): void {
+  event.object.updateWorldMatrix(true, false);
+  const localNormal = event.face?.normal;
+  const worldNormal = localNormal
+    ? localNormal.clone().applyNormalMatrix(new Matrix3().getNormalMatrix(event.object.matrixWorld)).normalize()
+    : null;
+  const walkable = isWalkableSurfaceNormalY(worldNormal?.y ?? null, MAX_WALKABLE_SLOPE_RADIANS);
+  onSurfaceClick([event.point.x, event.point.y, event.point.z], walkable);
 }
 
 function SpawnMarker({ spawn, active }: { spawn: SpawnPoint; active: boolean }) {
@@ -258,26 +307,4 @@ function CheckpointMarker({ checkpoint, active }: { checkpoint: Checkpoint; acti
       </mesh>
     </mesh>
   );
-}
-
-interface PreviewErrorBoundaryProps {
-  onError: () => void;
-  fallback: ReactNode;
-  children: ReactNode;
-}
-
-class PreviewErrorBoundary extends Component<PreviewErrorBoundaryProps, { failed: boolean }> {
-  override state = { failed: false };
-
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-
-  override componentDidCatch() {
-    this.props.onError();
-  }
-
-  override render() {
-    return this.state.failed ? this.props.fallback : this.props.children;
-  }
 }

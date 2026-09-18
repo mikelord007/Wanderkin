@@ -28,17 +28,19 @@ documented on the type).
 
 ### Preview loader
 
-The 3D preview loads each `generated-mesh` entity's GLB with
-`@react-three/drei`'s `useGLTF` (which wraps three.js's `GLTFLoader` with
-its own caching/eviction) rather than a hand-rolled loader — this is a
-generic three.js-ecosystem utility, not scene preparation's normalization
-algorithm (bounds analysis, floor detection, course generation), so it
-doesn't duplicate anything scene-owned. A failed or still-loading mesh
-renders a wireframe placeholder box (`PlaceholderBox`) so the editor stays
-usable for arbitrary imperfect/unreachable assets; floor-align and
-calibrate are disabled (not faked) until a real bounding box is available
-from a successfully loaded mesh, since inventing numbers from an arbitrary
-placeholder box would be dishonest, not just approximate.
+The preview uses `src/scene/loadAsset`, the same download/decode/cache used
+by preparation and gameplay. Each manifest entity clones the cached scene
+graph before mounting it, so two entities can share immutable geometry and
+materials without sharing transform state. Helper visuals come from
+`src/scene/createHelperGeometry`; in particular, a ramp is the same wedge
+triangle mesh used by its collider, never a misleading box.
+
+A failed or still-loading mesh renders a wireframe placeholder box, but a
+placeholder is not clickable placement geometry. Click-to-place also checks
+the real hit-face normal against the movement system's maximum walkable
+slope. Empty space, walls, and over-steep faces therefore cannot be stored as
+if they were safe spawn/checkpoint surfaces. Floor-align and calibration stay
+disabled until the real asset bounds are available.
 
 ### Unsaved draft persistence
 
@@ -100,26 +102,16 @@ malicious or accidental `levelId` like `"__proto__"` can never pollute a
 prototype; `isSafeLevelId` additionally bounds length/charset and
 blocklists `__proto__`/`constructor`/`prototype` as defense in depth.
 
-**This file is intentionally self-contained.** `server/persistence/*`
-(the real `JsonFileStore`, GLB/photo magic-byte validators) is owned by
-the Livepeer integration worker and exists on `worktree/clever-path`,
-not yet merged into this branch — so `server/levels.ts` carries its own
-small, independently-correct copies of the same small pieces (atomic
-write-then-rename, magic-byte sniffing) rather than importing files that
-don't exist here. **Once merged, these are natural candidates to
-consolidate** with `server/persistence/jsonStore.ts` and
-`server/persistence/validate.ts` — flagged to the Livepeer worker.
-
-**Not yet wired into `server/index.ts`** (owned by the Livepeer worker,
-out of this worker's ownership) — that file already has the exact
-integration point commented in:
+`LevelStore` accepts the process-wide `AssetStore` and `PhotoStore` instances.
+Bundle import calls those services directly, so imported files receive the
+same magic-byte/size validation and durable index records as ordinary uploads
+and are immediately visible through `GET /api/assets/:id`. The server wiring
+must pass the already-created stores rather than constructing isolated cached
+indexes:
 
 ```ts
-// TODO(Level tools worker): app.use(levelsRouter) from ./levels.js once it
-// exists — see docs/CONTRACTS.md "Server API" for the /api/levels contract.
+app.use(createLevelsRouter(new LevelStore(env.storageDir, assetStore, photoStore)));
 ```
-
-Wiring needed: `app.use(createLevelsRouter(new LevelStore(env.storageDir)))`.
 
 ### Import/export bundle format
 
@@ -132,20 +124,20 @@ interface LevelBundle {
 }
 ```
 
-Plain JSON, no zip dependency, per the brief. Export skips any
-asset/photo whose file is missing on disk rather than failing the whole
-export (a level can legitimately outlive a pruned asset). Import:
+Plain JSON, no zip dependency, per the brief. Export safely resolves both
+durable `/api/assets|photos/files/...` URLs and bundled `/samples/...` files.
+It is all-or-nothing: a missing file, unsafe/nonlocal URL, duplicate filename,
+invalid file, or asset hash/size mismatch returns an explicit 422 instead of a
+misleading incomplete bundle. Import:
 
 - Validates the bundle (including the embedded manifest) with the same
   strict schema used everywhere else.
-- Writes each embedded asset into content-addressed storage
-  (`STORAGE_DIR/assets/<sha256>.glb`) — re-importing the same bytes lands
-  on the same file, deduplicated, matching the Livepeer worker's asset
-  storage convention exactly, so an imported asset is immediately
-  servable at `/api/assets/files/<sha256>.glb` with zero extra wiring.
-- Writes each embedded photo into `STORAGE_DIR/photos/<uuid>.<ext>`
-  (photos are never content-addressed, matching the existing convention —
-  a re-import always mints a fresh id).
+- Requires exactly one embedded file for every manifest asset/photo and
+  rejects duplicate, ambiguous, or unreferenced mappings.
+- Canonically decodes base64, verifies every GLB's declared hash and byte size,
+  then preflights all GLB/photo validators before writing anything.
+- Stores through `AssetStore`/`PhotoStore`, preserving asset provenance and
+  indexing the minted IDs used by the existing API routes.
 - Remaps the manifest's `assets[].id/url`, `photos[].id/url`, and every
   `generated-mesh` entity's `assetId` to the freshly-stored values before
   creating the imported level as a **new** level (never overwrites).
@@ -175,18 +167,21 @@ ready for whichever worker adds that trigger.
 
 ## Testing
 
-`server/levels.test.ts` (28 tests): id safety (including
+`server/levels.test.ts`: id safety (including
 prototype-pollution-shaped ids), zod validation (valid/missing
-fields/wrong schema version/corrupt checkpoint ordering/garbage input),
+fields/wrong schema version/corrupt checkpoint ordering/garbage input,
+finite transforms/unit quaternions/nonzero scale/positive dimensions/reference
+integrity/helper collider agreement),
 `LevelStore` CRUD, atomicity under 20 concurrent creates, corrupted
-`levels.json` surfacing as a real error rather than silent data loss,
-export/import round-tripping (including dedup-by-sha256 and a
+`levels.json` surfacing as a real error rather than silent data loss, failed
+atomic writes not leaking into the cache, sample/local export resolution,
+strict export/import mapping and hash/size checks (including dedup-by-sha256 and a
 byte-identical re-materialized file), and full HTTP-level tests
 (`app.listen(0)` + real `fetch`, no new test dependency) covering every
 route including the 400s for invalid bodies, mismatched PUT ids, and an
 unsafe `:id`.
 
-`src/editor/*.test.ts` (30 tests): the pure logic in `geometry.ts`,
+`src/editor/*.test.ts` (33 tests): the pure logic in `geometry.ts`,
 `manifestEdits.ts`, and `draftStorage.ts`. `LevelEditor.tsx` and
 `Preview3D.tsx` themselves aren't unit-tested — no DOM/React-Three-Fiber
 testing library is installed and adding one is a dependency change out of
@@ -195,14 +190,10 @@ for `src/ui`'s screen components.
 
 ## Known limitations
 
-- No production build verification possible yet: `vite build` fails on
-  the still-missing `scene/index.ts` / `scene/samples.ts` / `game/GameView.tsx`
-  (pre-existing gap from before this work, not introduced by it).
-- `server/levels.ts` isn't registered in `server/index.ts` yet — needs a
-  one-line change from the Livepeer worker (see above).
+- This branch intentionally does not edit shared `server/index.ts`; integration
+  must pass its existing asset/photo stores as shown above.
 - No in-canvas text labels on preview placeholders (would need a
   font-loading dependency); the "loading…" / "preview unavailable" state
   surfaces via a DOM banner instead.
-- Ramp helper geometry only supports a single X-axis tilt, not arbitrary
-  orientation.
+- Ramp helpers expose heading around Y; their rise/run comes from dimensions.
 - No manifest/asset export-import UI trigger yet (routes only, see above).

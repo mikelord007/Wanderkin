@@ -156,7 +156,19 @@ export function updateHelperDimensions(
   return markManuallyAdjusted({
     ...manifest,
     entities: manifest.entities.map((entity) =>
-      entity.id === entityId && entity.kind !== "generated-mesh" ? { ...entity, dimensions } : entity,
+      entity.id === entityId && entity.kind !== "generated-mesh"
+        ? {
+            ...entity,
+            dimensions,
+            collider:
+              entity.kind === "ramp"
+                ? { kind: "triangle-mesh" as const }
+                : {
+                    kind: "box" as const,
+                    halfExtents: [dimensions[0] / 2, dimensions[1] / 2, dimensions[2] / 2],
+                  },
+          }
+        : entity,
     ),
   });
 }
