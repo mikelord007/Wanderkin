@@ -4,6 +4,8 @@ import { buildCollisionSet, type EntityCollision } from "./collision.js";
 import { helperLocalTriangles } from "./helpers.js";
 import {
   applyTransformToObject3D,
+  clearAssetCache,
+  getCachedAsset,
   loadAsset,
   type AssetLoadProgress,
   type LoadedAsset,
@@ -24,11 +26,11 @@ import type { TriangleSoup } from "./types.js";
  * indicator then, never a made-up percentage. */
 export interface SceneAssetProgress {
   stage: "downloading" | "decoding";
-  loaded: number;
-  total: number | null;
+  loadedBytes: number;
+  totalBytes: number | null;
 }
 
-export interface SceneAsset {
+export interface LoadedSceneAsset {
   /** Decoded glTF scene in asset-local space, node transforms already baked.
    * Apply the manifest entity transform with {@link applyTransformToObject3D}. */
   scene: THREE.Group;
@@ -48,15 +50,15 @@ export interface SceneAsset {
 export async function loadSceneAsset(
   url: string,
   onProgress?: (progress: SceneAssetProgress) => void,
-): Promise<SceneAsset> {
+): Promise<LoadedSceneAsset> {
   const loaded = await loadAsset(
     url,
     onProgress
       ? (progress: AssetLoadProgress) =>
           onProgress({
             stage: progress.stage === "downloading" ? "downloading" : "decoding",
-            loaded: progress.loadedBytes,
-            total: progress.totalBytes,
+            loadedBytes: progress.loadedBytes,
+            totalBytes: progress.totalBytes,
           })
       : undefined,
   );
@@ -64,6 +66,18 @@ export async function loadSceneAsset(
     scene: loaded.scene,
     collision: toIndexedMesh(loaded.triangles),
   };
+}
+
+/** Backward-compatible name for consumers that adopted the earlier draft. */
+export type SceneAsset = LoadedSceneAsset;
+
+/** Runtime-facing cache controls mirror the temporary game loader API. */
+export function clearSceneAssetCache(url?: string): void {
+  clearAssetCache(url);
+}
+
+export function isSceneAssetCached(url: string): boolean {
+  return getCachedAsset(url) !== null;
 }
 
 /** Loads every asset a manifest references, in parallel, sharing the cache

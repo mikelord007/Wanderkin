@@ -32,7 +32,7 @@ export interface MovementLimits {
   flatJumpRange: number;
   gravity: number;
   walkSpeed: number;
-  mantle: MovementConfig["mantle"]!;
+  mantle: MovementConfig["mantle"];
   /** Fraction of the theoretical envelope accepted, so a validated route has
    * margin instead of sitting exactly on the physical limit. */
   safetyFactor: number;

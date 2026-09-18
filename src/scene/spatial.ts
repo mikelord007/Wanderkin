@@ -70,7 +70,8 @@ export class TriangleGrid {
       ranges[t * 4 + 3] = z1;
       for (let cz = z0; cz <= z1; cz += 1) {
         for (let cx = x0; cx <= x1; cx += 1) {
-          counts[cz * this.cellsX + cx] += 1;
+          const cell = cz * this.cellsX + cx;
+          counts[cell] = counts[cell]! + 1;
         }
       }
     }
@@ -88,8 +89,9 @@ export class TriangleGrid {
       for (let cz = z0; cz <= z1; cz += 1) {
         for (let cx = x0; cx <= x1; cx += 1) {
           const c = cz * this.cellsX + cx;
-          this.cells[c]![cursors[c]] = t;
-          cursors[c] += 1;
+          const cursor = cursors[c]!;
+          this.cells[c]![cursor] = t;
+          cursors[c] = cursor + 1;
         }
       }
     }
