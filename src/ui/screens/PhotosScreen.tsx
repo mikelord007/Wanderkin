@@ -23,6 +23,24 @@ function newIdempotencyKey(): string {
   return `key-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function capabilityInputSummary(capability: ProviderCapabilityDescriptor): string {
+  const count =
+    capability.minPhotos === capability.maxPhotos
+      ? `${capability.minPhotos} photo${capability.minPhotos === 1 ? "" : "s"}`
+      : `${capability.minPhotos}–${capability.maxPhotos} photos`;
+  const views = capability.requiredViewOrder;
+  if (!views?.length) return `Use ${count} in any order.`;
+  return `Use ${count}. Assign views in order: ${views.join(", ")}.`;
+}
+
+function capabilityFallbackNotice(capability: ProviderCapabilityDescriptor): string | null {
+  if (!capability.notes?.toLowerCase().includes("fallback")) return null;
+  return (
+    "If this model is unavailable, the provider may use a compatible alternative. " +
+    "The result will record which model was used."
+  );
+}
+
 /** A submission in localStorage before its POST /api/jobs response ever
  * arrived (reload, tab close, timeout) — the server may already have
  * accepted it, so resuming must reuse the same idempotencyKey and the same
@@ -274,26 +292,27 @@ export function PhotosScreen({ onJobStarted, onBack }: PhotosScreenProps) {
           <p className="oq-error-text">No generation model is available right now.</p>
         ) : (
           <div className="oq-capability-list" role="radiogroup" aria-label="Generation model">
-            {capabilities.map((cap) => (
-              <label
-                key={cap.id}
-                className={`oq-capability-card${cap.id === selectedCapabilityId ? " oq-capability-card--selected" : ""}`}
-              >
-                <input
-                  type="radio"
-                  name="capability"
-                  checked={cap.id === selectedCapabilityId}
-                  onChange={() => setSelectedCapabilityId(cap.id)}
-                />
-                <span className="oq-capability-card__title">{cap.displayName}</span>
-                <span className="oq-capability-card__meta">
-                  {cap.requiredViewOrder?.length
-                    ? `Views: ${cap.requiredViewOrder.join(", ")} (${cap.minPhotos}-${cap.maxPhotos})`
-                    : `${cap.minPhotos}-${cap.maxPhotos} photos, any order`}
-                </span>
-                {cap.notes ? <span className="oq-capability-card__notes">{cap.notes}</span> : null}
-              </label>
-            ))}
+            {capabilities.map((cap) => {
+              const fallbackNotice = capabilityFallbackNotice(cap);
+              return (
+                <label
+                  key={cap.id}
+                  className={`oq-capability-card${cap.id === selectedCapabilityId ? " oq-capability-card--selected" : ""}`}
+                >
+                  <input
+                    type="radio"
+                    name="capability"
+                    checked={cap.id === selectedCapabilityId}
+                    onChange={() => setSelectedCapabilityId(cap.id)}
+                  />
+                  <span className="oq-capability-card__title">{cap.displayName}</span>
+                  <span className="oq-capability-card__meta">{capabilityInputSummary(cap)}</span>
+                  {fallbackNotice ? (
+                    <span className="oq-capability-card__notes">{fallbackNotice}</span>
+                  ) : null}
+                </label>
+              );
+            })}
           </div>
         )}
 
