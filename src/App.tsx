@@ -6,7 +6,14 @@ import { GenerationScreen } from "./ui/screens/GenerationScreen.js";
 import { PreparationScreen, type PreparationSource } from "./ui/screens/PreparationScreen.js";
 import { PlayScreen } from "./ui/screens/PlayScreen.js";
 import { FinishScreen } from "./ui/screens/FinishScreen.js";
-import { clearActiveJob, clearPendingSubmission, loadActiveJob, resolveResumeState } from "./ui/jobStorage.js";
+import {
+  clearActiveJob,
+  clearActivePreparation,
+  clearPendingSubmission,
+  loadActiveJob,
+  resolveResumeState,
+  saveActivePreparation,
+} from "./ui/jobStorage.js";
 import { createLevel, saveLevel } from "./ui/api.js";
 
 type Screen =
@@ -20,6 +27,14 @@ type Screen =
 function initialScreen(): Screen {
   const resume = resolveResumeState();
   if (resume.screen === "generation") return { name: "generation", jobId: resume.jobId };
+  if (resume.screen === "preparation") {
+    const { assetId, photos } = resume.preparation;
+    return {
+      name: "preparation",
+      source: photos.length > 0 ? { kind: "asset", assetId, sourcePhotos: photos } : { kind: "asset", assetId },
+      isNew: true,
+    };
+  }
   if (resume.screen === "photos") return { name: "photos" };
   return { name: "start" };
 }
@@ -44,17 +59,22 @@ export function App() {
   const handleJobReady = useCallback((job: GenerationJob) => {
     // Read the source photos before clearing — they only live in this
     // transient record, and Preparation needs them to attach provenance.
-    const sourcePhotos = loadActiveJob()?.photos;
+    const sourcePhotos = loadActiveJob()?.photos ?? [];
     clearActiveJob();
     if (!job.resultAssetId) {
       setScreen({ name: "start" });
       return;
     }
+    // AssetReference itself carries no photo refs, so without persisting
+    // this a reload between "asset ready" and "level saved" would silently
+    // drop which source photos the asset came from.
+    saveActivePreparation({ assetId: job.resultAssetId, photos: sourcePhotos });
     setScreen({
       name: "preparation",
-      source: sourcePhotos
-        ? { kind: "asset", assetId: job.resultAssetId, sourcePhotos }
-        : { kind: "asset", assetId: job.resultAssetId },
+      source:
+        sourcePhotos.length > 0
+          ? { kind: "asset", assetId: job.resultAssetId, sourcePhotos }
+          : { kind: "asset", assetId: job.resultAssetId },
       isNew: true,
     });
   }, []);
@@ -72,10 +92,20 @@ export function App() {
     async (manifest: SceneManifest) => {
       if (screen.name !== "preparation") return;
       const saved = screen.isNew ? await createLevel(manifest) : await saveLevel(manifest.levelId, manifest);
+      // The source photos are now durable inside the saved SceneManifest —
+      // the transient reload-recovery record is no longer needed.
+      clearActivePreparation();
       setScreen({ name: "preparation", source: { kind: "manifest", manifest: saved }, isNew: false });
     },
     [screen],
   );
+
+  const handlePreparationBack = useCallback(() => {
+    // Only ever set for an unsaved asset-sourced preparation; a no-op
+    // otherwise. Leaving without saving is a deliberate abandonment.
+    clearActivePreparation();
+    setScreen({ name: "start" });
+  }, []);
 
   switch (screen.name) {
     case "start":
@@ -90,9 +120,10 @@ export function App() {
             setScreen({ name: "preparation", source: { kind: "manifest", manifest }, isNew: false })
           }
           onCreateFromPhotos={() => setScreen({ name: "photos" })}
-          onImportGlbReady={(assetId) =>
-            setScreen({ name: "preparation", source: { kind: "asset", assetId }, isNew: true })
-          }
+          onImportGlbReady={(assetId) => {
+            saveActivePreparation({ assetId, photos: [] });
+            setScreen({ name: "preparation", source: { kind: "asset", assetId }, isNew: true });
+          }}
         />
       );
 
@@ -110,7 +141,7 @@ export function App() {
           source={screen.source}
           onPlay={(manifest) => setScreen({ name: "play", manifest })}
           onSave={handleSavePreparedLevel}
-          onBack={goStart}
+          onBack={handlePreparationBack}
         />
       );
 
