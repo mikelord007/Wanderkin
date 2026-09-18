@@ -83,12 +83,7 @@ describe("POST /api/uploads + GET /api/photos/files/:name", () => {
     expect(Object.keys(body)).toEqual(["message"]);
   });
 
-  // Known server bug (reported to Astra 2026-09-18): Multer rejects before
-  // the route handler and there is no terminal JSON error middleware, so
-  // this currently returns 500. `fails` keeps the desired contract
-  // executable and will make the suite fail as soon as the API is fixed,
-  // prompting removal of the marker rather than normalizing the bad shape.
-  it.fails("rejects a photo above the 20 MiB limit with a safe JSON error", async () => {
+  it("rejects a photo above the 20 MiB limit with a safe JSON error", async () => {
     const tooLarge = Buffer.alloc(20 * 1024 * 1024 + 1);
     tooLarge.set([0xff, 0xd8, 0xff]);
     const form = new FormData();

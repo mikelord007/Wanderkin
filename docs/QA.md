@@ -6,11 +6,9 @@ course has been completed in a browser.
 
 ## Current verification status (2026-09-18)
 
-- `npm test`: **225 passed** across 24 unit/headless test files after the
-  scene runtime and bundled manifests were integrated.
-- `npm run test:e2e:http`: **23 completed** across 4 HTTP integration files.
-  One of the 23 is an explicit expected-failure regression for the upload
-  limit bug below; therefore this is not 23 clean acceptance checks.
+- `npm test`: **240 passed** across 25 unit/headless test files on the
+  integrated scene/editor/game/server revision.
+- `npm run test:e2e:http`: **23 passed** across 4 HTTP integration files.
 - `npm run typecheck`: **passed**.
 - `npm run build`: **passed**; Vite emitted the client and TypeScript
   emitted the server. Vite reports a non-fatal large-chunk warning.
@@ -46,7 +44,7 @@ Run real-browser gameplay and UI acceptance:
 npm run test:e2e:browser
 ```
 
-Run static and production checks after scene integration:
+Run static and production checks:
 
 ```sh
 npm run typecheck
@@ -86,16 +84,6 @@ Current route coverage includes:
   uploaded twice.
 - Provider URL/token redaction and stable `{ "message": "..." }` route
   errors for invalid/unknown job requests.
-
-### Known HTTP defect
-
-An upload larger than 20 MiB reaches Multer's configured limit but returns
-HTTP 500 instead of a safe 400/413 JSON body. Multer rejects before the
-route callback, and `server/index.ts` currently has no terminal middleware
-that maps `MulterError` to the public error shape. The executable
-regression is marked `it.fails`; this keeps the desired behavior visible
-without treating the current 500 as correct. Remove that marker when the
-server-owned fix lands.
 
 ## Real-browser acceptance evidence
 
