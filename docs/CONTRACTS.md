@@ -1,10 +1,8 @@
 # Cross-worker integration contracts
 
-Beyond `shared/*` (the versioned data contracts every worker imports),
-these are the call/prop shapes the parallel workers build to. They are not
-implemented by the foundation worker — each owning worker defines the
-concrete code, but must keep to this shape so integration doesn't require
-renegotiating the boundary.
+`shared/*` contains the versioned data contracts. This document records the
+implemented module, UI, and server boundaries around them. New fields described
+as additive or optional must remain safe for older consumers to ignore.
 
 ## Game runtime (`src/game`, owner: Player and camera)
 
@@ -25,11 +23,17 @@ interface GameSnapshot {
   checkpointsTotal: number;
   nextCheckpointId: string | null;
   mantlePromptVisible: boolean;
+  stage?: "idle" | "downloading" | "decoding" | "building-physics" | "starting" | "running";
+  downloadedBytes?: number;
+  totalBytes?: number | null; // null means the server supplied no usable total
+  completed?: boolean;
 }
 ```
 
-`GameView` reads only `SceneManifest` + `MovementConfig`
-(`shared/movement.ts`) — never a provider or job shape.
+The four trailing snapshot fields are approved additive fields. `ready` becomes
+true only after scene, physics, and the first rendered frame are ready.
+`GameView` reads only `SceneManifest` plus `MovementConfig`; it never receives a
+provider or generation-job shape.
 
 ## Scene preparation (`src/scene`, owner: Scene preparation)
 
@@ -37,18 +41,40 @@ interface GameSnapshot {
 interface PrepareAssetOptions {
   assumedExtentMeters?: number; // default shared/manifest.ts DEFAULT_ASSUMED_EXTENT_METERS
   measuredDimension?: { description: string; meters: number };
+  seed?: string;
+  provenance?: AssetProvenance;
+  photos?: readonly PhotoReference[];
 }
 
 function prepareAsset(
   assetUrl: string,
-  options: PrepareAssetOptions,
-  onProgress?: (stage: "downloading" | "decoding" | "analyzing" | "validating") => void,
+  options?: PrepareAssetOptions,
+  onProgress?: (
+    stage: "downloading" | "decoding" | "analyzing" | "validating",
+    detail?: AssetLoadProgress,
+  ) => void,
 ): Promise<{ manifest: SceneManifest; courseCandidates: SceneManifest[] }>;
+
+interface SceneAssetProgress {
+  stage: "downloading" | "decoding";
+  loadedBytes: number;
+  totalBytes: number | null;
+}
+
+function loadSceneAsset(
+  url: string,
+  onProgress?: (progress: SceneAssetProgress) => void,
+): Promise<{
+  scene: THREE.Group;
+  collision: { vertices: Float32Array; indices: Uint32Array };
+}>;
 ```
 
-Geometry loaded here (normalized transforms, colliders) is reused by the
-game runtime rather than re-parsed — `src/game` consumes the manifest
-`entities`/`assets`, not raw GLB nodes.
+The byte fields are named `loadedBytes` and `totalBytes`, not the superseded
+draft names `loaded`/`total`. The scene and collision are asset-local; consumers
+apply the manifest entity transform identically. The URL-keyed cache shares
+in-flight and successful loads, replays current progress to late listeners,
+and evicts failures so retrying the same URL performs a new request.
 
 `src/scene/samples.ts` (owned by Scene preparation) exports hand-authored
 sample `SceneManifest`s for the bundled Rodin/Tripo GLBs in
@@ -65,11 +91,58 @@ interface LevelEditorProps {
 }
 ```
 
+Edits are immutable `SceneManifest` changes. Any course-affecting edit changes
+validation to `manually-adjusted`; the editor does not claim physics validation.
+Unsaved drafts are a client-side convenience in `localStorage`, keyed by level
+ID and the saved manifest's `updatedAt`. They are not an authoritative server
+store.
+
 ## Product UI (`src/App.tsx` + `src/ui`, owner: Product UI)
 
 Owns top-level routing between start/photos/generation/preparation/play/
-finish screens once the scaffold is ready; composes `GameView` and
-`LevelEditor` from the contracts above.
+finish screens and composes `GameView` and `LevelEditor` from the contracts
+above.
+
+`AssetReference` remains the shared manifest asset shape. The server may return
+the additive transport shape below from `GET /api/assets/:id`:
+
+```ts
+type StoredAssetRecord = AssetReference & { photos?: PhotoReference[] };
+```
+
+`photos` records the source images for a generated asset. Before inserting the
+asset into a manifest, the client removes that additive property and writes the
+resolved photo list to `SceneManifest.photos`. Server metadata wins over a
+stale client cache when present.
+
+## Persistence stores
+
+The server creates one process-wide instance of each authoritative store:
+
+- `PhotoStore(storageDir)` validates and indexes uploaded source photos and
+  supplies their bytes to provider adapters.
+- `AssetStore(storageDir)` validates and content-addresses GLBs. Its stored
+  record may include additive source `photos`.
+- `JobStore(storageDir)` owns public job state plus private idempotency,
+  provider-poll, original-request, and upload-URL-cache data.
+- `LevelStore(storageDir, assetStore, photoStore)` owns saved manifests and
+  uses the same asset/photo instances for portable bundle imports.
+
+The shared instances are part of the contract: constructing separate
+`AssetStore` or `PhotoStore` objects for the levels router can leave their
+in-memory indexes incoherent, so an imported file may not be visible through
+the ordinary asset/photo routes. The approved server registration is:
+
+```ts
+app.use(
+  createLevelsRouter(
+    new LevelStore(env.storageDir, assetStore, photoStore),
+  ),
+);
+```
+
+Server JSON indexes use serialized, temp-file-then-rename writes. A failed
+write must not mutate the in-memory snapshot.
 
 ## Server API (owner: Livepeer integration for provider/job routes; Level
 tools for persistence routes)
@@ -78,14 +151,22 @@ tools for persistence routes)
 | --- | --- | --- |
 | `/api/capabilities` | GET | `ProviderCapabilityDescriptor[]` (shared/provider.ts) |
 | `/api/uploads` | POST | multipart photo upload, returns `PhotoReference[]` |
+| `/api/photos/files/:name` | GET | stored photo bytes referenced by `PhotoReference.url` |
+| `/api/assets/import` | POST | multipart validated hand-imported GLB, returns `StoredAssetRecord` |
+| `/api/assets/:id` | GET | stored asset metadata, including optional additive `photos` |
+| `/api/assets/files/:filename` | GET | stored GLB bytes |
 | `/api/jobs` | POST | body includes `Idempotency-Key` header; reconciles an existing job with the same key instead of starting a duplicate |
 | `/api/jobs/:id` | GET | current `GenerationJob` (shared/job.ts) |
 | `/api/jobs/:id/retry` | POST | reconciles the existing provider job; never submits a second generation |
 | `/api/levels` | GET, POST | list / create saved `SceneManifest`s |
 | `/api/levels/:id` | GET, PUT | load / save one level |
+| `/api/levels/:id/export` | GET | strict portable manifest + embedded local files bundle |
+| `/api/levels/import` | POST | strict bundle import as a new level; uses route-scoped size handling |
 
-Import/export routes may be added by the Level tools worker as needed,
-serializing `SceneManifest` JSON directly.
+Bundle export/import is all-or-nothing: every local asset/photo reference must
+resolve and validate. Imports preserve provenance, verify declared asset
+hashes/sizes, reject ambiguous mappings, store through the shared stores, remap
+fresh IDs/URLs, and never overwrite an existing level.
 
 ## Status notes from live verification (2026-09-18)
 
@@ -103,6 +184,10 @@ serializing `SceneManifest` JSON directly.
   (`DEFAULT_MOVEMENT_CONFIG`, `shared/movement.ts` uses 0.7m). This is a
   documented, arbitrary game-scale choice, not a measured room scale.
 
-Physics/course validation logic is not implemented by the foundation
-worker — this document exists so the Scene preparation and Player/camera
-workers do not have to renegotiate these shapes mid-flight.
+- Both sample manifests contain five checkpoints and elevated furniture routes.
+  They pass real-GLB conservative validation; the Rodin helper climb also passes
+  the real headless game simulation. No complete browser play-through has been
+  accepted yet.
+- The integrated parent passed strict typecheck, a production build, and 225
+  tests. A Chrome viewport/root flex issue and an oversized-request 500 response
+  remain assigned fixes, so the build is not marked accepted.
