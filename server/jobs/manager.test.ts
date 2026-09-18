@@ -53,7 +53,7 @@ function fakeAdapter(overrides: Partial<ProviderAdapter> = {}): ProviderAdapter 
 
 const REQUEST = { capability: "rodin-i3d", photos: [{ photoId: "p1", sourceIndex: 1 }] } as const;
 
-/** Sanitized shape observed from the 2026-09-18 live smoke poll. The MCP
+/** Shape observed from the 2026-09-18 live smoke poll. The MCP
  * endpoint returned this as `result.isError`, so McpClient throws before the
  * adapter can return a normal `{ state: "failed" }` status object. */
 const TERMINAL_STATUS_TEXT =
@@ -67,6 +67,27 @@ const TERMINAL_STATUS_TEXT =
 const TERMINAL_STATUS_ENVELOPE = {
   isError: true,
   content: [{ type: "text", text: TERMINAL_STATUS_TEXT }],
+  structuredContent: {
+    status: "failed",
+    submitted_via: "run_capability",
+    job_id: "mjob_68bae8dfd271",
+    capability: "rodin-i3d",
+    error_retryable: null,
+    error_code: null,
+    cost_disposition: "release_pending",
+    error: {
+      model_id: "fal-ai/hyper3d/rodin/v2.5",
+      validation: [
+        {
+          type: "less_than_equal",
+          loc: ["body", "seed"],
+          msg: "Input should be less than or equal to 65535",
+          input: 463_045_388,
+          ctx: { le: 65_535 },
+        },
+      ],
+    },
+  },
 };
 
 describe("JobManager", () => {
@@ -202,7 +223,7 @@ describe("JobManager", () => {
     expect(updated?.state).toBe("generating");
   });
 
-  it("marks a non-retryable get_create_media isError envelope failed without losing the provider job id", async () => {
+  it("marks an explicit failed provider status terminal while keeping raw diagnostics server-only", async () => {
     const getStatus = vi.fn(async (): Promise<ProviderStatusResult> => {
       throw new McpToolError(
         TERMINAL_STATUS_TEXT,
@@ -228,22 +249,54 @@ describe("JobManager", () => {
     expect(updated?.state).toBe("failed");
     expect(updated?.providerJobId).toBe("mjob_68bae8dfd271");
     expect(updated?.lastError).toMatchObject({
-      code: "get_create_media",
+      code: "provider_failed",
       retryable: false,
     });
-    expect(updated?.lastError?.message).toContain("failed (19s)");
+    expect(updated?.lastError?.message).toBe(
+      "The provider rejected the generation request. Check the selected model settings and try again.",
+    );
+    expect(updated?.lastError?.message).not.toContain("dispatcher");
+    expect(updated?.lastError?.message).not.toContain("463045388");
     expect(updated?.completedAt).toBeTruthy();
 
     const stored = await jobStore.get(outcome.job.id);
     expect(stored?.internal.lastProviderStatusRaw).toMatchObject({
-      code: "get_create_media",
-      retryable: false,
+      isError: true,
+      structuredContent: {
+        status: "failed",
+        job_id: "mjob_68bae8dfd271",
+        cost_disposition: "release_pending",
+        error: {
+          model_id: "fal-ai/hyper3d/rodin/v2.5",
+          validation: [{ input: 463_045_388, ctx: { le: 65_535 } }],
+        },
+      },
     });
 
     // Terminal means subsequent reads return the stored failure and do not
     // keep hammering get_create_media forever.
     await manager.getPublic(outcome.job.id);
     expect(getStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps polling an isError envelope that has no explicit terminal provider status", async () => {
+    const raw = {
+      isError: true,
+      content: [{ type: "text", text: "temporary wrapper error" }],
+      structuredContent: { error_retryable: false },
+    };
+    const getStatus = vi.fn(async (): Promise<ProviderStatusResult> => {
+      throw new McpToolError("temporary wrapper error", "get_create_media", false, raw);
+    });
+    const jobStore = new JobStore(dir);
+    const manager = new JobManager(jobStore, fakeAdapter({ getStatus }), new AssetStore(dir), new PhotoStore(dir));
+
+    const outcome = await manager.submitOrReconcile(REQUEST, "objectquest-smoke-ambiguous-error");
+    const updated = await manager.pollAndAdvance(outcome.job.id);
+
+    expect(updated?.state).toBe("generating");
+    expect(updated?.completedAt).toBeUndefined();
+    expect((await jobStore.get(outcome.job.id))?.internal.lastProviderStatusRaw).toEqual(raw);
   });
 
   it("resumeOnBoot schedules an immediate poll for a job restored from disk mid-flight (providerJobId already set)", async () => {

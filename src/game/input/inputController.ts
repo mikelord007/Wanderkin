@@ -76,8 +76,11 @@ export class InputController {
 
   private handleKeyDown(event: KeyboardEvent): void {
     if (event.code === "Escape") {
-      // Pointer lock swallows Escape in most browsers, so the pause also
-      // has to be driven from pointerlockchange; both paths are idempotent.
+      // Explicitly release here as well as listening for the browser's
+      // pointerlockchange. Automation and embedded browsers can deliver the
+      // key event without performing the browser-chrome Escape release.
+      // releasePointerLock suppresses the resulting duplicate pause.
+      this.releasePointerLock();
       this.callbacks.onPauseRequested();
       return;
     }
