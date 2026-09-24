@@ -15,6 +15,7 @@ import { FriendLandingScreen } from "./ui/screens/FriendLandingScreen.js";
 import { LoadingScreen } from "./ui/components/LoadingScreen.js";
 import { publishedManifestForPlay } from "./ui/shareRouting.js";
 import {
+  createNavigationGuard,
   navigateTo,
   parseRoute,
   pathForCreate,
@@ -234,8 +235,19 @@ function challengeFor(result: GameCompletionResult): PublishedChallenge {
  * the same state instead of only ever `/`.
  */
 export function App() {
+  // Every navigation attempt — the initial load below, each `popstate`, and
+  // every in-app `go()` — begins a new token here. A route's async
+  // resolution (edit/play/finish/share-play; see `resolveScreen`) may take
+  // a while, and the user is free to navigate again before it finishes: the
+  // stale attempt's eventual result (success or its own fallback — routes
+  // never reject, they resolve to a fallback `Screen` on failure) must never
+  // be applied once superseded, whichever order the promises settle in.
+  const navigationGuardRef = useRef(createNavigationGuard());
+
   const initialResolutionRef = useRef<Screen | Promise<Screen> | null>(null);
+  const initialTokenRef = useRef(0);
   if (initialResolutionRef.current === null) {
+    initialTokenRef.current = navigationGuardRef.current.begin();
     initialResolutionRef.current = resolveScreen(window.location.pathname);
   }
   const [screen, setScreen] = useState<Screen>(() =>
@@ -243,6 +255,9 @@ export function App() {
   );
 
   const go = useCallback((next: Screen, options?: { replace?: boolean }) => {
+    // Supersede any still-pending async resolution from an earlier
+    // navigation — its result must be dropped whenever it eventually lands.
+    navigationGuardRef.current.begin();
     setScreen(next);
     navigateTo(pathForScreen(next), options?.replace ?? false);
   }, []);
@@ -254,15 +269,13 @@ export function App() {
   useEffect(() => {
     const pending = initialResolutionRef.current;
     if (pending instanceof Promise) {
-      let cancelled = false;
+      const token = initialTokenRef.current;
       void pending.then((resolved) => {
-        if (cancelled) return;
+        if (!navigationGuardRef.current.isCurrent(token)) return;
         setScreen(resolved);
         navigateTo(pathForScreen(resolved), true);
       });
-      return () => {
-        cancelled = true;
-      };
+      return undefined;
     }
     navigateTo(pathForScreen(pending as Screen), true);
     return undefined;
@@ -270,10 +283,12 @@ export function App() {
 
   useEffect(() => {
     function onPopState() {
+      const token = navigationGuardRef.current.begin();
       const result = resolveScreen(window.location.pathname);
       if (result instanceof Promise) {
         setScreen({ name: "resolving" });
         void result.then((resolved) => {
+          if (!navigationGuardRef.current.isCurrent(token)) return;
           setScreen(resolved);
           navigateTo(pathForScreen(resolved), true);
         });

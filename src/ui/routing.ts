@@ -106,3 +106,40 @@ export function navigateTo(path: string, replace = false): void {
   if (replace) window.history.replaceState(null, "", target);
   else window.history.pushState(null, "", target);
 }
+
+/**
+ * Some routes only resolve to a `Screen` after an async fetch (see
+ * `App.tsx`'s `resolveScreen`). Without a guard, a slow fetch for an older
+ * navigation (e.g. `/edit/:id`) can finish *after* the user has already
+ * navigated elsewhere (Back, Home, another link) and silently snap them
+ * back into the stale screen — including rewriting the URL back via
+ * `history.replaceState`. A `NavigationGuard` fixes this: every navigation
+ * attempt (initial load, `popstate`, or an in-app `go()`) calls `begin()`
+ * first, which invalidates every earlier attempt regardless of whether
+ * that earlier attempt is still pending, already settled, or resolves out
+ * of order later — only the result whose token is still current when it
+ * arrives may be applied. This covers both an eventually-successful stale
+ * resolution and a stale *fallback* result (routes like `/edit/:id` already
+ * resolve their own fetch failure to a fallback `Screen`, e.g. `start`,
+ * rather than rejecting — so "current" is the only thing that matters,
+ * not success vs. failure).
+ */
+export interface NavigationGuard {
+  /** Call once, synchronously, at the start of every navigation attempt —
+   * including ones that resolve synchronously — so any still-pending async
+   * attempt from before is superseded. Returns a token to check later. */
+  begin(): number;
+  /** True only if `token` is still the most recently started attempt. */
+  isCurrent(token: number): boolean;
+}
+
+export function createNavigationGuard(): NavigationGuard {
+  let token = 0;
+  return {
+    begin: () => {
+      token += 1;
+      return token;
+    },
+    isCurrent: (started: number) => started === token,
+  };
+}

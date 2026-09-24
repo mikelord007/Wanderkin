@@ -1,5 +1,41 @@
 # Navigation + pointer-lock worker checkpoint
 
+## Reopened: item 6 async-navigation race (fixed)
+
+Independent QA (`nimbalyst-local/playtest-checkpoints/verification.md`, "original" item 6 section) reproduced
+a real, live bug: `resolveScreen`'s async branches (`edit`/`play`/`finish`/`share-play`) had no supersession
+guard. A slow `/api/levels/:id` fetch that outlasted a subsequent navigation (Back/Home/another route) would
+still land its `.then` — silently snapping the user back into the stale screen *and* rewriting the URL back
+via `navigateTo(..., true)` (`history.replaceState`). Neither the initial-load effect's `cancelled` boolean
+(only guards a real React unmount, which the root `App` never does) nor the `popstate` handler (had no guard
+at all) caught this.
+
+Fix: `src/ui/routing.ts` gains `createNavigationGuard()` — a token counter where `begin()` (called at the
+start of *every* navigation attempt: initial load, each `popstate`, every in-app `go()`) invalidates any
+earlier attempt, and `isCurrent(token)` is checked before an async resolution's `.then` is allowed to call
+`setScreen`/`navigateTo`. Covers out-of-order settling too (an older attempt's promise can resolve *after* a
+newer one without being applied), and covers a resolved *fallback* the same as a resolved success (the
+route resolvers never reject — a failed fetch already resolves to a fallback `Screen` like `start`, so
+"still current" is the only thing that matters). `src/App.tsx`'s `go()`, the initial-resolution effect, and
+`onPopState` all now go through it.
+
+Regression tests added to `routing.test.ts` (4 new, all passing) using a controlled `deferred<T>()` helper —
+not just `parseRoute` coverage: (1) the exact reported scenario (stale `/edit/:id` resolution must not
+overrule a later Home navigation), (2) out-of-order settling of two competing async navigations, (3) a stale
+*fallback* result treated the same as a stale success, (4) an un-superseded result still applies normally
+(no false-positive suppression).
+
+Live-verified with the same bounded, read-only repro QA used (delayed `GET /api/levels/level-0ed836ff` via a
+patched `window.fetch`, `pushState`+`popstate` to `/edit/level-0ed836ff` then `/` before the fetch resolves):
+user now correctly stays on `/` after the delayed fetch finally settles (previously snapped back into the
+editor and rewrote the URL). Re-confirmed a legitimate, un-superseded direct load to `/edit/level-0ed836ff`
+still resolves correctly (no regression). No live-world/provider mutation — only `GET` traffic, same as QA's
+own repro.
+
+Scope discipline: did not touch the disclosed-but-nonblocking `GameStageProps.config` dead-code/diagnostics
+finding (QA's finding #1, gameplay-owned file, explicitly flagged as non-blocking pending the gameplay
+freeze) — out of scope for this reopened item per the coordinator's instruction.
+
 Session: NEW Claude-only overnight worker, coordinator 30e37344-f303-4b8a-80c8-ee9f8fd5f3d6.
 Model: Sonnet 5 (model id `claude-sonnet-5`, per this runtime's own system context — not inferred from a requested alias).
 Owns: items 6 (real URL routes) and 13 (pointer-lock/HUD usability) from OVERNIGHT_PLAYTEST_PLAN.md.
