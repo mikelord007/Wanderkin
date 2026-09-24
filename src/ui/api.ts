@@ -161,6 +161,26 @@ export function uploadWorldScreenshot(
   });
 }
 
+export type PostcardApiStatus =
+  | { state: "none"; cacheHit: false }
+  | { state: "job"; cacheHit: boolean; job: GenerationJob };
+
+export function getPostcardStatus(levelId: string): Promise<PostcardApiStatus> {
+  return request<PostcardApiStatus>(`/api/postcards/${encodeURIComponent(levelId)}`);
+}
+
+export function createAnimatedPostcard(levelId: string, screenshotAssetId: string): Promise<PostcardApiStatus> {
+  return request<PostcardApiStatus>(`/api/postcards/${encodeURIComponent(levelId)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ screenshotAssetId }),
+  });
+}
+
+export function retryAnimatedPostcard(levelId: string): Promise<PostcardApiStatus> {
+  return request<PostcardApiStatus>(`/api/postcards/${encodeURIComponent(levelId)}/retry`, { method: "POST" });
+}
+
 export function publishLevel(
   levelId: string,
   challenge: PublishedChallenge,
