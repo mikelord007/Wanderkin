@@ -73,6 +73,24 @@
 .oq-world-progress__notice, .oq-world-progress__leave-note { margin-top: 16px; color: var(--oq-muted); }
 @media (max-width: 699px) { .oq-world-progress { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .oq-world-progress__preview > img { animation: none; } }
+.oq-world-ready { display: grid; grid-template-columns: minmax(0,2fr) minmax(300px,1fr); gap: 24px; align-items: start; }
+.oq-world-ready__scene { min-height: 560px; padding: 0; overflow: hidden; background: var(--oq-inset); }
+.oq-world-ready__scene > div, .oq-world-ready__scene canvas { min-height: 560px; }
+.oq-world-ready__loading, .oq-world-ready__missing { min-height: 560px; display: grid; place-items: center; align-content: center; gap: 12px; padding: 28px; text-align: center; }
+.oq-world-ready__mission { position: sticky; top: 24px; }
+.oq-world-ready__badge { width: fit-content; padding: 6px 11px; border: 1px solid var(--oq-control-line); border-radius: 999px; font-size: .875rem; font-weight: 750; }
+.oq-world-ready__badge[data-kind="checked"] { color: var(--oq-success-ink); background: #e2efe5; }
+.oq-world-ready__badge[data-kind="needs"] { color: var(--oq-error-ink); background: #fbe5e7; }
+.oq-world-ready__badge[data-kind="prepared"] { color: var(--oq-warning-ink); background: #f8efd9; }
+.oq-world-ready__issue { display: grid; gap: 5px; padding: 14px 16px; border-left: 4px solid var(--oq-error-ink); border-radius: 10px; background: #fbe5e7; }
+.oq-world-ready__actions { display: grid; gap: 10px; }
+.oq-world-ready__toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; font-weight: 700; }
+.oq-world-ready__toggle input { width: 20px; height: 20px; }
+@media (max-width: 699px) {
+  .oq-world-ready { grid-template-columns: 1fr; }
+  .oq-world-ready__scene, .oq-world-ready__scene > div, .oq-world-ready__scene canvas { min-height: 360px; }
+  .oq-world-ready__mission { position: static; }
+}
 @media (prefers-reduced-motion: reduce) { .oq-capture__drop { transition: none; } }
 .oq-review { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(280px,.8fr); gap: 24px; align-items: start; }
 .oq-review__visual { display: grid; gap: 16px; }

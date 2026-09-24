@@ -4,6 +4,9 @@ import { describeApiError, getAsset } from "../api.js";
 import { LoadingScreen } from "../components/LoadingScreen.js";
 import { courseCandidateOptions, replaceSavedCandidate } from "../courseCandidates.js";
 import { attachProvenance, resolveAssetForManifest } from "../manifestProvenance.js";
+import { loadActiveCreation, saveCreationRecord } from "../creationStorage.js";
+import { withCreationUpdate } from "../creationFlow.js";
+import { WorldReadyScreen } from "./WorldReadyScreen.js";
 
 /**
  * Scene preparation owns `src/scene`; this screen assumes a barrel export
@@ -50,6 +53,7 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(source.kind === "manifest");
 
   useEffect(() => {
     if (source.kind === "manifest") return;
@@ -90,6 +94,8 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
         setPrimaryManifest(preparedPrimary);
         setManifest(preparedPrimary);
         setCandidates(preparedCandidates);
+        const creation = loadActiveCreation();
+        if (creation) saveCreationRecord(withCreationUpdate(creation, { step: "ready", title: preparedPrimary.name }));
       } catch (err) {
         if (!cancelled) setError(describeApiError(err));
       }
@@ -150,6 +156,15 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
         <LoadingScreen stage={stage} />
       </div>
     );
+  }
+
+  if (!editing) {
+    return <WorldReadyScreen
+      manifest={manifest}
+      onEnter={() => onPlay(manifest)}
+      onAdjustCourse={() => setEditing(true)}
+      onBack={onBack}
+    />;
   }
 
   return (
