@@ -113,6 +113,112 @@ describe("LivepeerAdapter.validateInput", () => {
   });
 });
 
+describe("LivepeerAdapter multi-kind contracts", () => {
+  const adapter = new LivepeerAdapter(fakeMcp({}), fakePhotos());
+
+  it("validates every supported generation kind against its capability contract", () => {
+    const requests = [
+      { schemaVersion: 1, kind: "image-edit", capability: "kontext-edit", idempotencyKey: "edit", purpose: "style-preview", sourceImageAssetId: "p", instruction: "watercolor", outputMimeType: "image/png" },
+      { schemaVersion: 1, kind: "image-edit", capability: "bg-remove", idempotencyKey: "bg", purpose: "object-cutout", sourceImageAssetId: "p", instruction: "Remove the background", outputMimeType: "image/png" },
+      { schemaVersion: 1, kind: "image-to-3d", capability: "rodin-i3d", idempotencyKey: "mesh", purpose: "world-mesh", photos: [{ photoId: "p", sourceIndex: 1 }] },
+      { schemaVersion: 1, kind: "text", capability: "gemini-text", idempotencyKey: "text", purpose: "quest-text", prompt: "Return quest JSON", output: "quest-json", maxCharacters: 1200 },
+      { schemaVersion: 1, kind: "music", capability: "music", idempotencyKey: "music", purpose: "soundtrack", prompt: "gentle instrumental", durationSeconds: 60, instrumental: true, loop: true },
+      { schemaVersion: 1, kind: "sfx", capability: "mirelo-sfx", idempotencyKey: "sfx", purpose: "pickup", prompt: "soft chime", durationSeconds: 3, loop: false },
+      { schemaVersion: 1, kind: "tts", capability: "chatterbox-tts", idempotencyKey: "tts", purpose: "narration", text: "Welcome explorer", language: "en" },
+      { schemaVersion: 1, kind: "video", capability: "pixverse-i2v", idempotencyKey: "video", purpose: "animated-postcard", sourceImageAssetId: "p", prompt: "slow orbit", durationSeconds: 5 },
+    ] as const;
+
+    for (const request of requests) expect(adapter.validateGenerationInput(request).valid, request.kind).toBe(true);
+  });
+
+  it("rejects incompatible capabilities and provider-bounded options before submission", () => {
+    expect(adapter.validateGenerationInput({
+      kind: "tts",
+      capability: "music",
+      schemaVersion: 1, idempotencyKey: "bad", purpose: "narration", text: "hello", language: "en",
+    }).errors.join(" ")).toMatch(/registered for music/);
+    expect(adapter.validateGenerationInput({
+      kind: "sfx",
+      capability: "mirelo-sfx",
+      schemaVersion: 1, idempotencyKey: "bad-sfx", purpose: "rain", prompt: "rain", durationSeconds: 61, loop: true,
+    }).valid).toBe(false);
+    expect(adapter.validateGenerationInput({
+      kind: "image-to-3d",
+      capability: "meshy-v7-i3d",
+      schemaVersion: 1, idempotencyKey: "bad-meshy", purpose: "companion",
+      photos: [{ photoId: "p", sourceIndex: 1 }, { photoId: "q", sourceIndex: 2 }],
+    }).errors.join(" ")).toMatch(/exactly one/);
+  });
+
+  it("accepts an ordered generated-image source and rejects an empty 3D selection", () => {
+    expect(adapter.validateGenerationInput({
+      kind: "image-to-3d",
+      capability: "rodin-i3d",
+      schemaVersion: 1,
+      idempotencyKey: "cutout-mesh",
+      purpose: "world-mesh",
+      sourceImageAssetIds: ["generated-cutout"],
+      styleReferenceAssetId: "approved-preview",
+    }).valid).toBe(true);
+    expect(adapter.validateGenerationInput({
+      kind: "image-to-3d",
+      capability: "rodin-i3d",
+      schemaVersion: 1,
+      idempotencyKey: "empty-mesh",
+      purpose: "world-mesh",
+    }).errors.join(" ")).toMatch(/requires between 1 and 5/);
+  });
+
+  it("submits TTS with the exact text field and no image upload", async () => {
+    const mcp = fakeMcp({
+      create_media: () => ({ job_id: "mjob_tts", status: "submitted", capability_used: "chatterbox-tts" }),
+    });
+    const live = new LivepeerAdapter(mcp, fakePhotos());
+    const result = await live.submitGeneration({
+      kind: "tts",
+      capability: "chatterbox-tts",
+      schemaVersion: 1,
+      purpose: "quest-narration",
+      text: "Welcome explorer",
+      language: "en",
+      idempotencyKey: "tts-1",
+      maxCostUsd: 1,
+    });
+    expect(result.providerJobId).toBe("mjob_tts");
+    expect(mcp.calls).toHaveLength(1);
+    expect(mcp.calls[0]).toMatchObject({
+      name: "create_media",
+      args: { action: "tts", text: "Welcome explorer", model_override: "chatterbox-tts", async: true },
+    });
+  });
+
+  it("uploads an image once and submits a bounded style edit", async () => {
+    const mcp = fakeMcp({
+      upload: () => ({ url: "https://agent.livepeer.org/a/source.jpg" }),
+      create_media: () => ({ job_id: "mjob_edit", status: "submitted", capability_used: "kontext-edit" }),
+    });
+    const live = new LivepeerAdapter(mcp, fakePhotos());
+    await live.submitGeneration({
+      kind: "image-edit",
+      capability: "kontext-edit",
+      schemaVersion: 1,
+      purpose: "style-preview",
+      sourceImageAssetId: "p",
+      instruction: "watercolor",
+      outputMimeType: "image/png",
+      idempotencyKey: "edit-1",
+      maxCostUsd: 0.1,
+    });
+    expect(mcp.calls.map((call) => call.name)).toEqual(["upload", "create_media"]);
+    expect(mcp.calls[1]?.args).toMatchObject({
+      model_override: "kontext-edit",
+      source_url: "https://agent.livepeer.org/a/source.jpg",
+      max_cost_usd: 0.1,
+      quality_gate: false,
+    });
+  });
+});
+
 describe("LivepeerAdapter.submit", () => {
   it("uploads photos in tripo's required view order and calls run_capability with async:true", async () => {
     const mcp = fakeMcp({
