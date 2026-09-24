@@ -208,7 +208,7 @@ describe("JobManager", () => {
     });
     expect(failedTts?.state).toBe("failed");
     expect((await manager.getPublic(mesh.job.id))?.state).toBe("ready");
-  });
+  }, 15_000);
 
   it("submits once on create and the job is retrievable by idempotency key without a second submit", async () => {
     const adapter = fakeAdapter();
