@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createEmptyManifest } from "@shared/index.js";
-import { clearDraft, loadDraft, resolveDraft, saveDraft, type EditorDraft } from "./draftStorage.js";
+import { clearDraft, listDrafts, loadDraft, resolveDraft, saveDraft, type EditorDraft } from "./draftStorage.js";
 
 class MemoryStorage implements Storage {
   private store = new Map<string, string>();
@@ -57,6 +57,15 @@ describe("draftStorage", () => {
     clearDraft("level-1");
     expect(loadDraft("level-1")).toBeNull();
     expect(loadDraft("level-2")).not.toBeNull();
+  });
+
+  it("lists recoverable drafts newest first and ignores unrelated storage", () => {
+    const older = { ...draftFor("level-1", "t1"), savedAt: "2026-01-01T00:00:00.000Z" };
+    const newer = { ...draftFor("level-2", "t1"), savedAt: "2026-02-01T00:00:00.000Z" };
+    saveDraft(older);
+    saveDraft(newer);
+    localStorage.setItem("unrelated", "value");
+    expect(listDrafts()).toEqual([newer, older]);
   });
 
   it("resolves to none when nothing is stored", () => {

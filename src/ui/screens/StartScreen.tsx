@@ -1,8 +1,13 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { Button, Card, EmptyState, Icon, PendingWorldsList, WorldStyleScope } from "../components/index.js";
-import { loadPendingWorlds, setActiveCreationId } from "../creationStorage.js";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Button, Card, EmptyState, Icon, WorldStyleScope } from "../components/index.js";
 import "../theme/welcome.css";
 import type { SceneManifest } from "@shared/index.js";
+import { listDrafts } from "../../editor/draftStorage.js";
+import {
+  missingAssetUrls,
+  savedWorldItems,
+  type MyWorldListItem,
+} from "../worlds.js";
 import {
   describeApiError,
   downloadLevelBundle,
@@ -21,6 +26,9 @@ interface StartScreenProps {
   onCreateFromPhotos: () => void;
   onImportGlbReady: (assetId: string) => void;
   onImportLevelBundleReady: (manifest: SceneManifest) => void;
+  additionalWorldItems?: readonly Extract<MyWorldListItem, { kind: "pending" | "failed" }>[];
+  onResumePendingWorld?: (jobId: string) => void;
+  onRetryFailedWorld?: (jobId: string) => void;
 }
 
 export function StartScreen({
@@ -31,12 +39,18 @@ export function StartScreen({
   onCreateFromPhotos,
   onImportGlbReady,
   onImportLevelBundleReady,
+  additionalWorldItems = [],
+  onResumePendingWorld,
+  onRetryFailedWorld,
 }: StartScreenProps) {
   const [sampleLevels, setSampleLevels] = useState<SceneManifest[] | null>(null);
   const [sampleError, setSampleError] = useState<string | null>(null);
 
   const [savedLevels, setSavedLevels] = useState<SceneManifest[] | null>(null);
   const [savedError, setSavedError] = useState<string | null>(null);
+  const [drafts] = useState(() => listDrafts());
+  const [checkingLevelId, setCheckingLevelId] = useState<string | null>(null);
+  const [assetIssues, setAssetIssues] = useState<Record<string, string>>({});
 
   const [importingGlb, setImportingGlb] = useState(false);
   const [glbImportError, setGlbImportError] = useState<string | null>(null);
@@ -44,18 +58,47 @@ export function StartScreen({
   const [bundleImportError, setBundleImportError] = useState<string | null>(null);
   const [exportingLevelId, setExportingLevelId] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
-  const [pendingWorlds] = useState(loadPendingWorlds);
   const worldsRef = useRef<HTMLElement | null>(null);
   const glbInputRef = useRef<HTMLInputElement | null>(null);
   const bundleInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    import("../../scene/samples.js")
-      .then((mod) => setSampleLevels(mod.SAMPLE_LEVELS))
+    Promise.all([import("../../scene/samples.js"), import("../../game/bundledSamples.js")])
+      .then(([sceneSamples, gameSamples]) =>
+        setSampleLevels([gameSamples.LOST_COLORS_SAMPLE, ...sceneSamples.SAMPLE_LEVELS]),
+      )
       .catch((error) =>
         setSampleError(error instanceof Error ? error.message : "Bundled samples are unavailable."),
       );
   }, []);
+
+  const worldItems = useMemo(
+    () => (savedLevels ? [...additionalWorldItems, ...savedWorldItems(savedLevels, drafts)] : []),
+    [additionalWorldItems, drafts, savedLevels],
+  );
+
+  async function handlePlaySaved(manifest: SceneManifest) {
+    setCheckingLevelId(manifest.levelId);
+    setAssetIssues((current) => {
+      const next = { ...current };
+      delete next[manifest.levelId];
+      return next;
+    });
+    try {
+      const missing = await missingAssetUrls(manifest);
+      if (missing.length > 0) {
+        setAssetIssues((current) => ({
+          ...current,
+          [manifest.levelId]:
+            "A saved 3D asset is missing or expired. Edit this world to replace it, or retry after restoring the file.",
+        }));
+        return;
+      }
+      onPlaySavedLevel(manifest);
+    } finally {
+      setCheckingLevelId(null);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -156,21 +199,46 @@ export function StartScreen({
             : !sampleLevels ? <p role="status" className="oq-kit-muted">Opening the sample collection…</p>
             : sampleLevels.length === 0 ? <EmptyState title="No samples available" description="You can still start a world from your own photo." action={<Button onClick={onCreateFromPhotos}>Create my world</Button>} />
             : <div className="oq-kit-grid">{sampleLevels.map((manifest, index) => <Card key={manifest.levelId} className="oq-welcome__sample-card">
-              <img src={`/samples/photo-${index === 0 ? 4 : 2}.jpg`} alt="Source photo for the bundled room sample" loading="lazy" />
-              <div><h3>{index === 0 ? "The desk & sofa adventure" : "A different perspective"}</h3><p>{manifest.checkpoints.length} checkpoints · a miniature room to explore</p>
+              <img src={`/samples/photo-${manifest.assets[0]?.url.includes("rodin") ? 4 : 2}.jpg`} alt="Source photo for the bundled room sample" loading="lazy" />
+              <div><h3>{manifest.levelId === "sample-lost-colors-rodin" ? "The Lost Colors of Teacup Island" : index === 1 ? "The desk & sofa adventure" : "A different perspective"}</h3><p>{manifest.experience?.mode.kind === "collect" ? "3 color fragments · restore this miniature world" : `${manifest.checkpoints.length} checkpoints · a miniature room to explore`}</p>
                 <div className="oq-kit-row"><Button onClick={() => onPlaySample(manifest)}>Play now</Button><Button variant="ghost" onClick={() => onEditSample(manifest)}>Edit course</Button></div></div>
             </Card>)}</div>}
         </section>
         <section className="oq-welcome__section" id="my-worlds" aria-labelledby="worlds-heading" ref={worldsRef} tabIndex={-1}>
           <div className="oq-welcome__section-heading"><h2 id="worlds-heading">My worlds</h2><span className="oq-kit-muted">Your next adventure is waiting.</span></div>
-          {pendingWorlds.length ? <div className="oq-kit-stack"><h3>In progress and drafts</h3><PendingWorldsList worlds={pendingWorlds} onOpen={world => { setActiveCreationId(world.id); onCreateFromPhotos(); }} /></div> : null}
           {savedError ? <Card><p role="alert" className="oq-kit-error">Your saved worlds couldn’t load. Check your connection and refresh to try again.</p></Card>
             : !savedLevels ? <p role="status" className="oq-kit-muted">Finding your saved worlds…</p>
-            : savedLevels.length === 0 && pendingWorlds.length === 0 ? <EmptyState icon={<Icon name="photo" />} title="Your first world starts with a photo" description="Pick something familiar. Make somewhere new." action={<Button onClick={onCreateFromPhotos}>Create my world</Button>} />
-            : <div className="oq-kit-grid">{savedLevels.map(manifest => <Card key={manifest.levelId} className="oq-kit-stack">
-              <h3>{manifest.name}</h3><p className="oq-kit-muted">{manifest.checkpoints.length} checkpoints · saved world</p>
-              <div className="oq-kit-row"><Button onClick={() => onPlaySavedLevel(manifest)}>Play</Button><Button variant="secondary" onClick={() => onEditSavedLevel(manifest)}>Edit</Button><Button variant="ghost" onClick={() => handleExport(manifest)} disabled={exportingLevelId !== null} loading={exportingLevelId === manifest.levelId} loadingLabel="Exporting…">Export</Button></div>
-            </Card>)}</div>}
+            : worldItems.length === 0 ? <EmptyState icon={<Icon name="photo" />} title="Your first world starts with a photo" description="Pick something familiar. Make somewhere new." action={<Button onClick={onCreateFromPhotos}>Create my world</Button>} />
+            : <div className="oq-kit-grid">{worldItems.map(item => {
+              if (item.kind === "pending") return <Card key={`pending-${item.id}`} className="oq-kit-stack">
+                <p className="oq-kit-eyebrow">In progress</p><h3>{item.title || "Untitled world"}</h3>
+                <p className="oq-kit-muted">{item.statusText ?? `Generation is ${item.job.state}. Leaving this page does not cancel it.`}</p>
+                <Button onClick={() => onResumePendingWorld?.(item.job.id)} disabled={!onResumePendingWorld}>{item.actionLabel ?? "Resume"}</Button>
+              </Card>;
+              if (item.kind === "failed") return <Card key={`failed-${item.id}`} className="oq-kit-stack">
+                <p className="oq-kit-eyebrow">Needs attention</p><h3>{item.title || "Untitled world"}</h3>
+                <p className="oq-kit-error">{item.statusText ?? item.job.uiMessage ?? "This generation stage needs another try."}</p>
+                <Button onClick={() => onRetryFailedWorld?.(item.job.id)} disabled={!onRetryFailedWorld}>{item.actionLabel ?? "Retry"}</Button>
+              </Card>;
+              if (item.kind === "draft") return <Card key={`draft-${item.id}`} className="oq-kit-stack">
+                <p className="oq-kit-eyebrow">Draft</p><h3>{item.draft.manifest.name || "Untitled world"}</h3>
+                <p className="oq-kit-muted">Unsaved course edits · {item.draft.manifest.experience?.mode.kind ?? "explore"}</p>
+                <Button onClick={() => onEditSavedLevel(item.draft.manifest)}>Resume</Button>
+              </Card>;
+              const { manifest, draft } = item;
+              return <Card key={manifest.levelId} className="oq-kit-stack">
+                <p className="oq-kit-eyebrow">{draft ? "Draft changes" : "Private saved world"}</p>
+                <h3>{manifest.name || "Untitled world"}</h3>
+                <p className="oq-kit-muted">{manifest.experience?.style.id ?? "cartoon"} · {manifest.experience?.mode.kind ?? "explore"} · {manifest.checkpoints.length} checkpoints</p>
+                {assetIssues[manifest.levelId] ? <p className="oq-kit-error" role="alert">{assetIssues[manifest.levelId]}</p> : null}
+                <div className="oq-kit-row">
+                  {draft ? <Button onClick={() => onEditSavedLevel(manifest)}>Resume</Button> : <Button onClick={() => handlePlaySaved(manifest)} loading={checkingLevelId === manifest.levelId} loadingLabel="Checking assets…">Play</Button>}
+                  {draft ? <Button variant="secondary" onClick={() => handlePlaySaved(manifest)} loading={checkingLevelId === manifest.levelId} loadingLabel="Checking assets…">Play saved</Button> : null}
+                  <Button variant="secondary" onClick={() => onEditSavedLevel(manifest)}>Edit</Button>
+                  <Button variant="ghost" onClick={() => handleExport(manifest)} disabled={exportingLevelId !== null} loading={exportingLevelId === manifest.levelId} loadingLabel="Exporting…">Export</Button>
+                </div>
+              </Card>;
+            })}</div>}
           {exportError && <p className="oq-kit-error" role="alert">We couldn’t export this world. Try Export again.</p>}
         </section>
         <details className="oq-welcome__imports"><summary>Already have a world? Import it here.</summary>

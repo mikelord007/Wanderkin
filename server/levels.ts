@@ -12,6 +12,12 @@ import { AssetStore } from "./persistence/assetStore.js";
 import { PhotoStore } from "./persistence/photoStore.js";
 import { assertValidGlb, assertValidPhoto, InvalidFileError } from "./persistence/validate.js";
 import { PublicationStore } from "./publications.js";
+import { extractGlbTriangles } from "../src/scene/glb.js";
+import {
+  assertPlayableExperience,
+  PlacementValidationError,
+  validateExperiencePlacements,
+} from "../src/game/placementValidation.js";
 
 /**
  * Manifest persistence (owner: Level tools and persistence). Bundle imports
@@ -612,6 +618,20 @@ function wrapAsync(
   };
 }
 
+async function assertLevelPublishable(store: LevelStore, manifest: SceneManifest): Promise<void> {
+  const geometry = new Map();
+  const referenced = new Set(
+    manifest.entities.flatMap((entity) => entity.kind === "generated-mesh" ? [entity.assetId] : []),
+  );
+  for (const asset of manifest.assets) {
+    if (!referenced.has(asset.id)) continue;
+    const source = resolveBundleSource(store.storageDir, store.publicDir, "asset", asset.url);
+    const buffer = await readBundleSource(source.path, "asset", asset.url);
+    geometry.set(asset.id, extractGlbTriangles(Uint8Array.from(buffer).buffer));
+  }
+  assertPlayableExperience(validateExperiencePlacements(manifest, geometry));
+}
+
 const publishRequestSchema = z.object({
   challenge: z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("completion") }),
@@ -698,9 +718,14 @@ export function createLevelsRouter(
         return;
       }
       try {
+        await assertLevelPublishable(store, level);
         const publication = await publications.publish(level, parsed.data);
         res.status(201).json(publication);
       } catch (error) {
+        if (error instanceof PlacementValidationError) {
+          res.status(422).json({ message: error.message, issues: error.result.issues });
+          return;
+        }
         if (error instanceof Error && /challenge|race target/i.test(error.message)) {
           res.status(400).json({ message: error.message });
           return;

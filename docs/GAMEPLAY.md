@@ -240,6 +240,15 @@ loading rather than being given approximate collision.
 
 Coordinate convention is Y-up, right-handed, metres (`shared/geometry.ts`).
 
+Before save or publish, `validateExperiencePlacements` projects the active
+mode's ordered fragments, destinations, checkpoints, and portal into the same
+conservative walk/jump/mantle validation used by scene preparation. The result
+is a discriminated `PlacementValidationResult`; `ok: false` contains
+display-ready repair issues and must block publication. For example, an
+unreachable race marker reports “Move this checkpoint closer to the previous
+platform.” `assertPlayableExperience` throws a `PlacementValidationError`
+carrying that result for boundaries that prefer exceptions.
+
 - `spawn.position` and `checkpoint.position` are **capsule centres**, not
   standing surfaces. A character standing on a surface at `y` has its
   centre at `y + 0.35` (`characterHalfHeight + characterRadius`) plus a

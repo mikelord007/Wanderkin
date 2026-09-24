@@ -1,5 +1,6 @@
 import type { GenerationJob } from "@shared/index.js";
 import { createCreationRecord, toPendingWorldItem, withCreationUpdate, type CreationRecord, type PendingWorldItem } from "./creationFlow.js";
+import type { MyWorldListItem } from "./worlds.js";
 
 const RECORDS_KEY = "objectquest:v2:creations";
 const ACTIVE_KEY = "objectquest:v2:active-creation";
@@ -82,6 +83,67 @@ export function loadPendingWorlds(storage: Storage | null = storageOrNull()): Pe
   return loadCreationRecords(storage)
     .map(toPendingWorldItem)
     .filter((item): item is PendingWorldItem => item !== null);
+}
+
+/** Adapts durable creation records to the shared My worlds union without
+ * leaking the saved-world rendering contract into the creation flow. */
+export function loadCreationWorldItems(
+  storage: Storage | null = storageOrNull(),
+): Extract<MyWorldListItem, { kind: "pending" | "failed" }>[] {
+  return loadCreationRecords(storage).flatMap<Extract<MyWorldListItem, { kind: "pending" | "failed" }>>((record) => {
+    const item = toPendingWorldItem(record);
+    if (!item) return [];
+    const jobRef = item.attentionStage
+      ? record.jobs[item.attentionStage]
+      : record.jobs.shape ?? record.jobs.preview ?? record.jobs.object;
+    const failed = item.status === "needs-attention";
+    const retryable = item.primaryAction === "retry";
+    const job: GenerationJob = {
+      schemaVersion: 1,
+      id: record.id,
+      idempotencyKey: `creation-${record.id}`,
+      providerId: "creation-flow",
+      providerJobId: jobRef?.providerJobId ?? null,
+      capabilityRequested: "creation-flow",
+      capabilityUsed: null,
+      fallbackFired: null,
+      state: failed ? "failed" : item.status === "pending" ? "generating" : "queued",
+      photoOrder: [],
+      createdAt: record.createdAt,
+      updatedAt: item.updatedAt,
+      retryCount: 0,
+      maxRetries: retryable ? 1 : 0,
+      ...(jobRef?.kind ? { kind: jobRef.kind } : {}),
+      uiMessage: item.statusText,
+      ...(failed
+        ? {
+            lastError: {
+              message: jobRef?.error ?? item.statusText,
+              retryable,
+              occurredAt: jobRef?.updatedAt ?? item.updatedAt,
+            },
+          }
+        : {}),
+    };
+    if (failed) {
+      return [{
+        kind: "failed" as const,
+        id: item.id,
+        title: item.title,
+        job,
+        statusText: item.statusText,
+        actionLabel: retryable ? "Retry" as const : "Review choices" as const,
+      }];
+    }
+    return [{
+      kind: "pending" as const,
+      id: item.id,
+      title: item.title,
+      job,
+      statusText: item.statusText,
+      actionLabel: item.primaryAction === "view-progress" ? "View progress" as const : "Resume" as const,
+    }];
+  });
 }
 
 function isCreationRecord(value: unknown): value is CreationRecord {

@@ -10,5 +10,3 @@ export * from "./Toast.js";
 export * from "./AudioControls.js";
 export * from "./PlayFrame.js";
 export * from "../theme/WorldStyleScope.js";
-export * from "./WorldList.js";
-export * from "./PendingWorldsList.js";

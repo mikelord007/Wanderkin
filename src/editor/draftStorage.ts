@@ -56,6 +56,24 @@ export function clearDraft(levelId: string): void {
   }
 }
 
+/** Enumerates recoverable editor drafts for My worlds. Corrupt entries are
+ * ignored individually so one bad localStorage value cannot hide the rest. */
+export function listDrafts(): EditorDraft[] {
+  try {
+    const drafts: EditorDraft[] = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key?.startsWith(DRAFT_KEY_PREFIX)) continue;
+      const levelId = key.slice(DRAFT_KEY_PREFIX.length);
+      const draft = loadDraft(levelId);
+      if (draft) drafts.push(draft);
+    }
+    return drafts.sort((left, right) => right.savedAt.localeCompare(left.savedAt));
+  } catch {
+    return [];
+  }
+}
+
 export type DraftResolution =
   | { kind: "none" }
   | { kind: "fresh"; draft: EditorDraft }
