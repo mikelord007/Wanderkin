@@ -17,7 +17,7 @@ export class GameAudioEngine {
   constructor(
     private settings: AudioSettings,
     private readonly contextFactory: () => AudioContext = () => new AudioContext(),
-    private readonly fetcher: typeof fetch = fetch,
+    private readonly fetcher: typeof fetch = (...args) => fetch(...args),
   ) {}
 
   configure(media?: LevelMedia): void { this.urls = resolveAudioUrls(media); }
