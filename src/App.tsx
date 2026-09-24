@@ -1,11 +1,13 @@
 import { useCallback, useState } from "react";
-import type { GenerationJob, SceneManifest } from "@shared/index.js";
+import type { GenerationJob, PublishedLevelVersion, SceneManifest } from "@shared/index.js";
 import { StartScreen } from "./ui/screens/StartScreen.js";
 import { PhotosScreen } from "./ui/screens/PhotosScreen.js";
 import { GenerationScreen } from "./ui/screens/GenerationScreen.js";
 import { PreparationScreen, type PreparationSource } from "./ui/screens/PreparationScreen.js";
 import { PlayScreen } from "./ui/screens/PlayScreen.js";
 import { FinishScreen } from "./ui/screens/FinishScreen.js";
+import { FriendLandingScreen } from "./ui/screens/FriendLandingScreen.js";
+import { publishedManifestForPlay, shareIdFromPath } from "./ui/shareRouting.js";
 import {
   clearActiveSource,
   clearPendingSubmission,
@@ -16,16 +18,20 @@ import {
 import { createLevel, downloadLevelBundle, saveLevel } from "./ui/api.js";
 import { createRaceVariant } from "./game/modes/raceVariant.js";
 import type { GameCompletionResult } from "./game/types.js";
+import { loadActiveCreation } from "./ui/creationStorage.js";
 
 type Screen =
   | { name: "start" }
+  | { name: "friend"; shareId: string }
   | { name: "photos" }
   | { name: "generation"; jobId: string }
   | { name: "preparation"; source: PreparationSource; isNew: boolean }
-  | { name: "play"; manifest: SceneManifest }
-  | { name: "finish"; manifest: SceneManifest; result: GameCompletionResult };
+  | { name: "play"; manifest: SceneManifest; publication?: PublishedLevelVersion }
+  | { name: "finish"; manifest: SceneManifest; result: GameCompletionResult; publication?: PublishedLevelVersion };
 
 function initialScreen(): Screen {
+  const shareId = shareIdFromPath(window.location.pathname);
+  if (shareId) return { name: "friend", shareId };
   const resume = resolveResumeState();
   if (resume.screen === "generation") return { name: "generation", jobId: resume.jobId };
   if (resume.screen === "preparation") {
@@ -37,6 +43,8 @@ function initialScreen(): Screen {
     };
   }
   if (resume.screen === "photos") return { name: "photos" };
+  const creation = loadActiveCreation();
+  if (creation && creation.step !== "ready") return { name: "photos" };
   return { name: "start" };
 }
 
@@ -83,12 +91,9 @@ export function App() {
   }, []);
 
   const handleJobCancelled = useCallback(() => {
-    // Deliberately abandoning this job (not a reload) — clear both so the
-    // next submission from Photos gets a fresh idempotency key instead of
-    // resuming this one.
-    clearActiveSource();
-    clearPendingSubmission();
-    setScreen({ name: "photos" });
+    // Leaving progress never cancels or forgets durable work. My worlds can
+    // reopen the same application job without another submission.
+    setScreen({ name: "start" });
   }, []);
 
   const handleSavePreparedLevel = useCallback(
@@ -138,6 +143,21 @@ export function App() {
         />
       );
 
+    case "friend":
+      return (
+        <FriendLandingScreen
+          shareId={screen.shareId}
+          onPlay={(publication) =>
+            setScreen({
+              name: "play",
+              manifest: publishedManifestForPlay(publication),
+              publication,
+            })
+          }
+          onHome={goStart}
+        />
+      );
+
     case "photos":
       return <PhotosScreen onJobStarted={handleJobStarted} onBack={goStart} />;
 
@@ -162,8 +182,18 @@ export function App() {
       return (
         <PlayScreen
           manifest={screen.manifest}
-          onExit={goStart}
-          onComplete={(result) => setScreen({ name: "finish", manifest: screen.manifest, result })}
+          onExit={() =>
+            screen.publication
+              ? setScreen({ name: "friend", shareId: screen.publication.shareId })
+              : goStart()
+          }
+          onComplete={(result) =>
+            setScreen(
+              screen.publication
+                ? { name: "finish", manifest: screen.manifest, result, publication: screen.publication }
+                : { name: "finish", manifest: screen.manifest, result },
+            )
+          }
         />
       );
 
@@ -172,7 +202,13 @@ export function App() {
         <FinishScreen
           manifest={screen.manifest}
           result={screen.result}
-          onReplay={() => setScreen({ name: "play", manifest: screen.manifest })}
+          onReplay={() =>
+            setScreen(
+              screen.publication
+                ? { name: "play", manifest: screen.manifest, publication: screen.publication }
+                : { name: "play", manifest: screen.manifest },
+            )
+          }
           onTryRace={() => setScreen({ name: "play", manifest: createRaceVariant(screen.manifest) })}
           onCreateAnother={() => setScreen({ name: "photos" })}
         />
