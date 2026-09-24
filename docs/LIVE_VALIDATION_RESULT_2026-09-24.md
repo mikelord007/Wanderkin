@@ -1,6 +1,61 @@
 # ObjectQuest v2 live-validation result — 2026-09-24
 
-Status: **rows 1–5 ready; the authorized remaining-row attempt stopped safely when row 6 music was rejected before provider dispatch; rows 7–16 remain unsubmitted**.
+Status: **rows 1–5 remain ready; corrected rows 6–8 are ready; the bounded
+audio run stopped without retry when row 9 portal-activate was rejected by its
+provider-backed Mirelo job; rows 10–15 remain unsubmitted and row 16 remains
+SKIPPED/BLOCKED**.
+
+## Corrected audio-only execution — stopped at first provider failure
+
+Integrated MAIN `14083cfbc5344050add1de8194cf1db37ec14a07` restarted only
+the isolated API on port 18799, from PID 35992 to PID 34496. The existing
+client on 15173 and protected services on 5173/8787 retained their PIDs. API
+boot left the durable jobs and ledger byte-identical at SHA-256
+`b32d9fdbb4865b68d839588ead5c5ca1230534b174e2ed3ceb41709cdc331560`
+and `21b4bf78146bd05c64f11365ac30e7b29ac9fd8d37b19feb8f18d866bb65e1fe`.
+
+A local coordination harness reused the reviewed `buildPlan`, `BudgetGuard`,
+and strict row-1–5 reuse assertion. Its two no-dispatch dry-runs verified the
+exact five reusable application jobs and request bodies, the obsolete
+60-second music job with no provider ID, the new `music-v2` key, rows 6–15's
+exact `$0.4124` maximum, the retained `$0.7247` six-entry ledger, and zero
+retry, level-save, publish, screenshot-upload, or postcard paths. The harness
+then submitted rows sequentially and stopped before the next row on the first
+unexpected terminal failure.
+
+| Row | Result | Application / provider job | Served capability / model | Stored artifact |
+| ---: | --- | --- | --- | --- |
+| 6 music | **READY**, no fallback | `job_ce2d246a-37d5-4d9e-92cd-576714355ecd` / `mjob_8243e6646190` | `music` / `fal-ai/minimax-music/v2` | MP3/ID3, 566,219 bytes, SHA-256 `34a653013e7f37b890d2c43d7f810bd3fdfea985a316914833f0cdb490e8d96b` |
+| 7 ambience | **READY**, no fallback | `job_70ab5853-fc2a-4ab5-9f4a-0e61fd97643c` / `mjob_0fd9e8e551e1` | `mirelo-sfx` / `Mirelo-AI/sfx1.6/text-to-audio` | RIFF/WAVE, 1,323,086 bytes, SHA-256 `7c2b71575426b362075ef0035bfc9a2b14e6887e5bda487ec5819e410d89643f` |
+| 8 fragment-pickup | **READY**, no fallback | `job_1474ebee-fa65-4d4b-b411-0f8babbabb87` / `mjob_9b4d5aa5632c` | `mirelo-sfx` / `Mirelo-AI/sfx1.6/text-to-audio` | RIFF/WAVE, 266,318 bytes, SHA-256 `b79dd5c6f413025b5fe4086b2a57bb20df64ae74ad709171f6a530e430fe5092` |
+| 9 portal-activate | **FAILED**, no fallback, nonretryable | `job_0ea8326f-b76f-46d6-aba1-5b2d03a02a14` / `mjob_f9db028110fb` | requested/used `mirelo-sfx`; terminal model `null` | None |
+| 10–15 | **NOT SUBMITTED** after stop | — | — | — |
+| 16 postcard | **SKIPPED/BLOCKED** | no job | no request | no upload, reservation, or video |
+
+The failed job used the exact reviewed three-second request and ended after
+158,090 ms with stable error code `provider_failed`, `retryable: false`, retry
+count 0, max retries 0, and message “The provider rejected the generation
+request. Check the selected model settings and try again.” No retry or
+replacement request was made. Provider-reported costs remain `null` for all
+four new jobs, so actual paid cost is unknown.
+
+The ledger now conservatively records `$0.9767` across ten entries: the prior
+`$0.7247` plus `$0.2520` for the three ready jobs and failed provider-backed
+portal request. Including the earlier `$0.4620` style spike gives a current
+conservative project total of `$1.4387`. This is reservation/estimate evidence,
+not an actual billing statement.
+
+The three ready files exist under ignored validation storage, match their
+stored SHA-256 values, and have MP3/RIFF-WAVE magic matching their declared
+MIME types. Full browser decode/playback was not claimed because the required
+audio set did not complete. The existing private level
+`live-validation-photo4-20260924-hands-on` remains the only saved level, with
+zero attached audio/video; its `levels.json` hash stayed byte-identical at
+`dbe0dfd604d6677b86f8d6f892b9440e7ca527530b693a24a25cac0f9f86554b`.
+No partial attachment, geometry/placement/quest change, second world, or
+publication occurred. This current saved-level fact supersedes the older
+checkpoint sections below that correctly recorded no saved level at their
+earlier timestamps.
 
 ## Dry-run checkpoint
 

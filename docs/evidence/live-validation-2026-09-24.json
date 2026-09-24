@@ -502,6 +502,179 @@
         "postcard"
       ],
       "level": null
+    },
+    {
+      "runId": "objectquest-live-audio-20260924T142103Z",
+      "status": "failed-provider-stopped-no-retry",
+      "integratedRevision": "14083cfbc5344050add1de8194cf1db37ec14a07",
+      "completedAt": "2026-09-24T14:24:59.536Z",
+      "executionControl": {
+        "sequential": true,
+        "stopOnFirstUnexpectedFailure": true,
+        "retryCalls": 0,
+        "levelWrites": 0,
+        "publishCalls": 0,
+        "postcardUploads": 0,
+        "automaticRetries": 0,
+        "freshMaximumUsd": 0.4124,
+        "perRequestMaximumUsd": 0.5,
+        "batchMaximumUsd": 3,
+        "projectMaximumUsd": 10
+      },
+      "reusedRows": [
+        { "step": "cutout", "applicationJobId": "job_737935e2-c54b-4c18-a6a6-782a7a4c69c8", "requestMatched": true, "state": "ready" },
+        { "step": "style-preview", "applicationJobId": "job_ef2fde65-65e2-4d16-b8df-e75d53c93d85", "requestMatched": true, "state": "ready" },
+        { "step": "alternate-edit", "applicationJobId": "job_f9bcf342-6254-4b38-9fa0-d32c797cb89f", "requestMatched": true, "state": "ready" },
+        { "step": "mesh", "applicationJobId": "job_662f0c8a-52f1-4e33-adad-fcff355e014d", "requestMatched": true, "state": "ready" },
+        { "step": "quest", "applicationJobId": "job_8df572b8-0ded-4e8b-b524-c3361698a1ca", "requestMatched": true, "state": "ready" }
+      ],
+      "completedRows": [
+        {
+          "step": "music",
+          "applicationJobId": "job_ce2d246a-37d5-4d9e-92cd-576714355ecd",
+          "providerJobId": "mjob_8243e6646190",
+          "idempotencyKey": "oq-live-20260924-music-v2",
+          "servedCapability": "music",
+          "servedModel": "fal-ai/minimax-music/v2",
+          "fallbackFired": null,
+          "reportedCost": null,
+          "timings": { "queueMilliseconds": 5116, "executionMilliseconds": 42924, "totalMilliseconds": 48040 },
+          "artifact": {
+            "id": "6bbf73bb-b471-41b7-87a6-e5359ba577d7",
+            "kind": "music",
+            "mimeType": "audio/mpeg",
+            "sizeBytes": 566219,
+            "durationSeconds": 15,
+            "loop": true,
+            "sha256": "34a653013e7f37b890d2c43d7f810bd3fdfea985a316914833f0cdb490e8d96b",
+            "hashVerified": true,
+            "fileSignature": "ID3v2"
+          }
+        },
+        {
+          "step": "ambience",
+          "applicationJobId": "job_70ab5853-fc2a-4ab5-9f4a-0e61fd97643c",
+          "providerJobId": "mjob_0fd9e8e551e1",
+          "idempotencyKey": "oq-live-20260924-ambience",
+          "servedCapability": "mirelo-sfx",
+          "servedModel": "Mirelo-AI/sfx1.6/text-to-audio",
+          "fallbackFired": null,
+          "reportedCost": null,
+          "timings": { "queueMilliseconds": 2633, "executionMilliseconds": 10446, "totalMilliseconds": 13079 },
+          "artifact": {
+            "id": "b6ed4d5b-39ea-4a41-b6ed-734cf89fad1e",
+            "kind": "ambience",
+            "mimeType": "audio/wav",
+            "sizeBytes": 1323086,
+            "durationSeconds": 15,
+            "loop": true,
+            "sha256": "7c2b71575426b362075ef0035bfc9a2b14e6887e5bda487ec5819e410d89643f",
+            "hashVerified": true,
+            "fileSignature": "RIFF/WAVE"
+          }
+        },
+        {
+          "step": "fragment-pickup",
+          "applicationJobId": "job_1474ebee-fa65-4d4b-b411-0f8babbabb87",
+          "providerJobId": "mjob_9b4d5aa5632c",
+          "idempotencyKey": "oq-live-20260924-fragment-pickup",
+          "servedCapability": "mirelo-sfx",
+          "servedModel": "Mirelo-AI/sfx1.6/text-to-audio",
+          "fallbackFired": null,
+          "reportedCost": null,
+          "timings": { "queueMilliseconds": 2321, "executionMilliseconds": 6996, "totalMilliseconds": 9317 },
+          "artifact": {
+            "id": "e8d567b4-7468-426f-9bff-f70e9860a522",
+            "kind": "sfx",
+            "mimeType": "audio/wav",
+            "sizeBytes": 266318,
+            "durationSeconds": 3,
+            "loop": false,
+            "sha256": "b79dd5c6f413025b5fe4086b2a57bb20df64ae74ad709171f6a530e430fe5092",
+            "hashVerified": true,
+            "fileSignature": "RIFF/WAVE"
+          }
+        }
+      ],
+      "failedRow": {
+        "step": "portal-activate",
+        "applicationJobId": "job_0ea8326f-b76f-46d6-aba1-5b2d03a02a14",
+        "providerJobId": "mjob_f9db028110fb",
+        "idempotencyKey": "oq-live-20260924-portal-activate",
+        "state": "failed",
+        "requestedCapability": "mirelo-sfx",
+        "capabilityUsed": "mirelo-sfx",
+        "servedModel": null,
+        "fallbackFired": null,
+        "reportedCost": null,
+        "retryable": false,
+        "retryCount": 0,
+        "maxRetries": 0,
+        "errorCode": "provider_failed",
+        "error": "The provider rejected the generation request. Check the selected model settings and try again.",
+        "timings": { "queueMilliseconds": 2072, "executionMilliseconds": 156018, "totalMilliseconds": 158090 },
+        "request": {
+          "schemaVersion": 1,
+          "kind": "sfx",
+          "capability": "mirelo-sfx",
+          "idempotencyKey": "oq-live-20260924-portal-activate",
+          "purpose": "audio:portal-activate",
+          "prompt": "warm magical portal bloom with a gentle rising shimmer. Cartoon miniature adventure; sofa, desk, and laptop room corner; clean game-ready sound, no speech, no copyrighted melody.",
+          "durationSeconds": 3,
+          "loop": false
+        }
+      },
+      "unsubmittedRows": [
+        "checkpoint",
+        "fall-respawn",
+        "race-start",
+        "race-finish",
+        "completion",
+        "narration"
+      ],
+      "postcard": {
+        "step": "postcard",
+        "status": "SKIPPED/BLOCKED",
+        "applicationJobId": null,
+        "providerJobId": null,
+        "reservedUsd": 0,
+        "screenshotUploaded": false,
+        "videoSubmitted": false
+      },
+      "ledger": {
+        "worldId": "live-validation-photo4-20260924",
+        "entriesBefore": 6,
+        "entriesAfter": 10,
+        "estimatedUsdBefore": 0.7247,
+        "estimatedUsdAfter": 0.9767,
+        "freshReservedUsd": 0.252,
+        "priorStyleSpikeUsd": 0.462,
+        "conservativeProjectTotalUsd": 1.4387,
+        "actualPaidCost": null
+      },
+      "level": {
+        "levelId": "live-validation-photo4-20260924-hands-on",
+        "name": "The Cozy Corner Color Caper!",
+        "audioAssetsBefore": 0,
+        "audioAssetsAfter": 0,
+        "videoAssetsBefore": 0,
+        "videoAssetsAfter": 0,
+        "attached": false,
+        "published": false,
+        "levelsJsonSha256Before": "dbe0dfd604d6677b86f8d6f892b9440e7ca527530b693a24a25cac0f9f86554b",
+        "levelsJsonSha256After": "dbe0dfd604d6677b86f8d6f892b9440e7ca527530b693a24a25cac0f9f86554b"
+      },
+      "durableState": {
+        "jobsJsonSha256": "f9d3bacf6352a2649ce71319b8882ae7d82d3d356dd707c58ccc18ec58682793",
+        "ledgerJsonSha256": "47752cf2cd8151e9f840e87a636588533bc377969cdb4a534ad9d508e2b57651",
+        "generatedAssetsJsonSha256": "7c77904cb1cd4b5810ea5ec3dfff8747da9ea84ce3063100b3795ef62340e20c"
+      },
+      "verification": {
+        "storedHashesMatch": true,
+        "fileSignaturesMatchMime": true,
+        "browserDecodePlayback": "not run because the required audio set did not complete and no partial attachment was made",
+        "seamlessLoopQuality": "unverified; loop fields remain playback intent only"
+      }
     }
   ]
 }
