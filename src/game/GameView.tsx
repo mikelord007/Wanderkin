@@ -35,6 +35,7 @@ import { GameplaySession, type GameplaySessionSnapshot } from "./modes/session.j
 import { updateGameplayProximity } from "./modes/proximity.js";
 import { gameplayEvents } from "./events.js";
 import type { Vec3Like } from "./core/vec.js";
+import { useGameAudio } from "../audio/useGameAudio.js";
 
 interface Runtime {
   simulation: GameSimulation;
@@ -90,6 +91,14 @@ export function GameView({
   manifestRef.current = manifest;
   const signature = useMemo(() => gameplaySignature(manifest), [manifest]);
   const resolvedEventBus = eventBus ?? gameplayEvents;
+  const audio = useGameAudio({
+    worldId: manifest.levelId,
+    eventBus: resolvedEventBus,
+    ...(manifest.media ? { media: manifest.media } : {}),
+    ...(manifest.experience?.quest.narrationScript
+      ? { narrationScript: manifest.experience.quest.narrationScript }
+      : {}),
+  });
   const gameplaySession = useMemo(
     () => manifest.experience
       ? new GameplaySession({
@@ -430,6 +439,7 @@ export function GameView({
 
   const handleStart = useCallback(() => {
     if (!runtime) return;
+    void audio.unlock();
     if (gameplaySession?.showIntroOnce()) {
       setIntroVisible(true);
       if (introTimerRef.current) clearTimeout(introTimerRef.current);
@@ -440,7 +450,7 @@ export function GameView({
     setStarted(true);
     setPaused(false);
     runtime.input.requestPointerLock();
-  }, [runtime, gameplaySession, syncModeState]);
+  }, [runtime, gameplaySession, syncModeState, audio]);
 
   const handleResume = useCallback(() => {
     if (!runtime) return;
@@ -616,6 +626,9 @@ export function GameView({
         objective={manifest.experience?.quest.objective}
         introVisible={introVisible}
         feedback={feedback}
+        audioSettings={audio.settings}
+        onAudioSettingsChange={audio.setSettings}
+        subtitle={audio.subtitle}
       />
     </div>
   );

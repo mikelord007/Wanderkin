@@ -1,5 +1,9 @@
-import { describe, it } from "vitest";
-import type { GenerationJobKind } from "../../shared/generation.js";
+import { describe, expect, it } from "vitest";
+import type { AudioAssetReference, GenerationJob, GenerationJobKind, GenerationRequest, SceneManifest } from "../../shared/index.js";
+import { migrateSceneManifest } from "../../shared/index.js";
+import lostColors from "../../shared/fixtures/lost-colors.json";
+import { AudioOrchestrator, type AudioGateway } from "../../server/audio/orchestrator.js";
+import type { SubmitOutcome } from "../../server/jobs/manager.js";
 
 const GENERATION_JOB_KINDS = [
   "image-to-3d",
@@ -40,7 +44,7 @@ describe("ObjectQuest v2 generation lifecycle integration contracts", () => {
     throw new Error("Contract stub: connect gateway, durable store, poller, and My worlds resume");
   });
 
-  it.skip("preserves the playable level and successful assets when one optional asset fails", () => {
+  it("preserves the playable level and successful assets when one optional asset fails", async () => {
     // Given a ready mesh/course plus independent music, narration, SFX, and
     // postcard jobs, make one optional job fail after another optional asset succeeds.
 
@@ -49,7 +53,32 @@ describe("ObjectQuest v2 generation lifecycle integration contracts", () => {
 
     // Retrying only the failed kind reuses the world/mesh and successful asset
     // IDs, creates no image-to-3d submission, and cannot erase the publication.
-    throw new Error("Contract stub: connect Workers 2, 6, 7, and 8 asset orchestration");
+    const gateway = new PartialFailureGateway();
+    let stored = migrateSceneManifest(lostColors);
+    const meshIds = stored.assets.map((asset) => asset.id);
+    const levels = {
+      async get() { return stored; },
+      async save(_id: string, manifest: SceneManifest) { stored = manifest; return manifest; },
+    };
+    const orchestrator = new AudioOrchestrator(gateway, levels);
+    const started = await orchestrator.start({
+      worldId: stored.levelId,
+      style: "cartoon",
+      objectDescription: "a blue teacup",
+      narrationScript: stored.experience!.quest.narrationScript,
+    });
+    expect(started.playable).toBe(true);
+    expect(started.failedCues).toContain("narration");
+    expect(started.readyAssets.map((asset) => asset.id)).toContain("music-ready");
+    await orchestrator.persist(stored.levelId, started);
+
+    const narrationJob = started.jobs.find((entry) => entry.cue === "narration")!.job!;
+    const retried = await orchestrator.retry("narration", narrationJob.id);
+    await orchestrator.persist(stored.levelId, retried);
+    expect(stored.assets.map((asset) => asset.id)).toEqual(meshIds);
+    expect(stored.media?.audio.map((asset) => asset.id)).toEqual(expect.arrayContaining(["music-ready", "narration-ready"]));
+    expect(gateway.requests.some((request) => request.kind === "image-to-3d")).toBe(false);
+    expect(gateway.retryIds).toEqual([narrationJob.id]);
   });
 
   it.skip("rejects per-request and per-world budget excess before provider submission", () => {
@@ -78,3 +107,35 @@ describe("ObjectQuest v2 generation lifecycle integration contracts", () => {
     throw new Error("Contract stub: connect Worker 4 approval store and Worker 2 request capture");
   });
 });
+
+const now = "2026-09-24T00:00:00.000Z";
+const provenance = { providerId: "fixture", requestedCapability: "music", servedCapability: "music", servedModel: "fixture", applicationJobId: "fixture", providerJobId: "provider", timings: { requestedAt: now }, reportedCost: null } as const;
+
+function audioAsset(id: string, kind: "music" | "narration"): AudioAssetReference {
+  return { schemaVersion: 1, mediaType: "audio", kind, id, url: `/${id}.wav`, sha256: id === "music-ready" ? "1".repeat(64) : "2".repeat(64), sizeBytes: 100, mimeType: "audio/wav", durationSeconds: 2, provenance: { ...provenance, requestedCapability: kind === "music" ? "music" : "chatterbox-tts", servedCapability: kind === "music" ? "music" : "chatterbox-tts" }, loop: kind === "music", defaultGain: 1 };
+}
+
+function generationJob(request: GenerationRequest, state: GenerationJob["state"], asset?: AudioAssetReference): GenerationJob {
+  const result = asset
+    ? request.kind === "music" ? { kind: "music" as const, asset: { ...asset, kind: "music" as const } }
+      : { kind: "tts" as const, asset: { ...asset, kind: "narration" as const } }
+    : undefined;
+  return { schemaVersion: 1, id: `job-${request.purpose}`, idempotencyKey: request.idempotencyKey, providerId: "fixture", providerJobId: `provider-${request.purpose}`, capabilityRequested: request.capability, capabilityUsed: request.capability, fallbackFired: null, state, photoOrder: [], createdAt: now, updatedAt: now, retryCount: 0, maxRetries: 1, kind: request.kind, request, ...(result ? { result } : {}), ...(state === "failed" ? { lastError: { message: "Optional narration unavailable.", retryable: true, occurredAt: now } } : {}) };
+}
+
+class PartialFailureGateway implements AudioGateway {
+  requests: GenerationRequest[] = [];
+  retryIds: string[] = [];
+  private narrationRequest: GenerationRequest | undefined;
+  async submitGenerationOrReconcile(request: GenerationRequest): Promise<SubmitOutcome> {
+    this.requests.push(request);
+    if (request.kind === "music") return { status: "created", job: generationJob(request, "ready", audioAsset("music-ready", "music")) };
+    if (request.kind === "tts") { this.narrationRequest = request; return { status: "created", job: generationJob(request, "failed") }; }
+    return { status: "created", job: generationJob(request, "generating") };
+  }
+  async getPublic(): Promise<GenerationJob | undefined> { return undefined; }
+  async retry(jobId: string): Promise<GenerationJob | undefined> {
+    this.retryIds.push(jobId);
+    return this.narrationRequest ? generationJob(this.narrationRequest, "ready", audioAsset("narration-ready", "narration")) : undefined;
+  }
+}

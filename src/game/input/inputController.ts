@@ -52,7 +52,9 @@ export class InputController {
     this.element = element;
 
     const onKeyDown = (event: KeyboardEvent) => this.handleKeyDown(event);
-    const onKeyUp = (event: KeyboardEvent) => this.held.delete(event.code);
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (!isInteractiveTarget(event.target)) this.held.delete(event.code);
+    };
     const onMouseMove = (event: MouseEvent) => this.handleMouseMove(event);
     const onPointerLockChange = () => this.handlePointerLockChange();
     const onBlur = () => this.held.clear();
@@ -75,6 +77,10 @@ export class InputController {
   }
 
   private handleKeyDown(event: KeyboardEvent): void {
+    // HUD buttons and sliders must retain normal keyboard behavior. In
+    // particular, Arrow keys adjust AudioControls instead of moving the
+    // player or being preventDefault-ed by the global game listener.
+    if (isInteractiveTarget(event.target)) return;
     if (event.code === "Escape") {
       // Explicitly release here as well as listening for the browser's
       // pointerlockchange. Automation and embedded browsers can deliver the
@@ -201,4 +207,9 @@ export class InputController {
     for (const code of codes) if (this.held.has(code)) return true;
     return false;
   }
+}
+
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  if (typeof HTMLElement === "undefined" || !(target instanceof HTMLElement)) return false;
+  return target.matches("input, button, select, textarea, a[href], [contenteditable='true']");
 }
