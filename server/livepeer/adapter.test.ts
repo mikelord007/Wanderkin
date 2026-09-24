@@ -38,6 +38,61 @@ const FAILED_FIXTURE = {
   error_retryable: true,
 };
 
+const GEMINI_NESTED_TEXT = '{"title": "The Cozy Corner Color Caper!", "intro": "Welcome, tiny explorer! Our friendly room corner has lost all its wonderful colors! They\'ve scattered like dandelion fluff in the wind. Can you help us find them all?", "objective": "Discover every lost color piece, then step into the shimmering portal!", "narrationScript": "Oh dear, the colors have gone astray! Let\'s help them find their way back home. Gather all the twinkling pieces, then the magic portal will whisk you away!"}';
+
+/** Successful wire fixture captured read-only from mjob_13e739e8d5af on
+ * 2026-09-24. Unlike media jobs, run_capability returned the text and
+ * concrete model inside run_output rather than in top-level output fields. */
+const GEMINI_NESTED_DONE_FIXTURE = {
+  submitted_via: "run_capability",
+  job_id: "mjob_13e739e8d5af",
+  sdk_job_id: "inf_02d5df90915068397543",
+  status: "done",
+  phase: {
+    phase: "done",
+    terminal: true,
+    blocked: null,
+    label: "Ready — your media is finished",
+    done: 0,
+    total: 0,
+  },
+  action: null,
+  capability: "gemini-text",
+  capability_used: "gemini-text",
+  requested_capability: null,
+  model_note: null,
+  url: null,
+  persisted: false,
+  source_upstream_url: null,
+  warnings: [],
+  run_output: {
+    ok: true,
+    capability: "gemini-text",
+    output_kind: "text",
+    result: {
+      text: GEMINI_NESTED_TEXT,
+      model_id: "fal-ai/any-llm",
+    },
+    cost_usd_estimated: 0.0001,
+    cost_unit_kind: "1000_tokens",
+    cost_units: 1,
+  },
+  output_kind: "text",
+  elapsed_ms: 2828,
+  error: null,
+  error_code: null,
+  error_retryable: null,
+  billing_note: null,
+  cost_disposition: "spent",
+  fallback_fired: null,
+  created_at: 1790253288509,
+  updated_at: 1790253291967,
+  cost_usd_estimated: 0.0001,
+  cost_unit_kind: "1000_tokens",
+  cost_units: 1,
+  cost_paid_usd: null,
+};
+
 function fakePhotos(): PhotoBytesProvider {
   return {
     getPhotoBytes: vi.fn(async (photoId: string) => ({
@@ -328,6 +383,68 @@ describe("LivepeerAdapter.submit", () => {
     const firstInputs = runCalls[0]?.args.inputs as { image_urls: string[] };
     const secondInputs = runCalls[1]?.args.inputs as { image_urls: string[] };
     expect(secondInputs.image_urls).toEqual(firstInputs.image_urls); // byte-identical request on retry
+  });
+});
+
+describe("LivepeerAdapter.getGenerationStatus", () => {
+  it("normalizes the observed nested gemini text result without treating its estimate as actual cost", async () => {
+    const mcp = fakeMcp({ get_create_media: () => GEMINI_NESTED_DONE_FIXTURE });
+    const status = await new LivepeerAdapter(mcp, fakePhotos()).getGenerationStatus("mjob_13e739e8d5af");
+
+    expect(status).toMatchObject({
+      state: "ready",
+      output: { text: GEMINI_NESTED_TEXT, outputKind: "text" },
+      actualCapabilityUsed: "gemini-text",
+      actualFallbackFired: null,
+      actualRegisteredModel: "fal-ai/any-llm",
+    });
+    expect(status.reportedCostUsd).toBeUndefined();
+    expect(mcp.calls.map((call) => call.name)).toEqual(["get_create_media"]);
+  });
+
+  it("retains legacy top-level text, model, and actual-cost normalization", async () => {
+    const mcp = fakeMcp({
+      get_create_media: () => ({
+        job_id: "mjob_legacy_text",
+        status: "done",
+        capability_used: "gemini-text",
+        fallback_fired: null,
+        text: "legacy text output",
+        output_kind: "text",
+        served_model_id: "legacy/text-model",
+        actual_cost_usd: 0.0002,
+      }),
+    });
+    const status = await new LivepeerAdapter(mcp, fakePhotos()).getGenerationStatus("mjob_legacy_text");
+
+    expect(status).toMatchObject({
+      state: "ready",
+      output: { text: "legacy text output", outputKind: "text" },
+      actualRegisteredModel: "legacy/text-model",
+      reportedCostUsd: 0.0002,
+    });
+  });
+
+  it.each([
+    ["missing result", { ok: true, output_kind: "text", result: null }],
+    ["non-text result", { ok: true, output_kind: "text", result: { text: 42, model_id: "ignored/model" } }],
+    ["error result", { ok: false, output_kind: "text", result: { text: "must not escape" }, error: "provider failed" }],
+    ["wrong output kind", { ok: true, output_kind: "image", result: { text: "must not escape" } }],
+  ])("rejects a malformed nested %s safely", async (_label, runOutput) => {
+    const mcp = fakeMcp({
+      get_create_media: () => ({
+        job_id: "mjob_bad_nested",
+        status: "done",
+        capability_used: "gemini-text",
+        served_model_id: "test/model",
+        run_output: runOutput,
+      }),
+    });
+    const status = await new LivepeerAdapter(mcp, fakePhotos()).getGenerationStatus("mjob_bad_nested");
+
+    expect(status.state).toBe("failed");
+    expect(status.output).toBeUndefined();
+    expect(status.error?.message).toBe('Provider reported "done" but returned no output');
   });
 });
 
