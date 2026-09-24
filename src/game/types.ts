@@ -2,7 +2,7 @@
  * Public contract for the game runtime, per `docs/CONTRACTS.md`.
  */
 
-import type { SceneManifest } from "@shared/index.js";
+import type { SceneManifest, StyleId } from "@shared/index.js";
 
 /**
  * Distinct phases of getting a level playable. Downloading, decoding and
@@ -51,4 +51,10 @@ export interface GameViewProps {
   onExit: () => void;
   onComplete: () => void;
   onProgress?: (snapshot: GameSnapshot) => void;
+  /** Optional preview/debug override; saved levels normally use experience.style.id. */
+  styleId?: StyleId;
+  /** Optional preview/debug override; saved levels normally use experience.style.atmosphere. */
+  atmosphere?: string;
+  /** Progressive Lost Colors hook. Worker 5 drives this from collected fragments. */
+  colorRestoration?: number;
 }
