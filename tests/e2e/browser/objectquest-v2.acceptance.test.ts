@@ -1,3 +1,4 @@
+import { runB5, runB6, runB10, runB11, runB15, runB19 } from "./objectquest-v2.creation-scenarios.js";
 import { mkdir, readFile } from "node:fs/promises";
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { createEmptyManifest, migrateSceneManifest, type SceneManifest } from "../../../shared/index.js";
@@ -142,25 +143,22 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
     throw new Error("Browser contract stub B4: connect Worker 5 mode flows");
   });
 
-  test.skip("B5 uploads or captures an image and reviews the isolated object", async ({ page, context }) => {
+  test("B5 uploads or captures an image and reviews the isolated object", async ({ page, context }) => {
     // 1. Upload a valid rotated photo; review corrected orientation and object.
     // 2. Replace/crop/accept it and prove only the accepted source is selected.
     // 3. If capture is supported, grant camera permission, capture, retake, and
     //    accept through visible controls; record unsupported-device behavior.
     // 4. Confirm no paid generation request occurs during object review.
-    void page;
-    void context;
-    throw new Error("Browser contract stub B5: connect Worker 4 upload/capture/review UI");
+    await runB5(page, context);
   });
 
-  test.skip("B6 requires explicit preview approval before the matching 3D build", async ({ page }) => {
+  test("B6 requires explicit preview approval before the matching 3D build", async ({ page }) => {
     // 1. Choose style A, create its preview, then switch to style B and preview.
     // 2. Inspect network/jobs: neither selection nor preview may submit 3D.
     // 3. Approve B, refresh, and assert the approved preview remains identifiable.
     // 4. Click Build once; assert one image-to-3D request uses B's exact durable
     //    asset/digest, style version, atmosphere, mode, and source identity.
-    void page;
-    throw new Error("Browser contract stub B6: connect Worker 4 approval gate and job evidence");
+    await runB6(page);
   });
 
   test.skip("B7 restarts and respawns without duplicate rewards or stale race time", async ({ page }) => {
@@ -191,7 +189,6 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
     await page.getByRole("article").filter({ hasText: manifest.name }).last().getByRole("button", { name: "Edit" }).click();
     await expect(page.getByRole("heading", { name: "Spawn & checkpoints" }).locator("..").locator(".oq-editor__vec3").first().getByLabel("X")).toHaveValue("-3.5");
     await expect(page.getByRole("heading", { name: "Collectibles & finish" }).locator("..").locator(".oq-editor__checkpoint-item").first().locator(".oq-editor__vec3").getByLabel("X")).toHaveValue("-3.25");
-    await page.getByRole("heading", { name: "Collectibles & finish" }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: "test-results/worker7/B8-editor-entities.png", fullPage: true });
   });
 
@@ -236,24 +233,22 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
     await page.screenshot({ path: "test-results/worker7/B9-saved-style-mission.png", fullPage: true });
   });
 
-  test.skip("B10 resumes a pending generation after refresh using the same job", async ({ page }) => {
+  test("B10 resumes a pending generation after refresh using the same job", async ({ page }) => {
     // 1. Start a deliberately delayed fake/authorized generation and capture
     //    application/provider job IDs while the world is visibly pending.
     // 2. Refresh, navigate away, and return through My worlds Resume.
     // 3. Observe continued progress to ready/failed with identical IDs and one
     //    provider submission; no duplicate uploads or generation are allowed.
-    void page;
-    throw new Error("Browser contract stub B10: connect Worker 4 pending-world resume");
+    await runB10(page);
   });
 
-  test.skip("B11 keeps the level usable when an optional audio or video job fails", async ({ page }) => {
+  test("B11 keeps the level usable when an optional audio or video job fails", async ({ page }) => {
     // 1. Begin with a playable saved level and successful mesh/one media asset.
     // 2. Induce or observe a narration/postcard failure and inspect honest UI.
     // 3. Enter/replay, edit, save, and share the level while that asset is failed.
     // 4. Retry only the failed kind and assert the mesh/course/successful asset
     //    IDs remain unchanged and no image-to-3D request is submitted.
-    void page;
-    throw new Error("Browser contract stub B11: connect optional failure and retry flows");
+    await runB11(page);
   });
 
   test("B12 opens and plays an immutable shared course in a separate browser session", async ({ browser }) => {
@@ -324,15 +319,13 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
     throw new Error("Browser contract stub B14: connect Worker 6 and shared accessibility controls");
   });
 
-  test.skip("B15 recovers from camera denial and gives useful invalid-input errors", async ({ page, context }) => {
+  test("B15 recovers from camera denial and gives useful invalid-input errors", async ({ page, context }) => {
     // 1. Deny camera permission and assert a clear explanation plus working upload fallback.
     // 2. Try wrong MIME/magic bytes, empty, oversized, and excessive-dimension images.
     // 3. Each error identifies the remedy, retains safe prior state, and permits
     //    a subsequent valid upload without refresh.
     // 4. Inspect requests to prove invalid inputs reach no billable endpoint.
-    void page;
-    void context;
-    throw new Error("Browser contract stub B15: connect Worker 4 denial and validation UI");
+    await runB15(page, context);
   });
 
   test.skip("B16 records, previews, and downloads an actual gameplay highlight where supported", async ({ page }) => {
@@ -404,5 +397,9 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
     await expect(draftCard.getByRole("button", { name: "Export", exact: true })).toBeVisible();
     await expect(draftCard.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
     await page.screenshot({ path: "test-results/worker7/B19-my-worlds-actions.png", fullPage: true });
+  });
+
+  test("B19 exposes correct My worlds actions for creation jobs", async ({ page }) => {
+    await runB19(page);
   });
 });

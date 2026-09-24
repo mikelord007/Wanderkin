@@ -1,5 +1,7 @@
 import type {
   AssetReference,
+  GeneratedImageReference,
+  GenerationRequest,
   GenerationJob,
   PhotoReference,
   PublishedChallenge,
@@ -8,6 +10,28 @@ import type {
   ProviderSubmitRequest,
   SceneManifest,
 } from "@shared/index.js";
+
+export interface GenerationEnvelope {
+  request: GenerationRequest;
+  worldId?: string;
+  maxCostUsd?: number;
+}
+
+export interface PreviewJobResponse {
+  cacheHit: boolean;
+  approved: boolean;
+  cacheKey: string;
+  job: GenerationJob;
+}
+
+export interface PreviewCacheResponse {
+  key: string;
+  jobId: string;
+  approved: boolean;
+  createdAt: string;
+  updatedAt: string;
+  job: GenerationJob | null;
+}
 
 /**
  * Thin fetch wrapper around the server API documented in docs/CONTRACTS.md.
@@ -94,6 +118,44 @@ export function retryJob(jobId: string): Promise<GenerationJob> {
   return request<GenerationJob>(`/api/jobs/${encodeURIComponent(jobId)}/retry`, {
     method: "POST",
   });
+}
+
+export function submitGeneration(envelope: GenerationEnvelope): Promise<GenerationJob> {
+  return request<GenerationJob>("/api/jobs/generate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": envelope.request.idempotencyKey,
+    },
+    body: JSON.stringify(envelope),
+  });
+}
+
+export function submitPreview(envelope: GenerationEnvelope): Promise<PreviewJobResponse> {
+  return request<PreviewJobResponse>("/api/jobs/previews", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": envelope.request.idempotencyKey,
+    },
+    body: JSON.stringify(envelope),
+  });
+}
+
+export function getPreviewCache(cacheKey: string): Promise<PreviewCacheResponse> {
+  return request<PreviewCacheResponse>(`/api/jobs/preview-cache/${encodeURIComponent(cacheKey)}`);
+}
+
+export function approvePreview(cacheKey: string, jobId: string): Promise<PreviewCacheResponse> {
+  return request<PreviewCacheResponse>(`/api/jobs/preview-cache/${encodeURIComponent(cacheKey)}/approve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jobId }),
+  });
+}
+
+export function getGeneratedImage(assetId: string): Promise<GeneratedImageReference> {
+  return request<GeneratedImageReference>(`/api/generated-assets/${encodeURIComponent(assetId)}`);
 }
 
 /** For a generated asset, the server additionally returns the ordered

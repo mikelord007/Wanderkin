@@ -4,6 +4,9 @@ import { describeApiError, getAsset } from "../api.js";
 import { LoadingScreen } from "../components/LoadingScreen.js";
 import { courseCandidateOptions, replaceSavedCandidate } from "../courseCandidates.js";
 import { attachProvenance, resolveAssetForManifest } from "../manifestProvenance.js";
+import { loadActiveCreation, saveCreationRecord } from "../creationStorage.js";
+import { toWorldWorkflow, withCreationUpdate } from "../creationFlow.js";
+import { WorldReadyScreen } from "./WorldReadyScreen.js";
 import { repairGuidanceFor, type RepairGuidance } from "../../editor/repairGuidance.js";
 import { validateExperiencePlacements } from "../../game/placementValidation.js";
 import "../../editor/editor.css";
@@ -18,9 +21,6 @@ const scenePreparationModule = () => import("../../scene/index.js");
 
 const LevelEditor = lazy(() =>
   import("../../editor/LevelEditor.js").then((mod) => ({ default: mod.LevelEditor })),
-);
-const Preview3D = lazy(() =>
-  import("../../editor/Preview3D.js").then((mod) => ({ default: mod.Preview3D })),
 );
 
 export type PreparationSource =
@@ -77,7 +77,7 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [view, setView] = useState<"ready" | "editor">(source.kind === "manifest" ? "editor" : "ready");
+  const [editing, setEditing] = useState(source.kind === "manifest");
   const [repairFocus, setRepairFocus] = useState<RepairGuidance | null>(
     null,
   );
@@ -128,9 +128,12 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
         );
         if (cancelled) return;
 
-        const primary = attachProvenance(result.manifest, cleanAsset, resolvedSourcePhotos);
+        const creation = loadActiveCreation();
+        const workflow = creation ? toWorldWorkflow(creation) : null;
+        const basePrimary = attachProvenance(result.manifest, cleanAsset, resolvedSourcePhotos);
+        const primary = workflow ? { ...basePrimary, workflow } : basePrimary;
         const candidateManifests = (result.courseCandidates ?? []).map((candidate: SceneManifest) =>
-          attachProvenance(candidate, cleanAsset, resolvedSourcePhotos),
+          workflow ? { ...attachProvenance(candidate, cleanAsset, resolvedSourcePhotos), workflow } : attachProvenance(candidate, cleanAsset, resolvedSourcePhotos),
         );
         const checkedPrimary = await validateForRepair(primary);
         const checkedCandidates = await Promise.all(candidateManifests.map(validateForRepair));
@@ -140,9 +143,9 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
         setPrimaryManifest(preparedPrimary);
         setManifest(preparedPrimary);
         setCandidates(preparedCandidates);
+        if (creation) saveCreationRecord(withCreationUpdate(creation, { step: "ready", title: preparedPrimary.name }));
         const guidance = checkedPrimary.guidance;
         setRepairFocus(guidance);
-        setView(guidance ? "editor" : "ready");
       } catch (err) {
         if (!cancelled) setError(describeApiError(err));
       }
@@ -179,7 +182,7 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
     void validateForRepair(candidate).then((checked) => {
       setManifest(checked.manifest);
       setRepairFocus(checked.guidance);
-      setView(checked.guidance ? "editor" : "ready");
+      setEditing(false);
     });
   }
 
@@ -213,13 +216,25 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
     );
   }
 
+  if (!editing) {
+    return <WorldReadyScreen
+      manifest={manifest}
+      onEnter={() => onPlay(manifest)}
+      onAdjustCourse={() => {
+        setRepairFocus(repairGuidanceFor(manifest));
+        setEditing(true);
+      }}
+      onBack={onBack}
+    />;
+  }
+
   return (
     <div className="oq-screen oq-screen--preparation">
       <header className="oq-screen__header">
         <button type="button" className="oq-button oq-button--ghost" onClick={onBack}>
           ← Back
         </button>
-        <h1>{view === "ready" ? `Welcome to ${manifest.experience?.quest.title ?? manifest.name}` : "Adjust your course"}</h1>
+        <h1>Adjust your course</h1>
       </header>
 
       {candidateOptions.length > 1 ? (
@@ -252,73 +267,23 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
 
       {saveError ? <p className="oq-error-text">{saveError}</p> : null}
 
-      {view === "ready" ? (
-        <section className="oq-panel oq-world-ready" aria-labelledby="world-ready-title">
-          <div className="oq-world-ready__copy">
-            <p className="oq-kit-eyebrow">
-              {manifest.courseValidation.status === "validated" ? "Course checked" : "Course prepared"}
-            </p>
-            <h2 id="world-ready-title">{manifest.experience?.quest.title ?? manifest.name}</h2>
-            <p>{manifest.experience?.quest.intro ?? `Explore ${manifest.name}.`}</p>
-            <p className="oq-world-ready__objective">
-              {manifest.experience?.quest.objective ?? "Explore the world at your own pace."}
-            </p>
-            <div className="oq-actions">
-              <button type="button" className="oq-button oq-button--primary" onClick={() => onPlay(manifest)}>
-                Enter world
-              </button>
-              <button
-                type="button"
-                className="oq-button oq-button--secondary"
-                onClick={() => {
-                  setRepairFocus(null);
-                  setView("editor");
-                }}
-              >
-                Adjust course
-              </button>
-              <button
-                type="button"
-                className="oq-button oq-button--ghost"
-                onClick={() => {
-                  setRepairFocus(null);
-                  setView("editor");
-                }}
-              >
-                World settings
-              </button>
-            </div>
-          </div>
-          <div className="oq-world-ready__preview" aria-label="Rendered world preview">
-            <Suspense fallback={<LoadingScreen stage="Loading your world preview…" />}>
-              <Preview3D
-                manifest={manifest}
-                selectedEntityId={null}
-                placementMode={null}
-                onSurfaceClick={() => undefined}
-                onLoadError={() => undefined}
-                onBoundsReport={() => undefined}
-              />
-            </Suspense>
-          </div>
-        </section>
-      ) : (
-        <Suspense fallback={<LoadingScreen stage="Loading the level editor…" />}>
-          <LevelEditor
-            key={`${manifest.levelId}-${repairFocus?.message ?? "manual"}`}
-            manifest={manifest}
-            isPersisted={!isNew}
-            onSave={handleSave}
-            onExport={onExport}
-            onPlay={onPlay}
-            onBack={() => {
-              if (source.kind === "asset" && !repairFocus) setView("ready");
-              else onBack();
-            }}
-            repairFocus={repairFocus}
-          />
-        </Suspense>
-      )}
+      <Suspense fallback={<LoadingScreen stage="Loading the level editor…" />}>
+        <LevelEditor
+          key={`${manifest.levelId}-${repairFocus?.message ?? "manual"}`}
+          manifest={manifest}
+          isPersisted={!isNew}
+          onSave={handleSave}
+          onExport={onExport}
+          onPlay={onPlay}
+          onBack={() => {
+            if (source.kind === "asset") {
+              setRepairFocus(repairGuidanceFor(manifest));
+              setEditing(false);
+            } else onBack();
+          }}
+          repairFocus={repairFocus}
+        />
+      </Suspense>
       {saving ? <p className="oq-warning-text">Saving…</p> : null}
     </div>
   );

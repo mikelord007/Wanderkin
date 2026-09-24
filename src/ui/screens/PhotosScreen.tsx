@@ -50,7 +50,7 @@ function restoredFromPending(): PendingSubmission | null {
   return loadPendingSubmission();
 }
 
-export function PhotosScreen({ onJobStarted, onBack }: PhotosScreenProps) {
+function LegacyPhotosScreen({ onJobStarted, onBack }: PhotosScreenProps) {
   const resumed = useRef(restoredFromPending()).current;
 
   const [photos, setPhotos] = useState<PhotoReference[]>(resumed?.photos ?? []);
@@ -364,3 +364,6 @@ export function PhotosScreen({ onJobStarted, onBack }: PhotosScreenProps) {
     </div>
   );
 }
+
+void LegacyPhotosScreen;
+export { CreationJourneyScreen as PhotosScreen } from "./CreationJourneyScreen.js";

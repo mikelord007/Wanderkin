@@ -23,6 +23,11 @@ import {
 import { createLevel, downloadLevelBundle, publishLevel, saveLevel } from "./ui/api.js";
 import { createRaceVariant } from "./game/modes/raceVariant.js";
 import type { GameCompletionResult } from "./game/types.js";
+import {
+  loadActiveCreation,
+  loadCreationWorldItems,
+  setActiveCreationId,
+} from "./ui/creationStorage.js";
 
 type Screen =
   | { name: "start" }
@@ -53,6 +58,8 @@ function initialScreen(): Screen {
     };
   }
   if (resume.screen === "photos") return { name: "photos" };
+  const creation = loadActiveCreation();
+  if (creation && creation.step !== "ready") return { name: "photos" };
   return { name: "start" };
 }
 
@@ -106,12 +113,9 @@ export function App() {
   }, []);
 
   const handleJobCancelled = useCallback(() => {
-    // Deliberately abandoning this job (not a reload) — clear both so the
-    // next submission from Photos gets a fresh idempotency key instead of
-    // resuming this one.
-    clearActiveSource();
-    clearPendingSubmission();
-    setScreen({ name: "photos" });
+    // Leaving progress never cancels or forgets durable work. My worlds can
+    // reopen the same application job without another submission.
+    setScreen({ name: "start" });
   }, []);
 
   const handleSavePreparedLevel = useCallback(
@@ -164,6 +168,15 @@ export function App() {
             clearActiveSource();
             clearPendingSubmission();
             setScreen({ name: "preparation", source: { kind: "manifest", manifest }, isNew: false });
+          }}
+          additionalWorldItems={loadCreationWorldItems()}
+          onResumePendingWorld={(creationId) => {
+            setActiveCreationId(creationId);
+            setScreen({ name: "photos" });
+          }}
+          onRetryFailedWorld={(creationId) => {
+            setActiveCreationId(creationId);
+            setScreen({ name: "photos" });
           }}
         />
       );
