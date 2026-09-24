@@ -21,8 +21,11 @@ export { GameplaySession } from "./modes/session.js";
 export type {
   GameplaySessionOptions,
   GameplaySessionSnapshot,
+  MonotonicClock,
+  RaceBestTimeStore,
   RacePhase,
 } from "./modes/session.js";
+export { localRaceBestTimes } from "./modes/session.js";
 export { ColorRestorationAdapter } from "./restorationAdapter.js";
 export type { ColorRestorationSink } from "./restorationAdapter.js";
 

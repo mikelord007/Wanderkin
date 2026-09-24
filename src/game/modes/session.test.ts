@@ -3,6 +3,7 @@ import type { LevelExperience } from "@shared/index.js";
 import lostColorsManifest from "../../../shared/fixtures/lost-colors.json";
 import { GameplayEventBus } from "../events.js";
 import { GameplaySession } from "./session.js";
+import type { MonotonicClock, RaceBestTimeStore } from "./session.js";
 
 const experience = lostColorsManifest.experience as unknown as LevelExperience;
 
@@ -94,5 +95,101 @@ describe("GameplaySession explore mode", () => {
     const session = new GameplaySession({ experience: exploreExperience, worldId: "explore-world" });
     expect(session.snapshot.portalActive).toBe(true);
     expect(session.enterPortal("finish-portal")).toBe(true);
+  });
+});
+
+describe("GameplaySession race mode", () => {
+  class FakeClock implements MonotonicClock {
+    value = 1_000;
+    now() { return this.value; }
+    advance(milliseconds: number) { this.value += milliseconds; }
+  }
+
+  class MemoryBestTimes implements RaceBestTimeStore {
+    values = new Map<string, number>();
+    read(key: string) { return this.values.get(key) ?? null; }
+    write(key: string, milliseconds: number) { this.values.set(key, milliseconds); }
+  }
+
+  const raceExperience: LevelExperience = {
+    ...experience,
+    mode: {
+      kind: "race",
+      countdownSeconds: 3,
+      orderedCheckpointIds: ["checkpoint-1", "checkpoint-2"],
+      finishPortalId: "finish-portal",
+      restartPolicy: "full-reset",
+    },
+    finishPortal: { ...experience.finishPortal!, activation: "all-race-checkpoints" },
+  };
+
+  it("excludes countdown and pause, enforces order, freezes the result, and stores a version-bound best", () => {
+    const clock = new FakeClock();
+    const store = new MemoryBestTimes();
+    const bus = new GameplayEventBus();
+    const events = vi.fn();
+    bus.on("*", events);
+    const session = new GameplaySession({
+      experience: raceExperience,
+      worldId: "race-world",
+      publishedVersionId: "published-v7",
+      clock,
+      bestTimeStore: store,
+      eventBus: bus,
+    });
+
+    session.start();
+    expect(session.reachCheckpoint("checkpoint-1")).toBe(false);
+    clock.advance(2_000);
+    session.update();
+    expect(session.snapshot.race.countdownSecondsRemaining).toBe(1);
+    clock.advance(1_000);
+    session.update();
+    expect(session.snapshot.race.phase).toBe("running");
+    expect(session.snapshot.race.elapsedMilliseconds).toBe(0);
+
+    clock.advance(1_250);
+    session.setPaused(true);
+    clock.advance(5_000);
+    session.update();
+    expect(session.snapshot.race.elapsedMilliseconds).toBe(1_250);
+    session.setPaused(false);
+    expect(session.reachCheckpoint("checkpoint-2")).toBe(false);
+    expect(session.reachCheckpoint("checkpoint-1")).toBe(true);
+    clock.advance(750);
+    expect(session.reachCheckpoint("checkpoint-2")).toBe(true);
+    expect(session.snapshot.portalActive).toBe(true);
+    expect(session.enterPortal("finish-portal")).toBe(true);
+
+    expect(session.snapshot.race.elapsedMilliseconds).toBe(2_000);
+    expect(session.snapshot.race.bestMilliseconds).toBe(2_000);
+    expect(store.values.get("objectquest:race-best:published-v7")).toBe(2_000);
+    expect(session.enterPortal("finish-portal")).toBe(false);
+    expect(events.mock.calls.filter(([event]) => event.type === "raceFinished")).toHaveLength(1);
+    expect(events.mock.calls.find(([event]) => event.type === "raceFinished")?.[0]).toMatchObject({
+      publishedVersionId: "published-v7",
+      isPersonalBest: true,
+    });
+  });
+
+  it("fully resets checkpoint and clock state on restart", () => {
+    const clock = new FakeClock();
+    const session = new GameplaySession({
+      experience: raceExperience,
+      worldId: "race-world",
+      clock,
+      bestTimeStore: new MemoryBestTimes(),
+    });
+    session.start();
+    clock.advance(3_000);
+    session.update();
+    session.reachCheckpoint("checkpoint-1");
+    clock.advance(900);
+
+    session.restart();
+    expect(session.snapshot.reachedCheckpointIds).toEqual([]);
+    expect(session.snapshot.race.phase).toBe("countdown");
+    expect(session.snapshot.race.elapsedMilliseconds).toBe(0);
+    expect(session.snapshot.race.countdownSecondsRemaining).toBe(3);
   });
 });

@@ -3,6 +3,35 @@ import type { LevelExperience } from "../../shared/experience.js";
 import lostColorsManifest from "../../shared/fixtures/lost-colors.json";
 import { GameplayEventBus } from "../../src/game/events.js";
 import { GameplaySession } from "../../src/game/modes/session.js";
+import type { MonotonicClock, RaceBestTimeStore } from "../../src/game/modes/session.js";
+
+class FakeClock implements MonotonicClock {
+  value = 10_000;
+  now() { return this.value; }
+  advance(milliseconds: number) { this.value += milliseconds; }
+}
+
+class MemoryBestTimes implements RaceBestTimeStore {
+  values = new Map<string, number>();
+  read(key: string) { return this.values.get(key) ?? null; }
+  write(key: string, milliseconds: number) { this.values.set(key, milliseconds); }
+}
+
+const collectExperience = lostColorsManifest.experience as unknown as LevelExperience;
+
+function raceExperience(): LevelExperience {
+  return {
+    ...collectExperience,
+    mode: {
+      kind: "race",
+      countdownSeconds: 2,
+      orderedCheckpointIds: ["checkpoint-1", "checkpoint-2"],
+      finishPortalId: "finish-portal",
+      restartPolicy: "full-reset",
+    },
+    finishPortal: { ...collectExperience.finishPortal!, activation: "all-race-checkpoints" },
+  };
+}
 
 describe("ObjectQuest v2 gameplay state integration contracts", () => {
   it("collects each Lost Colors fragment once and restores color monotonically from 0/3 to 3/3", () => {
@@ -10,7 +39,7 @@ describe("ObjectQuest v2 gameplay state integration contracts", () => {
     const received = vi.fn();
     bus.on("*", received);
     const session = new GameplaySession({
-      experience: lostColorsManifest.experience as unknown as LevelExperience,
+      experience: collectExperience,
       worldId: lostColorsManifest.levelId,
       eventBus: bus,
     });
@@ -34,15 +63,44 @@ describe("ObjectQuest v2 gameplay state integration contracts", () => {
     expect(received.mock.calls.filter(([event]) => event.type === "allFragmentsCollected")).toHaveLength(1);
   });
 
-  it.skip("applies independent finish rules for Explore, Collect, and Race", () => {
-    // Explore: the authored goal/portal completes under its configured rule.
-    // Collect: the portal rejects early entry and activates only after every
-    // required unique fragment. Race: ordered required checkpoints plus finish
-    // complete the run; skipped/out-of-order checkpoints cannot finish it.
+  it("applies independent finish rules for Explore, Collect, and Race", () => {
+    const collect = new GameplaySession({ experience: collectExperience, worldId: "collect" });
+    expect(collect.enterPortal("finish-portal")).toBe(false);
+    collectExperience.mode.kind === "collect" &&
+      collectExperience.mode.requiredCollectibleIds.forEach((id) => collect.collectFragment(id));
+    expect(collect.enterPortal("finish-portal")).toBe(true);
+    expect(collect.enterPortal("finish-portal")).toBe(false);
 
-    // In every mode completion is emitted once, freezes the final result, and
-    // repeated trigger overlap cannot award another completion or result.
-    throw new Error("Contract stub: connect Worker 5 mode finish state machines");
+    const explore = new GameplaySession({
+      worldId: "explore",
+      experience: {
+        ...collectExperience,
+        mode: {
+          kind: "explore",
+          destinations: [{ id: "summit", position: [0, 1, 0], label: "Summit" }],
+          optionalCollectibleIds: [],
+        },
+      },
+    });
+    expect(explore.reachDestination("summit")).toBe(true);
+    expect(explore.snapshot.completed).toBe(true);
+
+    const clock = new FakeClock();
+    const race = new GameplaySession({
+      experience: raceExperience(),
+      worldId: "race",
+      clock,
+      bestTimeStore: new MemoryBestTimes(),
+    });
+    race.start();
+    clock.advance(2_000);
+    race.update();
+    expect(race.reachCheckpoint("checkpoint-2")).toBe(false);
+    expect(race.reachCheckpoint("checkpoint-1")).toBe(true);
+    expect(race.enterPortal("finish-portal")).toBe(false);
+    expect(race.reachCheckpoint("checkpoint-2")).toBe(true);
+    expect(race.enterPortal("finish-portal")).toBe(true);
+    expect(race.enterPortal("finish-portal")).toBe(false);
   });
 
   it.skip("keeps restart and respawn state distinct and internally consistent", () => {
@@ -57,14 +115,40 @@ describe("ObjectQuest v2 gameplay state integration contracts", () => {
     throw new Error("Contract stub: connect Worker 5 run/session state boundary");
   });
 
-  it.skip("uses deterministic race timing across countdown, pause, restart, completion, and comparison", () => {
-    // Inject a monotonic fake clock. Verify countdown time is excluded, active
-    // elapsed time never decreases, pause/background policy is explicit, and
-    // restart returns elapsed time and checkpoint order to their initial state.
+  it("uses deterministic race timing across countdown, pause, restart, completion, and comparison", () => {
+    const clock = new FakeClock();
+    const bestTimes = new MemoryBestTimes();
+    const session = new GameplaySession({
+      experience: raceExperience(),
+      worldId: "source-level",
+      publishedVersionId: "immutable-version-4",
+      clock,
+      bestTimeStore: bestTimes,
+    });
 
-    // Completion freezes elapsed milliseconds once, updates personal best only
-    // when lower, and binds the result/comparison target to the exact immutable
-    // published version ID. Editing or republishing the source cannot retarget it.
-    throw new Error("Contract stub: connect Worker 5 timer and Worker 7 versioned records");
+    session.start();
+    clock.advance(2_000);
+    session.update();
+    clock.advance(1_200);
+    expect(session.snapshot.race.elapsedMilliseconds).toBe(1_200);
+    session.setPaused(true);
+    clock.advance(4_000);
+    expect(session.snapshot.race.elapsedMilliseconds).toBe(1_200);
+    session.setPaused(false);
+    session.reachCheckpoint("checkpoint-1");
+    clock.advance(800);
+    session.reachCheckpoint("checkpoint-2");
+    session.enterPortal("finish-portal");
+
+    expect(session.snapshot.race.elapsedMilliseconds).toBe(2_000);
+    expect(session.snapshot.race.bestMilliseconds).toBe(2_000);
+    expect(session.snapshot.race.publishedVersionId).toBe("immutable-version-4");
+    expect(bestTimes.values.get("objectquest:race-best:immutable-version-4")).toBe(2_000);
+
+    clock.advance(9_000);
+    expect(session.snapshot.race.elapsedMilliseconds).toBe(2_000);
+    session.restart();
+    expect(session.snapshot.race.elapsedMilliseconds).toBe(0);
+    expect(session.snapshot.reachedCheckpointIds).toEqual([]);
   });
 });
