@@ -189,6 +189,7 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
     await page.getByRole("article").filter({ hasText: manifest.name }).last().getByRole("button", { name: "Edit" }).click();
     await expect(page.getByRole("heading", { name: "Spawn & checkpoints" }).locator("..").locator(".oq-editor__vec3").first().getByLabel("X")).toHaveValue("-3.5");
     await expect(page.getByRole("heading", { name: "Collectibles & finish" }).locator("..").locator(".oq-editor__checkpoint-item").first().locator(".oq-editor__vec3").getByLabel("X")).toHaveValue("-3.25");
+    await expect(page.getByRole("heading", { name: "Collectibles & finish" })).toBeVisible();
     await page.screenshot({ path: "test-results/worker7/B8-editor-entities.png", fullPage: true });
   });
 
