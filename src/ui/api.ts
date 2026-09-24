@@ -7,6 +7,7 @@ import type {
   ProviderCapabilityDescriptor,
   ProviderSubmitRequest,
   SceneManifest,
+  GeneratedImageReference,
 } from "@shared/index.js";
 
 /**
@@ -146,6 +147,17 @@ export function saveLevel(levelId: string, manifest: SceneManifest): Promise<Sce
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(manifest),
+  });
+}
+
+export function uploadWorldScreenshot(
+  levelId: string,
+  imageBase64: string,
+): Promise<GeneratedImageReference> {
+  return request<GeneratedImageReference>(`/api/postcards/${encodeURIComponent(levelId)}/screenshot`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ imageBase64 }),
   });
 }
 

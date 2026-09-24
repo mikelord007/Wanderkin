@@ -18,6 +18,7 @@ import { createAssetsRouter } from "./routes/assets.js";
 import { createGeneratedAssetsRouter } from "./routes/generatedAssets.js";
 import { createJobsRouter } from "./routes/jobs.js";
 import { createLevelsRouter, LevelStore } from "./levels.js";
+import { createPostcardsRouter } from "./postcards/routes.js";
 import { logServerError } from "./util/sanitize.js";
 
 /**
@@ -35,6 +36,7 @@ const generatedAssetStore = new GeneratedAssetStore(env.storageDir);
 const jobStore = new JobStore(env.storageDir);
 const spendLedger = new SpendLedger(env.storageDir);
 const previewCache = new PreviewCacheStore(env.storageDir);
+const levelStore = new LevelStore(env.storageDir, assetStore, photoStore);
 const sourceBytes = {
   async getPhotoBytes(id: string) {
     return (await photoStore.get(id))
@@ -64,8 +66,9 @@ app.use(createUploadsRouter(photoStore));
 app.use(createPhotosRouter(photoStore));
 app.use(createAssetsRouter(assetStore));
 app.use(createGeneratedAssetsRouter(generatedAssetStore));
+app.use(createPostcardsRouter(levelStore, generatedAssetStore));
 app.use(createJobsRouter(jobManager, adapter, photoStore, generatedAssetStore, previewCache, spendLedger));
-app.use(createLevelsRouter(new LevelStore(env.storageDir, assetStore, photoStore)));
+app.use(createLevelsRouter(levelStore));
 
 const terminalErrorHandler: ErrorRequestHandler = (error, req, res, next) => {
   if (res.headersSent) {
