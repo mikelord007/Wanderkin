@@ -3,6 +3,8 @@ import type { CoordinateConvention, Transform, Vec3 } from "./geometry.js";
 import { COORDINATE_CONVENTION } from "./geometry.js";
 import type { ProviderCapabilityId } from "./provider.js";
 import type { LevelExperience } from "./experience.js";
+import type { LevelMedia } from "./media.js";
+import type { GenerationProvenance } from "./provenance.js";
 
 /**
  * Records where a piece of level geometry came from. `null` on an entity
@@ -30,6 +32,8 @@ export interface AssetReference {
   sizeBytes: number;
   /** Absent for hand-authored placeholder assets that were never generated. */
   provenance?: AssetProvenance;
+  /** Normalized v2 provenance. Legacy assets may carry only `provenance`. */
+  generation?: GenerationProvenance;
 }
 
 export interface PhotoReference {
@@ -141,6 +145,8 @@ export interface SceneManifest {
    * needs deterministic style/mode/quest defaults.
    */
   experience?: LevelExperience;
+  /** Generated optional media. Its failure must never invalidate the level. */
+  media?: LevelMedia;
 }
 
 export function createEmptyManifest(params: {

@@ -1,5 +1,7 @@
 import { JOB_SCHEMA_VERSION } from "./schema-version.js";
 import type { ProviderCapabilityId } from "./provider.js";
+import type { GenerationJobKind, GenerationRequest, GenerationResult } from "./generation.js";
+import type { GenerationProvenance } from "./provenance.js";
 
 /**
  * Durable job states. `queued` through `preparing` are all "in progress";
@@ -51,6 +53,14 @@ export interface GenerationJob {
   uiMessage?: string;
   /** Populated once `state === "ready"`; references shared/manifest.ts AssetReference.id. */
   resultAssetId?: string;
+  /** Absent only on legacy image-to-3D jobs. */
+  kind?: GenerationJobKind;
+  /** Durable normalized request; server implementations may retain it privately until migrated. */
+  request?: GenerationRequest;
+  /** Provider-neutral result for every v2 job kind. */
+  result?: GenerationResult;
+  /** Timings/model/cost evidence. Unknown cost is represented by null. */
+  provenance?: GenerationProvenance;
 }
 
 export function isTerminalJobState(state: JobState): boolean {
