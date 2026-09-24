@@ -219,3 +219,127 @@ fresh IDs/URLs, and never overwrite an existing level.
   save/download/import/reload round trip against isolated storage. The existing
   real Rodin GLB also completed preparation, stable candidate switching,
   editor save, and reload without a new provider submission.
+
+## ObjectQuest v2 shared contracts (2026-09-24)
+
+The v2 contracts extend the v1 manifest; they do not replace it. The canonical
+reference data is `shared/fixtures/lost-colors.json`, and provider/job examples
+are in `shared/fixtures/generation-job-cases.json`.
+
+### Versioning and legacy reads
+
+- `SceneManifest.schemaVersion` remains `1`. The v2 additions are optional,
+  additive fields and therefore are not an incompatible envelope change.
+- `SceneManifest.experience` and `SceneManifest.media` may be absent on old
+  saved levels and bundled samples.
+- Each new contract family carries its own version constant from
+  `shared/schema-version.ts`: experience, style, quest, media, generation, and
+  published level.
+- A v2-only consumer must call `migrateSceneManifest(unknown)` from
+  `shared/manifest-migration.ts`. It validates the legacy envelope and new
+  blocks, then adds deterministic Explore/cartoon/quest defaults in memory.
+  It does not mutate its input or claim that legacy content was generated.
+- `sceneManifestReaderSchema` is the compatible read boundary. The legacy
+  fixture proves a pre-v2 saved manifest still parses and hydrates.
+
+Important integration gap: the current `server/levels.ts` has a separate Zod
+object that strips unknown keys. Until Worker 7 switches it to the shared
+compatible reader (or mirrors every additive field with passthrough-safe
+behavior), saving a v2 manifest through that route will discard `experience`,
+`media`, and normalized asset generation provenance. This is a persistence
+integration requirement, not permission for other workers to edit that file
+without its owner/orchestrator.
+
+### Style contract
+
+`shared/style.ts` exports `STYLE_DEFINITIONS` for exactly three `StyleId`
+values: `cartoon`, `hand-painted`, and `watercolor`. Every definition drives:
+
+- preview and geometry-reference prompt fragments plus negative constraints;
+- scene, fragment, and portal colors;
+- lighting values;
+- tone mapping, saturation/contrast, outlines, bloom, paper/wash treatment,
+  and reduced-motion-compatible ambient motion;
+- environment sky, ground, prop, and particle prompts;
+- music, ambience, collection, and portal audio prompts; and
+- UI accent colors, including a focus-ring color.
+
+Workers must consume this definition rather than create separate style enums
+or hard-coded palettes in UI, renderer, or audio code. An optional atmosphere
+is stored on `StyleSelection`; choosing a local style does not itself authorize
+a billable generation request. `approvedPreviewAssetId` identifies the exact
+durable preview approved for the build.
+
+### Experience and game-mode contract
+
+`SceneManifest.experience` is a `LevelExperience` containing one style
+selection, one discriminated `GameModeData`, validated quest copy, authored
+color fragments, an optional finish portal, and initial color restoration.
+
+- `explore`: destinations and optional collectible IDs; no mandatory timer.
+- `collect`: required collectible IDs/count, a finish-portal reference, and one
+  monotonic 0..1 restoration step per required fragment.
+- `race`: countdown, ordered checkpoint IDs, full-reset restart policy,
+  optional finish portal, and an optional local personal best.
+
+Color fragments and the finish portal are authored entities in the experience
+block rather than additions to the existing `SceneEntity` union. That preserves
+v1 renderer/editor exhaustiveness while Workers 5 and 7 add explicit v2
+handling. Spawn/checkpoint/fragment/portal transforms use the existing
+right-handed, Y-up, game-metre convention.
+
+Quest text is data only: `title`, `intro`, `objective`, and
+`narrationScript`. It may add flavor around supported mechanics; it cannot
+define executable rules or establish course reachability.
+
+### Generation jobs and provenance
+
+`shared/generation.ts` defines one provider-neutral request/result union for:
+
+| `GenerationJobKind` | Output |
+| --- | --- |
+| `image-to-3d` | Manifest `AssetReference` |
+| `image-edit` | Durable generated image |
+| `text` | Validated text/optional structured value |
+| `music` | Music `AudioAssetReference` |
+| `sfx` | SFX or ambience `AudioAssetReference` |
+| `tts` | Narration `AudioAssetReference` |
+| `video` | Animated-postcard `VideoAssetReference` |
+
+Every request has a schema version, kind, requested capability, idempotency
+key, and game-asset purpose. `GenerationJob` keeps its legacy image-to-3D
+fields and adds optional `kind`, normalized `request`, `result`, and
+`provenance` so old durable job records remain readable.
+
+`GenerationProvenance` records provider, requested and actually served
+capability, served model, application/provider job IDs, requested/start/end and
+derived timing values, and reported cost. `reportedCost: null` means unknown;
+it never means free. Missing served fields remain `null` rather than being
+invented from the request. Provider adapters may expose additional diagnostics
+privately, but downstream code consumes this normalized shape.
+
+### Audio and video references
+
+`shared/media.ts` separates audio (`music`, `ambience`, `sfx`, `narration`)
+from video (`animated-postcard`, `gameplay-highlight`). References are durable,
+content-addressed, typed by MIME/duration, and carry normalized provenance.
+Audio also records loop/default gain and optional transcript. Video records
+dimensions and an honest source label: `generated-animation` or
+`gameplay-capture`. A generated postcard must never be labeled as gameplay.
+
+`SceneManifest.media` is optional and contains independent audio/video arrays.
+Optional media failure must not invalidate the mesh, course, saved level,
+publication, replay, or share link.
+
+### Immutable publishing
+
+`PublishedLevelVersion` in `shared/publishing.ts` contains a unique
+`versionId`, stable `shareId`, source level/update identity, publication time,
+a fully hydrated manifest snapshot, challenge, and an explicit
+`includesSourcePhotos` privacy decision. A publication is copied and frozen:
+editing the private source later requires a new version/share and cannot alter
+an existing recipient experience or race target.
+
+Race challenge verification is currently `personal-unverified`. No worker may
+describe client-submitted times as authoritative or cheat-proof without a new
+server-verification architecture and acceptance evidence.
