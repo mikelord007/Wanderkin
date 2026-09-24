@@ -16,13 +16,17 @@ test.afterAll(async () => {
   await mcp?.close();
 });
 
-test("saved bundled worlds expose provider/model names in player-facing copy", async ({ page }, testInfo) => {
+test("bundled and saved worlds keep provider names out of player-facing copy", async ({ page }, testInfo) => {
   await page.route("**/api/**", async (route) => {
     const source = new URL(route.request().url());
     await route.continue({ url: `${api.baseUrl}${source.pathname}${source.search}` });
   });
 
   await page.goto("/");
+  await expect(page.getByRole("heading", { name: "The desk & sofa adventure" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "A different perspective" })).toBeVisible();
+  await expect(page.getByText(/Room corner — (Rodin|Tripo)/)).toHaveCount(0);
+
   const sample = page.getByRole("article").filter({
     has: page.getByRole("heading", { name: "The desk & sofa adventure" }),
   });
@@ -32,8 +36,11 @@ test("saved bundled worlds expose provider/model names in player-facing copy", a
   await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
   await page.reload();
 
-  const saved = page.getByRole("article").filter({ hasText: "Room corner — Rodin" });
+  const saved = page.getByRole("article")
+    .filter({ hasText: "The desk & sofa adventure" })
+    .filter({ hasText: "Generated world" });
   await expect(saved).toBeVisible();
-  await saved.screenshot({ path: testInfo.outputPath("provider-name-in-saved-world.png") });
+  await expect(page.getByText(/Room corner — (Rodin|Tripo)/)).toHaveCount(0);
+  await saved.screenshot({ path: testInfo.outputPath("provider-neutral-saved-world.png") });
   expect(mcp.callsFor("run_capability")).toHaveLength(0);
 });
