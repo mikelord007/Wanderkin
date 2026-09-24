@@ -8,9 +8,11 @@
  * leaving the level and reacting to completion, via `onExit`/`onComplete`.
  */
 
-import type { RefObject } from "react";
+import { useState, type RefObject } from "react";
 import type { GameLoadStage } from "../types.js";
 import type { GameplaySessionSnapshot } from "../modes/session.js";
+import { AudioControls, SubtitleBar, type AudioSettings } from "../../ui/components/index.js";
+import type { SubtitleState } from "../../audio/useGameAudio.js";
 import "./hud.css";
 
 export interface HudProps {
@@ -39,6 +41,9 @@ export interface HudProps {
   objective: string | undefined;
   introVisible: boolean;
   feedback: string | null;
+  audioSettings: AudioSettings;
+  onAudioSettingsChange: (settings: AudioSettings) => void;
+  subtitle: SubtitleState;
 }
 
 const STAGE_LABELS: { stage: GameLoadStage; label: string }[] = [
@@ -166,6 +171,7 @@ function LoadingCard({
 }
 
 export function Hud(props: HudProps) {
+  const [soundOpen, setSoundOpen] = useState(false);
   const {
     stage,
     error,
@@ -190,7 +196,11 @@ export function Hud(props: HudProps) {
         <>
           <ObjectivePanel props={props} />
 
-          <button type="button" className="oq-hud__pause" onClick={props.onPause} aria-label="Pause game">Pause</button>
+          <div className="oq-hud__top-actions">
+            <button type="button" onClick={() => setSoundOpen((open) => !open)} aria-expanded={soundOpen} aria-controls="game-audio-controls">Sound</button>
+            <button type="button" onClick={props.onPause} aria-label="Pause game">Pause</button>
+          </div>
+          {soundOpen ? <div className="oq-hud__sound" id="game-audio-controls"><AudioControls value={props.audioSettings} onChange={props.onAudioSettingsChange} /></div> : null}
 
           <div className="oq-hud__pointer" ref={objectiveArrowRef}>
             <div className="oq-hud__pointer-arrow" aria-hidden="true">
@@ -220,6 +230,7 @@ export function Hud(props: HudProps) {
             <span>Use WASD to move, Space to jump, and E to climb ledges.</span>
           </div> : null}
           {props.feedback ? <div className="oq-hud__feedback" role="status" aria-live="polite">{props.feedback}</div> : null}
+          <div className="oq-hud__subtitle"><SubtitleBar {...props.subtitle} /></div>
           {props.modeState?.mode === "race" && props.modeState.race.phase === "countdown" ? (
             <div className="oq-hud__countdown" role="status" aria-live="assertive">
               {props.modeState.race.countdownSecondsRemaining || "Go!"}

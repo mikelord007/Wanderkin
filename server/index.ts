@@ -8,8 +8,8 @@ import { PhotoStore } from "./persistence/photoStore.js";
 import { AssetStore } from "./persistence/assetStore.js";
 import { GeneratedAssetStore } from "./persistence/generatedAssetStore.js";
 import { JobStore, JobStoreUploadUrlCache } from "./jobs/store.js";
-import { JobManager } from "./jobs/manager.js";
-import { SpendLedger } from "./jobs/spendLedger.js";
+import { JobManager, ProviderConcurrencyExceededError } from "./jobs/manager.js";
+import { BudgetExceededError, SpendLedger } from "./jobs/spendLedger.js";
 import { PreviewCacheStore } from "./jobs/previewCache.js";
 import { createCapabilitiesRouter } from "./routes/capabilities.js";
 import { createUploadsRouter } from "./routes/uploads.js";
@@ -18,6 +18,10 @@ import { createAssetsRouter } from "./routes/assets.js";
 import { createGeneratedAssetsRouter } from "./routes/generatedAssets.js";
 import { createJobsRouter } from "./routes/jobs.js";
 import { createLevelsRouter, LevelStore } from "./levels.js";
+import { QuestOrchestrator, questGatewayFromManager } from "./quest/orchestrator.js";
+import { createQuestRouter } from "./quest/routes.js";
+import { AudioOrchestrator, audioGatewayFromManager } from "./audio/orchestrator.js";
+import { createAudioRouter } from "./audio/routes.js";
 import { logServerError } from "./util/sanitize.js";
 import { createRateLimiter, isBillableRoute, isUploadRoute } from "./security/rateLimit.js";
 import { createDiagnosticsRouter } from "./security/diagnostics.js";
@@ -75,6 +79,9 @@ const jobManager = new JobManager(jobStore, adapter, assetStore, photoStore, {
   dailyLimitUsd: env.livepeerMaxDailyUsd,
   ownerSecurity,
 });
+const levelStore = new LevelStore(env.storageDir, assetStore, photoStore);
+const questOrchestrator = new QuestOrchestrator(questGatewayFromManager(jobManager), levelStore);
+const audioOrchestrator = new AudioOrchestrator(audioGatewayFromManager(jobManager), levelStore);
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
@@ -98,7 +105,9 @@ app.use(createPhotosRouter(photoStore, ownerSecurity));
 app.use(createAssetsRouter(assetStore, ownerSecurity));
 app.use(createGeneratedAssetsRouter(generatedAssetStore, ownerSecurity));
 app.use(createJobsRouter(jobManager, adapter, photoStore, generatedAssetStore, previewCache, spendLedger, ownerSecurity));
-app.use(createLevelsRouter(new LevelStore(env.storageDir, assetStore, photoStore), undefined, ownerSecurity));
+app.use(createQuestRouter(questOrchestrator, ownerSecurity));
+app.use(createAudioRouter(audioOrchestrator, ownerSecurity));
+app.use(createLevelsRouter(levelStore, undefined, ownerSecurity));
 
 const terminalErrorHandler: ErrorRequestHandler = (error, req, res, next) => {
   if (res.headersSent) {
@@ -112,6 +121,16 @@ const terminalErrorHandler: ErrorRequestHandler = (error, req, res, next) => {
       return;
     }
     res.status(400).json({ message: "The multipart upload is invalid or exceeds an upload limit." });
+    return;
+  }
+
+  if (error instanceof ProviderConcurrencyExceededError) {
+    res.setHeader("Retry-After", String(error.retryAfterSeconds));
+    res.status(429).json({ message: error.message });
+    return;
+  }
+  if (error instanceof BudgetExceededError) {
+    res.status(402).json({ message: error.message, code: error.code });
     return;
   }
 

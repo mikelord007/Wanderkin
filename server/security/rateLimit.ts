@@ -81,7 +81,7 @@ export function isBillableRoute(req: Request): boolean {
     req.path === "/api/jobs/generate" ||
     req.path === "/api/jobs/previews" ||
     /^\/api\/jobs\/[^/]+\/retry$/.test(req.path) ||
-    /^\/api\/(?:quest|audio|postcards?)(?:\/|$)/.test(req.path)
+    /^\/api\/(?:quests?|audio|postcards?)(?:\/|$)/.test(req.path)
   );
 }
 
