@@ -8,8 +8,15 @@ import type {
   ProviderSubmitResult,
   ProviderValidationResult,
 } from "../../shared/provider.js";
+import type {
+  CreateGenerationRequest,
+  GenerationProviderAdapter,
+  ProviderGenerationStatus,
+  ProviderGenerationSubmitRequest,
+  ProviderGenerationSubmitResult,
+} from "../jobs/types.js";
 import { McpToolError, McpTransportError, type McpToolCaller } from "./mcpClient.js";
-import { STATIC_CAPABILITY_DESCRIPTORS, findStaticDescriptor } from "./capabilities.js";
+import { capabilityContract, STATIC_CAPABILITY_DESCRIPTORS, findStaticDescriptor } from "./capabilities.js";
 
 /** Adapter-side hook for turning a stored photo into re-hostable bytes.
  * Kept separate from disk/storage concerns so the adapter stays testable
@@ -45,6 +52,13 @@ interface RunCapabilitySubmitResponse {
   error_retryable?: boolean | null;
   served_model_id?: string;
   url?: string | null;
+  output_kind?: string;
+  output?: unknown;
+  payload?: unknown;
+  text?: string;
+  cost_usd?: number | null;
+  reported_cost_usd?: number | null;
+  actual_cost_usd?: number | null;
 }
 
 interface GetCreateMediaResponse {
@@ -59,6 +73,14 @@ interface GetCreateMediaResponse {
   error_code?: string | null;
   error_retryable?: boolean | null;
   eta_seconds?: number | null;
+  output_kind?: string;
+  output?: unknown;
+  payload?: unknown;
+  text?: string;
+  content_type?: string;
+  cost_usd?: number | null;
+  reported_cost_usd?: number | null;
+  actual_cost_usd?: number | null;
 }
 
 interface DescribeCapabilityResponse {
@@ -94,6 +116,50 @@ function deterministicSeed(key: string, modulus = TRIPO_SEED_MODULUS): number {
   return Math.abs(hash) % modulus;
 }
 
+function validateText(errors: string[], field: string, value: string, min: number, max: number): void {
+  const length = value.trim().length;
+  if (length < min || length > max) errors.push(`${field} must contain between ${min} and ${max} characters.`);
+}
+
+function validateId(errors: string[], field: string, value: string): void {
+  if (!value.trim()) errors.push(`${field} is required.`);
+}
+
+function reportedCost(value: {
+  cost_usd?: number | null;
+  reported_cost_usd?: number | null;
+  actual_cost_usd?: number | null;
+}): number | undefined {
+  const cost = value.reported_cost_usd ?? value.actual_cost_usd ?? value.cost_usd;
+  return typeof cost === "number" && Number.isFinite(cost) && cost >= 0 ? cost : undefined;
+}
+
+function normalizeOutput(value: {
+  url?: string | null;
+  text?: string;
+  output?: unknown;
+  payload?: unknown;
+  output_kind?: string;
+  content_type?: string;
+}): ProviderGenerationStatus["output"] | undefined {
+  const rawKind = value.output_kind?.toLowerCase();
+  const outputKind = rawKind === "3d" || rawKind === "image" || rawKind === "audio" || rawKind === "video" || rawKind === "text" || rawKind === "json"
+    ? rawKind
+    : undefined;
+  if (value.url) {
+    return {
+      url: value.url,
+      ...(outputKind ? { outputKind } : {}),
+      ...(value.content_type ? { contentType: value.content_type } : {}),
+    };
+  }
+  if (value.text !== undefined) return { text: value.text, outputKind: outputKind ?? "text" };
+  const payload = value.payload ?? value.output;
+  if (payload === undefined) return undefined;
+  if (typeof payload === "string") return { text: payload, outputKind: outputKind ?? "text" };
+  return { json: payload, outputKind: outputKind ?? "json" };
+}
+
 function orderPhotosForCapability(
   capability: ProviderCapabilityId,
   photos: readonly ProviderInputPhoto[],
@@ -110,7 +176,7 @@ function orderPhotosForCapability(
   return [...photos];
 }
 
-export class LivepeerAdapter implements ProviderAdapter {
+export class LivepeerAdapter implements ProviderAdapter, GenerationProviderAdapter {
   readonly providerId = "livepeer-agent-mcp";
 
   private discoveryCache: { at: number; value: ProviderCapabilityDescriptor[] } | null = null;
@@ -215,6 +281,257 @@ export class LivepeerAdapter implements ProviderAdapter {
       seenSourceIndices.add(photo.sourceIndex);
     }
     return { valid: errors.length === 0, errors };
+  }
+
+  validateGenerationInput(request: CreateGenerationRequest): ProviderValidationResult {
+    const errors: string[] = [];
+    const contract = capabilityContract(request.capability);
+    if (!contract) {
+      return { valid: false, errors: [`Unknown or unpriced capability "${request.capability}".`] };
+    }
+    if (contract.kind !== request.kind || request.input.kind !== request.kind) {
+      errors.push(`Capability "${request.capability}" is registered for ${contract.kind}, not ${request.kind}.`);
+    }
+
+    switch (request.input.kind) {
+      case "image-edit":
+        validateText(errors, "prompt", request.input.prompt, 1, 4_000);
+        validateId(errors, "sourcePhotoId", request.input.sourcePhotoId);
+        break;
+      case "background-removal":
+        validateId(errors, "sourcePhotoId", request.input.sourcePhotoId);
+        break;
+      case "image-to-3d": {
+        if (request.capability === "meshy-v7-i3d") {
+          if (request.input.photos.length !== 1) errors.push("meshy-v7-i3d requires exactly one source image.");
+          const opts = request.input.meshy;
+          if (opts?.enableAnimation && !opts.enableRigging) {
+            errors.push("Meshy animation requires enableRigging=true.");
+          }
+          if (opts?.animationActionId !== undefined && (!Number.isInteger(opts.animationActionId) || opts.animationActionId < 0 || opts.animationActionId > 696)) {
+            errors.push("animationActionId must be an integer from 0 through 696.");
+          }
+          if (opts?.targetPolycount !== undefined && (opts.targetPolycount < 100 || opts.targetPolycount > 300_000)) {
+            errors.push("targetPolycount must be between 100 and 300000.");
+          }
+        } else {
+          return this.validateInput(request.capability, request.input.photos);
+        }
+        break;
+      }
+      case "text":
+        validateText(errors, "prompt", request.input.prompt, 1, 8_000);
+        break;
+      case "music":
+        validateText(errors, "prompt", request.input.prompt, 1, 4_000);
+        break;
+      case "sfx":
+        validateText(errors, "prompt", request.input.prompt, 1, 2_000);
+        if (!Number.isInteger(request.input.durationSeconds) || request.input.durationSeconds < 1 || request.input.durationSeconds > 60) {
+          errors.push("durationSeconds must be an integer from 1 through 60.");
+        }
+        break;
+      case "tts":
+        validateText(errors, "text", request.input.text, 1, 2_000);
+        if (request.input.voice !== undefined) validateText(errors, "voice", request.input.voice, 1, 200);
+        break;
+      case "image-to-video":
+        validateText(errors, "prompt", request.input.prompt, 1, 4_000);
+        validateId(errors, "sourcePhotoId", request.input.sourcePhotoId);
+        if (request.input.durationSeconds !== undefined && (!Number.isInteger(request.input.durationSeconds) || request.input.durationSeconds < 3 || request.input.durationSeconds > 15)) {
+          errors.push("durationSeconds must be an integer from 3 through 15.");
+        }
+        break;
+    }
+    return { valid: errors.length === 0, errors };
+  }
+
+  async submitGeneration(request: ProviderGenerationSubmitRequest): Promise<ProviderGenerationSubmitResult> {
+    const validation = this.validateGenerationInput(request);
+    if (!validation.valid) {
+      throw new McpToolError(
+        `Input validation failed: ${validation.errors.join("; ")}`,
+        "run_capability",
+        false,
+        validation,
+      );
+    }
+
+    if (request.input.kind === "image-to-3d" && request.capability !== "meshy-v7-i3d") {
+      const legacy = await this.submit({
+        capability: request.capability,
+        photos: request.input.photos,
+        idempotencyKey: request.idempotencyKey,
+        ...(request.input.scenePrompt !== undefined ? { scenePrompt: request.input.scenePrompt } : {}),
+      });
+      return legacy;
+    }
+
+    const imageUrls = await this.resolveGenerationImageUrls(request);
+    const common = {
+      async: true,
+      idempotency_key: request.idempotencyKey,
+      session_id: request.idempotencyKey,
+      max_cost_usd: request.maxCostUsd,
+    };
+    let toolName: "create_media" | "run_capability";
+    let args: Record<string, unknown>;
+
+    switch (request.input.kind) {
+      case "image-edit":
+        toolName = "create_media";
+        args = { action: "generate", model_override: request.capability, source_url: imageUrls[0], prompt: request.input.prompt, quality_gate: false, ...common };
+        break;
+      case "background-removal":
+        toolName = "create_media";
+        args = { action: "generate", model_override: request.capability, source_url: imageUrls[0], prompt: ".", quality_gate: false, ...common };
+        break;
+      case "image-to-3d": {
+        toolName = "run_capability";
+        const o = request.input.meshy ?? {};
+        args = {
+          capability: request.capability,
+          source_url: imageUrls[0],
+          inputs: {
+            image_url: imageUrls[0],
+            ...(o.enableRigging !== undefined ? { enable_rigging: o.enableRigging } : {}),
+            ...(o.enableAnimation !== undefined ? { enable_animation: o.enableAnimation } : {}),
+            ...(o.animationActionId !== undefined ? { animation_action_id: o.animationActionId } : {}),
+            ...(o.ultraMode !== undefined ? { ultra_mode: o.ultraMode } : {}),
+            ...(o.shouldTexture !== undefined ? { should_texture: o.shouldTexture } : {}),
+            ...(o.modelType !== undefined ? { model_type: o.modelType } : {}),
+            ...(o.topology !== undefined ? { topology: o.topology } : {}),
+            ...(o.targetPolycount !== undefined ? { target_polycount: o.targetPolycount } : {}),
+            ...(o.poseMode !== undefined ? { pose_mode: o.poseMode } : {}),
+            ...(o.symmetryMode !== undefined ? { symmetry_mode: o.symmetryMode } : {}),
+            ...(o.enablePbr !== undefined ? { enable_pbr: o.enablePbr } : {}),
+          },
+          timeout: CAPABILITY_TIMEOUT_SECONDS,
+          ...common,
+        };
+        break;
+      }
+      case "text":
+        toolName = "run_capability";
+        args = { capability: request.capability, prompt: request.input.prompt, timeout: CAPABILITY_TIMEOUT_SECONDS, ...common };
+        break;
+      case "music":
+        toolName = "create_media";
+        args = { action: "music", model_override: request.capability, prompt: request.input.prompt, instrumental: request.input.instrumental ?? true, ...common };
+        break;
+      case "sfx":
+        toolName = "create_media";
+        args = { action: "music", model_override: request.capability, prompt: request.input.prompt, duration: request.input.durationSeconds, ...common };
+        break;
+      case "tts":
+        toolName = "create_media";
+        args = { action: "tts", model_override: request.capability, prompt: request.input.text, text: request.input.text, ...(request.input.voice ? { voice: request.input.voice } : {}), ...common };
+        break;
+      case "image-to-video":
+        toolName = "create_media";
+        args = { action: "animate", model_override: request.capability, source_url: imageUrls[0], prompt: request.input.prompt, ...(request.input.durationSeconds !== undefined ? { duration: request.input.durationSeconds } : {}), on_i2v_timeout: "wait", quality_gate: false, ...common };
+        break;
+    }
+
+    const response = await this.mcp.callTool<RunCapabilitySubmitResponse>(
+      toolName,
+      args,
+      { timeoutMs: SUBMIT_HTTP_TIMEOUT_MS },
+    );
+    if (response.error) {
+      throw new McpToolError(response.error, toolName, Boolean(response.error_retryable), response);
+    }
+    const inlineOutput = response.url || response.text || response.output !== undefined || response.payload !== undefined
+      ? normalizeOutput(response)
+      : undefined;
+    if (!response.job_id && !inlineOutput) {
+      throw new McpTransportError(`${toolName} returned neither a job_id nor an inline output for "${request.capability}"`);
+    }
+    const submitCost = reportedCost(response);
+    return {
+      providerJobId: response.job_id ?? null,
+      capabilityUsed: (response.capability_used ?? response.capability ?? request.capability) as ProviderCapabilityId,
+      fallbackFired: (response.fallback_fired ?? null) as ProviderCapabilityId | null,
+      ...(response.served_model_id ? { servedModel: response.served_model_id } : {}),
+      ...(submitCost !== undefined ? { reportedCostUsd: submitCost } : {}),
+      ...(inlineOutput ? { inlineOutput } : {}),
+    };
+  }
+
+  async getGenerationStatus(providerJobId: string): Promise<ProviderGenerationStatus> {
+    const response = await this.mcp.callTool<GetCreateMediaResponse>(
+      "get_create_media",
+      { job_id: providerJobId },
+      { timeoutMs: STATUS_HTTP_TIMEOUT_MS },
+    );
+    const status = (response.status ?? "").toLowerCase();
+    const cost = reportedCost(response);
+    if (FAILED_STATUSES.has(status)) {
+      return {
+        state: "failed",
+        ...(response.capability_used ? { actualCapabilityUsed: response.capability_used as ProviderCapabilityId } : {}),
+        actualFallbackFired: (response.fallback_fired ?? null) as ProviderCapabilityId | null,
+        ...(cost !== undefined ? { reportedCostUsd: cost } : {}),
+        error: {
+          message: response.error ?? `Generation ${status === "cancelled" ? "was cancelled" : "failed"}`,
+          retryable: status === "cancelled" ? false : (response.error_retryable ?? true),
+        },
+      };
+    }
+    if (READY_STATUSES.has(status)) {
+      const actualCapability = this.resolveActualCapability(response);
+      const registeredModel = await this.resolveRegisteredModel(response, actualCapability);
+      const output = normalizeOutput(response);
+      if (!output) {
+        return { state: "failed", error: { message: `Provider reported "${status}" but returned no output`, retryable: true } };
+      }
+      return {
+        state: "ready",
+        output,
+        ...(actualCapability ? { actualCapabilityUsed: actualCapability } : {}),
+        actualFallbackFired: (response.fallback_fired ?? null) as ProviderCapabilityId | null,
+        ...(registeredModel ? { actualRegisteredModel: registeredModel } : {}),
+        ...(cost !== undefined ? { reportedCostUsd: cost } : {}),
+      };
+    }
+    return {
+      state: "generating",
+      ...(response.capability_used ? { actualCapabilityUsed: response.capability_used as ProviderCapabilityId } : {}),
+      actualFallbackFired: (response.fallback_fired ?? null) as ProviderCapabilityId | null,
+      ...(cost !== undefined ? { reportedCostUsd: cost } : {}),
+    };
+  }
+
+  private async resolveGenerationImageUrls(request: ProviderGenerationSubmitRequest): Promise<string[]> {
+    let photoIds: string[] = [];
+    switch (request.input.kind) {
+      case "image-edit":
+      case "background-removal":
+      case "image-to-video":
+        photoIds = [request.input.sourcePhotoId];
+        break;
+      case "image-to-3d":
+        photoIds = orderPhotosForCapability(request.capability, request.input.photos).map((photo) => photo.photoId);
+        break;
+      default:
+        return [];
+    }
+
+    const cached = await this.uploadCache?.get(request.idempotencyKey);
+    if (cached) return cached;
+    const urls: string[] = [];
+    for (const photoId of photoIds) {
+      const bytes = await this.photos.getPhotoBytes(photoId);
+      const uploaded = await this.mcp.callTool<{ url?: string }>(
+        "upload",
+        { data: bytes.buffer.toString("base64"), mime_type: bytes.mimeType, kind: "image", filename: bytes.filename },
+        { timeoutMs: STATUS_HTTP_TIMEOUT_MS },
+      );
+      if (!uploaded.url) throw new McpTransportError(`Livepeer "upload" did not return a URL for photo ${photoId}`);
+      urls.push(uploaded.url);
+    }
+    await this.uploadCache?.set(request.idempotencyKey, urls);
+    return urls;
   }
 
   async submit(request: ProviderSubmitRequest): Promise<ProviderSubmitResult> {

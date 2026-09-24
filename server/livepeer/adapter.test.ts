@@ -113,6 +113,89 @@ describe("LivepeerAdapter.validateInput", () => {
   });
 });
 
+describe("LivepeerAdapter multi-kind contracts", () => {
+  const adapter = new LivepeerAdapter(fakeMcp({}), fakePhotos());
+
+  it("validates every supported generation kind against its capability contract", () => {
+    const requests = [
+      { kind: "image-edit", capability: "kontext-edit", input: { kind: "image-edit", sourcePhotoId: "p", prompt: "watercolor" } },
+      { kind: "background-removal", capability: "bg-remove", input: { kind: "background-removal", sourcePhotoId: "p" } },
+      { kind: "image-to-3d", capability: "rodin-i3d", input: { kind: "image-to-3d", photos: [{ photoId: "p", sourceIndex: 1 }] } },
+      { kind: "text", capability: "gemini-text", input: { kind: "text", prompt: "Return quest JSON" } },
+      { kind: "music", capability: "music", input: { kind: "music", prompt: "gentle instrumental" } },
+      { kind: "sfx", capability: "mirelo-sfx", input: { kind: "sfx", prompt: "soft chime", durationSeconds: 3 } },
+      { kind: "tts", capability: "chatterbox-tts", input: { kind: "tts", text: "Welcome explorer" } },
+      { kind: "image-to-video", capability: "pixverse-i2v", input: { kind: "image-to-video", sourcePhotoId: "p", prompt: "slow orbit", durationSeconds: 5 } },
+    ] as const;
+
+    for (const request of requests) expect(adapter.validateGenerationInput(request).valid, request.kind).toBe(true);
+  });
+
+  it("rejects incompatible capabilities and provider-bounded options before submission", () => {
+    expect(adapter.validateGenerationInput({
+      kind: "tts",
+      capability: "music",
+      input: { kind: "tts", text: "hello" },
+    }).errors.join(" ")).toMatch(/registered for music/);
+    expect(adapter.validateGenerationInput({
+      kind: "sfx",
+      capability: "mirelo-sfx",
+      input: { kind: "sfx", prompt: "rain", durationSeconds: 61 },
+    }).valid).toBe(false);
+    expect(adapter.validateGenerationInput({
+      kind: "image-to-3d",
+      capability: "meshy-v7-i3d",
+      input: {
+        kind: "image-to-3d",
+        photos: [{ photoId: "p", sourceIndex: 1 }],
+        meshy: { enableAnimation: true, enableRigging: false },
+      },
+    }).errors.join(" ")).toMatch(/requires enableRigging/);
+  });
+
+  it("submits TTS with the exact text field and no image upload", async () => {
+    const mcp = fakeMcp({
+      create_media: () => ({ job_id: "mjob_tts", status: "submitted", capability_used: "chatterbox-tts" }),
+    });
+    const live = new LivepeerAdapter(mcp, fakePhotos());
+    const result = await live.submitGeneration({
+      kind: "tts",
+      capability: "chatterbox-tts",
+      input: { kind: "tts", text: "Welcome explorer" },
+      idempotencyKey: "tts-1",
+      maxCostUsd: 1,
+    });
+    expect(result.providerJobId).toBe("mjob_tts");
+    expect(mcp.calls).toHaveLength(1);
+    expect(mcp.calls[0]).toMatchObject({
+      name: "create_media",
+      args: { action: "tts", text: "Welcome explorer", model_override: "chatterbox-tts", async: true },
+    });
+  });
+
+  it("uploads an image once and submits a bounded style edit", async () => {
+    const mcp = fakeMcp({
+      upload: () => ({ url: "https://agent.livepeer.org/a/source.jpg" }),
+      create_media: () => ({ job_id: "mjob_edit", status: "submitted", capability_used: "kontext-edit" }),
+    });
+    const live = new LivepeerAdapter(mcp, fakePhotos());
+    await live.submitGeneration({
+      kind: "image-edit",
+      capability: "kontext-edit",
+      input: { kind: "image-edit", sourcePhotoId: "p", prompt: "watercolor" },
+      idempotencyKey: "edit-1",
+      maxCostUsd: 0.1,
+    });
+    expect(mcp.calls.map((call) => call.name)).toEqual(["upload", "create_media"]);
+    expect(mcp.calls[1]?.args).toMatchObject({
+      model_override: "kontext-edit",
+      source_url: "https://agent.livepeer.org/a/source.jpg",
+      max_cost_usd: 0.1,
+      quality_gate: false,
+    });
+  });
+});
+
 describe("LivepeerAdapter.submit", () => {
   it("uploads photos in tripo's required view order and calls run_capability with async:true", async () => {
     const mcp = fakeMcp({
