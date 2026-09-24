@@ -3,6 +3,10 @@ import { createEmptyManifest } from "./manifest.js";
 import { SCENE_MANIFEST_SCHEMA_VERSION } from "./schema-version.js";
 import { COORDINATE_CONVENTION } from "./geometry.js";
 import { isTerminalJobState } from "./job.js";
+import legacyFixture from "./fixtures/legacy-scene-manifest-v1.json";
+import { migrateSceneManifest, sceneManifestReaderSchema } from "./manifest-migration.js";
+import lostColorsFixture from "./fixtures/lost-colors.json";
+import generationJobCases from "./fixtures/generation-job-cases.json";
 
 describe("createEmptyManifest", () => {
   it("produces a schema-versioned manifest with the shared coordinate convention", () => {
@@ -26,5 +30,43 @@ describe("isTerminalJobState", () => {
     expect(isTerminalJobState("failed")).toBe(true);
     expect(isTerminalJobState("generating")).toBe(false);
     expect(isTerminalJobState("queued")).toBe(false);
+  });
+});
+
+describe("legacy manifest compatibility", () => {
+  it("loads the pre-v2 saved-level fixture without changing its envelope version", () => {
+    expect(sceneManifestReaderSchema.parse(legacyFixture).schemaVersion).toBe(1);
+
+    const migrated = migrateSceneManifest(legacyFixture);
+    expect(migrated.schemaVersion).toBe(1);
+    expect(migrated.experience.mode.kind).toBe("explore");
+    expect(migrated.experience.quest.title).toBe(legacyFixture.name);
+    expect(migrated.experience.collectibles).toEqual([]);
+  });
+});
+
+describe("v2 reference fixtures", () => {
+  it("validates the complete Lost Colors fixture", () => {
+    const manifest = migrateSceneManifest(lostColorsFixture);
+    expect(manifest.assets[0]?.url).toBe("/samples/rodin.glb");
+    expect(manifest.experience.style.id).toBe("cartoon");
+    expect(manifest.experience.mode.kind).toBe("collect");
+    expect(manifest.experience.collectibles).toHaveLength(3);
+    expect(manifest.experience.finishPortal?.activation).toBe("all-required-collectibles");
+    expect(manifest.experience.quest.title).toBe("The Lost Colors of Teacup Island");
+  });
+
+  it("provides matching request and response fixtures for every job kind", () => {
+    const expected = ["image-to-3d", "image-edit", "text", "music", "sfx", "tts", "video"];
+    expect(generationJobCases.map((item) => item.request.kind)).toEqual(expected);
+    for (const fixture of generationJobCases) {
+      expect(fixture.request.schemaVersion).toBe(1);
+      expect(fixture.response.schemaVersion).toBe(1);
+      expect(fixture.response.kind).toBe(fixture.request.kind);
+      expect(fixture.response.provenance.requestedCapability).toBe(fixture.request.capability);
+      expect(fixture.response.provenance.applicationJobId).toBe(fixture.response.applicationJobId);
+      expect(fixture.response.provenance).toHaveProperty("reportedCost");
+      expect(fixture.response.result?.kind).toBe(fixture.request.kind);
+    }
   });
 });
