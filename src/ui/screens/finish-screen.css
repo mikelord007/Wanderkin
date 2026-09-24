@@ -25,6 +25,10 @@
 .oq-finish__eyebrow { margin: 0 0 10px; color: var(--oq-accent-ink); font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .oq-finish__card h1 { margin: 0; max-width: 12ch; font-family: var(--oq-font-display); font-size: clamp(2.6rem, 5.4vw, 4.8rem); line-height: .98; }
 .oq-finish__copy { margin: 20px 0 26px; max-width: 44ch; color: var(--oq-muted); font-size: 1.05rem; line-height: 1.65; }
+.oq-finish__results { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: -8px 0 24px; }
+.oq-finish__results div { padding: 12px; border-radius: 14px; background: var(--oq-wash); }
+.oq-finish__results dt { color: var(--oq-muted); font-size: .75rem; }
+.oq-finish__results dd { margin: 4px 0 0; font-size: 1.35rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .oq-finish__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .oq-finish__actions .oq-kit-button:first-child { grid-column: 1 / -1; }
 .oq-finish__note { margin: 15px 0 0; color: var(--oq-muted); font-size: .78rem; line-height: 1.45; }

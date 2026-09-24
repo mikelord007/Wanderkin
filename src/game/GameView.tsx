@@ -363,7 +363,18 @@ export function GameView({
         : runtime?.simulation.simulatedSeconds ?? 0,
     );
     runtime?.input.releasePointerLock();
-    onCompleteRef.current();
+    onCompleteRef.current({
+      mode: nextModeState?.mode ?? "legacy",
+      elapsedMilliseconds: nextModeState?.mode === "race"
+        ? nextModeState.race.elapsedMilliseconds
+        : nextModeState === null
+          ? Math.round((runtime?.simulation.simulatedSeconds ?? 0) * 1000)
+          : null,
+      bestMilliseconds: nextModeState?.mode === "race"
+        ? nextModeState.race.bestMilliseconds
+        : null,
+      publishedVersionId: nextModeState?.race.publishedVersionId ?? null,
+    });
   }, [runtime]);
 
   const syncModeState = useCallback((force = false) => {

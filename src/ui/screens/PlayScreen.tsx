@@ -1,5 +1,6 @@
 import { Component, lazy, Suspense, useState, type ReactNode } from "react";
 import type { SceneManifest } from "@shared/index.js";
+import type { GameCompletionResult } from "../../game/types.js";
 import { LoadingScreen } from "../components/LoadingScreen.js";
 
 const GameView = lazy(() =>
@@ -9,7 +10,7 @@ const GameView = lazy(() =>
 interface PlayScreenProps {
   manifest: SceneManifest;
   onExit: () => void;
-  onComplete: () => void;
+  onComplete: (result: GameCompletionResult) => void;
 }
 
 /** Thin wrapper — GameView owns gameplay HUD, mantle prompt, pause, and

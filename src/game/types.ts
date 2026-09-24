@@ -50,10 +50,17 @@ export interface GameSnapshot {
   mode?: GameplaySessionSnapshot;
 }
 
+export interface GameCompletionResult {
+  mode: "legacy" | "explore" | "collect" | "race";
+  elapsedMilliseconds: number | null;
+  bestMilliseconds: number | null;
+  publishedVersionId: string | null;
+}
+
 export interface GameViewProps {
   manifest: SceneManifest;
   onExit: () => void;
-  onComplete: () => void;
+  onComplete: (result: GameCompletionResult) => void;
   onProgress?: (snapshot: GameSnapshot) => void;
   /** Optional preview/debug override; saved levels normally use experience.style.id. */
   styleId?: StyleId;
