@@ -1,14 +1,16 @@
 # ObjectQuest hackathon demo
 
-This is the canonical ten-step sequence from the product brief. Use a current
+Snapshot: **2026-09-24**, integrated revision `764d1dd`. This is the canonical
+ten-step sequence from the product brief. Use a current
 desktop Chromium browser with keyboard and mouse. Do not improvise a paid run:
 refresh capability/price/allowance immediately before the demo and use a new
 photo only when that batch is authorized. Never show `.env` or a secret.
 
 ## Preflight
 
-1. Open the dedicated ObjectQuest origin and check `/api/health` in a separate
-   tab. It must return `{"status":"ok"}`.
+1. Open the authorized ObjectQuest origin and check `/api/health` in a separate
+   tab. It must return `{"status":"ok"}`. No hosted origin exists at this
+   snapshot; use the documented local topology until one is supplied.
 2. Confirm the durable volume is mounted and the release revision passed the
    checks in [`DELIVERY_CHECKLIST.md`](DELIVERY_CHECKLIST.md).
 3. Open **My worlds** on the welcome page and confirm the planned demo world or
@@ -29,10 +31,11 @@ select the authorized demo image. Confirm/use the image when prompted.
 with replace/retake available. Explain: “This is the source photograph; no 3D
 asset existed in ObjectQuest yet.”
 
-**Integrated UI:** The creation journey now provides **Choose from photos**,
+**Integrated UI:** The creation journey provides **Choose from photos**,
 **Take a photo**, drag-and-drop, a real preview, **Use this photo**, and
-**Retake or replace**. The complete journey still needs final browser validation
-on the release revision.
+**Retake or replace**. The integrated browser suite passed 37/43 with six
+intentional skips and no failures; target-device camera and user hands-on review
+remain open.
 
 ### 2. Review the object
 
@@ -43,14 +46,15 @@ the original image** or replace it.
 **Expected:** The intended object is complete and centered before any expensive
 3D work. The original remains available for comparison.
 
-**Fallback:** If background removal is unavailable, click **Use original photo**
-and state that this provider step has no real execution evidence; never show a
-fabricated cutout.
+**Fallback:** If background removal is unavailable, click **Use original photo**.
+ObjectQuest has one real cutout job (`mjob_a2426904c928`), but it is dated batch
+evidence, not a result for the current visitor. Never show a fabricated cutout.
 
 ### 3. Choose and approve the visual direction
 
-**Click:** Choose **Cartoon**, **Collect** (the default), optionally enter the
-prepared atmosphere, then click **Preview my world**. On **Like this
+**Click:** Choose one visual style—**Cartoon**, **Hand-painted**, or
+**Watercolor**—then choose the gameplay mode **Collect** (the default),
+optionally enter the prepared atmosphere, and click **Preview my world**. On **Like this
 direction?**, compare original and preview, click **Use this preview**, then
 click **Build my world**.
 
@@ -108,13 +112,14 @@ continues. Show subtitles with narration.
 **Expected:** Playback is user-initiated, channel controls work, and audio is
 tied to the saved world without restarting generation.
 
-**Current evidence boundary:** Worker 4's progress screen can submit story,
-music, and narration jobs and preview returned music/narration deliberately.
-Worker 6's complete quest/audio-to-saved-world integration has not landed, the
-bundled Lost Colors manifest has an empty audio array, and no real ObjectQuest
-execution exists yet for music, SFX, or TTS. Skip this step unless Worker 6
-supplies and validates those assets; do not substitute unrelated audio or
-claim generated sound evidence.
+**Current evidence boundary:** Quest/audio integration, independent optional
+jobs, bundled Lost Colors audio, gesture-gated playback, four audio buses,
+subtitles, and one-shot narration are implemented. The final B14 run made three
+WAV requests with zero runtime errors. That proves bundled playback, not real
+generated media: no current music, ambience, SFX, or TTS job has been submitted.
+If using the fallback, say “bundled audio.” If using a generated world, perform
+this step only after the corresponding real media has been generated and
+reviewed.
 
 ### 8. Save and share the challenge
 
@@ -133,17 +138,20 @@ copy; play and complete that saved copy before using **Share this world**.
 
 ### 9. Show optional media honestly
 
-**Click:** If integrated and already prepared, click **Create animated
-postcard** or **Download gameplay highlight** from completion. For a postcard,
-wait on its independent job; for a highlight, play the captured game clip.
+**Click:** From completion, click **Download gameplay highlight** and preview
+the recorded play if the browser supports capture. Click **Create animated
+postcard** only when a real postcard has already been authorized and prepared;
+wait on its independent job, then preview/download it.
 
 **Expected:** A postcard is labelled generated animation; a highlight is
 labelled actual gameplay. Failure does not block replay or the share link.
 
-**Current evidence boundary:** No real image-to-video execution is recorded.
-If the release has neither a validated postcard nor capture action, state that
-this optional extension is not demo-ready and continue. Never relabel the
-style-spike render as a postcard or gameplay capture.
+**Current evidence boundary:** Actual gameplay capture plus postcard screenshot,
+cache, retry, resume, preview, and download are implemented and covered by local
+contracts. No real image-to-video execution is recorded. In a no-provider demo,
+show the gameplay highlight only and describe the postcard as implemented but
+unvalidated live. Never relabel gameplay footage or the style-spike render as a
+generated postcard.
 
 ### 10. Show the real Livepeer evidence
 
@@ -151,12 +159,14 @@ style-spike render as a postcard or gameplay capture.
 provenance and artifacts. Point to the job IDs and costs rather than an endpoint
 logo alone.
 
-**Expected:** Show `mjob_7c10fc5aa558` (`kontext-edit`, $0.042 estimated) and
-`mjob_03a06e271b73` (`rodin-i3d`, $0.420 estimated), plus the 2026-09-18
-`mjob_cfb2286bf2b5` Rodin success with unknown retained cost. Explain the five
-separate claims: catalog availability, historical health, our execution,
-visual quality, and gameplay usability. Provider-metered cost for the spike
-jobs is unknown because their terminal records returned null.
+**Expected:** Start with current ready rows: `mjob_a2426904c928` (cutout),
+`mjob_d3d1797a1657` (Kontext), `mjob_4a0b2bde417b` (GPT image edit), and
+`mjob_0001ef7f3201` (Rodin). Explain that quest job
+`mjob_13e739e8d5af` completed at the provider with nested valid text, but the
+application adapter/recovery is pending; rows 6–16 were not submitted. Then
+show the $0.042 Kontext and $0.420 Rodin style spike and the 2026-09-18 Rodin
+success. The current batch estimate is $0.6932 and the combined batch-plus-
+spike estimate is $1.1552; provider-metered costs are unknown, not zero.
 
 ## Provider-down fallback path
 
@@ -168,6 +178,9 @@ were verified present after Integration #3:
 - source photograph: [`public/samples/photo-4.jpg`](../public/samples/photo-4.jpg),
 - Rodin GLB: [`public/samples/rodin.glb`](../public/samples/rodin.glb),
 - Tripo GLB: [`public/samples/tripo.glb`](../public/samples/tripo.glb).
+- bundled audio is referenced by
+  [`shared/fixtures/lost-colors.json`](../shared/fixtures/lost-colors.json) and
+  served from [`public/audio`](../public/audio).
 
 To switch cleanly:
 
@@ -180,10 +193,13 @@ To switch cleanly:
 3. Complete steps 5 and 6 with the bundled Rodin world. For sharing, use **Edit
    course** → **Save** first, then complete and share the saved copy as described
    in step 8.
-4. For steps 3, 9, and 10, show only the committed dated evidence and state its
-   date and boundary. Skip step 7 unless validated generated audio has landed.
+4. Use the bundled Lost Colors tracks for step 7 and call them bundled. For
+   steps 3, 9, and 10, show only committed dated evidence and state its date and
+   boundary. Do not click **Preview my world**, **Build my world**, or **Create
+   animated postcard** in this no-provider path.
 
-This fallback still demonstrates recognizable real provider geometry, authored
-gameplay, Lost Colors progression, persistence, immutable sharing, and honest
-provenance. It does not demonstrate a new live job, automatic course quality,
-generated audio, or generated postcard media.
+This fallback demonstrates recognizable bundled real-provider geometry,
+authored gameplay, Lost Colors progression and audio, gameplay capture,
+persistence, immutable sharing, and honest provenance. It does not demonstrate
+a new live job, automatic course quality, generated audio, or generated
+postcard media.
