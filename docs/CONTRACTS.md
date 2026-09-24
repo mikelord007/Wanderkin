@@ -116,6 +116,14 @@ The client sends imports as `application/octet-stream` so the route-specific
 bundle limit applies. This implemented contract is not yet a browser-acceptance
 claim; the final round-trip result belongs in `docs/QA.md`.
 
+The smallest share bootstrap lives in `src/App.tsx`: a pathname matching
+`/share/:shareId` takes precedence over local creation-resume state and opens
+the public friend landing. The landing reads only `GET /api/shares/:shareId`
+and enters `PlayScreen` with the immutable manifest; it never calls upload or
+generation routes. Shared Race play uses the publication `versionId` as its
+client-side world identity and labels the creator target unverified, so local
+times cannot be compared across later private publications.
+
 `AssetReference` remains the shared manifest asset shape. The server may return
 the additive transport shape below from `GET /api/assets/:id`:
 
