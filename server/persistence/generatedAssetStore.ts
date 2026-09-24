@@ -14,9 +14,10 @@ type GeneratedBinaryAssetDraft =
   | Omit<AudioAssetReference, "url" | "sha256" | "sizeBytes">
   | Omit<VideoAssetReference, "url" | "sha256" | "sizeBytes">;
 
-const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
+export const MAX_GENERATED_IMAGE_BYTES = 25 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 75 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
+const ALLOWED_PROVIDER_IMAGE_CAPABILITIES = new Set(["bg-remove", "kontext-edit", "gpt-image-edit"]);
 
 export class GeneratedAssetStore {
   private readonly index: JsonFileStore<Record<string, GeneratedBinaryAsset>>;
@@ -32,7 +33,7 @@ export class GeneratedAssetStore {
     expectedMimeType: GeneratedImageReference["mimeType"],
     provenance: GenerationProvenance,
   ): Promise<GeneratedImageReference> {
-    assertSize(buffer, MAX_IMAGE_BYTES, "image");
+    assertSize(buffer, MAX_GENERATED_IMAGE_BYTES, "image");
     const detected = detectImage(buffer);
     if (!detected || detected.mimeType !== expectedMimeType) {
       throw new InvalidFileError(`Generated image bytes do not match expected ${expectedMimeType}.`);
@@ -100,13 +101,24 @@ export class GeneratedAssetStore {
   }
 
   async getImageBytes(id: string): Promise<{ buffer: Buffer; mimeType: string; filename: string }> {
-    const asset = await this.get(id);
-    if (!asset || "mediaType" in asset) {
-      throw new Error(`Unknown generated image asset id "${id}"`);
-    }
+    const asset = await this.getProviderImage(id);
+    if (!asset) throw new Error(`Unknown or ineligible generated image asset id "${id}"`);
     const filename = asset.url.split("/").pop();
     if (!filename) throw new Error(`Generated image "${id}" has an invalid stored URL`);
-    return { buffer: await readFile(join(this.dir, filename)), mimeType: asset.mimeType, filename };
+    const buffer = await readFile(join(this.dir, filename));
+    assertSize(buffer, MAX_GENERATED_IMAGE_BYTES, "image");
+    return { buffer, mimeType: asset.mimeType, filename };
+  }
+
+  /** Returns only generated images that are safe to reuse as provider image
+   * inputs. Audio/video records and images from unrelated capabilities are
+   * deliberately excluded. */
+  async getProviderImage(id: string): Promise<GeneratedImageReference | undefined> {
+    const asset = await this.get(id);
+    if (!asset || "mediaType" in asset) return undefined;
+    if (asset.sizeBytes < 1 || asset.sizeBytes > MAX_GENERATED_IMAGE_BYTES) return undefined;
+    if (!ALLOWED_PROVIDER_IMAGE_CAPABILITIES.has(asset.provenance.requestedCapability)) return undefined;
+    return asset;
   }
 
   fileDir(): string {

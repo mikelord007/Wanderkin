@@ -27,4 +27,8 @@ export interface GenerationProvenance {
   timings: GenerationTimings;
   /** `null` means unknown/not reported; it must never be interpreted as zero. */
   reportedCost: ReportedGenerationCost | null;
+  /** Generated image inputs used for a 3D request, in provider order. */
+  sourceImageAssetIds?: readonly string[];
+  /** Approved style direction associated with a 3D request. Provider-inert. */
+  styleReferenceAssetId?: string;
 }
