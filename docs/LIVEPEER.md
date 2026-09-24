@@ -20,6 +20,57 @@ Environment variables (`server/env.ts`):
 | `LIVEPEER_API_KEY` | empty | Optional bearer token. Not exercised against a real key — the reference workspace's successful 2026-09-17 test used the **keyless demo path** with no `Authorization` header at all (see `mcpClient.ts`). |
 | `PORT` | `8787` | Node API port. |
 | `STORAGE_DIR` | `./storage` | Durable jobs/photos/assets JSON + file storage. Created on first write. |
+| `LIVEPEER_MAX_REQUEST_USD` | `2` | Hard server-side estimate ceiling for one generation request; callers may only tighten it. |
+| `LIVEPEER_MAX_WORLD_USD` | `8` | Hard cumulative known-spend ceiling for one supplied `worldId`. |
+| `LIVEPEER_MAX_AUTOMATIC_RETRIES` | `3` | Retry bound, constrained to 0–5. |
+
+## V2 common generation API
+
+The normalized request and result unions are in `shared/generation.ts`; job
+provenance is exactly `shared/provenance.ts`. The server does not expose raw
+provider responses, signed URLs, or credentials.
+
+```ts
+jobManager.submitGenerationOrReconcile(
+  request: GenerationRequest,
+  options?: { worldId?: string; requestLimitOverrideUsd?: number },
+): Promise<SubmitOutcome>
+```
+
+HTTP:
+
+- `POST /api/jobs/generate` with
+  `{request: GenerationRequest, worldId?: string, maxCostUsd?: number}` and an
+  `Idempotency-Key` header equal to `request.idempotencyKey`.
+- `GET /api/jobs/:id` and `POST /api/jobs/:id/retry` work for both legacy and
+  v2 jobs.
+- `GET /api/jobs/spend/:worldId` returns known spend plus an explicit count
+  of unknown-cost ledger entries.
+- `POST /api/jobs/previews` submits or reuses an image-edit style preview.
+- `GET /api/jobs/preview-cache/:sha256` reads its cache entry.
+- `POST /api/jobs/preview-cache/:sha256/approve` with `{jobId}` marks a ready
+  preview approved. A later request with identical capability, source image,
+  instruction, and MIME type returns the approved job without submission.
+- `GET /api/generated-assets/:id` returns generated image/audio/video
+  metadata and provenance; immutable bytes are under
+  `/api/generated-assets/files/:sha256.ext`.
+
+`bg-remove` is represented by the shared `image-edit` request kind with
+capability `bg-remove`, purpose `object-cutout`, and an explicit removal
+instruction. `pixverse-i2v` uses the shared `video` kind. The adapter supports
+the shared kinds image-to-3d, image-edit, text, music, sfx, tts, and video;
+the legacy `POST /api/jobs` Rodin/Tripo request remains unchanged.
+
+The spend ledger (`storage/spend-ledger.json`) reserves the catalog estimate
+before submission and replaces it with provider-reported USD when supplied.
+An unavailable estimate is persisted with status `unknown`; it is never
+coerced to zero. A request whose known estimate would cross either limit is
+rejected with HTTP 402 and `code: "budget_exceeded"` before upload or provider
+submission.
+
+Generated media is downloaded through the existing SSRF/redirect/size guard,
+magic-byte checked, content-addressed, and stored independently. A failed
+optional TTS/SFX/video job cannot mutate or invalidate an already-ready mesh.
 
 ## Wire protocol
 
@@ -246,6 +297,21 @@ which has no provenance either.
 
 ## Known gaps / follow-ups
 
+- Worker 1's shared contracts intentionally have no separate
+  `background-removal` kind; the exact server mapping is the `image-edit`
+  profile documented above.
+- `GenerationProvenance` has no game-asset-consumer field. The consuming slot
+  is retained in `GenerationRequest.purpose` and the world budget key is kept
+  in the spend ledger; no server-local provenance fork is emitted.
+- `ImageTo3dGenerationRequest` does not expose Meshy rigging/animation option
+  fields even though the live capability supports them. The gateway therefore
+  submits only the base single-image Meshy contract and does not expose those
+  paid add-ons until the shared request union is extended.
+- TTS provider results do not currently expose a reliable duration in the
+  normalized status, while `AudioAssetReference.durationSeconds` is required;
+  persisted narration uses `0` to mean unknown duration. It is not presented
+  as measured duration.
+
 - `/api/levels`, `/api/levels/:id` (manifest persistence) are owned by the
   Level tools worker and are not registered in `server/index.ts` yet — see
   the `TODO(Level tools worker)` comment there.
@@ -259,9 +325,6 @@ which has no provenance either.
   explicit temporary sole-ownership grant for that one dependency addition
   (foundation worker idle, runtime at max concurrent workers). Full server
   tree typechecks clean now.
-- No HTTP-level route tests (e.g. via `supertest`) — this worktree has no
-  test HTTP client dependency installed, and adding one is a root-config
-  decision outside this worker's scope. Route logic is covered indirectly
-  through `JobManager`/`LivepeerAdapter` unit tests (which route handlers
-  delegate to almost immediately) plus manual read-through of the
-  request/response shapes against `src/ui/api.ts`.
+- Route coverage uses real Express listeners and native `fetch`; HTTP e2e
+  coverage spawns the actual `server/index.ts` against a local fake MCP
+  server, so no additional HTTP-test dependency or live generation is used.

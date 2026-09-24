@@ -212,4 +212,57 @@ describe("POST /api/jobs, status, retry, and restart reconciliation", () => {
     const unknownBody = (await unknown.json()) as { message: string };
     expect(unknownBody).toEqual({ message: "Job not found" });
   });
+
+  it("submits and deduplicates a shared v2 text job and records world spend", async () => {
+    await boot();
+    const key = uniqueIdempotencyKey("v2-text");
+    const request = {
+      schemaVersion: 1,
+      kind: "text",
+      capability: "gemini-text",
+      idempotencyKey: key,
+      purpose: "quest-text",
+      prompt: "Return a constrained Lost Colors quest JSON object.",
+      output: "quest-json",
+      maxCharacters: 1200,
+    } as const;
+    const send = () => fetch(`${api!.baseUrl}/api/jobs/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": key },
+      body: JSON.stringify({ request, worldId: "world-v2-text", maxCostUsd: 0.01 }),
+    });
+    const first = await send();
+    const firstJob = await first.json() as GenerationJob;
+    const second = await send();
+    const secondJob = await second.json() as GenerationJob;
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(200);
+    expect(secondJob.id).toBe(firstJob.id);
+    expect(firstJob).toMatchObject({ kind: "text", state: "generating", request: { purpose: "quest-text" } });
+    expect(mcp!.callsFor("run_capability")).toHaveLength(1);
+    const spend = await fetch(`${api!.baseUrl}/api/jobs/spend/world-v2-text`);
+    expect(await spend.json()).toMatchObject({ worldId: "world-v2-text", entries: 1, unknownEntries: 0 });
+  });
+
+  it("hard-rejects an over-budget v2 mesh before upload or provider submission", async () => {
+    await boot();
+    const photo = await uploadPhoto(1);
+    const key = uniqueIdempotencyKey("v2-budget");
+    const response = await fetch(`${api!.baseUrl}/api/jobs/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": key },
+      body: JSON.stringify({
+        request: {
+          schemaVersion: 1, kind: "image-to-3d", capability: "rodin-i3d", idempotencyKey: key,
+          purpose: "world-mesh", photos: [{ photoId: photo.id, sourceIndex: 1 }],
+        },
+        worldId: "world-over-budget",
+        maxCostUsd: 0.1,
+      }),
+    });
+    expect(response.status).toBe(402);
+    expect(await response.json()).toMatchObject({ code: "budget_exceeded", message: expect.stringMatching(/per-request limit/) });
+    expect(mcp!.callsFor("upload")).toHaveLength(0);
+    expect(mcp!.callsFor("run_capability")).toHaveLength(0);
+  });
 });
