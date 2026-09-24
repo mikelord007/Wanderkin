@@ -1,0 +1,27 @@
+# Replace the default with the dedicated ObjectQuest hostname. Caddy obtains
+# and renews TLS certificates when DNS points the hostname at this server.
+{$OBJECTQUEST_ORIGIN:localhost} {
+	encode zstd gzip
+
+	# Keep API responses, stored GLBs, photos, audio, and video on the same
+	# public origin. Do not use handle_path: the Node routes include /api.
+	handle /api/* {
+		reverse_proxy {$OBJECTQUEST_API:127.0.0.1:8787}
+	}
+
+	# Copy the Vite build output here. try_files makes direct loads of
+	# /share/:shareId and other React routes resolve to the application shell.
+	handle {
+		root * {$OBJECTQUEST_STATIC_ROOT:/srv/objectquest/dist}
+		try_files {path} /index.html
+		file_server
+	}
+
+	# The API intentionally has no CORS policy: browser traffic is same-origin.
+	# Caddy's reverse proxy preserves Range requests used by media clients.
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}
