@@ -1,4 +1,180 @@
-# Independent QA verification — items 6, 10, 13, 11/12, 1-5/7-9
+# Independent QA verification — items 6, 10, 13, 11/12, 1-5/7-9, FINAL
+
+## FINAL: settled-tree combined validation
+
+All three owners frozen. Reviewed at **HEAD `5082e3a`** (my own prior checkpoint commit; product
+code unchanged since `fb2500d`/`cec9f92`), `git status` clean of all tracked source (only the
+known pre-existing untracked `nimbalyst-local/*` docs/screenshots remain, none of them product
+code). No source or test files edited this round either — still fully read-only.
+
+### Gameplay's final delta (`1a45bdb`, `cec9f92`) — reviewed
+
+- `1a45bdb` (lantern washout fix): read the full diff. The physics is sound — a Three.js
+  `PointLight`'s `distance`/`intensity` are world-space and untouched by a parent group's scale,
+  so a range/intensity tuned for the 0.70 m character floods a 0.35 m one; the fix expresses both
+  relative to the character's real height (`LANTERN_LIGHT.rangeInHeights`,
+  `intensityAtUnitHeight`), with intensity scaled by height² — correct, since illuminance falls
+  off with the square of distance, so holding apparent brightness constant at a
+  proportionally-scaled point requires intensity ∝ distance² ∝ height². Also moves the lantern
+  from centre-chest (hidden by the scarf) to a shoulder blade, and stands the light off behind its
+  own lens (a light sitting on the body's own surface washing out the surface it sits on is an
+  independently-plausible bug, not just asserted). Viewed the before/after-equivalent screenshots
+  (`game-camera-new-035m.png`, `under-the-sofa-game-camera.png`): character reads clearly, no
+  white blowout, small legible lantern glow — consistent with the fix.
+  **Gap found, low severity**: this logic has **zero unit test coverage** — no
+  `PlayerAvatar.test.ts` exists anywhere, so `LANTERN_LIGHT`'s height-scaling math is verified only
+  by screenshot, not pinned by any assertion. A future height change could silently reintroduce
+  the washout with nothing to catch it. Worth a cheap follow-up test (pure arithmetic, no
+  rendering needed: assert `distance`/intensity scale correctly for a couple of heights) whenever
+  this file is next touched — not blocking, not requesting it now per the freeze.
+- `cec9f92` (in-scene camera verification, `cameraRig.test.ts`, 4 tests): read the full test file.
+  It drives the **real** `CameraRig` against a **real** Rapier physics world under an actual 0.55 m
+  slab (sofa-underside proxy), not a mock — and precisely asserts every invariant the coordinator
+  named: the miniature capsule stands/grounds where the authored one physically cannot fit
+  (`capsuleHeight(AUTHORED) > CLEARANCE`, `capsuleHeight(miniature) < CLEARANCE`); occlusion pull-in
+  (`pose.occluded === true`, `pose.distance < config.camera.distance`); never inside the furniture
+  (`pose.position.y < CLEARANCE`) or the character (`pose.distance >= characterRadius *
+  CAMERA_MIN_DISTANCE_RATIO`); eases back to the full boom in the open
+  (`toBeCloseTo(config.camera.distance, 3)`); and framing ratios (boom/lift/min-boom, all measured
+  in character heights) are identical between scales to 9 decimal places. This is exactly what was
+  claimed, independently confirmed by reading the assertions, not the prose summary.
+
+### Focused mesh/rig/animator/camera tests — run now that gameplay's files are frozen
+
+Previously blocked (these files were dirty mid-polish during the items-11/12 pass). Now clean, run
+directly: `characterGeometry.test.ts` (14), `characterRig.test.ts` (8), `characterAnimator.test.ts`
+(16), `cameraRig.test.ts` (4) — **42/42 pass**. Combined with the 51 already re-verified in the
+items-11/12 section below, that's every gameplay-owned test file independently re-run by this
+worker at a settled commit, not just relying on the gameplay owner's own report.
+
+### `fb2500d` (navigation's async-race fix) — reviewed and re-proven live, not just re-read
+
+Read the full diff (`createNavigationGuard()`: a monotonic token counter — `begin()` supersedes
+any earlier attempt, `isCurrent(token)` gates whether a since-superseded async resolution may still
+apply — wired through all three navigation entry points in `App.tsx`: initial load, `popstate`,
+`go()`). This is the correct fix: it doesn't matter whether a stale result is a success or a
+fallback, or which order two competing async resolutions settle in — only the most-recently-started
+attempt's result can ever be applied.
+
+- `routing.test.ts`: **12/12 pass**, including the 4 new deterministic regression tests (original
+  repro; out-of-order settling; stale-fallback-treated-same-as-stale-success; sanity check that a
+  non-superseded result still applies).
+- **Re-ran my own original live repro end-to-end in the actual app** (not just the unit tests):
+  patched `fetch` to delay `GET /api/levels/level-0ed836ff` by 800ms, navigated to
+  `/edit/level-0ed836ff`, then back to `/` before the fetch resolved. After the full delay plus a
+  500ms margin: `location.pathname` stayed at `/` and **zero** `history.replaceState` calls were
+  logged — confirmed fixed, using the identical repro that originally found the bug.
+- **Additionally ran the "competing async success, out-of-order settle" case live** (the
+  coordinator's second scenario): navigated to `/edit/sample-rodin-room-corner` (older, delayed
+  1200ms) then, 
+  before it resolved, to `/edit/level-0ed836ff` (newer, delayed 200ms — resolves first). After both
+  fetches had long since resolved, `location.pathname` remained at `/edit/level-0ed836ff` (the
+  newer/current navigation) throughout, with no stray `replaceState` calls — the late-arriving
+  older result was correctly discarded even though it succeeded.
+- Did **not** additionally re-run the "older failure" case live (a stale fetch that resolves to a
+  fallback rather than a success) — judged the deterministic unit test (`routing.test.ts`'s third
+  new test, using controlled deferred promises) sufficient for that one, since it exercises the
+  exact same `isCurrent()` gate with no timing flakiness, and I'd already independently reproduced
+  both other scenarios live. Noting this honestly rather than claiming full live coverage of all
+  three.
+- Item 6 is now fully closed: no outstanding defects.
+
+### Combined settled-tree check — run once, as requested
+
+Inspected `package.json` scripts and `tests/e2e/http/helpers/apiServer.ts` first, per the
+instruction to check for unintended provider/storage activity before running anything broad:
+the HTTP e2e helper spawns the real server as a child process but with an OS-assigned free port
+(`getFreePort()`, never 8787/5173/15173/18799) and a fresh `mkdtempSync` temp `STORAGE_DIR` per
+test file, `LIVEPEER_MCP_ENDPOINT` pointed at a local `FakeMcpServer`, and an empty
+`LIVEPEER_API_KEY` — confirmed safe (no protected ports, no live storage, no real provider calls)
+before running it.
+
+- `npm run typecheck` (client + server tsconfig): **clean**.
+- `npm run build` (typecheck + `vite build` + server `tsc`): **succeeds**, exit 0, produced both
+  `dist/` and `dist-server/` (deleted afterward — gitignored, not part of the checkpoint).
+  Chunk-size warnings for `rapier.es` (2 MB) and `GLTFLoader` (729 KB) are pre-existing, expected
+  for a 3D/physics app, not a new regression.
+- `npx vitest run` (full unit suite): **69 files, 474 tests, all pass** — the first genuinely clean
+  full-suite run at a settled commit boundary this session. This resolves the previously-reported
+  "2 failures in `characterAnimator.test.ts`" for good: 16/16 pass here, consistent with the
+  gameplay owner's own explanation (a shared-tree read of a half-applied edit mid-session, not a
+  real defect) and with every other independent re-run of that file this session.
+- `npm run test:e2e:http` (isolated child-process server, temp storage/ports, fake MCP endpoint):
+  **7 files, 46 tests, all pass**.
+- No paid calls made, no protected port/service touched or restarted, no live storage written.
+
+### Item 8 (Create step 2 Look/Adventure) — live-confirmed via `/design-kit/`
+
+Previously flagged as not independently re-verified (needs a real prepared asset to reach live,
+which I didn't want to generate). Found a side door: `/design-kit/` (a separate Vite entry,
+`design-kit/index.html`, confirmed in `vite.config.ts`) renders the actual `CustomizeScreen`
+component with illustrative placeholder swatches instead of a real asset — same component, same
+CSS, no generation needed. Screenshotted it directly: **"Look" and "Adventure" are now real
+Fraunces-display headings**, each with its own descriptive line, clearly separated from the tile
+cards by rule and air — exactly matching the "real headings ... separated by a rule and air"
+claim, not "bold text stranded between three identically shadowed cards." The Look tiles are also
+explicitly labelled "Illustrative color swatches — not generated previews" in this view, which is
+itself the correct, honest distinction item 9 asked for. Caveat: this is the shared component
+rendered with placeholder content, not the literal live Create-from-photos flow with real
+generated images — sufficient evidence for the layout/heading claim (what item 8 is about), not a
+substitute for a real end-to-end creation flow (which nothing in this review triggered, correctly,
+to avoid paid calls).
+
+## FINAL — item-by-item summary (all 13)
+
+| # | Item | Status | Evidence |
+|---|---|---|---|
+| 1 | App name (Mousehold) | Done, verified | `src/brand.ts`, page `<title>`, landing screenshot |
+| 2 | Original logo | Done, verified | `public/brand/mousehold-mark.svg`, favicon, boot screen, landing header screenshot |
+| 3 | Landing word wrapping | Done, verified | Landing screenshot at 1440; no defects observed |
+| 4 | Landing spacing/readability | Done, verified | Landing screenshot; automated AA contrast sweep (408 nodes, 0 failures, independently spot-checked with my own computed ratios) |
+| 5 | Responsive | Done, verified | Landing 1440 screenshot + 390 no-overflow check (live); editor 390 no-overflow + plaster-bg check (live) |
+| 6 | Real URL routes | Done, verified, **one bug found and now fixed** | Direct-load/refresh/popstate/invalid-fallback/legacy-hash all live-checked; async race found, reported, fixed (`fb2500d`), re-proven live twice + 12 unit tests |
+| 7 | Editor visual consistency | Done, verified | `/edit` background confirmed plaster not violet (live); `finish-screen.css` violet-gradient removal confirmed by reading the diff |
+| 8 | Look/Adventure step 2 layout | Done, verified | `/design-kit/` screenshot: real headings, correct separation |
+| 9 | Same-source style variants | Done, verified | 4/4 sha256 hashes independently recomputed and matched; all 4 images directly viewed and confirmed same room/composition, genuinely distinct render styles; cost accounting cross-checked |
+| 10 | Friendly sample music | Done, verified | Generator reproduces the shipped WAV byte-for-byte from a clean run; real browser `AudioContext.decodeAudioData` succeeded on the actual served bytes |
+| 11 | Authored character/animation | Done, verified | Source read (mesh/rig/face/animator); 42/42 render-slice tests re-run at frozen commit; lantern fix reviewed and screenshot-checked (untested by unit tests — noted) |
+| 12 | Miniature scale | Done, verified | Collider/render/camera consistency independently traced to one source of truth; spawn/respawn/reset re-seating traced; idempotency and walkMaxSpan-safety-margin confirmed by reading assertions; camera-under-furniture invariants confirmed by reading and running `cameraRig.test.ts` |
+| 13 | Pointer-lock/HUD controls | Done, source-verified; **not interactively confirmed** | `requestPointerLock()` call sites (exactly 3, all explicit gestures), HUD release wiring, `M`/`C` keyboard path all traced end-to-end in source; genuine click-to-play → lock → HUD-click flow could not be exercised in this headless environment all session (documented, pre-existing limitation) — owed to the user's manual playtest |
+
+### Outstanding findings, severity-ranked (none blocking; none are source-owner freeze violations)
+
+1. **Medium** — `src/capture/screenshot.ts:101` stamps the literal string `"OBJECTQUEST"` onto
+   every exported world screenshot/postcard. One-line fix (`BRAND_NAME` from `src/brand.ts`),
+   outside every current owner's frozen scope, real and visible on an artifact players keep.
+2. **Low, unconfirmed** — `.oq-hud__objective-label` in `hud.css` could theoretically drop below
+   AA contrast (computed ~3.23:1) if an unusually bright part of the 3D scene shows through its
+   translucent panel; I picked the "bright scene" RGB arbitrarily and could not empirically trigger
+   it. Flagged for awareness, not a confirmed defect.
+3. **Low, explicitly deprioritized by the coordinator** — `GameStageProps.config` is dead code
+   (confirmed: declared, passed, never read) and is the root cause of the already-disclosed
+   `movementConfigId` diagnostics mismatch. Coordinator has said no source cleanup is needed for
+   13-item completion unless it hides a real validation error — confirmed it does not (diagnostics
+   display only, no functional impact) — so this stays informational only.
+4. **Low** — no unit test pins the lantern's height-scaling math (`LANTERN_LIGHT`); verified only
+   by screenshot. Worth a cheap follow-up whenever the file is next touched.
+5. Item 13's live pointer-lock flow and item 8's literal live Create-from-photos flow (as opposed
+   to the design-kit's placeholder-swatch rendering of the same component) remain the two things
+   this review could not exercise end-to-end without either a working headless-3D pointer-lock
+   session or triggering a real (paid) generation job — both correctly out of scope for an
+   automated, no-paid-calls, read-only review. Both are explicitly the user's own manual playtest
+   to close, not a gap in this review's diligence.
+
+## Final verdict
+
+All 13 items map to real, independently verified, committed changes. One real defect was found and
+fixed during this review cycle (item 6's async-navigation race — found, reported, fixed by the
+navigation owner, and re-proven fixed twice more by this worker using two different live repros
+plus the owner's own deterministic tests). One new, low-cost, easy-to-scope defect remains open
+(the `OBJECTQUEST` watermark) for whoever next owns `src/capture/*`. No other functional defects
+found across routing, pointer-lock wiring, sample audio, character rendering, miniature scale, or
+brand/responsive UI. Full combined validation (typecheck, build, 474 unit tests, 46 HTTP e2e tests)
+is green at the settled tip. This closes this worker's QA pass; remaining gaps are the user's own
+subjective play-test (character feel, gameplay controls while actually pointer-locked) and the one
+open `OBJECTQUEST` watermark fix, not open questions about whether the 13 items were actually done.
+
+---
 
 ## Update: navigation's async-route race (from the items-6 section below) is now fixed
 
