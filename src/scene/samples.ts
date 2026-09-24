@@ -224,7 +224,7 @@ const RODIN_HELPERS: HelperEntity[] = [
 const RODIN_SAMPLE: SceneManifest = {
   schemaVersion: SCENE_MANIFEST_SCHEMA_VERSION,
   levelId: "sample-rodin-room-corner",
-  name: "Room corner — Rodin",
+  name: "The desk & sofa adventure",
   createdAt: AUTHORED_AT,
   updatedAt: AUTHORED_AT,
   coordinateConvention: COORDINATE_CONVENTION,
@@ -362,7 +362,7 @@ const TRIPO_HELPERS: HelperEntity[] = [
 const TRIPO_SAMPLE: SceneManifest = {
   schemaVersion: SCENE_MANIFEST_SCHEMA_VERSION,
   levelId: "sample-tripo-room-corner",
-  name: "Room corner — Tripo",
+  name: "A different perspective",
   createdAt: AUTHORED_AT,
   updatedAt: AUTHORED_AT,
   coordinateConvention: COORDINATE_CONVENTION,

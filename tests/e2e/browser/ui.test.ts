@@ -78,8 +78,10 @@ test("editor scale, spawn, checkpoint, and helper edits survive save and reload"
   await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
   await page.reload();
 
-  const savedCard = page.getByRole("article").filter({ hasText: "Room corner — Rodin" });
-  await savedCard.getByRole("button", { name: "Edit" }).click();
+  const savedCard = page.getByRole("article")
+    .filter({ hasText: "The desk & sofa adventure" })
+    .filter({ hasText: "Generated world" });
+  await savedCard.getByRole("button", { name: "Edit", exact: true }).click();
   await page.getByRole("heading", { name: "Model orientation" }).waitFor();
 
   const reloadedOrientation = page.getByRole("heading", { name: "Model orientation" }).locator("..");
@@ -125,7 +127,7 @@ test("portable level export downloads and imports through the browser", async ({
   // A full reload must rediscover both the original saved level and the
   // newly imported copy from the isolated server's durable level index.
   await page.reload();
-  await expect(page.getByRole("article").filter({ hasText: "Room corner — Tripo" })).toHaveCount(2);
+  await expect(page.getByRole("article").filter({ hasText: "A different perspective" })).toHaveCount(2);
 
   expect(mcp.callsFor("run_capability")).toHaveLength(0);
 });
