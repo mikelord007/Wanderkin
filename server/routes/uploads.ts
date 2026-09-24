@@ -37,25 +37,34 @@ export function createUploadsRouter(
     }
     let releaseBudget: (() => void) | undefined;
     try {
-      if (imagePolicy) {
-        const decodedBytes = files.reduce((sum, file) => {
-          // Preserve the existing byte/magic validation precedence before
-          // trusting format-specific dimension offsets.
-          assertValidPhoto(file.buffer);
+      let decodedBytes = 0;
+      for (const file of files) {
+        // Validate the entire batch before any content-hash lookup or write.
+        assertValidPhoto(file.buffer);
+        if (imagePolicy) {
           const dimensions = assertImageDimensions(file.buffer, imagePolicy.limits);
-          return sum + dimensions.width * dimensions.height * 4;
-        }, 0);
+          decodedBytes += dimensions.width * dimensions.height * 4;
+        }
+      }
+      if (imagePolicy) {
         releaseBudget = imagePolicy.budget.acquire(decodedBytes);
       }
       const owner = security?.issue(req, res);
-      const references = await Promise.all(
+      const results = await Promise.all(
         files.map(async (file, index) => {
-          const photo = await photos.store(file.buffer, index + 1, file.originalname);
-          if (owner) await security?.claim("photo", photo.id, owner.ownerId);
-          return photo;
+          const result = await photos.storeOrReuse(
+            file.buffer,
+            index + 1,
+            file.originalname,
+            security?.legacyOpen === false ? owner!.ownerId : null,
+            (photoId) => security ? security.canReuse("photo", photoId, owner?.ownerId) : Promise.resolve(true),
+          );
+          if (owner && result.created) await security?.claim("photo", result.photo.id, owner.ownerId);
+          return result;
         }),
       );
-      res.status(201).json(references);
+      res.status(results.every((result) => !result.created) ? 200 : 201)
+        .json(results.map((result) => result.photo));
     } catch (err) {
       if (err instanceof InvalidFileError) {
         res.status(400).json({ message: err.message });

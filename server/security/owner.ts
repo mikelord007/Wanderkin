@@ -129,6 +129,13 @@ export class OwnerSecurity {
     return (await this.owners(kind, id)).length === 0;
   }
 
+  /** Whether an older record without an embedded dedupe scope may be reused. */
+  async canReuse(kind: OwnedResourceKind, id: string, ownerId?: string): Promise<boolean> {
+    const owners = await this.owners(kind, id);
+    if (this.legacyOpen) return owners.length === 0;
+    return ownerId !== undefined && owners.includes(ownerId);
+  }
+
   private async owners(kind: OwnedResourceKind, id: string): Promise<string[]> {
     return (await this.ownership.read())[resourceKey(kind, id)] ?? [];
   }

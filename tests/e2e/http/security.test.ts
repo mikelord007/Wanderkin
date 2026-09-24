@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { readdir } from "node:fs/promises";
+import { join } from "node:path";
 import { createEmptyManifest, migrateSceneManifest, type PublishedLevelVersion, type SceneManifest } from "../../../shared/index.js";
 import { startApiServer, type ApiServerHandle } from "./helpers/apiServer.js";
 import { startFakeMcpServer, type FakeMcpServer } from "./helpers/fakeMcpServer.js";
@@ -43,6 +45,46 @@ describe("strict owner-token boundary", () => {
   }, 30_000);
 
   afterAll(async () => { await api?.stop(); await mcp?.close(); });
+
+  it("deduplicates photo bytes only within the same owner", async () => {
+    const photosDir = join(api.storageDir, "photos");
+    const before = await readdir(photosDir).catch(() => [] as string[]);
+    const original = readSamplePhoto(5);
+    const modified = Buffer.from(original);
+    modified[modified.length - 1] = (modified[modified.length - 1]! + 1) % 256;
+
+    const upload = async (bytes: Buffer, token?: string) => {
+      const form = new FormData();
+      form.append("photos", new Blob([new Uint8Array(bytes)], { type: "image/jpeg" }), "private.jpg");
+      return fetch(`${api.baseUrl}/api/uploads`, {
+        method: "POST",
+        headers: token ? { "X-ObjectQuest-Owner": token } : undefined,
+        body: form,
+      });
+    };
+
+    const first = await upload(original);
+    expect(first.status).toBe(201);
+    const firstToken = first.headers.get("x-objectquest-owner")!;
+    const [firstPhoto] = await first.json() as Array<{ id: string }>;
+
+    const repeated = await upload(original, firstToken);
+    expect(repeated.status).toBe(200);
+    const [repeatedPhoto] = await repeated.json() as Array<{ id: string }>;
+    expect(repeatedPhoto!.id).toBe(firstPhoto!.id);
+
+    const changed = await upload(modified, firstToken);
+    expect(changed.status).toBe(201);
+    const [changedPhoto] = await changed.json() as Array<{ id: string }>;
+    expect(changedPhoto!.id).not.toBe(firstPhoto!.id);
+
+    const otherOwner = await upload(original);
+    expect(otherOwner.status).toBe(201);
+    const [otherOwnerPhoto] = await otherOwner.json() as Array<{ id: string }>;
+    expect(otherOwnerPhoto!.id).not.toBe(firstPhoto!.id);
+
+    expect(await readdir(photosDir)).toHaveLength(before.length + 3);
+  });
 
   it("does not expose an owner's photo URL to another client", async () => {
     const form = new FormData();
