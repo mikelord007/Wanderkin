@@ -1,4 +1,4 @@
-.oq-creation { min-height: 100vh; background: var(--oq-paper); }
+.oq-creation { align-self: flex-start; width: 100%; min-height: 100vh; background: var(--oq-paper); }
 .oq-creation__container { width: min(100%, 944px); margin-inline: auto; padding: 24px 32px 64px; }
 .oq-creation__header { display: grid; gap: 28px; margin-bottom: 32px; }
 .oq-creation__topline { display: grid; grid-template-columns: 120px 1fr 120px; align-items: center; gap: 16px; }

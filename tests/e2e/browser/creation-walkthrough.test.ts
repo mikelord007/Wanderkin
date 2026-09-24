@@ -38,5 +38,7 @@ test("screens 2–7 mocked creation walkthrough", async ({ page }) => {
 
   await page.getByRole("button", { name: "Prepare my course" }).click();
   await expect(page.getByRole("heading", { name: /Welcome to/ })).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator(".oq-world-ready__scene canvas")).toBeVisible();
+  await page.waitForTimeout(1_000);
   await page.screenshot({ path: `${evidenceDir}/07-ready.png`, fullPage: true });
 });
