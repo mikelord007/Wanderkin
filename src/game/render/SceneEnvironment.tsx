@@ -74,7 +74,7 @@ export function SceneEnvironment({ bounds, style, atmosphere, reducedMotion }: S
     const centerX = (bounds.min.x + bounds.max.x) / 2;
     const centerZ = (bounds.min.z + bounds.max.z) / 2;
     const extent = Math.max(bounds.max.x - bounds.min.x, bounds.max.z - bounds.min.z, 4);
-    const count = dressing.definition.density === "sparse" ? 5 : 8;
+    const count = dressing.definition.density === "sparse" ? 3 : 5;
     return Array.from({ length: count }, (_, index) => {
       const angle = (index / count) * Math.PI * 2 + 0.31;
       const radius = extent * (0.72 + (index % 3) * 0.08);

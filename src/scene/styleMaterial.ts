@@ -106,6 +106,19 @@ function installStyleShader(
   material.userData[USER_DATA_KEY] = state;
 
   const previousCompile = material.onBeforeCompile;
+  const styleFragment = style.id === "cartoon"
+    ? `
+      if (oqColorSteps > 1.0) {
+        oqColor = floor(oqColor * oqColorSteps + 0.5) / oqColorSteps;
+      }`
+    : style.id === "hand-painted"
+      ? `
+      float oqStroke = oqHash(floor(gl_FragCoord.xy * vec2(0.14, 0.045)));
+      oqColor += (oqStroke - 0.5) * oqPaperTexture * 0.09;`
+      : `
+      float oqGrain = oqHash(gl_FragCoord.xy * 0.32) - 0.5;
+      oqColor += oqGrain * oqPaperTexture * 0.075;
+      oqColor = mix(oqColor, vec3(1.0), oqWatercolorWash * (0.045 + max(0.0, oqGrain) * 0.06));`;
   material.onBeforeCompile = (shader, renderer) => {
     previousCompile.call(material, shader, renderer);
     Object.assign(shader.uniforms, {
@@ -139,15 +152,7 @@ function installStyleShader(
       float oqLuma = dot(oqColor, vec3(0.2126, 0.7152, 0.0722));
       oqColor = mix(vec3(oqLuma), oqColor, oqSaturation);
       oqColor = clamp((oqColor - 0.5) * oqContrast + 0.5, 0.0, 1.0);
-      if (oqColorSteps > 1.0) {
-        oqColor = floor(oqColor * oqColorSteps + 0.5) / oqColorSteps;
-      }
-      float oqGrain = oqHash(gl_FragCoord.xy * 0.45) - 0.5;
-      oqColor += oqGrain * oqPaperTexture * 0.11;
-      float oqWash = oqWatercolorWash * (0.05 + max(0.0, oqGrain) * 0.08);
-      oqColor = mix(oqColor, vec3(1.0), oqWash);
-      float oqEdge = smoothstep(0.018, 0.12, fwidth(oqLuma));
-      oqColor = mix(oqColor, oqEdgeColor, oqEdge * oqEdgeStrength);
+      ${styleFragment}
       float oqStyledLuma = dot(oqColor, vec3(0.2126, 0.7152, 0.0722));
       gl_FragColor.rgb = mix(vec3(oqStyledLuma), oqColor, oqColorRestoration);`,
     );
