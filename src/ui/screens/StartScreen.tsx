@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { Button, Card, EmptyState, Icon, WorldStyleScope } from "../components/index.js";
+import { Button, Card, EmptyState, Icon, PendingWorldsList, WorldStyleScope } from "../components/index.js";
+import { loadPendingWorlds, setActiveCreationId } from "../creationStorage.js";
 import "../theme/welcome.css";
 import type { SceneManifest } from "@shared/index.js";
 import {
@@ -43,6 +44,7 @@ export function StartScreen({
   const [bundleImportError, setBundleImportError] = useState<string | null>(null);
   const [exportingLevelId, setExportingLevelId] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [pendingWorlds] = useState(loadPendingWorlds);
   const worldsRef = useRef<HTMLElement | null>(null);
   const glbInputRef = useRef<HTMLInputElement | null>(null);
   const bundleInputRef = useRef<HTMLInputElement | null>(null);
@@ -163,9 +165,10 @@ export function StartScreen({
         </section>
         <section className="oq-welcome__section" id="my-worlds" aria-labelledby="worlds-heading" ref={worldsRef} tabIndex={-1}>
           <div className="oq-welcome__section-heading"><h2 id="worlds-heading">My worlds</h2><span className="oq-kit-muted">Your next adventure is waiting.</span></div>
+          {pendingWorlds.length ? <div className="oq-kit-stack"><h3>In progress and drafts</h3><PendingWorldsList worlds={pendingWorlds} onOpen={world => { setActiveCreationId(world.id); onCreateFromPhotos(); }} /></div> : null}
           {savedError ? <Card><p role="alert" className="oq-kit-error">Your saved worlds couldn’t load. Check your connection and refresh to try again.</p></Card>
             : !savedLevels ? <p role="status" className="oq-kit-muted">Finding your saved worlds…</p>
-            : savedLevels.length === 0 ? <EmptyState icon={<Icon name="photo" />} title="Your first world starts with a photo" description="Pick something familiar. Make somewhere new." action={<Button onClick={onCreateFromPhotos}>Create my world</Button>} />
+            : savedLevels.length === 0 && pendingWorlds.length === 0 ? <EmptyState icon={<Icon name="photo" />} title="Your first world starts with a photo" description="Pick something familiar. Make somewhere new." action={<Button onClick={onCreateFromPhotos}>Create my world</Button>} />
             : <div className="oq-kit-grid">{savedLevels.map(manifest => <Card key={manifest.levelId} className="oq-kit-stack">
               <h3>{manifest.name}</h3><p className="oq-kit-muted">{manifest.checkpoints.length} checkpoints · saved world</p>
               <div className="oq-kit-row"><Button onClick={() => onPlaySavedLevel(manifest)}>Play</Button><Button variant="secondary" onClick={() => onEditSavedLevel(manifest)}>Edit</Button><Button variant="ghost" onClick={() => handleExport(manifest)} disabled={exportingLevelId !== null} loading={exportingLevelId === manifest.levelId} loadingLabel="Exporting…">Export</Button></div>

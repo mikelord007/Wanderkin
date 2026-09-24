@@ -11,3 +11,4 @@ export * from "./experience.js";
 export * from "./manifest.js";
 export * from "./manifest-migration.js";
 export * from "./publishing.js";
+export * from "./workflow.js";

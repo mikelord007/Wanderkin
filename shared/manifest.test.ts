@@ -7,6 +7,7 @@ import legacyFixture from "./fixtures/legacy-scene-manifest-v1.json";
 import { migrateSceneManifest, sceneManifestReaderSchema } from "./manifest-migration.js";
 import lostColorsFixture from "./fixtures/lost-colors.json";
 import generationJobCases from "./fixtures/generation-job-cases.json";
+import workflowFixture from "./fixtures/world-workflow-v1.json";
 import { SAMPLE_LEVELS } from "../src/scene/samples.js";
 
 describe("createEmptyManifest", () => {
@@ -58,6 +59,14 @@ describe("legacy manifest compatibility", () => {
 });
 
 describe("v2 reference fixtures", () => {
+  it("round-trips the optional workflow snapshot without changing the manifest envelope", () => {
+    const input = { ...lostColorsFixture, workflow: workflowFixture };
+    const parsed = migrateSceneManifest(input);
+    expect(parsed.schemaVersion).toBe(1);
+    expect(parsed.workflow).toEqual(workflowFixture);
+    expect(migrateSceneManifest(JSON.parse(JSON.stringify(parsed)))).toEqual(parsed);
+  });
+
   it("validates the complete Lost Colors fixture", () => {
     const manifest = migrateSceneManifest(lostColorsFixture);
     expect(manifest.assets[0]?.url).toBe("/samples/rodin.glb");

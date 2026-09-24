@@ -4,6 +4,11 @@ import { describeApiError, getAsset } from "../api.js";
 import { LoadingScreen } from "../components/LoadingScreen.js";
 import { courseCandidateOptions, replaceSavedCandidate } from "../courseCandidates.js";
 import { attachProvenance, resolveAssetForManifest } from "../manifestProvenance.js";
+import { loadActiveCreation, saveCreationRecord } from "../creationStorage.js";
+import { toWorldWorkflow, withCreationUpdate } from "../creationFlow.js";
+import { WorldReadyScreen } from "./WorldReadyScreen.js";
+import { repairGuidanceFor, type RepairGuidance } from "../../editor/repairGuidance.js";
+import "../../editor/editor.css";
 
 /**
  * Scene preparation owns `src/scene`; this screen assumes a barrel export
@@ -50,6 +55,10 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(source.kind === "manifest");
+  const [repairFocus, setRepairFocus] = useState<RepairGuidance | null>(
+    source.kind === "manifest" ? repairGuidanceFor(source.manifest) : null,
+  );
 
   useEffect(() => {
     if (source.kind === "manifest") return;
@@ -83,13 +92,19 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
         );
         if (cancelled) return;
 
-        const preparedPrimary = attachProvenance(result.manifest, cleanAsset, resolvedSourcePhotos);
+        const creation = loadActiveCreation();
+        const workflow = creation ? toWorldWorkflow(creation) : null;
+        const basePrimary = attachProvenance(result.manifest, cleanAsset, resolvedSourcePhotos);
+        const preparedPrimary = workflow ? { ...basePrimary, workflow } : basePrimary;
         const preparedCandidates = (result.courseCandidates ?? []).map((candidate: SceneManifest) =>
-          attachProvenance(candidate, cleanAsset, resolvedSourcePhotos),
+          workflow ? { ...attachProvenance(candidate, cleanAsset, resolvedSourcePhotos), workflow } : attachProvenance(candidate, cleanAsset, resolvedSourcePhotos),
         );
         setPrimaryManifest(preparedPrimary);
         setManifest(preparedPrimary);
         setCandidates(preparedCandidates);
+        if (creation) saveCreationRecord(withCreationUpdate(creation, { step: "ready", title: preparedPrimary.name }));
+        const guidance = repairGuidanceFor(preparedPrimary);
+        setRepairFocus(guidance);
       } catch (err) {
         if (!cancelled) setError(describeApiError(err));
       }
@@ -122,6 +137,13 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
     }
   }
 
+  function selectCandidate(candidate: SceneManifest) {
+    const guidance = repairGuidanceFor(candidate);
+    setManifest(candidate);
+    setRepairFocus(guidance);
+    setEditing(false);
+  }
+
   if (error) {
     return (
       <div className="oq-screen oq-screen--preparation">
@@ -152,13 +174,25 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
     );
   }
 
+  if (!editing) {
+    return <WorldReadyScreen
+      manifest={manifest}
+      onEnter={() => onPlay(manifest)}
+      onAdjustCourse={() => {
+        setRepairFocus(repairGuidanceFor(manifest));
+        setEditing(true);
+      }}
+      onBack={onBack}
+    />;
+  }
+
   return (
     <div className="oq-screen oq-screen--preparation">
       <header className="oq-screen__header">
         <button type="button" className="oq-button oq-button--ghost" onClick={onBack}>
           ← Back
         </button>
-        <h1>Prepare your level</h1>
+        <h1>Adjust your course</h1>
       </header>
 
       {candidateOptions.length > 1 ? (
@@ -175,7 +209,7 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
                   type="radio"
                   name="candidate"
                   checked={candidate === manifest}
-                  onChange={() => setManifest(candidate)}
+                  onChange={() => selectCandidate(candidate)}
                 />
                 <span className="oq-capability-card__title">
                   {candidate.checkpoints.length} checkpoint{candidate.checkpoints.length === 1 ? "" : "s"}
@@ -193,13 +227,19 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
 
       <Suspense fallback={<LoadingScreen stage="Loading the level editor…" />}>
         <LevelEditor
-          key={manifest.levelId}
+          key={`${manifest.levelId}-${repairFocus?.message ?? "manual"}`}
           manifest={manifest}
           isPersisted={!isNew}
           onSave={handleSave}
           onExport={onExport}
           onPlay={onPlay}
-          onBack={onBack}
+          onBack={() => {
+            if (source.kind === "asset") {
+              setRepairFocus(repairGuidanceFor(manifest));
+              setEditing(false);
+            } else onBack();
+          }}
+          repairFocus={repairFocus}
         />
       </Suspense>
       {saving ? <p className="oq-warning-text">Saving…</p> : null}

@@ -116,6 +116,14 @@ The client sends imports as `application/octet-stream` so the route-specific
 bundle limit applies. This implemented contract is not yet a browser-acceptance
 claim; the final round-trip result belongs in `docs/QA.md`.
 
+The smallest share bootstrap lives in `src/App.tsx`: a pathname matching
+`/share/:shareId` takes precedence over local creation-resume state and opens
+the public friend landing. The landing reads only `GET /api/shares/:shareId`
+and enters `PlayScreen` with the immutable manifest; it never calls upload or
+generation routes. Shared Race play uses the publication `versionId` as its
+client-side world identity and labels the creator target unverified, so local
+times cannot be compared across later private publications.
+
 `AssetReference` remains the shared manifest asset shape. The server may return
 the additive transport shape below from `GET /api/assets/:id`:
 
@@ -178,6 +186,9 @@ tools for persistence routes)
 | `/api/jobs/:id/retry` | POST | reconciles the existing provider job; never submits a second generation |
 | `/api/levels` | GET, POST | list / create saved `SceneManifest`s |
 | `/api/levels/:id` | GET, PUT | load / save one level |
+| `/api/levels/:id/publish` | POST | create a new immutable `PublishedLevelVersion` and `shareId` from the current private save |
+| `/api/levels/:id/publications` | GET | list immutable versions created from a private level |
+| `/api/shares/:shareId` | GET | public read of one immutable version; source photos are absent unless explicitly included |
 | `/api/levels/:id/export` | GET | strict portable manifest + embedded local files bundle |
 | `/api/levels/import` | POST | strict bundle import as a new level; uses route-scoped size handling |
 
@@ -339,6 +350,10 @@ a fully hydrated manifest snapshot, challenge, and an explicit
 `includesSourcePhotos` privacy decision. A publication is copied and frozen:
 editing the private source later requires a new version/share and cannot alter
 an existing recipient experience or race target.
+
+Creation workflow/job metadata is never copied into the public manifest.
+Source photos default to private and are copied only when
+`includesSourcePhotos: true` is explicitly supplied to the publish request.
 
 Race challenge verification is currently `personal-unverified`. No worker may
 describe client-submitted times as authoritative or cheat-proof without a new

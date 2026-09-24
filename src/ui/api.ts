@@ -1,11 +1,49 @@
 import type {
   AssetReference,
+  GeneratedImageReference,
+  GenerationRequest,
+  ImageTo3dGenerationRequest,
   GenerationJob,
   PhotoReference,
+  PublishedChallenge,
+  PublishedLevelVersion,
   ProviderCapabilityDescriptor,
   ProviderSubmitRequest,
   SceneManifest,
 } from "@shared/index.js";
+
+/** Additive client shape agreed for turning the exact approved style image
+ * into geometry. It remains local until shared/generation.ts is updated by
+ * its owner. `photos` keeps original-source provenance while these IDs name
+ * the actual image inputs used by the build. */
+export interface ApprovedStyleMeshRequest extends ImageTo3dGenerationRequest {
+  sourceImageAssetIds: readonly string[];
+  styleReferenceAssetId: string;
+}
+
+export type CreationGenerationRequest = GenerationRequest | ApprovedStyleMeshRequest;
+
+export interface GenerationEnvelope {
+  request: CreationGenerationRequest;
+  worldId?: string;
+  maxCostUsd?: number;
+}
+
+export interface PreviewJobResponse {
+  cacheHit: boolean;
+  approved: boolean;
+  cacheKey: string;
+  job: GenerationJob;
+}
+
+export interface PreviewCacheResponse {
+  key: string;
+  jobId: string;
+  approved: boolean;
+  createdAt: string;
+  updatedAt: string;
+  job: GenerationJob | null;
+}
 
 /**
  * Thin fetch wrapper around the server API documented in docs/CONTRACTS.md.
@@ -94,6 +132,44 @@ export function retryJob(jobId: string): Promise<GenerationJob> {
   });
 }
 
+export function submitGeneration(envelope: GenerationEnvelope): Promise<GenerationJob> {
+  return request<GenerationJob>("/api/jobs/generate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": envelope.request.idempotencyKey,
+    },
+    body: JSON.stringify(envelope),
+  });
+}
+
+export function submitPreview(envelope: GenerationEnvelope): Promise<PreviewJobResponse> {
+  return request<PreviewJobResponse>("/api/jobs/previews", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": envelope.request.idempotencyKey,
+    },
+    body: JSON.stringify(envelope),
+  });
+}
+
+export function getPreviewCache(cacheKey: string): Promise<PreviewCacheResponse> {
+  return request<PreviewCacheResponse>(`/api/jobs/preview-cache/${encodeURIComponent(cacheKey)}`);
+}
+
+export function approvePreview(cacheKey: string, jobId: string): Promise<PreviewCacheResponse> {
+  return request<PreviewCacheResponse>(`/api/jobs/preview-cache/${encodeURIComponent(cacheKey)}/approve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jobId }),
+  });
+}
+
+export function getGeneratedImage(assetId: string): Promise<GeneratedImageReference> {
+  return request<GeneratedImageReference>(`/api/generated-assets/${encodeURIComponent(assetId)}`);
+}
+
 /** For a generated asset, the server additionally returns the ordered
  * source photos it came from (absent for a hand-imported asset via
  * /api/assets/import, which has no provenance). Lets Preparation recover
@@ -145,6 +221,22 @@ export function saveLevel(levelId: string, manifest: SceneManifest): Promise<Sce
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(manifest),
   });
+}
+
+export function publishLevel(
+  levelId: string,
+  challenge: PublishedChallenge,
+  includesSourcePhotos = false,
+): Promise<PublishedLevelVersion> {
+  return request<PublishedLevelVersion>(`/api/levels/${encodeURIComponent(levelId)}/publish`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ challenge, includesSourcePhotos }),
+  });
+}
+
+export function getSharedLevel(shareId: string): Promise<PublishedLevelVersion> {
+  return request<PublishedLevelVersion>(`/api/shares/${encodeURIComponent(shareId)}`);
 }
 
 export function exportLevelBundle(levelId: string): Promise<LevelBundle> {
