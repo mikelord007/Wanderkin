@@ -1,16 +1,37 @@
-import { describe, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { LevelExperience } from "../../shared/experience.js";
 import lostColorsManifest from "../../shared/fixtures/lost-colors.json";
+import { GameplayEventBus } from "../../src/game/events.js";
+import { GameplaySession } from "../../src/game/modes/session.js";
 
 describe("ObjectQuest v2 gameplay state integration contracts", () => {
-  it.skip("collects each Lost Colors fragment once and restores color monotonically from 0/3 to 3/3", () => {
-    // Given the real Lost Colors fixture and Worker 5 gameplay reducer/runtime,
-    // enter and leave every fragment trigger, including repeated overlap events.
-    void lostColorsManifest;
+  it("collects each Lost Colors fragment once and restores color monotonically from 0/3 to 3/3", () => {
+    const bus = new GameplayEventBus();
+    const received = vi.fn();
+    bus.on("*", received);
+    const session = new GameplaySession({
+      experience: lostColorsManifest.experience as unknown as LevelExperience,
+      worldId: lostColorsManifest.levelId,
+      eventBus: bus,
+    });
 
-    // Assert unique collected IDs, progress 0/3 -> 1/3 -> 2/3 -> 3/3,
-    // monotonic restoration steps, one reward/SFX/narration event per fragment,
-    // and no credit for unknown or duplicate collectible IDs.
-    throw new Error("Contract stub: connect Worker 5 collect-mode state/runtime");
+    const progression = [session.snapshot];
+    expect(session.collectFragment("not-authored")).toBe(false);
+    for (const fragment of lostColorsManifest.experience.collectibles) {
+      expect(session.collectFragment(fragment.id)).toBe(true);
+      expect(session.collectFragment(fragment.id)).toBe(false);
+      progression.push(session.snapshot);
+    }
+
+    expect(progression.map((state) => state.requiredFragmentsCollected)).toEqual([0, 1, 2, 3]);
+    expect(progression.map((state) => state.restoration)).toEqual([
+      0,
+      0.3333333333,
+      0.6666666667,
+      1,
+    ]);
+    expect(received.mock.calls.filter(([event]) => event.type === "fragmentCollected")).toHaveLength(3);
+    expect(received.mock.calls.filter(([event]) => event.type === "allFragmentsCollected")).toHaveLength(1);
   });
 
   it.skip("applies independent finish rules for Explore, Collect, and Race", () => {

@@ -17,6 +17,12 @@ export type {
   GameplayEventMap,
   GameplayEventType,
 } from "./events.js";
+export { GameplaySession } from "./modes/session.js";
+export type {
+  GameplaySessionOptions,
+  GameplaySessionSnapshot,
+  RacePhase,
+} from "./modes/session.js";
 
 // Diagnostics (development builds install these on window.__objectquest).
 export { DIAGNOSTICS_GLOBAL } from "./diagnostics.js";
