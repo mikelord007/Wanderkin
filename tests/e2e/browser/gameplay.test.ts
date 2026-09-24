@@ -21,13 +21,24 @@ interface Diagnostics {
 type Point = readonly [number, number];
 type MovementKey = "w" | "a" | "s" | "d";
 
+test.beforeEach(async ({ page }) => {
+  // Gameplay only needs the bundled samples. The welcome screen also asks for
+  // the saved-world library, so keep that unrelated request from falling
+  // through Vite's development proxy to a shared API server on :8787.
+  await page.route("**/api/levels", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
+  );
+});
+
 async function readDiagnostics(page: Page): Promise<Diagnostics | null> {
   return page.evaluate(() => window.__objectquest?.get() ?? null);
 }
 
 async function openSample(page: Page, name: string): Promise<Diagnostics> {
   await page.goto("/");
-  const card = page.locator("article").filter({ hasText: name });
+  const card = page.getByRole("article").filter({
+    has: page.getByRole("heading", { name }),
+  });
   await card.getByRole("button", { name: "Play now" }).click();
   await page.getByRole("button", { name: /^Play$/ }).waitFor();
   await page.getByRole("button", { name: /^Play$/ }).click();
@@ -240,7 +251,7 @@ async function finishAndReplay(page: Page): Promise<void> {
 
 test.describe("real browser gameplay input", () => {
   test("completes and replays the Rodin sample with keyboard and mouse", async ({ page }) => {
-    const initial = await openSample(page, "Room corner — Rodin");
+    const initial = await openSample(page, "The desk & sofa adventure");
     const yawBefore = initial.cameraYaw;
     await page.mouse.move(640, 360);
     await page.mouse.move(720, 360);
@@ -262,7 +273,7 @@ test.describe("real browser gameplay input", () => {
   });
 
   test("completes and replays the Tripo sample with the same controls", async ({ page }) => {
-    await openSample(page, "Room corner — Tripo");
+    await openSample(page, "A different perspective");
     await collectNextCheckpoint(page, 1, { timeoutMs: 20_000 });
     await verifyPauseAndResume(page);
     await verifyJump(page);
