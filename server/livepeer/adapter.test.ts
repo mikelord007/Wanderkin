@@ -118,14 +118,14 @@ describe("LivepeerAdapter multi-kind contracts", () => {
 
   it("validates every supported generation kind against its capability contract", () => {
     const requests = [
-      { kind: "image-edit", capability: "kontext-edit", input: { kind: "image-edit", sourcePhotoId: "p", prompt: "watercolor" } },
-      { kind: "background-removal", capability: "bg-remove", input: { kind: "background-removal", sourcePhotoId: "p" } },
-      { kind: "image-to-3d", capability: "rodin-i3d", input: { kind: "image-to-3d", photos: [{ photoId: "p", sourceIndex: 1 }] } },
-      { kind: "text", capability: "gemini-text", input: { kind: "text", prompt: "Return quest JSON" } },
-      { kind: "music", capability: "music", input: { kind: "music", prompt: "gentle instrumental" } },
-      { kind: "sfx", capability: "mirelo-sfx", input: { kind: "sfx", prompt: "soft chime", durationSeconds: 3 } },
-      { kind: "tts", capability: "chatterbox-tts", input: { kind: "tts", text: "Welcome explorer" } },
-      { kind: "image-to-video", capability: "pixverse-i2v", input: { kind: "image-to-video", sourcePhotoId: "p", prompt: "slow orbit", durationSeconds: 5 } },
+      { schemaVersion: 1, kind: "image-edit", capability: "kontext-edit", idempotencyKey: "edit", purpose: "style-preview", sourceImageAssetId: "p", instruction: "watercolor", outputMimeType: "image/png" },
+      { schemaVersion: 1, kind: "image-edit", capability: "bg-remove", idempotencyKey: "bg", purpose: "object-cutout", sourceImageAssetId: "p", instruction: "Remove the background", outputMimeType: "image/png" },
+      { schemaVersion: 1, kind: "image-to-3d", capability: "rodin-i3d", idempotencyKey: "mesh", purpose: "world-mesh", photos: [{ photoId: "p", sourceIndex: 1 }] },
+      { schemaVersion: 1, kind: "text", capability: "gemini-text", idempotencyKey: "text", purpose: "quest-text", prompt: "Return quest JSON", output: "quest-json", maxCharacters: 1200 },
+      { schemaVersion: 1, kind: "music", capability: "music", idempotencyKey: "music", purpose: "soundtrack", prompt: "gentle instrumental", durationSeconds: 60, instrumental: true, loop: true },
+      { schemaVersion: 1, kind: "sfx", capability: "mirelo-sfx", idempotencyKey: "sfx", purpose: "pickup", prompt: "soft chime", durationSeconds: 3, loop: false },
+      { schemaVersion: 1, kind: "tts", capability: "chatterbox-tts", idempotencyKey: "tts", purpose: "narration", text: "Welcome explorer", language: "en" },
+      { schemaVersion: 1, kind: "video", capability: "pixverse-i2v", idempotencyKey: "video", purpose: "animated-postcard", sourceImageAssetId: "p", prompt: "slow orbit", durationSeconds: 5 },
     ] as const;
 
     for (const request of requests) expect(adapter.validateGenerationInput(request).valid, request.kind).toBe(true);
@@ -135,22 +135,19 @@ describe("LivepeerAdapter multi-kind contracts", () => {
     expect(adapter.validateGenerationInput({
       kind: "tts",
       capability: "music",
-      input: { kind: "tts", text: "hello" },
+      schemaVersion: 1, idempotencyKey: "bad", purpose: "narration", text: "hello", language: "en",
     }).errors.join(" ")).toMatch(/registered for music/);
     expect(adapter.validateGenerationInput({
       kind: "sfx",
       capability: "mirelo-sfx",
-      input: { kind: "sfx", prompt: "rain", durationSeconds: 61 },
+      schemaVersion: 1, idempotencyKey: "bad-sfx", purpose: "rain", prompt: "rain", durationSeconds: 61, loop: true,
     }).valid).toBe(false);
     expect(adapter.validateGenerationInput({
       kind: "image-to-3d",
       capability: "meshy-v7-i3d",
-      input: {
-        kind: "image-to-3d",
-        photos: [{ photoId: "p", sourceIndex: 1 }],
-        meshy: { enableAnimation: true, enableRigging: false },
-      },
-    }).errors.join(" ")).toMatch(/requires enableRigging/);
+      schemaVersion: 1, idempotencyKey: "bad-meshy", purpose: "companion",
+      photos: [{ photoId: "p", sourceIndex: 1 }, { photoId: "q", sourceIndex: 2 }],
+    }).errors.join(" ")).toMatch(/exactly one/);
   });
 
   it("submits TTS with the exact text field and no image upload", async () => {
@@ -161,7 +158,10 @@ describe("LivepeerAdapter multi-kind contracts", () => {
     const result = await live.submitGeneration({
       kind: "tts",
       capability: "chatterbox-tts",
-      input: { kind: "tts", text: "Welcome explorer" },
+      schemaVersion: 1,
+      purpose: "quest-narration",
+      text: "Welcome explorer",
+      language: "en",
       idempotencyKey: "tts-1",
       maxCostUsd: 1,
     });
@@ -182,7 +182,11 @@ describe("LivepeerAdapter multi-kind contracts", () => {
     await live.submitGeneration({
       kind: "image-edit",
       capability: "kontext-edit",
-      input: { kind: "image-edit", sourcePhotoId: "p", prompt: "watercolor" },
+      schemaVersion: 1,
+      purpose: "style-preview",
+      sourceImageAssetId: "p",
+      instruction: "watercolor",
+      outputMimeType: "image/png",
       idempotencyKey: "edit-1",
       maxCostUsd: 0.1,
     });

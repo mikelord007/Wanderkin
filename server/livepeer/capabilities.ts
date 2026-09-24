@@ -1,8 +1,8 @@
 import type { ProviderCapabilityDescriptor } from "../../shared/provider.js";
-import type { CreateGenerationRequest, GenerationKind } from "../jobs/types.js";
+import type { GenerationJobKind, GenerationRequest } from "../../shared/generation.js";
 
 export interface CapabilityContract {
-  kind: GenerationKind;
+  kind: GenerationJobKind;
   outputKind: "image" | "3d" | "text" | "audio" | "video";
   invokeVia: "create_media" | "run_capability";
   priceUsd: number;
@@ -13,7 +13,7 @@ export interface CapabilityContract {
 /** Live-discovered on 2026-09-24; see docs/LIVEPEER_CAPABILITIES.md. Price
  * estimators intentionally round up later, never down. */
 export const CAPABILITY_CONTRACTS: Readonly<Record<string, CapabilityContract>> = {
-  "bg-remove": { kind: "background-removal", outputKind: "image", invokeVia: "create_media", priceUsd: 0.00105, priceUnit: "image", fallbackChain: ["ideogram-bg-remove"] },
+  "bg-remove": { kind: "image-edit", outputKind: "image", invokeVia: "create_media", priceUsd: 0.00105, priceUnit: "image", fallbackChain: ["ideogram-bg-remove"] },
   "kontext-edit": { kind: "image-edit", outputKind: "image", invokeVia: "create_media", priceUsd: 0.042, priceUnit: "image", fallbackChain: [] },
   "gpt-image-edit": { kind: "image-edit", outputKind: "image", invokeVia: "create_media", priceUsd: 0.22995, priceUnit: "image", fallbackChain: [] },
   "rodin-i3d": { kind: "image-to-3d", outputKind: "3d", invokeVia: "run_capability", priceUsd: 0.42, priceUnit: "call", fallbackChain: ["tripo-i3d", "triposplat"] },
@@ -23,42 +23,35 @@ export const CAPABILITY_CONTRACTS: Readonly<Record<string, CapabilityContract>> 
   music: { kind: "music", outputKind: "audio", invokeVia: "create_media", priceUsd: 0.0315, priceUnit: "track", fallbackChain: [] },
   "mirelo-sfx": { kind: "sfx", outputKind: "audio", invokeVia: "create_media", priceUsd: 0.0105, priceUnit: "second", fallbackChain: [] },
   "chatterbox-tts": { kind: "tts", outputKind: "audio", invokeVia: "create_media", priceUsd: 0.02625, priceUnit: "1000_characters", fallbackChain: ["gemini-tts", "inworld-tts", "grok-tts"] },
-  "pixverse-i2v": { kind: "image-to-video", outputKind: "video", invokeVia: "create_media", priceUsd: 0.06825, priceUnit: "second", fallbackChain: ["ltx-i2v", "seedance-mini-i2v"] },
+  "pixverse-i2v": { kind: "video", outputKind: "video", invokeVia: "create_media", priceUsd: 0.06825, priceUnit: "second", fallbackChain: ["ltx-i2v", "seedance-mini-i2v"] },
 };
 
 export function capabilityContract(capability: string): CapabilityContract | undefined {
   return CAPABILITY_CONTRACTS[capability];
 }
 
-export function estimateRequestCost(request: CreateGenerationRequest): number | null {
+export function estimateRequestCost(request: GenerationRequest): number | null {
   const contract = capabilityContract(request.capability);
   if (!contract) return null;
   switch (contract.priceUnit) {
     case "second": {
-      const seconds = request.input.kind === "sfx"
-        ? request.input.durationSeconds
-        : request.input.kind === "image-to-video"
-          ? (request.input.durationSeconds ?? 5)
+      const seconds = request.kind === "sfx"
+        ? request.durationSeconds
+        : request.kind === "video"
+          ? request.durationSeconds
           : null;
       return seconds === null ? null : roundUsd(contract.priceUsd * seconds);
     }
     case "1000_characters":
-      return request.input.kind === "tts" ? roundUsd(contract.priceUsd * request.input.text.length / 1000) : null;
+      return request.kind === "tts" ? roundUsd(contract.priceUsd * request.text.length / 1000) : null;
     case "1000_tokens":
       // The provider bills tokens. Four characters/token is a conservative
       // planning estimate; reconciliation replaces this when actual cost is returned.
-      return request.input.kind === "text"
-        ? roundUsd(contract.priceUsd * Math.max(1, Math.ceil(request.input.prompt.length / 4)) / 1000)
+      return request.kind === "text"
+        ? roundUsd(contract.priceUsd * Math.max(1, Math.ceil(request.prompt.length / 4)) / 1000)
         : null;
     case "mesh": {
-      if (request.input.kind !== "image-to-3d") return null;
-      const options = request.input.meshy;
-      let cost = contract.priceUsd;
-      if (options?.shouldTexture === false) cost -= 0.42;
-      if (options?.ultraMode) cost += 0.21;
-      if (options?.enableRigging) cost += 0.21;
-      if (options?.enableAnimation) cost += 0.126;
-      return roundUsd(cost);
+      return request.kind === "image-to-3d" ? roundUsd(contract.priceUsd) : null;
     }
     default:
       return roundUsd(contract.priceUsd);

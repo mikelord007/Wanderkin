@@ -9,12 +9,12 @@ import type {
   ProviderValidationResult,
 } from "../../shared/provider.js";
 import type {
-  CreateGenerationRequest,
   GenerationProviderAdapter,
   ProviderGenerationStatus,
   ProviderGenerationSubmitRequest,
   ProviderGenerationSubmitResult,
 } from "../jobs/types.js";
+import type { GenerationRequest } from "../../shared/generation.js";
 import { McpToolError, McpTransportError, type McpToolCaller } from "./mcpClient.js";
 import { capabilityContract, STATIC_CAPABILITY_DESCRIPTORS, findStaticDescriptor } from "./capabilities.js";
 
@@ -283,62 +283,56 @@ export class LivepeerAdapter implements ProviderAdapter, GenerationProviderAdapt
     return { valid: errors.length === 0, errors };
   }
 
-  validateGenerationInput(request: CreateGenerationRequest): ProviderValidationResult {
+  validateGenerationInput(request: GenerationRequest): ProviderValidationResult {
     const errors: string[] = [];
     const contract = capabilityContract(request.capability);
     if (!contract) {
       return { valid: false, errors: [`Unknown or unpriced capability "${request.capability}".`] };
     }
-    if (contract.kind !== request.kind || request.input.kind !== request.kind) {
+    if (contract.kind !== request.kind) {
       errors.push(`Capability "${request.capability}" is registered for ${contract.kind}, not ${request.kind}.`);
     }
 
-    switch (request.input.kind) {
+    switch (request.kind) {
       case "image-edit":
-        validateText(errors, "prompt", request.input.prompt, 1, 4_000);
-        validateId(errors, "sourcePhotoId", request.input.sourcePhotoId);
-        break;
-      case "background-removal":
-        validateId(errors, "sourcePhotoId", request.input.sourcePhotoId);
+        validateText(errors, "instruction", request.instruction, 1, 4_000);
+        validateId(errors, "sourceImageAssetId", request.sourceImageAssetId);
         break;
       case "image-to-3d": {
         if (request.capability === "meshy-v7-i3d") {
-          if (request.input.photos.length !== 1) errors.push("meshy-v7-i3d requires exactly one source image.");
-          const opts = request.input.meshy;
-          if (opts?.enableAnimation && !opts.enableRigging) {
-            errors.push("Meshy animation requires enableRigging=true.");
-          }
-          if (opts?.animationActionId !== undefined && (!Number.isInteger(opts.animationActionId) || opts.animationActionId < 0 || opts.animationActionId > 696)) {
-            errors.push("animationActionId must be an integer from 0 through 696.");
-          }
-          if (opts?.targetPolycount !== undefined && (opts.targetPolycount < 100 || opts.targetPolycount > 300_000)) {
-            errors.push("targetPolycount must be between 100 and 300000.");
-          }
+          if (request.photos.length !== 1) errors.push("meshy-v7-i3d requires exactly one source image.");
         } else {
-          return this.validateInput(request.capability, request.input.photos);
+          return this.validateInput(request.capability, request.photos);
         }
         break;
       }
       case "text":
-        validateText(errors, "prompt", request.input.prompt, 1, 8_000);
+        validateText(errors, "prompt", request.prompt, 1, 8_000);
+        if (!Number.isInteger(request.maxCharacters) || request.maxCharacters < 1 || request.maxCharacters > 8_000) {
+          errors.push("maxCharacters must be an integer from 1 through 8000.");
+        }
         break;
       case "music":
-        validateText(errors, "prompt", request.input.prompt, 1, 4_000);
+        validateText(errors, "prompt", request.prompt, 1, 4_000);
+        if (!Number.isInteger(request.durationSeconds) || request.durationSeconds < 1 || request.durationSeconds > 600) {
+          errors.push("durationSeconds must be an integer from 1 through 600.");
+        }
         break;
       case "sfx":
-        validateText(errors, "prompt", request.input.prompt, 1, 2_000);
-        if (!Number.isInteger(request.input.durationSeconds) || request.input.durationSeconds < 1 || request.input.durationSeconds > 60) {
+        validateText(errors, "prompt", request.prompt, 1, 2_000);
+        if (!Number.isInteger(request.durationSeconds) || request.durationSeconds < 1 || request.durationSeconds > 60) {
           errors.push("durationSeconds must be an integer from 1 through 60.");
         }
         break;
       case "tts":
-        validateText(errors, "text", request.input.text, 1, 2_000);
-        if (request.input.voice !== undefined) validateText(errors, "voice", request.input.voice, 1, 200);
+        validateText(errors, "text", request.text, 1, 2_000);
+        validateText(errors, "language", request.language, 1, 32);
+        if (request.voice !== undefined) validateText(errors, "voice", request.voice, 1, 200);
         break;
-      case "image-to-video":
-        validateText(errors, "prompt", request.input.prompt, 1, 4_000);
-        validateId(errors, "sourcePhotoId", request.input.sourcePhotoId);
-        if (request.input.durationSeconds !== undefined && (!Number.isInteger(request.input.durationSeconds) || request.input.durationSeconds < 3 || request.input.durationSeconds > 15)) {
+      case "video":
+        validateText(errors, "prompt", request.prompt, 1, 4_000);
+        validateId(errors, "sourceImageAssetId", request.sourceImageAssetId);
+        if (!Number.isInteger(request.durationSeconds) || request.durationSeconds < 3 || request.durationSeconds > 15) {
           errors.push("durationSeconds must be an integer from 3 through 15.");
         }
         break;
@@ -357,12 +351,12 @@ export class LivepeerAdapter implements ProviderAdapter, GenerationProviderAdapt
       );
     }
 
-    if (request.input.kind === "image-to-3d" && request.capability !== "meshy-v7-i3d") {
+    if (request.kind === "image-to-3d" && request.capability !== "meshy-v7-i3d") {
       const legacy = await this.submit({
         capability: request.capability,
-        photos: request.input.photos,
+        photos: request.photos,
         idempotencyKey: request.idempotencyKey,
-        ...(request.input.scenePrompt !== undefined ? { scenePrompt: request.input.scenePrompt } : {}),
+        ...(request.scenePrompt !== undefined ? { scenePrompt: request.scenePrompt } : {}),
       });
       return legacy;
     }
@@ -377,34 +371,18 @@ export class LivepeerAdapter implements ProviderAdapter, GenerationProviderAdapt
     let toolName: "create_media" | "run_capability";
     let args: Record<string, unknown>;
 
-    switch (request.input.kind) {
+    switch (request.kind) {
       case "image-edit":
         toolName = "create_media";
-        args = { action: "generate", model_override: request.capability, source_url: imageUrls[0], prompt: request.input.prompt, quality_gate: false, ...common };
-        break;
-      case "background-removal":
-        toolName = "create_media";
-        args = { action: "generate", model_override: request.capability, source_url: imageUrls[0], prompt: ".", quality_gate: false, ...common };
+        args = { action: "generate", model_override: request.capability, source_url: imageUrls[0], prompt: request.instruction, quality_gate: false, ...common };
         break;
       case "image-to-3d": {
         toolName = "run_capability";
-        const o = request.input.meshy ?? {};
         args = {
           capability: request.capability,
           source_url: imageUrls[0],
           inputs: {
             image_url: imageUrls[0],
-            ...(o.enableRigging !== undefined ? { enable_rigging: o.enableRigging } : {}),
-            ...(o.enableAnimation !== undefined ? { enable_animation: o.enableAnimation } : {}),
-            ...(o.animationActionId !== undefined ? { animation_action_id: o.animationActionId } : {}),
-            ...(o.ultraMode !== undefined ? { ultra_mode: o.ultraMode } : {}),
-            ...(o.shouldTexture !== undefined ? { should_texture: o.shouldTexture } : {}),
-            ...(o.modelType !== undefined ? { model_type: o.modelType } : {}),
-            ...(o.topology !== undefined ? { topology: o.topology } : {}),
-            ...(o.targetPolycount !== undefined ? { target_polycount: o.targetPolycount } : {}),
-            ...(o.poseMode !== undefined ? { pose_mode: o.poseMode } : {}),
-            ...(o.symmetryMode !== undefined ? { symmetry_mode: o.symmetryMode } : {}),
-            ...(o.enablePbr !== undefined ? { enable_pbr: o.enablePbr } : {}),
           },
           timeout: CAPABILITY_TIMEOUT_SECONDS,
           ...common,
@@ -413,23 +391,23 @@ export class LivepeerAdapter implements ProviderAdapter, GenerationProviderAdapt
       }
       case "text":
         toolName = "run_capability";
-        args = { capability: request.capability, prompt: request.input.prompt, timeout: CAPABILITY_TIMEOUT_SECONDS, ...common };
+        args = { capability: request.capability, prompt: request.prompt, inputs: { max_characters: request.maxCharacters, output: request.output }, timeout: CAPABILITY_TIMEOUT_SECONDS, ...common };
         break;
       case "music":
         toolName = "create_media";
-        args = { action: "music", model_override: request.capability, prompt: request.input.prompt, instrumental: request.input.instrumental ?? true, ...common };
+        args = { action: "music", model_override: request.capability, prompt: request.prompt, duration: request.durationSeconds, instrumental: true, ...common };
         break;
       case "sfx":
         toolName = "create_media";
-        args = { action: "music", model_override: request.capability, prompt: request.input.prompt, duration: request.input.durationSeconds, ...common };
+        args = { action: "music", model_override: request.capability, prompt: request.prompt, duration: request.durationSeconds, ...common };
         break;
       case "tts":
         toolName = "create_media";
-        args = { action: "tts", model_override: request.capability, prompt: request.input.text, text: request.input.text, ...(request.input.voice ? { voice: request.input.voice } : {}), ...common };
+        args = { action: "tts", model_override: request.capability, prompt: request.text, text: request.text, ...(request.voice ? { voice: request.voice } : {}), ...common };
         break;
-      case "image-to-video":
+      case "video":
         toolName = "create_media";
-        args = { action: "animate", model_override: request.capability, source_url: imageUrls[0], prompt: request.input.prompt, ...(request.input.durationSeconds !== undefined ? { duration: request.input.durationSeconds } : {}), on_i2v_timeout: "wait", quality_gate: false, ...common };
+        args = { action: "animate", model_override: request.capability, source_url: imageUrls[0], prompt: request.prompt, duration: request.durationSeconds, on_i2v_timeout: "wait", quality_gate: false, ...common };
         break;
     }
 
@@ -504,14 +482,13 @@ export class LivepeerAdapter implements ProviderAdapter, GenerationProviderAdapt
 
   private async resolveGenerationImageUrls(request: ProviderGenerationSubmitRequest): Promise<string[]> {
     let photoIds: string[] = [];
-    switch (request.input.kind) {
+    switch (request.kind) {
       case "image-edit":
-      case "background-removal":
-      case "image-to-video":
-        photoIds = [request.input.sourcePhotoId];
+      case "video":
+        photoIds = [request.sourceImageAssetId];
         break;
       case "image-to-3d":
-        photoIds = orderPhotosForCapability(request.capability, request.input.photos).map((photo) => photo.photoId);
+        photoIds = orderPhotosForCapability(request.capability, request.photos).map((photo) => photo.photoId);
         break;
       default:
         return [];

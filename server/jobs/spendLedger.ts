@@ -1,12 +1,12 @@
 import { join } from "node:path";
-import type { GenerationKind } from "./types.js";
+import type { GenerationJobKind } from "../../shared/generation.js";
 import { JsonFileStore } from "../persistence/jsonStore.js";
 
 export interface SpendLedgerEntry {
   jobId: string;
   worldId: string | null;
   capability: string;
-  kind: GenerationKind;
+  kind: GenerationJobKind;
   estimateUsd: number | null;
   reportedUsd: number | null;
   status: "estimated" | "reported" | "unknown";
@@ -42,7 +42,7 @@ export class SpendLedger {
     jobId: string;
     worldId: string | null;
     capability: string;
-    kind: GenerationKind;
+    kind: GenerationJobKind;
     estimateUsd: number | null;
     perRequestLimitUsd: number;
     perWorldLimitUsd: number;
