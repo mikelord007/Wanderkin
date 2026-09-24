@@ -57,3 +57,42 @@ describe("GameplaySession collect mode", () => {
     expect(session.snapshot.completed).toBe(false);
   });
 });
+
+describe("GameplaySession explore mode", () => {
+  const exploreExperience: LevelExperience = {
+    ...experience,
+    mode: {
+      kind: "explore",
+      destinations: [
+        { id: "lookout", position: [1, 0, 0], label: "Cloud lookout" },
+        { id: "garden", position: [2, 0, 0], label: "Tiny garden" },
+      ],
+      optionalCollectibleIds: ["fragment-red"],
+    },
+    finishPortal: { ...experience.finishPortal!, activation: "always" },
+  };
+
+  it("has no timer, allows optional fragments, and completes on all destinations", () => {
+    const bus = new GameplayEventBus();
+    const events = vi.fn();
+    bus.on("*", events);
+    const session = new GameplaySession({ experience: exploreExperience, worldId: "explore-world", eventBus: bus });
+
+    expect(session.snapshot.race.phase).toBe("not-applicable");
+    expect(session.snapshot.race.elapsedMilliseconds).toBe(0);
+    expect(session.collectFragment("fragment-red")).toBe(true);
+    expect(session.reachDestination("not-authored")).toBe(false);
+    expect(session.reachDestination("lookout")).toBe(true);
+    expect(session.reachDestination("lookout")).toBe(false);
+    expect(session.snapshot.completed).toBe(false);
+    expect(session.reachDestination("garden")).toBe(true);
+    expect(session.snapshot.completed).toBe(true);
+    expect(events.mock.calls.filter(([event]) => event.type === "worldCompleted")).toHaveLength(1);
+  });
+
+  it("allows an always-active authored portal to finish exploration", () => {
+    const session = new GameplaySession({ experience: exploreExperience, worldId: "explore-world" });
+    expect(session.snapshot.portalActive).toBe(true);
+    expect(session.enterPortal("finish-portal")).toBe(true);
+  });
+});

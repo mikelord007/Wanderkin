@@ -142,6 +142,23 @@ export class GameplaySession {
     return true;
   }
 
+  reachDestination(destinationId: string): boolean {
+    const mode = this.experience.mode;
+    if (this.completed || mode.kind !== "explore" || this.destinationsReached.has(destinationId)) {
+      return false;
+    }
+    if (!mode.destinations.some((destination) => destination.id === destinationId)) return false;
+
+    this.destinationsReached.add(destinationId);
+    if (
+      mode.destinations.length > 0 &&
+      mode.destinations.every((destination) => this.destinationsReached.has(destination.id))
+    ) {
+      this.completeWorld();
+    }
+    return true;
+  }
+
   enterPortal(portalId: string): boolean {
     const portal = this.experience.finishPortal;
     if (this.completed || !portal || portal.id !== portalId || !this.portalActive) return false;
