@@ -10,6 +10,7 @@
 
 import type { RefObject } from "react";
 import type { GameLoadStage } from "../types.js";
+import type { GameplaySessionSnapshot } from "../modes/session.js";
 import "./hud.css";
 
 export interface HudProps {
@@ -33,6 +34,11 @@ export interface HudProps {
   onRetry: () => void;
   onExit: () => void;
   onStart: () => void;
+  onPause: () => void;
+  modeState: GameplaySessionSnapshot | null;
+  objective: string | undefined;
+  introVisible: boolean;
+  feedback: string | null;
 }
 
 const STAGE_LABELS: { stage: GameLoadStage; label: string }[] = [
@@ -56,6 +62,13 @@ function formatDuration(seconds: number): string {
   return `${minutes}:${String(total % 60).padStart(2, "0")}`;
 }
 
+function formatMilliseconds(milliseconds: number): string {
+  const totalTenths = Math.max(0, Math.floor(milliseconds / 100));
+  const minutes = Math.floor(totalTenths / 600);
+  const seconds = Math.floor((totalTenths % 600) / 10);
+  return `${minutes}:${String(seconds).padStart(2, "0")}.${totalTenths % 10}`;
+}
+
 function Controls() {
   return (
     <div className="oq-hud__controls">
@@ -73,8 +86,38 @@ function Controls() {
         <dt>Esc</dt>
         <dd>Pause</dd>
       </dl>
+      <p className="oq-hud__touch-notice">Keyboard and mouse are supported. Touch controls are not available yet.</p>
     </div>
   );
+}
+
+function ObjectivePanel({ props }: { props: HudProps }) {
+  const state = props.modeState;
+  if (!state) {
+    return <div className="oq-hud__objective">
+      <div className="oq-hud__objective-label">{props.completed ? "Course complete" : "Checkpoints"}</div>
+      <div className="oq-hud__objective-count">{props.checkpointsCollected}<span> / {props.checkpointsTotal}</span></div>
+    </div>;
+  }
+  if (state.mode === "collect") {
+    return <div className="oq-hud__objective" role="status" aria-live="polite">
+      <div className="oq-hud__objective-label">Lost Colors</div>
+      <div className="oq-hud__objective-count">Colors found {state.requiredFragmentsCollected}<span> / {state.requiredFragmentsTotal}</span></div>
+      <p>{state.portalActive ? "The portal is awake — step inside." : props.objective}</p>
+    </div>;
+  }
+  if (state.mode === "explore") {
+    return <div className="oq-hud__objective">
+      <div className="oq-hud__objective-label">Explore</div>
+      <div className="oq-hud__objective-count">{state.destinationsReached.size} places visited</div>
+      <p>{props.objective}</p>
+    </div>;
+  }
+  return <div className="oq-hud__objective">
+    <div className="oq-hud__objective-label">Race · {state.reachedCheckpointIds.length}/{props.checkpointsTotal}</div>
+    <div className="oq-hud__objective-count">{formatMilliseconds(state.race.elapsedMilliseconds)}</div>
+    {state.race.bestMilliseconds !== null ? <p>Best {formatMilliseconds(state.race.bestMilliseconds)}</p> : null}
+  </div>;
 }
 
 function LoadingCard({
@@ -145,29 +188,9 @@ export function Hud(props: HudProps) {
     <div className="oq-hud">
       {ready ? (
         <>
-          <div className="oq-hud__objective">
-            <div className="oq-hud__objective-label">
-              {completed ? "Course complete" : "Checkpoints"}
-            </div>
-            <div className="oq-hud__objective-count">
-              {checkpointsCollected}
-              <span style={{ opacity: 0.45 }}> / {checkpointsTotal}</span>
-            </div>
-            <div className="oq-hud__pips">
-              {Array.from({ length: checkpointsTotal }, (_, index) => (
-                <span
-                  key={index}
-                  className={`oq-hud__pip${
-                    index < checkpointsCollected
-                      ? " oq-hud__pip--done"
-                      : index === checkpointsCollected
-                        ? " oq-hud__pip--active"
-                        : ""
-                  }`}
-                />
-              ))}
-            </div>
-          </div>
+          <ObjectivePanel props={props} />
+
+          <button type="button" className="oq-hud__pause" onClick={props.onPause} aria-label="Pause game">Pause</button>
 
           <div className="oq-hud__pointer" ref={objectiveArrowRef}>
             <div className="oq-hud__pointer-arrow" aria-hidden="true">
@@ -192,6 +215,16 @@ export function Hud(props: HudProps) {
           ) : null}
 
           <Controls />
+          {props.introVisible ? <div className="oq-hud__intro" role="status">
+            <strong>Ready, tiny explorer?</strong>
+            <span>Use WASD to move, Space to jump, and E to climb ledges.</span>
+          </div> : null}
+          {props.feedback ? <div className="oq-hud__feedback" role="status" aria-live="polite">{props.feedback}</div> : null}
+          {props.modeState?.mode === "race" && props.modeState.race.phase === "countdown" ? (
+            <div className="oq-hud__countdown" role="status" aria-live="assertive">
+              {props.modeState.race.countdownSecondsRemaining || "Go!"}
+            </div>
+          ) : null}
         </>
       ) : null}
 

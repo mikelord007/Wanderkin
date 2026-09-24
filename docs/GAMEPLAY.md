@@ -23,6 +23,33 @@ Clicking the game captures the mouse. `Esc` releases it and pauses; so does
 the browser dropping pointer lock for any other reason, so the game can
 never keep simulating while the player has lost control of the camera.
 
+## Gameplay event bus
+
+`src/game/events.ts` exports `GameplayEventBus` and the default
+`gameplayEvents` instance. Audio, subtitles, analytics and browser QA consume
+this typed event stream; none of them infer rewards from rendered objects.
+Events are synchronous and carry immutable primitive payloads. A subscriber
+returns an unsubscribe function and may listen to a named event or `*`.
+
+| Event | Emitted when |
+| --- | --- |
+| `fragmentCollected` | A required or optional fragment is credited for the first time. Includes progress, color, and the new 0..1 restoration target. |
+| `allFragmentsCollected` | The last required fragment is credited. |
+| `portalActivated` | A previously locked portal becomes enterable. |
+| `checkpointReached` | The next ordered course/race checkpoint is reached. |
+| `playerFell` | The movement controller detects out-of-bounds, before respawn feedback. |
+| `respawned` | A fall or manual return moves the capsule to its safe pose. |
+| `raceCountdown` | The visible whole-second countdown changes. |
+| `raceStarted` | Countdown ends and the monotonic race clock starts. |
+| `raceFinished` | A result is frozen and the local personal best is evaluated. |
+| `worldCompleted` | Any mode reaches its completion rule; emitted once per run. |
+| `introShown` | The contextual movement/jump introduction is shown for this world. |
+
+Fragment and completion events are idempotent per run. Respawn never clears
+progress. Restart creates a new run and may therefore emit the same reward
+sequence again, but it first returns all mode state to its authored initial
+values.
+
 ## Simulation model
 
 Rapier runs at a **fixed timestep** of `fixedTimestepSeconds` (1/60 s),
@@ -212,6 +239,15 @@ loading rather than being given approximate collision.
 ## Authoring a level for this runtime
 
 Coordinate convention is Y-up, right-handed, metres (`shared/geometry.ts`).
+
+Before save or publish, `validateExperiencePlacements` projects the active
+mode's ordered fragments, destinations, checkpoints, and portal into the same
+conservative walk/jump/mantle validation used by scene preparation. The result
+is a discriminated `PlacementValidationResult`; `ok: false` contains
+display-ready repair issues and must block publication. For example, an
+unreachable race marker reports “Move this checkpoint closer to the previous
+platform.” `assertPlayableExperience` throws a `PlacementValidationError`
+carrying that result for boundaries that prefer exceptions.
 
 - `spawn.position` and `checkpoint.position` are **capsule centres**, not
   standing surfaces. A character standing on a surface at `y` has its
