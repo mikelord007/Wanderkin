@@ -31,6 +31,10 @@ import { GameStage as StageContents, type HudSignals } from "./render/GameStage.
 import { usePrefersReducedMotion } from "./render/useReducedMotion.js";
 import { ColorRestorationAdapter } from "./restorationAdapter.js";
 import type { GameLoadStage, GameSnapshot, GameViewProps } from "./types.js";
+import { GameplaySession, type GameplaySessionSnapshot } from "./modes/session.js";
+import { updateGameplayProximity } from "./modes/proximity.js";
+import { gameplayEvents } from "./events.js";
+import type { Vec3Like } from "./core/vec.js";
 
 interface Runtime {
   simulation: GameSimulation;
@@ -60,6 +64,7 @@ function gameplaySignature(manifest: SceneManifest): string {
     manifest.spawn,
     manifest.checkpoints,
     manifest.movementConfigId,
+    manifest.experience,
   ]);
 }
 
@@ -76,12 +81,26 @@ export function GameView({
   styleId,
   atmosphere,
   colorRestoration: colorRestorationOverride,
+  eventBus,
+  publishedVersionId,
 }: GameViewProps) {
   const config = DEFAULT_MOVEMENT_CONFIG;
   const reducedMotion = usePrefersReducedMotion();
   const manifestRef = useRef(manifest);
   manifestRef.current = manifest;
   const signature = useMemo(() => gameplaySignature(manifest), [manifest]);
+  const resolvedEventBus = eventBus ?? gameplayEvents;
+  const gameplaySession = useMemo(
+    () => manifest.experience
+      ? new GameplaySession({
+          experience: manifest.experience,
+          worldId: manifest.levelId,
+          eventBus: resolvedEventBus,
+          ...(publishedVersionId === undefined ? {} : { publishedVersionId }),
+        })
+      : null,
+    [signature, resolvedEventBus, publishedVersionId],
+  );
   const style = getSceneStyle(styleId ?? manifest.experience?.style.id ?? "cartoon");
   const resolvedAtmosphere = atmosphere ?? manifest.experience?.style.atmosphere;
   const initialColorRestoration = clampColorRestoration(
@@ -111,16 +130,42 @@ export function GameView({
   const [signals, setSignals] = useState<HudSignals>(EMPTY_SIGNALS);
   const [downloadedBytes, setDownloadedBytes] = useState(0);
   const [totalBytes, setTotalBytes] = useState<number | null>(null);
+  const [modeState, setModeState] = useState<GameplaySessionSnapshot | null>(
+    () => gameplaySession?.snapshot ?? null,
+  );
+  const [introVisible, setIntroVisible] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const objectiveArrowRef = useRef<HTMLDivElement>(null);
   const objectiveDistanceRef = useRef<HTMLSpanElement>(null);
   const diagnosticsRef = useRef<GameDiagnostics | null>(null);
   const runningRef = useRef(false);
+  const completionHandledRef = useRef(false);
+  const introTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastModeHudUpdateRef = useRef(0);
 
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
   const onProgressRef = useRef(onProgress);
+
+  useEffect(() => {
+    const next = gameplaySession?.snapshot ?? null;
+    setModeState(next);
+    if (next) restorationAdapter.reset(next.restoration);
+  }, [gameplaySession, restorationAdapter]);
+
+  useEffect(() => () => {
+    if (introTimerRef.current) clearTimeout(introTimerRef.current);
+    if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+  }, []);
+
+  useEffect(() => resolvedEventBus.on("fragmentCollected", (event) => {
+    setFeedback(`Color found — ${event.collected} of ${event.required}`);
+    if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+    feedbackTimerRef.current = setTimeout(() => setFeedback(null), 1800);
+  }), [resolvedEventBus]);
 
   // ---- Load assets and build the world --------------------------------
 
@@ -139,6 +184,7 @@ export function GameView({
     setSignals(EMPTY_SIGNALS);
     setDownloadedBytes(0);
     setTotalBytes(null);
+    completionHandledRef.current = false;
     runningRef.current = false;
 
     void (async () => {
@@ -210,6 +256,8 @@ export function GameView({
         const input = new InputController(config, current.spawn.headingRadians, {
           onPauseRequested: () => {
             runningRef.current = false;
+            gameplaySession?.setPaused(true);
+            if (gameplaySession) setModeState(gameplaySession.snapshot);
             setPaused(true);
           },
           onPointerLockChange: setPointerLocked,
@@ -231,7 +279,7 @@ export function GameView({
     };
     // `config` is a module constant; `signature` captures every manifest
     // change that requires a rebuild.
-  }, [signature, loadToken, config]);
+  }, [signature, loadToken, config, gameplaySession]);
 
   // Tear the world down when it is replaced or the view unmounts.
   useEffect(() => {
@@ -275,9 +323,13 @@ export function GameView({
   // frame or two) from flashing the overlay.
   useEffect(() => {
     if (!ready || !started || paused || completed || pointerLocked) return undefined;
-    const timer = setTimeout(() => setPaused(true), 600);
+    const timer = setTimeout(() => {
+      gameplaySession?.setPaused(true);
+      if (gameplaySession) setModeState(gameplaySession.snapshot);
+      setPaused(true);
+    }, 600);
     return () => clearTimeout(timer);
-  }, [ready, started, paused, completed, pointerLocked]);
+  }, [ready, started, paused, completed, pointerLocked, gameplaySession]);
 
   const handleFirstFrame = useCallback(() => {
     setStage((previous) => (previous === "starting" ? "running" : previous));
@@ -294,6 +346,32 @@ export function GameView({
     );
   }, []);
 
+  const finishGameplay = useCallback((nextModeState: GameplaySessionSnapshot | null) => {
+    if (completionHandledRef.current) return;
+    completionHandledRef.current = true;
+    runningRef.current = false;
+    setCompleted(true);
+    setCompletionSeconds(
+      nextModeState?.mode === "race"
+        ? nextModeState.race.elapsedMilliseconds / 1000
+        : runtime?.simulation.simulatedSeconds ?? 0,
+    );
+    runtime?.input.releasePointerLock();
+    onCompleteRef.current();
+  }, [runtime]);
+
+  const syncModeState = useCallback((force = false) => {
+    if (!gameplaySession) return;
+    const next = gameplaySession.snapshot;
+    restorationAdapter.apply(next.restoration);
+    const now = performance.now();
+    if (force || next.mode !== "race" || now - lastModeHudUpdateRef.current >= 50 || next.completed) {
+      lastModeHudUpdateRef.current = now;
+      setModeState(next);
+    }
+    if (next.completed) finishGameplay(next);
+  }, [gameplaySession, restorationAdapter, finishGameplay]);
+
   const handleEvent = useCallback(
     (event: SimulationEvent) => {
       if (event.type === "checkpoint") {
@@ -302,38 +380,72 @@ export function GameView({
           next.add(event.id);
           return next;
         });
+        if (gameplaySession?.reachCheckpoint(event.id)) syncModeState(true);
+        return;
+      }
+      if (event.type === "respawn") {
+        const checkpointIndex = runtime?.simulation.checkpointState.lastActivatedIndex ?? -1;
+        const checkpointId = checkpointIndex >= 0
+          ? runtime?.simulation.checkpointState.checkpoints[checkpointIndex]?.id ?? null
+          : null;
+        gameplaySession?.respawn(event.reason, checkpointId);
         return;
       }
       if (event.type === "complete") {
-        runningRef.current = false;
-        setCompleted(true);
-        setCompletionSeconds(runtime?.simulation.simulatedSeconds ?? 0);
-        runtime?.input.releasePointerLock();
-        onCompleteRef.current();
+        if (!gameplaySession) finishGameplay(null);
       }
     },
-    [runtime],
+    [runtime, gameplaySession, syncModeState, finishGameplay],
   );
+
+  const handleGameplayFrame = useCallback((position: Vec3Like) => {
+    if (!gameplaySession || !manifestRef.current.experience) return;
+    gameplaySession.update();
+    const changed = updateGameplayProximity(
+      gameplaySession,
+      manifestRef.current.experience,
+      position,
+    );
+    syncModeState(changed);
+  }, [gameplaySession, syncModeState]);
 
   // ---- Player actions -------------------------------------------------
 
   const handleStart = useCallback(() => {
     if (!runtime) return;
+    if (gameplaySession?.showIntroOnce()) {
+      setIntroVisible(true);
+      if (introTimerRef.current) clearTimeout(introTimerRef.current);
+      introTimerRef.current = setTimeout(() => setIntroVisible(false), 5200);
+    }
+    gameplaySession?.start();
+    syncModeState(true);
     setStarted(true);
     setPaused(false);
     runtime.input.requestPointerLock();
-  }, [runtime]);
+  }, [runtime, gameplaySession, syncModeState]);
 
   const handleResume = useCallback(() => {
     if (!runtime) return;
+    gameplaySession?.setPaused(false);
+    syncModeState(true);
     setPaused(false);
     setStarted(true);
     runtime.input.requestPointerLock();
-  }, [runtime]);
+  }, [runtime, gameplaySession, syncModeState]);
+
+  const handlePause = useCallback(() => {
+    runningRef.current = false;
+    gameplaySession?.setPaused(true);
+    syncModeState(true);
+    runtime?.input.releasePointerLock();
+    setPaused(true);
+  }, [runtime, gameplaySession, syncModeState]);
 
   const handleRestart = useCallback(() => {
     if (!runtime) return;
     runtime.simulation.reset();
+    gameplaySession?.restart();
     runtime.input.setYaw(manifestRef.current.spawn.headingRadians);
     setCollectedIds(new Set());
     setCompleted(false);
@@ -341,8 +453,15 @@ export function GameView({
     setPaused(false);
     setStarted(true);
     setSignals(EMPTY_SIGNALS);
+    setFeedback(null);
+    completionHandledRef.current = false;
+    if (gameplaySession) {
+      const next = gameplaySession.snapshot;
+      setModeState(next);
+      restorationAdapter.reset(next.restoration);
+    }
     runtime.input.requestPointerLock();
-  }, [runtime]);
+  }, [runtime, gameplaySession, restorationAdapter]);
 
   const handleRetry = useCallback(() => {
     setLoadToken((token) => token + 1);
@@ -369,9 +488,39 @@ export function GameView({
       downloadedBytes,
       totalBytes,
       completed,
+      ...(modeState ? { mode: modeState } : {}),
     }),
-    [ready, error, paused, signals, manifest.checkpoints.length, stage, downloadedBytes, totalBytes, completed],
+    [ready, error, paused, signals, manifest.checkpoints.length, stage, downloadedBytes, totalBytes, completed, modeState],
   );
+
+  const objectivePosition = useMemo<Vec3Like | null>(() => {
+    const experience = manifest.experience;
+    if (!experience || !modeState) return null;
+    if (experience.mode.kind === "collect") {
+      const nextId = experience.mode.requiredCollectibleIds.find(
+        (id) => !modeState.collectedFragmentIds.has(id),
+      );
+      const fragment = experience.collectibles.find((item) => item.id === nextId);
+      if (fragment) {
+        const [x, y, z] = fragment.transform.position;
+        return { x, y, z };
+      }
+    }
+    if (experience.mode.kind === "explore") {
+      const destination = experience.mode.destinations.find(
+        (item) => !modeState.destinationsReached.has(item.id),
+      );
+      if (destination) {
+        const [x, y, z] = destination.position;
+        return { x, y, z };
+      }
+    }
+    if (modeState.portalActive && experience.finishPortal) {
+      const [x, y, z] = experience.finishPortal.transform.position;
+      return { x, y, z };
+    }
+    return null;
+  }, [manifest.experience, modeState]);
 
   // Held in a ref so an inline `onProgress` from the parent cannot make
   // this fire on every render of the parent, which would be an easy way
@@ -417,6 +566,9 @@ export function GameView({
             atmosphere={resolvedAtmosphere}
             colorRestoration={colorRestoration}
             reducedMotion={reducedMotion}
+            modeState={modeState}
+            objectivePosition={objectivePosition}
+            onGameplayFrame={handleGameplayFrame}
           />
         </Canvas>
       ) : null}
@@ -442,6 +594,11 @@ export function GameView({
         onRetry={handleRetry}
         onExit={handleExit}
         onStart={handleStart}
+        onPause={handlePause}
+        modeState={modeState}
+        objective={manifest.experience?.quest.objective}
+        introVisible={introVisible}
+        feedback={feedback}
       />
     </div>
   );

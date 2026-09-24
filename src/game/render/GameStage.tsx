@@ -23,6 +23,9 @@ import { SceneEntities } from "./SceneEntities.js";
 import { SceneLighting } from "./SceneLighting.js";
 import { CheckpointMarkers } from "./Checkpoints.js";
 import { SceneEnvironment } from "./SceneEnvironment.js";
+import { ModeEntities } from "./ModeEntities.js";
+import type { GameplaySessionSnapshot } from "../modes/session.js";
+import type { Vec3Like } from "../core/vec.js";
 
 /** Frame-by-frame values the HUD cares about. Compared shallowly upstream. */
 export interface HudSignals {
@@ -53,6 +56,9 @@ export interface GameStageProps {
   atmosphere: string | undefined;
   colorRestoration: number;
   reducedMotion: boolean;
+  modeState: GameplaySessionSnapshot | null;
+  objectivePosition: Vec3Like | null;
+  onGameplayFrame: (position: Vec3Like) => void;
 }
 
 export function GameStage({
@@ -75,6 +81,9 @@ export function GameStage({
   atmosphere,
   colorRestoration,
   reducedMotion,
+  modeState,
+  objectivePosition,
+  onGameplayFrame,
 }: GameStageProps) {
   const camera = useThree((state) => state.camera);
   const avatar = useRef<PlayerAvatarHandle>(null);
@@ -93,7 +102,10 @@ export function GameStage({
     frames.current += 1;
 
     if (runningRef.current) {
-      simulation.advance(input.consume(), delta);
+      const raceAllowsMovement =
+        modeState?.mode !== "race" || modeState.race.phase === "running";
+      if (raceAllowsMovement) simulation.advance(input.consume(), delta);
+      else input.clear();
       for (const event of simulation.drainEvents()) {
         if (event.type === "respawn") {
           input.setYaw(event.headingRadians);
@@ -107,6 +119,7 @@ export function GameStage({
 
     const position = simulation.interpolatedPosition();
     const yaw = simulation.interpolatedYaw();
+    if (runningRef.current) onGameplayFrame(simulation.playerPosition);
 
     const pose = rig.update(
       simulation.scene.world,
@@ -140,6 +153,7 @@ export function GameStage({
 
     updateObjectivePointer(
       simulation,
+      objectivePosition,
       input.yaw,
       position,
       objectiveArrowRef.current,
@@ -223,6 +237,9 @@ export function GameStage({
         style={style}
         reducedMotion={reducedMotion}
       />
+      {manifest.experience && modeState ? (
+        <ModeEntities experience={manifest.experience} state={modeState} reducedMotion={reducedMotion} />
+      ) : null}
       <PlayerAvatar ref={avatar} config={config} reducedMotion={reducedMotion} />
     </>
   );
@@ -230,6 +247,7 @@ export function GameStage({
 
 function updateObjectivePointer(
   simulation: GameSimulation,
+  objectivePosition: Vec3Like | null,
   cameraYaw: number,
   playerPosition: { x: number; y: number; z: number },
   arrow: HTMLDivElement | null,
@@ -237,7 +255,7 @@ function updateObjectivePointer(
 ): void {
   if (!arrow) return;
 
-  const target = simulation.nextCheckpointPosition;
+  const target = objectivePosition ?? simulation.nextCheckpointPosition;
   if (!target) {
     arrow.style.opacity = "0";
     return;
