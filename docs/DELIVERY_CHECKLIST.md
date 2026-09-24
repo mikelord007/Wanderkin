@@ -20,14 +20,14 @@ unchecked until that work actually occurs.
 - [x] **Commit summary and integration status** — Worker 12 commit hashes are
   reported in the orchestrator handoff; the branch is based on Integration #3
   merges `8450c5d`, `ddbeb49`, and `a27bd1c`.
-- [ ] **Final integration revision recorded** — fill in the final main commit
-  after all workers land and the required final `git merge main` is complete.
+- [x] **Final integration revision recorded** — final pre-verification merge of
+  `main` reported already up to date at `a27bd1c`; Worker 12 runtime revision
+  `218e6c5` was then verified.
 - [ ] **Deployment URL** — no authorized account/origin exists. The exact
   missing platform, hostname/DNS/TLS, volume, and provider-mode decision is
   stated in [`DEPLOYMENT.md`](DEPLOYMENT.md#deployment-status-and-remaining-requirement).
-- [ ] **Exact final automated results** — Worker 12 will record the final
-  `npm run typecheck`, `npm test`, `npm run build`, and Docker result below
-  after the last merge from main.
+- [x] **Exact final automated results** — recorded below after the required
+  final merge from main.
 - [ ] **Final real-browser results** — run the complete desktop and mobile-layout
   matrix on the final release revision; existing dated evidence remains in
   [`QA.md`](QA.md) and [`QA_BASELINE_2026-09-24.md`](QA_BASELINE_2026-09-24.md).
@@ -69,16 +69,13 @@ unchecked until that work actually occurs.
 
 ### Automated verification
 
-- [ ] `npm run typecheck` passes on the final integrated revision.
-- [ ] `npm test` passes on the final integrated revision; record exact files and
-  test count, not a historical number.
-- [ ] `npm run build` emits both `dist/` and `dist-server/server/index.js` on the
-  final integrated revision.
-- [ ] Docker image builds from the final revision, or Docker unavailability is
-  recorded with the exact command that could not run.
-- [ ] `npm run test:e2e:http` passes on the final revision (release-gate command
-  from [`QA.md`](QA.md), although not separately requested for Worker 12's
-  minimum check set).
+- [x] `npm run typecheck` passes on the final integrated revision.
+- [x] `npm test` passes: 46 files, 321 tests.
+- [x] `npm run build` emits both `dist/` and `dist-server/server/index.js`.
+- [x] Docker executable availability was checked with `docker version`; it is
+  not installed on this machine, so the image build could not be run.
+- [x] `npm run test:e2e:http` passes: 6 files, 31 tests against full server
+  processes and the fake provider.
 
 ### Browser verification
 
@@ -149,12 +146,14 @@ Complete this block only after merging current `main` immediately before the
 final verification:
 
 ```text
-Final revision: PENDING
-npm run typecheck: PENDING
-npm test: PENDING
-npm run build: PENDING
-npm run test:e2e:http: PENDING
-Docker build: PENDING
+Verified runtime revision: 218e6c5bdee27a52c89999db2c9f15f32460b6e0
+Integrated main revision: a27bd1c0b5d98f3d89080277eb24893d31ee4dde
+npm run typecheck: PASS
+npm test: PASS — 46 files, 321 tests
+npm run build: PASS — dist/ and dist-server/ emitted; Vite large-chunk warning
+npm run test:e2e:http: PASS — 6 files, 31 tests
+npm start smoke: PASS — GET /api/health on port 18787 returned {"status":"ok"}
+Docker build: NOT RUN — docker executable is not installed on this machine
 Real-browser QA: PENDING
 Live-provider validation: PENDING
 Deployment URL: PENDING — no authorized target
