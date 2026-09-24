@@ -148,3 +148,27 @@ retained served capability `kontext-edit`, served model
 - Chrome screenshot: SHA-256
   `4d4073f495391e5796cd64f88b69576895b490053fdc5480bd309ab57920f614`
   (36,575 bytes).
+
+## Cleanup and local-state integrity
+
+- Final spend endpoint: `knownUsd: 0.0431`, `unknownEntries: 0`,
+  `entries: 2`.
+- Final saved-level count: 0.
+- Ignored spend ledger SHA-256:
+  `3390d5ad288bdadbc173306436504f83119c9744c8c711a5341683b680ecb8e8`.
+- Ignored durable jobs index SHA-256:
+  `2184d6f6978b429ae528e90e28b7cfec6dca1c2c959a680078e6edf1fd8cae18`.
+- The generated PNG, storage directory, durable jobs/ledger, and runner log
+  remain uncommitted under ignored paths.
+- No Vite client was started because the runner stopped before it created a
+  level; the successful cutout was checked directly from the isolated API in
+  real Chrome.
+- The Chrome validation tab was closed, the isolated API was stopped, and
+  port 18799 was confirmed no longer listening.
+
+Checkpoint commits before this final document update:
+
+- `1a57e0e5dee60d150218bdcec62e120b79e8f820` — dry-run confirmation.
+- `a2142c36bb2b01495390b3ac109523696c054e1f` — runner evidence JSON.
+- `1bed190a0545b88f817b9a6e996d8fdfd1790302` — browser findings and
+  screenshot.
