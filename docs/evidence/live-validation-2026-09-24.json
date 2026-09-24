@@ -212,6 +212,71 @@
           "artifact": null
         }
       ]
+    },
+    {
+      "runId": "objectquest-quest-recovery-1790256121269",
+      "status": "recovered",
+      "recoveredStep": "quest",
+      "completedAt": "2026-09-24T13:22:01.269Z",
+      "method": "force-poll-existing-provider-job",
+      "freshProviderSubmissions": 0,
+      "freshEstimatedUsd": 0,
+      "applicationJobId": "job_8df572b8-0ded-4e8b-b524-c3361698a1ca",
+      "providerJobId": "mjob_13e739e8d5af",
+      "servedCapability": "gemini-text",
+      "servedModel": "fal-ai/any-llm",
+      "fallbackFired": null,
+      "retryCount": 0,
+      "maxRetries": 0,
+      "reportedCost": null,
+      "ledger": {
+        "worldId": "live-validation-photo4-20260924",
+        "entriesBefore": 5,
+        "entriesAfter": 5,
+        "estimatedUsdBefore": 0.6932,
+        "estimatedUsdAfter": 0.6932,
+        "estimatedUsdDelta": 0,
+        "reportedUsdDelta": null,
+        "beforeSha256": "475df491edf3b679795c338dba26c5688760c68e5ea46a02f13a09d81dfdbcc0",
+        "afterSha256": "4e3d5f91f451acc1277697a2ba8a1a12b75b2760c51c3ec96bdaef8756337e64",
+        "hashChangeReason": "The existing quest entry updatedAt changed when the same job finalized; no entry, estimate, or reservation was added."
+      },
+      "quest": {
+        "validationOk": true,
+        "validationErrors": [],
+        "fields": [
+          "title",
+          "intro",
+          "objective",
+          "narrationScript"
+        ],
+        "title": "The Cozy Corner Color Caper!",
+        "objective": "Discover every lost color piece, then step into the shimmering portal!",
+        "canonicalTextSha256": "47561633496011cc62324b3d7b8225b5600c1f9178e3a5a2e82bfb6fd1f5bb6e",
+        "canonicalTextBytes": 478
+      },
+      "unchangedExistingArtifacts": [
+        {
+          "step": "cutout",
+          "sha256": "6d0b4d2c18d6dd58aa1a7754cebc710b7872094295457c538666205c0da404f9",
+          "sizeBytes": 193234
+        },
+        {
+          "step": "style-preview",
+          "sha256": "adcd4f6a9c5ab0e6064d1e3656f906f5f5b9c4a22da704854b7c2c8fa0263c5e",
+          "sizeBytes": 129740
+        },
+        {
+          "step": "alternate-edit",
+          "sha256": "93c3895a6dbf68121eb8f50487efd44a0e2601a4ee5bf6c2653c133aa1501106",
+          "sizeBytes": 684261
+        },
+        {
+          "step": "mesh",
+          "sha256": "f0855519fb1314e14703ef91a7778b6992f2f4c80b64910cfe4781e719b0e24c",
+          "sizeBytes": 4680412
+        }
+      ]
     }
   ]
 }

@@ -1,6 +1,6 @@
 # ObjectQuest v2 live-validation result — 2026-09-24
 
-Status: **resumed after the image-format fix; stopped safely at row 5 when the quest provider returned no output**.
+Status: **rows 1–5 ready; the row-5 quest was recovered from its existing provider job at zero new spend; rows 6–16 await separate authorization to resume**.
 
 ## Dry-run checkpoint
 
@@ -55,9 +55,10 @@ npx tsx scripts/live-validation/run.ts --api http://127.0.0.1:18799 --max-usd 3 
 Rows 1–2 reconciled without a new provider submission or ledger entry. The
 previous Kontext provider output downloaded successfully as a real JPEG and
 was stored using its detected media type. Rows 3 and 4 completed without
-fallback. Row 5 reached provider state `done`, but the provider result
-contained no normalized text/output value. The runner stopped immediately;
-rows 6–16 were not submitted and no retry was attempted.
+fallback. Row 5 reached provider state `done`, but its successful text was
+nested at `run_output.result.text`, which the adapter did not yet normalize.
+The runner stopped immediately; rows 6–16 were not submitted and no retry was
+attempted during that run.
 
 The resumed runner's complete console output was:
 
@@ -73,7 +74,7 @@ Validation stopped at quest: Provider reported "done" but returned no output. Pa
 | 2 | Cartoon style preview | `job_ef2fde65-65e2-4d16-b8df-e75d53c93d85` / `mjob_d3d1797a1657` | `kontext-edit` / `fal-ai/flux-pro/kontext` | **Reconciled ready**, no fallback, zero new spend | JPEG, 129,740 bytes, SHA-256 `adcd4f6a9c5ab0e6064d1e3656f906f5f5b9c4a22da704854b7c2c8fa0263c5e` |
 | 3 | GPT image-edit alternate | `job_f9bcf342-6254-4b38-9fa0-d32c797cb89f` / `mjob_4a0b2bde417b` | `gpt-image-edit` / `openai/gpt-image-2/edit` | **Ready**, no fallback; provider total 77,457 ms | PNG, 684,261 bytes, SHA-256 `93c3895a6dbf68121eb8f50487efd44a0e2601a4ee5bf6c2653c133aa1501106` |
 | 4 | Rodin mesh | `job_662f0c8a-52f1-4e33-adad-fcff355e014d` / `mjob_0001ef7f3201` | `rodin-i3d` / `fal-ai/hyper3d/rodin/v2.5` | **Ready**, no fallback; provider total 138,789 ms | GLB, 4,680,412 bytes, SHA-256 `f0855519fb1314e14703ef91a7778b6992f2f4c80b64910cfe4781e719b0e24c` |
-| 5 | Quest | `job_8df572b8-0ded-4e8b-b524-c3361698a1ca` / `mjob_13e739e8d5af` | `gemini-text` / model not reported | **Failed**, no fallback: provider reported `done` without output; provider total 10,478 ms | None |
+| 5 | Quest | `job_8df572b8-0ded-4e8b-b524-c3361698a1ca` / `mjob_13e739e8d5af` | `gemini-text` / `fal-ai/any-llm` | **Recovered ready**, no fallback and zero new provider submission; originally stopped after 10,478 ms | Structured quest JSON, canonical SHA-256 `47561633496011cc62324b3d7b8225b5600c1f9178e3a5a2e82bfb6fd1f5bb6e` |
 | 6 | Music | — | — | Not submitted after runner stop | — |
 | 7 | Ambience | — | — | Not submitted after runner stop | — |
 | 8 | Fragment-pickup SFX | — | — | Not submitted after runner stop | — |
@@ -95,6 +96,44 @@ Validation stopped at quest: Provider reported "done" but returned no output. Pa
   **unknown**, not zero.
 - Neither reconciliation added a ledger entry or incurred new estimated
   spend.
+- Recovering row 5 retained five ledger entries and **$0.6932**, with zero
+  estimate/reservation delta. Only the existing quest entry's `updatedAt`
+  changed when it finalized.
+- Rows 6–16 are the only fresh remaining calls, mathematically **$0.7327**.
+  The runner's conservative resume guard still counts reconciled rows 3–5 and
+  therefore reports **$1.3828**; that is reservation accounting, not expected
+  fresh provider spend.
+
+## Zero-spend quest recovery
+
+A read-only provider lookup showed that `mjob_13e739e8d5af` had completed
+successfully with `run_output.ok: true`, `run_output.output_kind: text`, and
+the quest JSON at `run_output.result.text`. The same result reported concrete
+model `fal-ai/any-llm`, estimate `$0.0001`, and paid cost `null`. The adapter
+previously inspected only top-level `url`, `text`, `output`, and `payload`.
+
+The scoped adapter repair accepts only the observed successful nested-text
+shape, preserves the nested model ID, rejects malformed/error/wrong-kind
+nested envelopes, retains legacy top-level normalization, and does not treat
+the nested estimate as actual reported spend. Typecheck passed; focused
+adapter, job-manager, and quest tests passed 69/69.
+
+Before recovery, all five stored jobs were terminal, provider-backed, and had
+`retryCount: 0`, `maxRetries: 0`. Restarting only API port 18799 left the quest
+failed and did not alter the ledger. One authorized
+`POST /api/jobs/job_8df572b8-0ded-4e8b-b524-c3361698a1ca/retry` then force-polled
+the same `mjob_13e739e8d5af`; the app job became ready without entering a
+provider submission path. The app/provider IDs and retry counters remained
+unchanged, fallback remained null, the four quest fields passed the product
+validator, and reported cost remains unknown.
+
+Ledger entry count stayed 5 and its estimate stayed `$0.6932`. The ledger
+file hash changed only because the existing quest entry's `updatedAt` changed:
+`475df491edf3b679795c338dba26c5688760c68e5ea46a02f13a09d81dfdbcc0`
+before recovery and
+`4e3d5f91f451acc1277697a2ba8a1a12b75b2760c51c3ec96bdaef8756337e64`
+afterward. Cutout, preview, alternate, and mesh bytes still match their
+recorded hashes and sizes.
 
 ## Initial per-row execution record
 
@@ -181,19 +220,27 @@ retained served capability `kontext-edit`, served model
 preference and retained magic-byte validation, the same provider job and URL
 stored a valid JPEG artifact without another paid Kontext submission.
 
-## Blocking quest-output defect
+## Resolved quest-output normalization defect
 
 **Reproduction:** submit the authorized `gemini-text` request with idempotency
 key `oq-live-20260924-quest` through `POST /api/jobs/generate` and poll
 application job `job_8df572b8-0ded-4e8b-b524-c3361698a1ca`.
 
 **Expected:** provider state `done` includes text or structured quest JSON for
-the four required fields.
+the four required fields and the adapter normalizes the provider's supported
+success envelope.
 
-**Actual:** provider job `mjob_13e739e8d5af` reported `done`, served
-`gemini-text`, and fired no fallback, but the normalized result contained no
-output. The application job failed with `Provider reported "done" but returned
-no output`; reported cost and served model were both absent.
+**Actual before repair:** provider job `mjob_13e739e8d5af` reported `done`,
+served `gemini-text`, and fired no fallback. Its valid JSON was nested at
+`run_output.result.text`; the adapter ignored that field and failed the app job
+with `Provider reported "done" but returned no output`.
+
+**Resolution evidence:** commit
+`27bebaeda3e30e9985c95073f68ce830bb641fc0` added strict support for the
+observed nested text envelope. One force-poll of the existing provider job
+recovered the same application job as ready with served model
+`fal-ai/any-llm`, validated quest fields, null reported cost, and no new ledger
+entry, reservation, or provider submission.
 
 ## Five-layer distinction
 
@@ -204,9 +251,9 @@ no output`; reported cost and served model were both absent.
 2. **Historical health:** the plan's seven-day provider history remains
    contextual evidence only; it is not this ObjectQuest run.
 3. **Our execution:** ObjectQuest has ready, no-fallback jobs for `bg-remove`,
-   `kontext-edit`, `gpt-image-edit`, and `rodin-i3d`. The `gemini-text` job
-   reached provider state `done` but failed because no output was returned.
-   Rows 6–16 were not executed.
+   `kontext-edit`, `gpt-image-edit`, `rodin-i3d`, and `gemini-text`. The text
+   job was recovered by polling its original provider job after the adapter
+   learned the observed nested-output contract. Rows 6–16 were not executed.
 4. **Visual quality:** human inspection in real Chrome supports only the
    cutout-preservation finding above. Preview and mesh artifacts exist but
    were intentionally left for the user's hands-on review. There is no audio
@@ -216,9 +263,12 @@ no output`; reported cost and served model were both absent.
 
 ## Evidence hashes
 
-- Runner evidence JSON: SHA-256
-  `c3ceab02717b78f2a95700b02ae22aeadb9286203136048292a3c39023c16a96`
-  (8,250 bytes).
+- Runner and recovery evidence JSON: SHA-256
+  `6f9ccac97ebc76ae039bf47f48767f4cc0985342891f7d8cb8694e86bab4949d`
+  (10,668 bytes).
+- Recovered canonical quest JSON: SHA-256
+  `47561633496011cc62324b3d7b8225b5600c1f9178e3a5a2e82bfb6fd1f5bb6e`
+  (478 bytes).
 - Full runner console log: SHA-256
   `af9a316e22346f08b671ff97c8017bdc80862fd8bd71f258110d418c2292db6a`
   (225 bytes; local ignored path `test-results/live-validation/paid-run.log`).
@@ -247,9 +297,9 @@ no output`; reported cost and served model were both absent.
   `entries: 5`, `reservedUsd: 0.6932`.
 - Final saved-level count: 0.
 - Ignored spend ledger SHA-256:
-  `475df491edf3b679795c338dba26c5688760c68e5ea46a02f13a09d81dfdbcc0`.
+  `4e3d5f91f451acc1277697a2ba8a1a12b75b2760c51c3ec96bdaef8756337e64`.
 - Ignored durable jobs index SHA-256:
-  `39ebbcd5465199323eaea320f5ce453d31ecd7f9b598c8847344279db0a7423d`.
+  `08422f087e9d4ed3300af94307d9d4eec1338d5b7161de360f82eee8a28c37a9`.
 - Generated media, storage, durable jobs/ledger, runtime Vite configuration,
   and runner logs remain uncommitted under ignored paths.
 - The isolated API remains running at `http://127.0.0.1:18799` and the client
@@ -264,3 +314,5 @@ Checkpoint commits before this final document update:
 - `1bed190a0545b88f817b9a6e996d8fdfd1790302` — browser findings and
   screenshot.
 - `86f2b4005eb4c60704550fedc0a9dbfd546bf2e8` — resume-mode runner tooling.
+- `27bebaeda3e30e9985c95073f68ce830bb641fc0` — nested text-output adapter
+  repair and regression coverage.
