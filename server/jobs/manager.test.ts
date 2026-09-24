@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -66,6 +66,25 @@ function generatedWebp(width = 640, height = 480): Buffer {
   buffer.write("VP8X", 12, "ascii");
   buffer.writeUIntLE(width - 1, 24, 3);
   buffer.writeUIntLE(height - 1, 27, 3);
+  return buffer;
+}
+
+function generatedWav(durationSeconds: number, sampleRate = 24_000): Buffer {
+  const dataBytes = Math.round(durationSeconds * sampleRate) * 2;
+  const buffer = Buffer.alloc(44 + dataBytes);
+  buffer.write("RIFF", 0, "ascii");
+  buffer.writeUInt32LE(buffer.length - 8, 4);
+  buffer.write("WAVE", 8, "ascii");
+  buffer.write("fmt ", 12, "ascii");
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(1, 22);
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(sampleRate * 2, 28);
+  buffer.writeUInt16LE(2, 32);
+  buffer.writeUInt16LE(16, 34);
+  buffer.write("data", 36, "ascii");
+  buffer.writeUInt32LE(dataBytes, 40);
   return buffer;
 }
 
@@ -396,6 +415,84 @@ describe("JobManager", () => {
     expect(failedTts?.state).toBe("failed");
     expect((await manager.getPublic(mesh.job.id))?.state).toBe("ready");
   }, 15_000);
+
+  it("finalizes TTS with the duration derived from WAV bytes", async () => {
+    const wav = generatedWav(0.25);
+    vi.mocked(downloadBounded).mockResolvedValue({ buffer: wav, contentType: "audio/wav" });
+    const adapter = fakeMultiAdapter({
+      getGenerationStatus: vi.fn(async (): Promise<ProviderGenerationStatus> => ({
+        state: "ready",
+        actualCapabilityUsed: "chatterbox-tts",
+        actualFallbackFired: null,
+        actualRegisteredModel: "fixture/tts",
+        output: { url: "https://provider.example/narration.wav", outputKind: "audio" },
+      })),
+    });
+    const manager = buildMulti(adapter);
+    const request = v2Requests.find((candidate) => candidate.kind === "tts")!;
+    const submitted = await manager.submitGenerationOrReconcile(request, { worldId: "world-tts" });
+    const ready = await manager.pollAndAdvance(submitted.job.id, { force: true });
+
+    expect(ready).toMatchObject({
+      id: submitted.job.id,
+      providerJobId: `provider-${request.idempotencyKey}`,
+      state: "ready",
+      result: { kind: "tts", asset: { durationSeconds: 0.25, sizeBytes: wav.length } },
+    });
+  });
+
+  it("reconciles a stored zero-duration TTS job without provider activity or identity changes", async () => {
+    const wav = generatedWav(0.375);
+    const generatedAssets = new GeneratedAssetStore(dir);
+    const stored = await generatedAssets.storeAudio(wav, {
+      kind: "narration", loop: false, defaultGain: 1, transcript: "Welcome", provenance: {
+        providerId: "fake", requestedCapability: "chatterbox-tts", servedCapability: "chatterbox-tts",
+        servedModel: "fixture/tts", applicationJobId: "job-legacy-tts", providerJobId: "provider-legacy-tts",
+        timings: { requestedAt: "2026-09-24T00:00:00.000Z" }, reportedCost: null,
+      },
+    });
+    const assetsPath = join(dir, "generated-assets.json");
+    const assetRecords = JSON.parse(readFileSync(assetsPath, "utf8")) as Record<string, typeof stored>;
+    const legacyAsset = { ...assetRecords[stored.id]!, durationSeconds: 0 };
+    assetRecords[stored.id] = legacyAsset;
+    writeFileSync(assetsPath, JSON.stringify(assetRecords, null, 2));
+
+    const request = v2Requests.find((candidate) => candidate.kind === "tts")!;
+    const now = "2026-09-24T00:00:00.000Z";
+    const jobStore = new JobStore(dir);
+    await jobStore.put({
+      job: {
+        schemaVersion: 1, id: "job-legacy-tts", idempotencyKey: request.idempotencyKey,
+        providerId: "fake", providerJobId: "provider-legacy-tts", capabilityRequested: "chatterbox-tts",
+        capabilityUsed: "chatterbox-tts", fallbackFired: null, state: "ready", photoOrder: [],
+        createdAt: now, updatedAt: now, completedAt: now, retryCount: 0, maxRetries: 0,
+        kind: "tts", request, resultAssetId: legacyAsset.id,
+        result: { kind: "tts", asset: { ...legacyAsset, kind: "narration" } },
+      },
+      internal: { nextPollAt: 0, backoffMs: 5_000, originalRequest: { photos: [] } },
+    });
+    const adapter = fakeMultiAdapter();
+    const manager = new JobManager(jobStore, adapter, new AssetStore(dir), new PhotoStore(dir), {
+      generatedAssets: new GeneratedAssetStore(dir), spendLedger: new SpendLedger(dir),
+      perRequestLimitUsd: 2, perWorldLimitUsd: 8, maxRetries: 0, maxInFlight: 100,
+      globalLimitUsd: 100, dailyLimitUsd: 20,
+    });
+
+    const repaired = await manager.getPublicWithReconciledAudio("job-legacy-tts");
+    expect(repaired).toMatchObject({
+      id: "job-legacy-tts", providerJobId: "provider-legacy-tts", resultAssetId: stored.id,
+      result: { kind: "tts", asset: { id: stored.id, sha256: stored.sha256, durationSeconds: 0.375 } },
+    });
+    expect(adapter.submitGeneration).not.toHaveBeenCalled();
+    expect(adapter.getGenerationStatus).not.toHaveBeenCalled();
+    const assetsAfterFirst = readFileSync(assetsPath, "utf8");
+    const jobsPath = join(dir, "jobs.json");
+    const jobsAfterFirst = readFileSync(jobsPath, "utf8");
+    await expect(manager.getPublicWithReconciledAudio("job-legacy-tts")).resolves.toEqual(repaired);
+    expect(readFileSync(assetsPath, "utf8")).toBe(assetsAfterFirst);
+    expect(readFileSync(jobsPath, "utf8")).toBe(jobsAfterFirst);
+    expect(readFileSync(join(dir, "generated-assets", stored.url.split("/").pop()!))).toEqual(wav);
+  });
 
   it.each([
     { label: "PNG unchanged", buffer: generatedPng(), contentType: "image/png", mimeType: "image/png", extension: "png" },

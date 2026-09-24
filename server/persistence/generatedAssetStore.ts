@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import type { GeneratedImageReference } from "../../shared/generation.js";
 import type { AudioAssetReference, VideoAssetReference } from "../../shared/media.js";
 import type { GenerationProvenance } from "../../shared/provenance.js";
@@ -60,7 +61,7 @@ export class GeneratedAssetStore {
     buffer: Buffer,
     params: {
       kind: AudioAssetReference["kind"];
-      durationSeconds: number;
+      durationSeconds?: number;
       loop: boolean;
       defaultGain: number;
       transcript?: string;
@@ -70,18 +71,57 @@ export class GeneratedAssetStore {
     assertSize(buffer, MAX_AUDIO_BYTES, "audio");
     const detected = detectAudio(buffer);
     if (!detected) throw new InvalidFileError("Generated audio has an unsupported or invalid file signature.");
+    const durationSeconds = detected.durationSeconds ?? params.durationSeconds;
+    if (durationSeconds === undefined || !Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+      throw new InvalidFileError("Generated audio duration could not be derived from its bytes and no positive duration was supplied.");
+    }
     return this.store({
       schemaVersion: MEDIA_ASSET_SCHEMA_VERSION,
       mediaType: "audio",
       id: randomUUID(),
       mimeType: detected.mimeType,
-      durationSeconds: params.durationSeconds,
+      durationSeconds,
       kind: params.kind,
       loop: params.loop,
       defaultGain: params.defaultGain,
       ...(params.transcript !== undefined ? { transcript: params.transcript } : {}),
       provenance: params.provenance,
     }, buffer, detected.extension) as Promise<AudioAssetReference>;
+  }
+
+  /** Repairs legacy audio metadata from the already-stored bytes. The
+   * expected reference comes from the job record and must match the asset
+   * index in every field except duration, so recovery cannot silently bind a
+   * job to different content or provenance. */
+  async reconcileAudioDuration(expected: AudioAssetReference): Promise<AudioAssetReference> {
+    const current = await this.get(expected.id);
+    assertMatchingAudioReference(expected, current);
+    if (Number.isFinite(current.durationSeconds) && current.durationSeconds > 0) return current;
+
+    const prefix = "/api/generated-assets/files/";
+    if (!current.url.startsWith(prefix)) throw new InvalidFileError("Stored audio has an invalid file URL.");
+    const filename = current.url.slice(prefix.length);
+    if (!filename || filename.includes("/") || filename.includes("\\")) {
+      throw new InvalidFileError("Stored audio has an invalid file URL.");
+    }
+    const buffer = await readFile(join(this.dir, filename));
+    assertSize(buffer, MAX_AUDIO_BYTES, "audio");
+    if (buffer.byteLength !== current.sizeBytes) throw new InvalidFileError("Stored audio size does not match its metadata.");
+    const sha256 = createHash("sha256").update(buffer).digest("hex");
+    if (sha256 !== current.sha256) throw new InvalidFileError("Stored audio hash does not match its metadata.");
+    const detected = detectAudio(buffer);
+    if (!detected || detected.mimeType !== current.mimeType || detected.durationSeconds === undefined) {
+      throw new InvalidFileError("Stored audio duration could not be derived from its bytes.");
+    }
+
+    return this.index.update((records) => {
+      const latest = records[expected.id];
+      assertMatchingAudioReference(expected, latest);
+      if (Number.isFinite(latest.durationSeconds) && latest.durationSeconds > 0) return latest;
+      const normalized = { ...latest, durationSeconds: detected.durationSeconds! };
+      records[expected.id] = normalized;
+      return normalized;
+    });
   }
 
   async storeVideo(
@@ -176,12 +216,78 @@ function detectImage(buffer: Buffer): { mimeType: GeneratedImageReference["mimeT
   return { mimeType, extension, ...dimensions };
 }
 
-function detectAudio(buffer: Buffer): { mimeType: string; extension: string } | undefined {
-  if (buffer.length >= 12 && buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WAVE") return { mimeType: "audio/wav", extension: "wav" };
+function detectAudio(buffer: Buffer): { mimeType: string; extension: string; durationSeconds?: number } | undefined {
+  if (buffer.length >= 12 && buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WAVE") {
+    return { mimeType: "audio/wav", extension: "wav", durationSeconds: inspectWavDuration(buffer) };
+  }
   if (buffer.length >= 3 && buffer.toString("ascii", 0, 3) === "ID3") return { mimeType: "audio/mpeg", extension: "mp3" };
   if (buffer.length >= 2 && buffer[0] === 0xff && ((buffer[1] ?? 0) & 0xe0) === 0xe0) return { mimeType: "audio/mpeg", extension: "mp3" };
   if (buffer.length >= 4 && buffer.toString("ascii", 0, 4) === "OggS") return { mimeType: "audio/ogg", extension: "ogg" };
   return undefined;
+}
+
+function inspectWavDuration(buffer: Buffer): number {
+  if (buffer.length < 12) throw new InvalidFileError("Generated WAV header is truncated.");
+  const riffEnd = buffer.readUInt32LE(4) + 8;
+  if (riffEnd !== buffer.length) throw new InvalidFileError("Generated WAV RIFF size does not match the file length.");
+
+  let bytesPerFrame: number | undefined;
+  let sampleRate: number | undefined;
+  let dataBytes = 0;
+  for (let offset = 12; offset < riffEnd;) {
+    if (offset + 8 > riffEnd) throw new InvalidFileError("Generated WAV contains a truncated chunk header.");
+    const chunkId = buffer.toString("ascii", offset, offset + 4);
+    const chunkSize = buffer.readUInt32LE(offset + 4);
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + chunkSize;
+    if (dataEnd > riffEnd) throw new InvalidFileError("Generated WAV contains a truncated chunk.");
+    if (chunkId === "fmt ") {
+      if (chunkSize < 16) throw new InvalidFileError("Generated WAV fmt chunk is invalid.");
+      const format = buffer.readUInt16LE(dataStart);
+      const channels = buffer.readUInt16LE(dataStart + 2);
+      const candidateSampleRate = buffer.readUInt32LE(dataStart + 4);
+      const byteRate = buffer.readUInt32LE(dataStart + 8);
+      const blockAlign = buffer.readUInt16LE(dataStart + 12);
+      const bitsPerSample = buffer.readUInt16LE(dataStart + 14);
+      if (format !== 1 && format !== 3) throw new InvalidFileError("Generated WAV uses an unsupported audio encoding.");
+      if (channels < 1 || candidateSampleRate < 1 || byteRate < 1 || blockAlign < 1 || bitsPerSample < 1) {
+        throw new InvalidFileError("Generated WAV fmt chunk has invalid sample metadata.");
+      }
+      const expectedBlockAlign = channels * Math.ceil(bitsPerSample / 8);
+      if (blockAlign !== expectedBlockAlign || byteRate !== candidateSampleRate * blockAlign) {
+        throw new InvalidFileError("Generated WAV fmt chunk has inconsistent sample metadata.");
+      }
+      bytesPerFrame = blockAlign;
+      sampleRate = candidateSampleRate;
+    } else if (chunkId === "data") {
+      dataBytes += chunkSize;
+    }
+    offset = dataEnd + (chunkSize % 2);
+    if (offset > riffEnd) throw new InvalidFileError("Generated WAV chunk padding exceeds the file length.");
+  }
+  if (bytesPerFrame === undefined || sampleRate === undefined || dataBytes < 1) {
+    throw new InvalidFileError("Generated WAV is missing usable fmt or data chunks.");
+  }
+  if (dataBytes % bytesPerFrame !== 0) throw new InvalidFileError("Generated WAV data ends mid-sample.");
+  const durationSeconds = dataBytes / bytesPerFrame / sampleRate;
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+    throw new InvalidFileError("Generated WAV duration is invalid.");
+  }
+  return durationSeconds;
+}
+
+function assertMatchingAudioReference(
+  expected: AudioAssetReference,
+  actual: GeneratedBinaryAsset | undefined,
+): asserts actual is AudioAssetReference {
+  if (!actual || !("mediaType" in actual) || actual.mediaType !== "audio") {
+    throw new InvalidFileError(`Unknown generated audio asset id "${expected.id}".`);
+  }
+  const { durationSeconds: _expectedDuration, ...expectedStable } = expected;
+  const { durationSeconds: _actualDuration, ...actualStable } = actual;
+  if (!isDeepStrictEqual(actualStable, expectedStable)) {
+    throw new InvalidFileError("Stored audio metadata does not match the job result.");
+  }
 }
 
 function detectVideo(buffer: Buffer): { mimeType: string; extension: string } | undefined {

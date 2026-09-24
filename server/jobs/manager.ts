@@ -396,6 +396,28 @@ export class JobManager {
     return toPublicJob(record);
   }
 
+  /** Reconciles legacy READY audio jobs whose duration was not available in
+   * the request (notably TTS). This reads only the already-stored asset bytes;
+   * it never polls or submits to the provider. */
+  async getPublicWithReconciledAudio(id: string): Promise<GenerationJob | undefined> {
+    const job = await this.getPublic(id);
+    if (!job || job.state !== "ready" || !this.generation) return job;
+    if (job.result?.kind !== "music" && job.result?.kind !== "sfx" && job.result?.kind !== "tts") return job;
+
+    return this.runExclusive(`job:${id}`, async () => {
+      const record = await this.store.get(id);
+      if (!record || record.job.state !== "ready") return record && toPublicJob(record);
+      const result = record.job.result;
+      if (result?.kind !== "music" && result?.kind !== "sfx" && result?.kind !== "tts") return toPublicJob(record);
+      const normalized = await this.generation!.generatedAssets.reconcileAudioDuration(result.asset);
+      if (result.asset.durationSeconds !== normalized.durationSeconds) {
+        result.asset.durationSeconds = normalized.durationSeconds;
+        await this.store.put(record);
+      }
+      return toPublicJob(record);
+    });
+  }
+
   async findByIdempotencyKey(idempotencyKey: string): Promise<GenerationJob | undefined> {
     const record = await this.store.findByIdempotencyKey(idempotencyKey);
     return record && toPublicJob(record);
@@ -841,7 +863,7 @@ export class JobManager {
               : request.purpose.toLowerCase().includes("ambience") ? "ambience" : "sfx";
           const asset = await this.generation.generatedAssets.storeAudio(buffer, {
             kind,
-            durationSeconds: request.kind === "tts" ? 0 : request.durationSeconds,
+            ...(request.kind === "tts" ? {} : { durationSeconds: request.durationSeconds }),
             loop: request.kind === "tts" ? false : request.loop,
             defaultGain: request.kind === "music" ? 0.7 : request.kind === "tts" ? 1 : 0.85,
             ...(request.kind === "tts" ? { transcript: request.text } : {}),

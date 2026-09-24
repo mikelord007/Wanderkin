@@ -80,7 +80,7 @@ export class AudioOrchestrator {
 export function audioGatewayFromManager(manager: JobManager): AudioGateway {
   return {
     submitGenerationOrReconcile: (request, options) => manager.submitGenerationOrReconcile(request, options),
-    getPublic: (jobId) => manager.getPublic(jobId),
+    getPublic: (jobId) => manager.getPublicWithReconciledAudio(jobId),
     retry: (jobId) => manager.retry(jobId),
   };
 }
