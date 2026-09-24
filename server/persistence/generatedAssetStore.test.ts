@@ -30,9 +30,9 @@ describe("GeneratedAssetStore", () => {
     expect((await store.getImageBytes(asset.id)).buffer).toEqual(png);
   });
 
-  it("rejects content that does not match the expected media type", async () => {
+  it("rejects content that is not a supported image", async () => {
     await expect(new GeneratedAssetStore(dir).storeImage(Buffer.from("not an image"), "image/png", provenance))
-      .rejects.toThrow(/do not match/);
+      .rejects.toThrow(/not a recognized JPEG, PNG, or WebP/);
   });
 
   it("stores independent audio and video assets with honest kinds", async () => {

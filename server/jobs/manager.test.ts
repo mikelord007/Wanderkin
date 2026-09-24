@@ -37,6 +37,37 @@ function minimalJpeg(size = 2000): Buffer {
   return buffer;
 }
 
+function generatedPng(width = 640, height = 480): Buffer {
+  const buffer = Buffer.alloc(24);
+  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(buffer);
+  buffer.writeUInt32BE(width, 16);
+  buffer.writeUInt32BE(height, 20);
+  return buffer;
+}
+
+function generatedJpeg(width = 640, height = 480): Buffer {
+  return Buffer.from([
+    0xff, 0xd8,
+    0xff, 0xe0, 0x00, 0x04, 0x00, 0x00,
+    0xff, 0xc0, 0x00, 0x11, 0x08,
+    (height >> 8) & 0xff, height & 0xff,
+    (width >> 8) & 0xff, width & 0xff,
+    0x03, 0x01, 0x11, 0x00, 0x02, 0x11, 0x00, 0x03, 0x11, 0x00,
+    0xff, 0xd9,
+  ]);
+}
+
+function generatedWebp(width = 640, height = 480): Buffer {
+  const buffer = Buffer.alloc(30);
+  buffer.write("RIFF", 0, "ascii");
+  buffer.writeUInt32LE(22, 4);
+  buffer.write("WEBP", 8, "ascii");
+  buffer.write("VP8X", 12, "ascii");
+  buffer.writeUIntLE(width - 1, 24, 3);
+  buffer.writeUIntLE(height - 1, 27, 3);
+  return buffer;
+}
+
 function fakeAdapter(overrides: Partial<ProviderAdapter> = {}): ProviderAdapter {
   return {
     providerId: "fake",
@@ -227,6 +258,69 @@ describe("JobManager", () => {
     expect(failedTts?.state).toBe("failed");
     expect((await manager.getPublic(mesh.job.id))?.state).toBe("ready");
   }, 15_000);
+
+  it.each([
+    { label: "PNG unchanged", buffer: generatedPng(), contentType: "image/png", mimeType: "image/png", extension: "png" },
+    { label: "JPEG despite PNG preference", buffer: generatedJpeg(), contentType: "image/jpeg", mimeType: "image/jpeg", extension: "jpg" },
+    { label: "WebP despite PNG preference", buffer: generatedWebp(), contentType: "image/webp", mimeType: "image/webp", extension: "webp" },
+  ] as const)("finalizes a Kontext $label result using detected bytes", async ({ buffer, contentType, mimeType, extension }) => {
+    vi.mocked(downloadBounded).mockResolvedValue({ buffer, contentType });
+    const adapter = fakeMultiAdapter({
+      getGenerationStatus: vi.fn(async (): Promise<ProviderGenerationStatus> => ({
+        state: "ready",
+        actualCapabilityUsed: "kontext-edit",
+        actualFallbackFired: null,
+        actualRegisteredModel: "fal-ai/flux-pro/kontext",
+        output: { url: "https://provider.example/result", outputKind: "image" },
+      })),
+    });
+    const manager = buildMulti(adapter);
+    const request = {
+      ...v2Requests[0]!,
+      idempotencyKey: `kontext-${extension}`,
+      outputMimeType: "image/png" as const,
+    };
+    const submitted = await manager.submitGenerationOrReconcile(request, { worldId: `world-${extension}` });
+    const ready = await manager.pollAndAdvance(submitted.job.id, { force: true });
+
+    expect(ready).toMatchObject({
+      state: "ready",
+      request: { outputMimeType: "image/png" },
+      result: {
+        kind: "image-edit",
+        asset: { mimeType, width: 640, height: 480, sizeBytes: buffer.length },
+      },
+    });
+    if (ready?.result?.kind !== "image-edit") throw new Error("Expected an image-edit result");
+    expect(ready.result.asset.url).toMatch(new RegExp(`^[\\/]api[\\/]generated-assets[\\/]files[\\/][a-f0-9]{64}\\.${extension}$`));
+  });
+
+  it("fails a non-image provider body clearly and leaves it retryable", async () => {
+    vi.mocked(downloadBounded).mockResolvedValue({
+      buffer: Buffer.from("upstream error page"),
+      contentType: "text/html",
+    });
+    const adapter = fakeMultiAdapter({
+      getGenerationStatus: vi.fn(async (): Promise<ProviderGenerationStatus> => ({
+        state: "ready",
+        actualCapabilityUsed: "kontext-edit",
+        actualFallbackFired: null,
+        output: { url: "https://provider.example/error", outputKind: "image" },
+      })),
+    });
+    const manager = buildMulti(adapter);
+    const submitted = await manager.submitGenerationOrReconcile(v2Requests[0]!, { worldId: "world-non-image" });
+    const failed = await manager.pollAndAdvance(submitted.job.id, { force: true });
+
+    expect(failed).toMatchObject({
+      state: "failed",
+      lastError: {
+        message: "Generated image is not a recognized JPEG, PNG, or WebP image (magic bytes did not match).",
+        retryable: true,
+      },
+    });
+    expect(failed?.result).toBeUndefined();
+  });
 
   it("submits once on create and the job is retrievable by idempotency key without a second submit", async () => {
     const adapter = fakeAdapter();

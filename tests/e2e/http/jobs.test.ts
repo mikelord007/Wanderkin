@@ -247,6 +247,42 @@ describe("POST /api/jobs, status, retry, and restart reconciliation", () => {
     expect(await spend.json()).toMatchObject({ worldId: "world-v2-text", entries: 1, unknownEntries: 0 });
   });
 
+  it("exposes the image format preference through HTTP and forwards it to create_media", async () => {
+    await boot();
+    mcp!.setHandler("create_media", (args) => ({
+      job_id: `fake-edit-${args.idempotency_key}`,
+      status: "submitted",
+      capability_used: args.model_override,
+      fallback_fired: null,
+    }));
+    const photo = await uploadPhoto(4);
+    const key = uniqueIdempotencyKey("v2-image-format");
+    const request = {
+      schemaVersion: 1,
+      kind: "image-edit",
+      capability: "kontext-edit",
+      idempotencyKey: key,
+      purpose: "style-preview",
+      sourceImageAssetId: photo.id,
+      instruction: "Preserve the composition and apply a watercolor style.",
+      outputMimeType: "image/webp",
+    } as const;
+    const response = await fetch(`${api!.baseUrl}/api/jobs/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": key },
+      body: JSON.stringify({ request, worldId: "world-v2-image-format", maxCostUsd: 0.1 }),
+    });
+    const job = await response.json() as GenerationJob;
+
+    expect(response.status).toBe(201);
+    expect(job).toMatchObject({ state: "generating", request: { outputMimeType: "image/webp" } });
+    expect(mcp!.callsFor("create_media")).toHaveLength(1);
+    expect(mcp!.callsFor("create_media")[0]!.args).toMatchObject({
+      model_override: "kontext-edit",
+      output_format: "webp",
+    });
+  });
+
   it("hard-rejects an over-budget v2 mesh before upload or provider submission", async () => {
     await boot();
     const photo = await uploadPhoto(1);
