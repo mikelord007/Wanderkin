@@ -38,9 +38,38 @@ describe("SpendLedger", () => {
       jobId: "j1", worldId: "w1", capability: "future-cap", kind: "text",
       estimateUsd: null, perRequestLimitUsd: 1, perWorldLimitUsd: 1,
     });
-    expect(await ledger.summaryForWorld("w1")).toEqual({ worldId: "w1", knownUsd: 0, unknownEntries: 1, entries: 1 });
+    expect(await ledger.summaryForWorld("w1")).toEqual({ worldId: "w1", knownUsd: 0, unknownEntries: 1, entries: 1, reservedUsd: 1 });
     await ledger.reconcile("j1", 0.125);
-    expect(await ledger.summaryForWorld("w1")).toEqual({ worldId: "w1", knownUsd: 0.125, unknownEntries: 0, entries: 1 });
+    expect(await ledger.summaryForWorld("w1")).toEqual({ worldId: "w1", knownUsd: 0.125, unknownEntries: 0, entries: 1, reservedUsd: 0.125 });
+  });
+
+  it("enforces lifetime and rolling daily caps before recording", async () => {
+    const base = {
+      worldId: null, capability: "music", kind: "music" as const,
+      estimateUsd: 0.4, perRequestLimitUsd: 1, perWorldLimitUsd: 10,
+      globalLimitUsd: 0.7, dailyLimitUsd: 0.7,
+    };
+    await ledger.reserve({ ...base, jobId: "j1", now: new Date("2026-09-24T00:00:00Z") });
+    await expect(ledger.reserve({ ...base, jobId: "j2", now: new Date("2026-09-24T01:00:00Z") }))
+      .rejects.toThrow(/global limit/);
+    expect((await ledger.summaryAll(new Date("2026-09-24T01:00:00Z"))).entries).toBe(1);
+
+    const dailyLedger = new SpendLedger(join(dir, "daily"));
+    await dailyLedger.reserve({ ...base, jobId: "old", globalLimitUsd: 10, now: new Date("2026-09-22T00:00:00Z") });
+    await dailyLedger.reserve({ ...base, jobId: "new", globalLimitUsd: 10, now: new Date("2026-09-24T00:00:00Z") });
+    await expect(dailyLedger.reserve({ ...base, jobId: "blocked", globalLimitUsd: 10, now: new Date("2026-09-24T01:00:00Z") }))
+      .rejects.toThrow(/daily limit/);
+  });
+
+  it("reserves list price when the estimate is unknown", async () => {
+    await ledger.reserve({
+      jobId: "j1", worldId: null, capability: "music", kind: "music",
+      estimateUsd: null, listPriceUsd: 0.0315, perRequestLimitUsd: 1, perWorldLimitUsd: 1,
+      globalLimitUsd: 1, dailyLimitUsd: 0.03,
+    }).then(
+      () => { throw new Error("expected rejection"); },
+      (error: unknown) => expect(error).toMatchObject({ code: "budget_exceeded" }),
+    );
   });
 
   it("is idempotent for a repeated reservation of the same job", async () => {

@@ -32,6 +32,8 @@ export const env = {
   livepeerApiKey: process.env.LIVEPEER_API_KEY ?? "",
   livepeerMaxRequestUsd: positiveNumber(process.env.LIVEPEER_MAX_REQUEST_USD, 2),
   livepeerMaxWorldUsd: positiveNumber(process.env.LIVEPEER_MAX_WORLD_USD, 8),
+  livepeerMaxGlobalUsd: positiveNumber(process.env.LIVEPEER_MAX_GLOBAL_USD, 100),
+  livepeerMaxDailyUsd: positiveNumber(process.env.LIVEPEER_MAX_DAILY_USD, 20),
   livepeerMaxAutomaticRetries: boundedInteger(process.env.LIVEPEER_MAX_AUTOMATIC_RETRIES, 3, 0, 5),
   providerMaxInFlight: boundedInteger(process.env.PROVIDER_MAX_IN_FLIGHT, 4, 1, 100),
   providerConcurrencyRetrySeconds: boundedInteger(process.env.PROVIDER_CONCURRENCY_RETRY_SECONDS, 15, 1, 3_600),
@@ -41,4 +43,5 @@ export const env = {
   // Trusting forwarding headers is an explicit deployment choice. Keep it
   // disabled unless a trusted reverse proxy overwrites X-Forwarded-For.
   trustProxyHops: nonNegativeInteger(process.env.TRUST_PROXY_HOPS, 0),
+  diagnosticsToken: process.env.DIAGNOSTICS_TOKEN ?? "",
 };

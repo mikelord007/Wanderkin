@@ -20,6 +20,7 @@ import { createJobsRouter } from "./routes/jobs.js";
 import { createLevelsRouter, LevelStore } from "./levels.js";
 import { logServerError } from "./util/sanitize.js";
 import { createRateLimiter, isBillableRoute, isUploadRoute } from "./security/rateLimit.js";
+import { createDiagnosticsRouter } from "./security/diagnostics.js";
 
 /**
  * Foundation API shell plus the Livepeer provider/job/asset routes (owned by
@@ -66,6 +67,8 @@ const jobManager = new JobManager(jobStore, adapter, assetStore, photoStore, {
   maxRetries: env.livepeerMaxAutomaticRetries,
   maxInFlight: env.providerMaxInFlight,
   concurrencyRetrySeconds: env.providerConcurrencyRetrySeconds,
+  globalLimitUsd: env.livepeerMaxGlobalUsd,
+  dailyLimitUsd: env.livepeerMaxDailyUsd,
 });
 
 app.get("/api/health", (_req, res) => {
@@ -77,6 +80,7 @@ app.get("/api/movement-config", (_req, res) => {
 });
 
 app.use(createCapabilitiesRouter(adapter));
+app.use(createDiagnosticsRouter(spendLedger, env.diagnosticsToken));
 app.use(createUploadsRouter(photoStore));
 app.use(createPhotosRouter(photoStore));
 app.use(createAssetsRouter(assetStore));

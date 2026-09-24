@@ -13,7 +13,7 @@ import { downloadBounded, UnsafeUrlError, DownloadTooLargeError } from "../persi
 import { MAX_GLB_BYTES } from "../persistence/validate.js";
 import type { PhotoStore } from "../persistence/photoStore.js";
 import { sanitizeMessage } from "../util/sanitize.js";
-import { estimateRequestCost } from "../livepeer/capabilities.js";
+import { capabilityContract, estimateRequestCost } from "../livepeer/capabilities.js";
 import type { GenerationProviderAdapter, ProviderGenerationStatus } from "./types.js";
 import { BudgetExceededError, SpendLedger } from "./spendLedger.js";
 import {
@@ -245,6 +245,8 @@ export class JobManager {
       maxRetries?: number;
       maxInFlight?: number;
       concurrencyRetrySeconds?: number;
+      globalLimitUsd: number;
+      dailyLimitUsd: number;
     },
   ) {}
 
@@ -396,6 +398,21 @@ export class JobManager {
       const record = this.buildRecord(request, idempotencyKey);
       await this.runExclusive("provider-capacity", async () => {
         await this.assertProviderCapacity();
+        if (this.generation) {
+          const listPriceUsd = capabilityContract(request.capability)?.priceUsd ?? null;
+          await this.generation.spendLedger.reserve({
+            jobId: record.job.id,
+            worldId: null,
+            capability: request.capability,
+            kind: "image-to-3d",
+            estimateUsd: listPriceUsd,
+            listPriceUsd,
+            perRequestLimitUsd: this.generation.perRequestLimitUsd,
+            perWorldLimitUsd: this.generation.perWorldLimitUsd,
+            globalLimitUsd: this.generation.globalLimitUsd,
+            dailyLimitUsd: this.generation.dailyLimitUsd,
+          });
+        }
         await this.store.put(record);
       });
       const submitted = await this.submitToProvider(record, request);
@@ -439,9 +456,12 @@ export class JobManager {
           worldId: options.worldId ?? null,
           capability: request.capability,
           kind: request.kind,
-          estimateUsd,
-          perRequestLimitUsd: effectiveRequestLimit,
-          perWorldLimitUsd: this.generation!.perWorldLimitUsd,
+        estimateUsd,
+        listPriceUsd: capabilityContract(request.capability)?.priceUsd ?? null,
+        perRequestLimitUsd: effectiveRequestLimit,
+        perWorldLimitUsd: this.generation!.perWorldLimitUsd,
+        globalLimitUsd: this.generation!.globalLimitUsd,
+        dailyLimitUsd: this.generation!.dailyLimitUsd,
         });
         await this.store.put(record);
       });

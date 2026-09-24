@@ -127,6 +127,8 @@ describe("JobManager", () => {
         perWorldLimitUsd: 8,
         maxRetries: 2,
         maxInFlight: 100,
+        globalLimitUsd: 100,
+        dailyLimitUsd: 20,
         ...limits,
       },
     );
