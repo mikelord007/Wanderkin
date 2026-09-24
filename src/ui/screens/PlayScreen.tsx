@@ -54,6 +54,7 @@ export function PlayScreen({ manifest, onExit, onComplete, publishedVersionId }:
         const message = recorder.error?.message ?? "Gameplay recording stopped unexpectedly.";
         recordingErrorRef.current = message;
         setCaptureError(message);
+        setCaptureState("idle");
       }
     });
     recorderRef.current = recorder;
