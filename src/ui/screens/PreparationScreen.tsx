@@ -7,6 +7,8 @@ import { attachProvenance, resolveAssetForManifest } from "../manifestProvenance
 import { loadActiveCreation, saveCreationRecord } from "../creationStorage.js";
 import { withCreationUpdate } from "../creationFlow.js";
 import { WorldReadyScreen } from "./WorldReadyScreen.js";
+import { repairGuidanceFor, type RepairGuidance } from "../../editor/repairGuidance.js";
+import "../../editor/editor.css";
 
 /**
  * Scene preparation owns `src/scene`; this screen assumes a barrel export
@@ -54,6 +56,9 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [editing, setEditing] = useState(source.kind === "manifest");
+  const [repairFocus, setRepairFocus] = useState<RepairGuidance | null>(
+    source.kind === "manifest" ? repairGuidanceFor(source.manifest) : null,
+  );
 
   useEffect(() => {
     if (source.kind === "manifest") return;
@@ -96,6 +101,8 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
         setCandidates(preparedCandidates);
         const creation = loadActiveCreation();
         if (creation) saveCreationRecord(withCreationUpdate(creation, { step: "ready", title: preparedPrimary.name }));
+        const guidance = repairGuidanceFor(preparedPrimary);
+        setRepairFocus(guidance);
       } catch (err) {
         if (!cancelled) setError(describeApiError(err));
       }
@@ -126,6 +133,13 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
     } finally {
       setSaving(false);
     }
+  }
+
+  function selectCandidate(candidate: SceneManifest) {
+    const guidance = repairGuidanceFor(candidate);
+    setManifest(candidate);
+    setRepairFocus(guidance);
+    setEditing(false);
   }
 
   if (error) {
@@ -162,7 +176,10 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
     return <WorldReadyScreen
       manifest={manifest}
       onEnter={() => onPlay(manifest)}
-      onAdjustCourse={() => setEditing(true)}
+      onAdjustCourse={() => {
+        setRepairFocus(repairGuidanceFor(manifest));
+        setEditing(true);
+      }}
       onBack={onBack}
     />;
   }
@@ -173,7 +190,7 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
         <button type="button" className="oq-button oq-button--ghost" onClick={onBack}>
           ← Back
         </button>
-        <h1>Prepare your level</h1>
+        <h1>Adjust your course</h1>
       </header>
 
       {candidateOptions.length > 1 ? (
@@ -190,7 +207,7 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
                   type="radio"
                   name="candidate"
                   checked={candidate === manifest}
-                  onChange={() => setManifest(candidate)}
+                  onChange={() => selectCandidate(candidate)}
                 />
                 <span className="oq-capability-card__title">
                   {candidate.checkpoints.length} checkpoint{candidate.checkpoints.length === 1 ? "" : "s"}
@@ -208,13 +225,19 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
 
       <Suspense fallback={<LoadingScreen stage="Loading the level editor…" />}>
         <LevelEditor
-          key={manifest.levelId}
+          key={`${manifest.levelId}-${repairFocus?.message ?? "manual"}`}
           manifest={manifest}
           isPersisted={!isNew}
           onSave={handleSave}
           onExport={onExport}
           onPlay={onPlay}
-          onBack={onBack}
+          onBack={() => {
+            if (source.kind === "asset") {
+              setRepairFocus(repairGuidanceFor(manifest));
+              setEditing(false);
+            } else onBack();
+          }}
+          repairFocus={repairFocus}
         />
       </Suspense>
       {saving ? <p className="oq-warning-text">Saving…</p> : null}
