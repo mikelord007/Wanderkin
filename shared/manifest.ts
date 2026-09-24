@@ -2,6 +2,7 @@ import { SCENE_MANIFEST_SCHEMA_VERSION } from "./schema-version.js";
 import type { CoordinateConvention, Transform, Vec3 } from "./geometry.js";
 import { COORDINATE_CONVENTION } from "./geometry.js";
 import type { ProviderCapabilityId } from "./provider.js";
+import type { LevelExperience } from "./experience.js";
 
 /**
  * Records where a piece of level geometry came from. `null` on an entity
@@ -134,6 +135,12 @@ export interface SceneManifest {
   seed: string;
   movementConfigId: string;
   courseValidation: CourseValidation;
+  /**
+   * Additive ObjectQuest v2 data. Legacy schema-v1 manifests omit this block
+   * and remain valid; call `migrateSceneManifest` before a v2-only consumer
+   * needs deterministic style/mode/quest defaults.
+   */
+  experience?: LevelExperience;
 }
 
 export function createEmptyManifest(params: {
