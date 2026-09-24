@@ -1,9 +1,9 @@
 # ObjectQuest v2 live-validation result — 2026-09-24
 
 Status: **rows 1–5 remain ready; corrected rows 6–8 are ready; the bounded
-audio run stopped without retry when row 9 portal-activate was rejected by its
-provider-backed Mirelo job; rows 10–15 remain unsubmitted and row 16 remains
-SKIPPED/BLOCKED**.
+audio run stopped without retry when row 9 portal-activate's provider runner
+was abandoned after losing its heartbeat; rows 10–15 remain unsubmitted and
+row 16 remains SKIPPED/BLOCKED**.
 
 ## Corrected audio-only execution — stopped at first provider failure
 
@@ -28,16 +28,46 @@ unexpected terminal failure.
 | 6 music | **READY**, no fallback | `job_ce2d246a-37d5-4d9e-92cd-576714355ecd` / `mjob_8243e6646190` | `music` / `fal-ai/minimax-music/v2` | MP3/ID3, 566,219 bytes, SHA-256 `34a653013e7f37b890d2c43d7f810bd3fdfea985a316914833f0cdb490e8d96b` |
 | 7 ambience | **READY**, no fallback | `job_70ab5853-fc2a-4ab5-9f4a-0e61fd97643c` / `mjob_0fd9e8e551e1` | `mirelo-sfx` / `Mirelo-AI/sfx1.6/text-to-audio` | RIFF/WAVE, 1,323,086 bytes, SHA-256 `7c2b71575426b362075ef0035bfc9a2b14e6887e5bda487ec5819e410d89643f` |
 | 8 fragment-pickup | **READY**, no fallback | `job_1474ebee-fa65-4d4b-b411-0f8babbabb87` / `mjob_9b4d5aa5632c` | `mirelo-sfx` / `Mirelo-AI/sfx1.6/text-to-audio` | RIFF/WAVE, 266,318 bytes, SHA-256 `b79dd5c6f413025b5fe4086b2a57bb20df64ae74ad709171f6a530e430fe5092` |
-| 9 portal-activate | **FAILED**, no fallback, nonretryable | `job_0ea8326f-b76f-46d6-aba1-5b2d03a02a14` / `mjob_f9db028110fb` | requested/used `mirelo-sfx`; terminal model `null` | None |
+| 9 portal-activate | **FAILED**, provider runner abandoned, no fallback | `job_0ea8326f-b76f-46d6-aba1-5b2d03a02a14` / `mjob_f9db028110fb` | requested `mirelo-sfx`; terminal capability/model `null` in the raw envelope | None |
 | 10–15 | **NOT SUBMITTED** after stop | — | — | — |
 | 16 postcard | **SKIPPED/BLOCKED** | no job | no request | no upload, reservation, or video |
 
 The failed job used the exact reviewed three-second request and ended after
-158,090 ms with stable error code `provider_failed`, `retryable: false`, retry
-count 0, max retries 0, and message “The provider rejected the generation
-request. Check the selected model settings and try again.” No retry or
-replacement request was made. Provider-reported costs remain `null` for all
-four new jobs, so actual paid cost is unknown.
+158,090 ms. ObjectQuest intentionally exposed the stable safe error
+`provider_failed`, `retryable: false`, and the message “The provider rejected
+the generation request. Check the selected model settings and try again.” The
+preserved raw provider envelope is more specific: host `agent.livepeer.org`
+entered with HTTP 200, then reported `runner_abandoned` after no heartbeat for
+155 seconds; `url`, `run_output`, and served model were null, `persisted` was
+false, and it explicitly stated that no media was produced. This rules out
+output normalization, URL download, MIME validation, or app finalization as
+the failure stage. It also shows a job-specific provider runner failure rather
+than rejection of the prompt, duration, or Mirelo contract: the immediately
+preceding three-second fragment request and 15-second ambience request both
+succeeded on the same capability. Retry count and max retries remained 0, and
+no retry or replacement request was made.
+
+The raw cost fields are estimated `$0.0315`, disposition `release_pending`,
+release record `null`, and paid cost `null`. The reservation therefore remains
+in conservative accounting; neither release nor actual provider billing may
+be inferred.
+
+Rows 10–15 are independent durable requests and all six original idempotency
+keys remain unused. The five remaining Mirelo cues retain the same valid
+three-second contract, while narration uses the separate Chatterbox capability;
+their reviewed combined ceiling is `$0.1604`. Completing only those rows would
+raise the conservative batch/project totals to `$1.1371`/`$1.5991` without
+altering row 9's honest failed state. A new row-9 generation would require a
+new versioned key and a further `$0.0315` ceiling, producing conservative totals
+of `$1.1686`/`$1.6306`. It is not authorized by this diagnosis. The current
+retry route is a no-op because the job is nonretryable, and the terminal raw
+envelope contains no output to recover.
+
+Generation independence does not make partial attachment safe: gameplay maps
+the seven generic SFX assets by array position. Attaching later SFX while
+portal-activate is absent would shift cue meanings. Preserve all ready assets
+in storage, but defer attachment until row 9 is recovered or an explicit
+position-preserving fallback is designed and reviewed.
 
 The ledger now conservatively records `$0.9767` across ten entries: the prior
 `$0.7247` plus `$0.2520` for the three ready jobs and failed provider-backed

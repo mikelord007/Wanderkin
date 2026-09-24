@@ -612,6 +612,28 @@
         "maxRetries": 0,
         "errorCode": "provider_failed",
         "error": "The provider rejected the generation request. Check the selected model settings and try again.",
+        "safeErrorMeaning": "ObjectQuest maps terminal provider-tool failures to a stable nonretryable public message; this text is not evidence that the prompt or model settings were rejected.",
+        "rawProviderDiagnosis": {
+          "status": "failed",
+          "isError": true,
+          "runner": "host agent.livepeer.org",
+          "runnerOutcome": "runner_abandoned",
+          "entered": true,
+          "httpStatus": 200,
+          "heartbeatMissingSeconds": 155,
+          "providerError": "The background worker running this job stopped responding (no heartbeat for 155s after it started). No media was produced. Re-run the request — short renders now run inline and are not affected.",
+          "url": null,
+          "runOutput": null,
+          "persisted": false,
+          "capabilityUsed": null,
+          "servedModel": null,
+          "fallbackFired": null,
+          "costDisposition": "release_pending",
+          "spendRelease": null,
+          "costUsdEstimated": 0.0315,
+          "costPaidUsd": null,
+          "failureStage": "provider runner before output; normalization, download, MIME validation, storage, and app finalization were not reached"
+        },
         "timings": { "queueMilliseconds": 2072, "executionMilliseconds": 156018, "totalMilliseconds": 158090 },
         "request": {
           "schemaVersion": 1,
@@ -632,6 +654,24 @@
         "completion",
         "narration"
       ],
+      "readOnlyRecoveryAssessment": {
+        "systemicContractFailureIndicated": false,
+        "reason": "The failed request entered the provider host and was abandoned after a heartbeat loss. A 3-second fragment cue and 15-second ambience request succeeded immediately beforehand on the same Mirelo capability.",
+        "rows10Through15Independent": true,
+        "originalKeysUnused": true,
+        "rows10Through15MaximumUsd": 0.1604,
+        "batchAfterRows10Through15Usd": 1.1371,
+        "projectAfterRows10Through15Usd": 1.5991,
+        "existingPortalJobRecovery": "The terminal raw envelope has no URL or run output. The application retry route returns the unchanged job because retryable is false; no provider dispatch occurs.",
+        "newPortalGeneration": {
+          "requiresNewVersionedKey": true,
+          "additionalMaximumUsd": 0.0315,
+          "batchAfterAllRemainingAndReplacementUsd": 1.1686,
+          "projectAfterAllRemainingAndReplacementUsd": 1.6306,
+          "authorized": false
+        },
+        "attachmentConstraint": "Generic SFX are mapped to gameplay cues by array position. Do not attach later SFX while portal-activate is missing, or subsequent cue meanings would shift."
+      },
       "postcard": {
         "step": "postcard",
         "status": "SKIPPED/BLOCKED",
