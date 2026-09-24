@@ -18,6 +18,10 @@ import { createAssetsRouter } from "./routes/assets.js";
 import { createGeneratedAssetsRouter } from "./routes/generatedAssets.js";
 import { createJobsRouter } from "./routes/jobs.js";
 import { createLevelsRouter, LevelStore } from "./levels.js";
+import { QuestOrchestrator, questGatewayFromManager } from "./quest/orchestrator.js";
+import { createQuestRouter } from "./quest/routes.js";
+import { AudioOrchestrator, audioGatewayFromManager } from "./audio/orchestrator.js";
+import { createAudioRouter } from "./audio/routes.js";
 import { logServerError } from "./util/sanitize.js";
 
 /**
@@ -50,6 +54,9 @@ const jobManager = new JobManager(jobStore, adapter, assetStore, photoStore, {
   perWorldLimitUsd: env.livepeerMaxWorldUsd,
   maxRetries: env.livepeerMaxAutomaticRetries,
 });
+const levelStore = new LevelStore(env.storageDir, assetStore, photoStore);
+const questOrchestrator = new QuestOrchestrator(questGatewayFromManager(jobManager), levelStore);
+const audioOrchestrator = new AudioOrchestrator(audioGatewayFromManager(jobManager), levelStore);
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
@@ -65,7 +72,9 @@ app.use(createPhotosRouter(photoStore));
 app.use(createAssetsRouter(assetStore));
 app.use(createGeneratedAssetsRouter(generatedAssetStore));
 app.use(createJobsRouter(jobManager, adapter, photoStore, generatedAssetStore, previewCache, spendLedger));
-app.use(createLevelsRouter(new LevelStore(env.storageDir, assetStore, photoStore)));
+app.use(createQuestRouter(questOrchestrator));
+app.use(createAudioRouter(audioOrchestrator));
+app.use(createLevelsRouter(levelStore));
 
 const terminalErrorHandler: ErrorRequestHandler = (error, req, res, next) => {
   if (res.headersSent) {

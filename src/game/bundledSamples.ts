@@ -1,6 +1,7 @@
 import { migrateSceneManifest } from "@shared/index.js";
 import lostColorsFixture from "../../shared/fixtures/lost-colors.json";
 import { SAMPLE_LEVELS } from "../scene/samples.js";
+import { LOST_COLORS_BUNDLED_MEDIA } from "../audio/bundledMedia.js";
 
 /** Offline-ready flagship adventure over the existing bundled Rodin GLB. */
 const fixture = migrateSceneManifest(lostColorsFixture);
@@ -13,6 +14,7 @@ export const LOST_COLORS_SAMPLE = {
   // helper steps so its elevated blue fragment is reachable by the capsule.
   entities: rodinCourse.entities,
   checkpoints: rodinCourse.checkpoints,
+  media: LOST_COLORS_BUNDLED_MEDIA,
 };
 
 /** The same geometry as Lost Colors, configured for relaxed destination play. */
