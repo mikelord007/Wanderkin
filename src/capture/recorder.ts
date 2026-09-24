@@ -1,3 +1,5 @@
+import { BRAND_SLUG } from "../brand.js";
+
 export type GameplayRecorderState = "idle" | "recording" | "stopping" | "ready" | "error";
 
 export interface GameplayHighlight {
@@ -249,7 +251,7 @@ export function downloadGameplayHighlight(highlight: GameplayHighlight, worldNam
   const url = URL.createObjectURL(highlight.blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `${stem || "objectquest"}-gameplay-highlight.${extension}`;
+  anchor.download = `${stem || BRAND_SLUG}-gameplay-highlight.${extension}`;
   document.body.append(anchor);
   anchor.click();
   anchor.remove();
