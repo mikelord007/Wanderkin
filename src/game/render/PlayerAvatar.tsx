@@ -22,6 +22,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "rea
 import * as THREE from "three";
 import type { MovementConfig } from "@shared/index.js";
 import { buildCharacter } from "./character/buildCharacter.js";
+import { LANTERN_LIGHT } from "./character/characterDesign.js";
 import { CharacterAnimator } from "./character/characterAnimator.js";
 
 export interface AvatarFrameState {
@@ -78,6 +79,15 @@ export const PlayerAvatar = forwardRef<
 
   const height = characterHeight(config);
 
+  // A point light's range and intensity are world-space and ignore the group's
+  // scale, so they have to be derived from the character's real height or the
+  // lantern floods a small character and the floor under it.
+  useEffect(() => {
+    model.lanternLight.distance = height * LANTERN_LIGHT.rangeInHeights;
+  }, [model, height]);
+  const lanternBase = LANTERN_LIGHT.intensityAtUnitHeight * height * height;
+  const lanternPulse = LANTERN_LIGHT.pulseAtUnitHeight * height * height;
+
   useImperativeHandle(ref, () => ({
     update(state) {
       const group = root.current;
@@ -119,7 +129,7 @@ export const PlayerAvatar = forwardRef<
       }
 
       model.lanternMaterial.emissiveIntensity = 0.95 + pose.lanternPulse * 0.28;
-      model.lanternLight.intensity = 0.32 + pose.lanternPulse * 0.1;
+      model.lanternLight.intensity = lanternBase + pose.lanternPulse * lanternPulse;
 
       if (shadow.current) {
         if (state.groundY === null) {

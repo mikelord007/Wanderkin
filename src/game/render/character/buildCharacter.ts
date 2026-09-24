@@ -12,6 +12,7 @@ import * as THREE from "three";
 import {
   BONES,
   LANTERN_COLOUR,
+  LANTERN_LIGHT,
   LANTERN_LENS,
   OUTLINE_COLOUR,
   OUTLINE_THICKNESS,
@@ -100,8 +101,14 @@ export function buildCharacter(options: { outline?: boolean } = {}): CharacterMo
   );
   chest.add(lantern);
 
-  const lanternLight = new THREE.PointLight(new THREE.Color(LANTERN_COLOUR), 0.32, 4.2, 2);
+  // Range and intensity are left at placeholder values: they are world-space
+  // and unaffected by the group's scale, so `PlayerAvatar` sets them from the
+  // capsule's real height via `LANTERN_LIGHT`.
+  const lanternLight = new THREE.PointLight(new THREE.Color(LANTERN_COLOUR), 0, 1, 2);
+  // Stood off behind the lens: a point light sitting on the body's own surface
+  // washes the back of the character out to white at any scale.
   lanternLight.position.copy(lantern.position);
+  lanternLight.position.z -= LANTERN_LIGHT.offsetBehindLens;
   chest.add(lanternLight);
 
   return {

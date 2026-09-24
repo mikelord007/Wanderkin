@@ -12,6 +12,14 @@ import {
   CharacterAnimator,
   type AnimatorInput,
 } from "../src/game/render/character/characterAnimator.js";
+import { LANTERN_LIGHT } from "../src/game/render/character/characterDesign.js";
+
+/** Same derivation PlayerAvatar uses: the lantern light is world-space, so it
+ * has to be sized from the character's real height. */
+function applyLanternScale(model: ReturnType<typeof buildCharacter>, height: number): void {
+  model.lanternLight.distance = height * LANTERN_LIGHT.rangeInHeights;
+  model.lanternLight.intensity = LANTERN_LIGHT.intensityAtUnitHeight * height * height;
+}
 
 const WALK_SPEED = 2.2;
 
@@ -56,7 +64,7 @@ document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color("#1a1622");
 
-const key = new THREE.DirectionalLight("#fff3e0", 2.4);
+const key = new THREE.DirectionalLight("#fff3e0", 1.7);
 key.position.set(2.5, 4, 3);
 key.castShadow = true;
 key.shadow.mapSize.set(1024, 1024);
@@ -65,8 +73,8 @@ key.shadow.camera.right = 3;
 key.shadow.camera.top = 3;
 key.shadow.camera.bottom = -3;
 scene.add(key);
-scene.add(new THREE.HemisphereLight("#bcd7ff", "#4a3a52", 1.1));
-const rim = new THREE.DirectionalLight("#9fd8ff", 1.0);
+scene.add(new THREE.HemisphereLight("#bcd7ff", "#4a3a52", 0.9));
+const rim = new THREE.DirectionalLight("#9fd8ff", 0.7);
 rim.position.set(-3, 2, -3);
 scene.add(rim);
 
@@ -114,6 +122,7 @@ const subjects: Subject[] = active.map((scenario, index) => {
     holder.add(capsule);
   }
 
+  applyLanternScale(model, HEIGHT);
   return { scenario, model, animator, holder, tilt };
 });
 
@@ -158,6 +167,7 @@ if (params.get("scene") === "sofa") {
     holder.add(tilt);
     holder.position.set(-2 + index * 4, SOFA.seat + height / 2, 1.1);
     scene.add(holder);
+    applyLanternScale(model, height);
     sofaSubjects.push({ holder, model, animator, tilt, height });
   }
 }
@@ -229,6 +239,28 @@ function frame(fixedDelta?: number): void {
   }
 
   if (sofaSubjects.length) {
+    if (params.get("cam") === "game") {
+      // The real third-person rig from src/game/render/cameraRig.ts, for the
+      // subject whose height matches ?height=: boom = camera.distance, target
+      // lifted by characterRadius * CAMERA_TARGET_LIFT_RATIO above the capsule
+      // centre. Values are those of the scaled config for that height.
+      const subject = sofaSubjects[params.get("height") === "0.7" ? 0 : 1]!;
+      const radius = subject.height * 0.2571;
+      const boom = 2.5 * (subject.height / 0.7);
+      const pitch = 0.32;
+      const target = new THREE.Vector3(
+        subject.holder.position.x,
+        subject.holder.position.y + radius * 0.7,
+        subject.holder.position.z,
+      );
+      const direction = new THREE.Vector3(0, Math.sin(pitch), -Math.cos(pitch));
+      camera.position.copy(target).addScaledVector(direction, boom);
+      camera.lookAt(target);
+      renderer.render(scene, camera);
+      label.textContent = `game camera, character ${subject.height.toFixed(2)} m, boom ${boom.toFixed(2)} m\nsofa ${SOFA.length} m long, ${SOFA.height} m tall, seat ${SOFA.seat} m`;
+      if (fixedDelta === undefined) requestAnimationFrame(() => frame());
+      return;
+    }
     camera.position.set(1.5, 3.4, 9.5);
     camera.lookAt(0, 1.5, 0);
     renderer.render(scene, camera);

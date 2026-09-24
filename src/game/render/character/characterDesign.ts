@@ -114,7 +114,7 @@ export const PALETTE: Record<ZoneName, string> = {
   // as a hat over a face rather than as one pale dome.
   cap: "#2fa8a2",
   skin: "#ffd9bc",
-  mitten: "#fff3e3",
+  mitten: "#f4dfc8",
   boot: "#3b3350",
   scarf: "#63e0d8",
   goggles: "#2b2438",
@@ -376,11 +376,14 @@ const LANTERN_HOUSING: PartDefinition = {
   sides: 10,
   startCap: "pole",
   endCap: "pole",
+  // Offset onto the character's right shoulder blade: the scarf tail hangs
+  // straight down the middle of the back and would hide a centred lantern
+  // completely from the default chase camera.
   rings: [
-    { at: [0, 0.05, -0.11], rx: 0.03, rz: 0.02, zone: ZONE.boot, weights: [W("chest")] },
-    { at: [0, 0.055, -0.135], rx: 0.045, rz: 0.035, squareness: 1.4, zone: ZONE.boot, weights: [W("chest")] },
-    { at: [0, 0.055, -0.162], rx: 0.042, rz: 0.032, squareness: 1.4, zone: ZONE.boot, weights: [W("chest")] },
-    { at: [0, 0.052, -0.176], rx: 0.026, rz: 0.02, zone: ZONE.boot, weights: [W("chest")] },
+    { at: [-0.078, 0.05, -0.105], rx: 0.03, rz: 0.02, zone: ZONE.boot, weights: [W("chest")] },
+    { at: [-0.078, 0.055, -0.13], rx: 0.045, rz: 0.035, squareness: 1.4, zone: ZONE.boot, weights: [W("chest")] },
+    { at: [-0.078, 0.055, -0.157], rx: 0.042, rz: 0.032, squareness: 1.4, zone: ZONE.boot, weights: [W("chest")] },
+    { at: [-0.078, 0.052, -0.171], rx: 0.026, rz: 0.02, zone: ZONE.boot, weights: [W("chest")] },
   ],
 };
 
@@ -400,8 +403,38 @@ export const CHARACTER_PARTS: readonly PartDefinition[] = [
 /** Where the emissive lantern lens sits, and how big, in normalized units. */
 export const LANTERN_LENS = {
   bone: "chest",
-  at: [0, 0.055, -0.18] as const,
+  at: [-0.078, 0.055, -0.175] as const,
   radius: 0.026,
+};
+
+/**
+ * The lantern's light, expressed relative to the character's own height rather
+ * than in metres.
+ *
+ * A point light's `distance` and `intensity` are world-space and are NOT
+ * affected by a parent's scale, so hard-coded metres do not survive a change of
+ * character scale: a range that lit the character nicely at 0.70 m floods it
+ * and the floor around it at 0.35 m. `PlayerAvatar` converts these using the
+ * capsule's real height. Intensity goes as height squared because the light
+ * decays with the square of distance, so that is what holds the brightness at
+ * corresponding points constant.
+ */
+export const LANTERN_LIGHT = {
+  /** Range as a multiple of the character's standing height. */
+  rangeInHeights: 3,
+  /**
+   * Intensity at a one-metre-tall character; scales with height squared.
+   * Kept low deliberately: the light sits a few centimetres from the
+   * character's own back, and decay is quadratic, so a value chosen to look
+   * right on the floor nearby blows the body out to white. The lantern's job
+   * is to pool light on the surface around the character; the emissive lens
+   * itself is what makes the character findable.
+   */
+  intensityAtUnitHeight: 0.12,
+  /** Extra intensity at the top of the idle pulse, same units. */
+  pulseAtUnitHeight: 0.035,
+  /** Stood off behind the lens so the body is not sitting inside the light. */
+  offsetBehindLens: 0.16,
 };
 
 /**
