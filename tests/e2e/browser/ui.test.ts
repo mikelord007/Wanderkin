@@ -34,36 +34,25 @@ async function openEditorForSample(page: Page, sampleName: string): Promise<void
   await page.getByRole("heading", { name: "Model orientation" }).waitFor();
 }
 
-test("photo lightbox follows real left/right/Escape keyboard input", async ({ page }) => {
+test("capture preview supports a real upload and replacement", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Create my world" }).first().click();
-  await page.getByRole("heading", { name: "Add your photos" }).waitFor();
+  await page.getByRole("heading", { name: "What will your world be made of?" }).waitFor();
 
-  await page.locator('input[type="file"]').setInputFiles([
-    "public/samples/photo-1.jpg",
-    "public/samples/photo-2.jpg",
-  ]);
-  const firstPhoto = page.getByRole("button", { name: "Enlarge photo 1" });
-  try {
-    await firstPhoto.waitFor({ state: "visible", timeout: 15_000 });
-  } catch {
-    throw new Error(`Photo upload UI did not become ready:\n${await page.locator("body").innerText()}`);
-  }
-  await firstPhoto.click();
+  const input = page.locator('input[type="file"][aria-label="Choose an object photo"]');
+  await input.setInputFiles("public/samples/photo-1.jpg");
+  const preview = page.getByRole("img", { name: "Your selected object" });
+  await expect(preview).toBeVisible();
+  await expect(page.getByText("Ready to review", { exact: true })).toBeVisible();
+  const firstSource = await preview.getAttribute("src");
 
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toHaveAttribute("aria-label", /Photo 1/);
-  await expect(dialog).toContainText("1 of 2");
-  await page.keyboard.press("ArrowRight");
-  await expect(dialog).toHaveAttribute("aria-label", /Photo 2/);
-  await expect(dialog).toContainText("2 of 2");
-  await page.keyboard.press("ArrowLeft");
-  await expect(dialog).toContainText("1 of 2");
-  await page.keyboard.press("Escape");
-  await expect(dialog).toBeHidden();
+  await page.getByRole("button", { name: "Retake or replace" }).click();
+  await input.setInputFiles("public/samples/photo-2.jpg");
+  await expect.poll(() => preview.getAttribute("src")).not.toBe(firstSource);
+  await expect(page.getByRole("button", { name: "Use this photo" })).toBeEnabled();
 
-  // Uploading photos is local-only in this test; no generation tool call is
-  // allowed merely by exercising the selection/lightbox UI.
+  // Choosing/replacing is local-only; no generation call is allowed merely
+  // by exercising the capture preview.
   expect(mcp.callsFor("run_capability")).toHaveLength(0);
 });
 
