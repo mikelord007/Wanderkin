@@ -2,7 +2,6 @@ import type {
   AssetReference,
   GeneratedImageReference,
   GenerationRequest,
-  ImageTo3dGenerationRequest,
   GenerationJob,
   PhotoReference,
   PublishedChallenge,
@@ -12,19 +11,8 @@ import type {
   SceneManifest,
 } from "@shared/index.js";
 
-/** Additive client shape agreed for turning the exact approved style image
- * into geometry. It remains local until shared/generation.ts is updated by
- * its owner. `photos` keeps original-source provenance while these IDs name
- * the actual image inputs used by the build. */
-export interface ApprovedStyleMeshRequest extends ImageTo3dGenerationRequest {
-  sourceImageAssetIds: readonly string[];
-  styleReferenceAssetId: string;
-}
-
-export type CreationGenerationRequest = GenerationRequest | ApprovedStyleMeshRequest;
-
 export interface GenerationEnvelope {
-  request: CreationGenerationRequest;
+  request: GenerationRequest;
   worldId?: string;
   maxCostUsd?: number;
 }
