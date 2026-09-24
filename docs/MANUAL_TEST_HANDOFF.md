@@ -51,9 +51,10 @@ port 5173 and the API remains on port 8787. Stop it only after testing is done.
 6. **Publish and share:** save a private copy, publish it, and open the returned
    `/share/<shareId>` URL in a fresh incognito window. It should be playable
    without an upload, owner cookie, or generation request.
-7. **My worlds:** try the action appropriate to each visible card—Resume/View
-   progress, Play, Edit, Retry, Export—and verify private versus published state
-   is clear.
+7. **My worlds:** try only no-provider actions appropriate to each visible
+   card—Resume/View progress, Play, Edit, and Export—and verify private versus
+   published state is clear. If a failed card exposes **Retry**, confirm that
+   the action is labelled clearly but do not activate it during this pass.
 8. **Accessibility and sound:** in Lost Colors, open **Sound**, deliberately
    unmute after entering play, toggle subtitles, move each channel slider, and
    confirm labels, values, keyboard focus, persistence, and one-shot narration.
