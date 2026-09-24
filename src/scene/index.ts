@@ -30,3 +30,4 @@ export * from "./runtime.js";
 export * from "./prepare.js";
 export * from "./samples.js";
 export * from "./style.js";
+export * from "./styleMaterial.js";
