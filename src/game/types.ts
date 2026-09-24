@@ -72,4 +72,16 @@ export interface GameViewProps {
   eventBus?: GameplayEventBus;
   /** Immutable published version used to scope Race comparisons and bests. */
   publishedVersionId?: PublishedLevelVersion["versionId"];
+  /** `C` keyboard shortcut, usable while pointer-locked — see GameViewHandle. */
+  onToggleCapture?: () => void;
+}
+
+/**
+ * Imperative escape hatch for a caller-owned overlay control (e.g.
+ * PlayScreen's Start/Stop gameplay capture button) that sits outside the
+ * built-in HUD but still needs to release pointer lock before its own click
+ * can be reliably delivered.
+ */
+export interface GameViewHandle {
+  releasePointerLockForOverlay: () => void;
 }

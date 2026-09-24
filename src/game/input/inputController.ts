@@ -22,6 +22,14 @@ export interface InputControllerCallbacks {
   /** Escape, or the browser dropping pointer lock during play. */
   onPauseRequested: () => void;
   onPointerLockChange: (locked: boolean) => void;
+  /** `M` — a mouse click on an on-screen Sound toggle is not reliably
+   * delivered while the pointer is locked (the OS cursor is hidden and
+   * frozen, so hit-testing away from the lock point is unreliable in some
+   * browsers), so mute needs a keyboard path that works during active play. */
+  onToggleMute?: () => void;
+  /** `C` — same reasoning as `onToggleMute`, for Start/Stop gameplay
+   * capture, which lives outside this controller's own HUD. */
+  onToggleCapture?: () => void;
 }
 
 export class InputController {
@@ -92,6 +100,15 @@ export class InputController {
     }
 
     if (event.repeat) return;
+
+    if (event.code === "KeyM") {
+      this.callbacks.onToggleMute?.();
+      return;
+    }
+    if (event.code === "KeyC") {
+      this.callbacks.onToggleCapture?.();
+      return;
+    }
 
     switch (event.code) {
       case "Space":

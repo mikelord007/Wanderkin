@@ -16,7 +16,7 @@
  *    so jump height and mantle rules cannot drift between levels.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { DEFAULT_MOVEMENT_CONFIG, type SceneManifest } from "@shared/index.js";
 import { loadSceneAsset, type LoadedSceneAsset } from "./assets/loadSceneAsset.js";
@@ -30,7 +30,7 @@ import { Hud } from "./hud/Hud.js";
 import { GameStage as StageContents, type HudSignals } from "./render/GameStage.js";
 import { usePrefersReducedMotion } from "./render/useReducedMotion.js";
 import { ColorRestorationAdapter } from "./restorationAdapter.js";
-import type { GameLoadStage, GameSnapshot, GameViewProps } from "./types.js";
+import type { GameLoadStage, GameSnapshot, GameViewHandle, GameViewProps } from "./types.js";
 import { GameplaySession, type GameplaySessionSnapshot } from "./modes/session.js";
 import { updateGameplayProximity } from "./modes/proximity.js";
 import { gameplayEvents } from "./events.js";
@@ -74,7 +74,7 @@ function describeError(error: unknown): string {
   return "An unexpected error occurred while preparing this level.";
 }
 
-export function GameView({
+export const GameView = forwardRef<GameViewHandle, GameViewProps>(function GameView({
   manifest,
   onExit,
   onComplete,
@@ -84,7 +84,8 @@ export function GameView({
   colorRestoration: colorRestorationOverride,
   eventBus,
   publishedVersionId,
-}: GameViewProps) {
+  onToggleCapture,
+}, ref) {
   const config = DEFAULT_MOVEMENT_CONFIG;
   const reducedMotion = usePrefersReducedMotion();
   const manifestRef = useRef(manifest);
@@ -99,6 +100,10 @@ export function GameView({
       ? { narrationScript: manifest.experience.quest.narrationScript }
       : {}),
   });
+  // Read inside the `M` keyboard-shortcut handler below, which is wired
+  // once per InputController construction rather than on every render.
+  const audioRef = useRef(audio);
+  audioRef.current = audio;
   const gameplaySession = useMemo(
     () => manifest.experience
       ? new GameplaySession({
@@ -163,6 +168,8 @@ export function GameView({
 
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
+  const onToggleCaptureRef = useRef(onToggleCapture);
+  onToggleCaptureRef.current = onToggleCapture;
   const onProgressRef = useRef(onProgress);
 
   useEffect(() => {
@@ -276,6 +283,11 @@ export function GameView({
             setPaused(true);
           },
           onPointerLockChange: setPointerLocked,
+          onToggleMute: () => {
+            const current = audioRef.current;
+            current.setSettings({ ...current.settings, muted: !current.settings.muted });
+          },
+          onToggleCapture: () => onToggleCaptureRef.current?.(),
         });
 
         setRuntime({ simulation, rapier, assets: loaded, input });
@@ -500,6 +512,19 @@ export function GameView({
     onExit();
   }, [runtime, onExit]);
 
+  // Explicitly releases pointer lock without pausing — used by HUD controls
+  // (Sound) and by the caller's own overlay controls (PlayScreen's gameplay
+  // capture button) so a real cursor is available for the click that
+  // follows. Nothing here ever re-requests the lock: only the Play/Resume
+  // gestures do that, so a HUD click can never trigger an accidental relock.
+  const handleReleaseForHud = useCallback(() => {
+    runtime?.input.releasePointerLock();
+  }, [runtime]);
+
+  useImperativeHandle(ref, () => ({
+    releasePointerLockForOverlay: handleReleaseForHud,
+  }), [handleReleaseForHud]);
+
   // ---- Snapshot reporting ---------------------------------------------
 
   const snapshot = useMemo<GameSnapshot>(
@@ -630,7 +655,8 @@ export function GameView({
         audioSettings={audio.settings}
         onAudioSettingsChange={audio.setSettings}
         subtitle={audio.subtitle}
+        onRequestPointerRelease={handleReleaseForHud}
       />
     </div>
   );
-}
+});

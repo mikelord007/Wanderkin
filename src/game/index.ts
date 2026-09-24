@@ -8,7 +8,7 @@
  */
 
 export { GameView } from "./GameView.js";
-export type { GameCompletionResult, GameSnapshot, GameViewProps, GameLoadStage } from "./types.js";
+export type { GameCompletionResult, GameSnapshot, GameViewProps, GameViewHandle, GameLoadStage } from "./types.js";
 
 export { GameplayEventBus, gameplayEvents } from "./events.js";
 export type {

@@ -43,4 +43,25 @@ describe("InputController", () => {
     internals.handlePointerLockChange();
     expect(events).toEqual(["exit", "pause", "locked:false"]);
   });
+
+  it("toggles mute and gameplay capture from the keyboard, independent of pointer lock or clicks", () => {
+    const events: string[] = [];
+    const controller = new InputController(CONFIG, 0, {
+      onPauseRequested: () => events.push("pause"),
+      onPointerLockChange: () => undefined,
+      onToggleMute: () => events.push("mute"),
+      onToggleCapture: () => events.push("capture"),
+    });
+    const internals = controller as unknown as {
+      handleKeyDown: (event: { code: string; repeat?: boolean; target?: EventTarget | null }) => void;
+    };
+
+    internals.handleKeyDown({ code: "KeyM" });
+    internals.handleKeyDown({ code: "KeyC" });
+    expect(events).toEqual(["mute", "capture"]);
+
+    // A held key (repeat) must not fire the toggle twice.
+    internals.handleKeyDown({ code: "KeyM", repeat: true });
+    expect(events).toEqual(["mute", "capture"]);
+  });
 });

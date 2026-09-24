@@ -44,6 +44,11 @@ export interface HudProps {
   audioSettings: AudioSettings;
   onAudioSettingsChange: (settings: AudioSettings) => void;
   subtitle: SubtitleState;
+  /** Called before any HUD control that needs a real cursor (Sound) opens —
+   * a click on an overlay control is not reliably delivered while the
+   * pointer is locked, so this always runs first. Never re-requests the
+   * lock itself; only the Play/Resume buttons do that. */
+  onRequestPointerRelease?: () => void;
 }
 
 const STAGE_LABELS: { stage: GameLoadStage; label: string }[] = [
@@ -90,6 +95,10 @@ function Controls() {
         <dd>Back to checkpoint</dd>
         <dt>Esc</dt>
         <dd>Pause</dd>
+        <dt>M</dt>
+        <dd>Mute / unmute</dd>
+        <dt>C</dt>
+        <dd>Start / stop capture</dd>
       </dl>
       <p className="oq-hud__touch-notice">Keyboard and mouse are supported. Touch controls are not available yet.</p>
     </div>
@@ -197,7 +206,18 @@ export function Hud(props: HudProps) {
           <ObjectivePanel props={props} />
 
           <div className="oq-hud__top-actions">
-            <button type="button" onClick={() => setSoundOpen((open) => !open)} aria-expanded={soundOpen} aria-controls="game-audio-controls">Sound</button>
+            <button
+              type="button"
+              onClick={() => {
+                props.onRequestPointerRelease?.();
+                setSoundOpen((open) => !open);
+              }}
+              aria-expanded={soundOpen}
+              aria-controls="game-audio-controls"
+              title="Sound settings — press M to mute/unmute without opening this panel"
+            >
+              Sound
+            </button>
             <button type="button" onClick={props.onPause} aria-label="Pause game">Pause</button>
           </div>
           {soundOpen ? <div className="oq-hud__sound" id="game-audio-controls"><AudioControls value={props.audioSettings} onChange={props.onAudioSettingsChange} /></div> : null}

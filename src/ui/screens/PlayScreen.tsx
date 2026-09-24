@@ -1,6 +1,6 @@
 import { Component, lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import type { PublishedLevelVersion, SceneManifest } from "@shared/index.js";
-import type { GameCompletionResult } from "../../game/types.js";
+import type { GameCompletionResult, GameViewHandle } from "../../game/types.js";
 import { LoadingScreen } from "../components/LoadingScreen.js";
 import { Button } from "../components/Button.js";
 import { GameplayRecorder, supportsGameplayRecording, type GameplayHighlight } from "../../capture/recorder.js";
@@ -29,6 +29,7 @@ export function PlayScreen({ manifest, onExit, onComplete, publishedVersionId }:
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [recordingSupported] = useState(() => supportsGameplayRecording());
   const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const gameViewRef = useRef<GameViewHandle>(null);
   const recorderRef = useRef<GameplayRecorder | null>(null);
   const highlightRef = useRef<GameplayHighlight | null>(null);
   const recordingErrorRef = useRef<string | null>(null);
@@ -72,6 +73,14 @@ export function PlayScreen({ manifest, onExit, onComplete, publishedVersionId }:
       setCaptureError(message);
       return null;
     }
+  }
+
+  /** Wired to GameView's `C` keyboard shortcut, which works even while the
+   * pointer is locked (unlike a click on the button below, which needs the
+   * lock released first — see `startCapture`/`stopCapture` button handlers). */
+  function handleToggleCapture() {
+    if (captureState === "recording") void stopCapture();
+    else if (captureState === "idle") startCapture();
   }
 
   async function handleComplete(result: GameCompletionResult) {
@@ -129,17 +138,44 @@ export function PlayScreen({ manifest, onExit, onComplete, publishedVersionId }:
       <ErrorBoundary key={retryAttempt} onError={setLoadError}>
         <Suspense fallback={<LoadingScreen stage="Loading the game…" />}>
           <GameView
+            ref={gameViewRef}
             manifest={manifest}
             onExit={onExit}
             onComplete={handleComplete}
+            onToggleCapture={handleToggleCapture}
             {...(publishedVersionId === undefined ? {} : { publishedVersionId })}
           />
         </Suspense>
       </ErrorBoundary>
       <div className="oq-capture-controls" data-recording={captureState === "recording"} aria-label="Gameplay highlight controls">
         {!recordingSupported ? <p>Gameplay recording isn’t supported by this browser.</p>
-          : captureState === "idle" ? <Button variant="secondary" onClick={startCapture}>Start gameplay capture</Button>
-          : captureState === "recording" ? <Button variant="secondary" onClick={() => void stopCapture()}>Stop gameplay capture</Button>
+          : captureState === "idle" ? (
+            <Button
+              variant="secondary"
+              title="Start gameplay capture (C)"
+              onClick={() => {
+                // A click on this button is not reliably delivered while
+                // the pointer is locked, so release it first — the `C` key
+                // (wired above via onToggleCapture) works during lock too.
+                gameViewRef.current?.releasePointerLockForOverlay();
+                startCapture();
+              }}
+            >
+              Start gameplay capture
+            </Button>
+          )
+          : captureState === "recording" ? (
+            <Button
+              variant="secondary"
+              title="Stop gameplay capture (C)"
+              onClick={() => {
+                gameViewRef.current?.releasePointerLockForOverlay();
+                void stopCapture();
+              }}
+            >
+              Stop gameplay capture
+            </Button>
+          )
           : captureState === "stopping" ? <p role="status">Finishing gameplay highlight…</p>
           : <p role="status">Gameplay highlight ready</p>}
         {captureError ? <p role="alert">{captureError}</p> : null}

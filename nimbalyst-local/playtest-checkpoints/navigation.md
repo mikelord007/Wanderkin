@@ -37,7 +37,15 @@ Every existing `setScreen(...)` call becomes `go(screen)`, which also pushes the
 state instead of just changing the URL. `document.getElementById("my-worlds")` is scrolled to directly from
 App (not by editing StartScreen, which I don't own) for both `/worlds` and the legacy hash link.
 
-Status: `src/ui/routing.ts` + `src/ui/routing.test.ts` written and passing (8/8). App.tsx rewrite in progress next.
+Status: DONE and committed (398c7ebecf9f8d67cc20421119920ef2cc4d219f). Full vitest (401/401) and tsc --noEmit
+clean (aside from a pre-existing, unrelated Logo.tsx error from a concurrent peer worker). Manually browser-
+verified: `/`, `/worlds` (scrolls), `/#my-worlds` (legacy, scrolls), `/play/sample-explore-rodin` (bundled
+sample resolves without a network fetch), `/edit/level-0ed836ff` (real saved level refetched via `getLevel`
+and opened in the editor), `/finish/level-0ed836ff` (redirects to `/play/level-0ed836ff` as designed),
+`/this-route-does-not-exist` (falls back to `/`), refresh on `/play/:id`, and back/forward across all of the
+above. Not live-tested: `/share/:shareId` and `/share/:shareId/play` against a real publication — didn't want
+to publish a new version of a live saved world as a side effect just to test; covered instead by
+`shareRouting.test.ts` (untouched) and `routing.test.ts`'s path build/parse round trip for `share-play`.
 
 ## Plan (item 13 — pointer-lock/HUD usability)
 
@@ -58,7 +66,43 @@ also explicitly releases lock before its own click handler runs. (3) No handler 
 `requestPointerLock()` except the explicit Play/Resume buttons — verified no accidental re-lock on any HUD
 click.
 
-Status: not yet implemented — next step after App.tsx routing lands and is committed.
+Status: implemented, typechecked, and unit-tested; ready to commit next.
+
+- `src/game/input/inputController.ts`: `InputControllerCallbacks` gains optional `onToggleMute`/
+  `onToggleCapture`, fired on `KeyM`/`KeyC` (guarded by the same `isInteractiveTarget`/`repeat` checks as
+  every other binding). New tests in `inputController.test.ts` (2 added, all passing).
+- `src/game/types.ts`: new `GameViewHandle` (`releasePointerLockForOverlay`); `GameViewProps` gains optional
+  `onToggleCapture`. Re-exported from `src/game/index.ts`.
+- `src/game/GameView.tsx`: now `forwardRef<GameViewHandle, GameViewProps>`; wires `M` to
+  `audio.setSettings({...,muted:!muted})` and `C` to the new `onToggleCapture` prop (both read through a
+  ref so they never go stale without needing the asset-loading effect to re-run); exposes
+  `releasePointerLockForOverlay` via `useImperativeHandle`; passes a new `onRequestPointerRelease` into
+  `Hud`. No new `requestPointerLock()` call sites — grepped to confirm still exactly the original 3
+  (Start/Resume/Restart) — so nothing can trigger an accidental relock.
+- `src/game/hud/Hud.tsx`: Sound button now calls `onRequestPointerRelease` before toggling the panel; added
+  `M`/`C` to the on-screen controls legend for discoverability.
+- `src/ui/screens/PlayScreen.tsx`: holds a `GameViewHandle` ref; Start/Stop gameplay capture buttons call
+  `releasePointerLockForOverlay()` before their own action; `onToggleCapture` passed into `GameView` wires
+  the same start/stop through the `C` keyboard shortcut (single source of truth — no duplicate listener, so
+  no double-toggle risk).
+
+Root-cause reasoning (why this is the real fix, not a guess): while the pointer is locked the OS cursor is
+hidden and effectively frozen, so a browser's hit-test for a `click` on a control positioned away from the
+lock point is not reliable — this is why Sound/Pause/Start-Gameplay-Capture were reported as unusable during
+play. Escape already worked because it's a `keydown`, unaffected by cursor hit-testing; `M`/`C` extend that
+same keyboard path to mute and capture so both are genuinely usable while locked, not just after leaving
+pointer lock. The Sound button's explicit release-before-toggle covers the browsers/cases where the click
+after release still needs a real cursor.
+
+Not verified in-browser: this repo's headless browser sessions stall the 3D scene at "Rendering first
+frame" even with WebGL2 available in the page (matches the pre-existing "Full headless 3D scene stalled in
+geometry preparation" note already on record from an earlier worker) — so the actual click-to-play,
+pointer-lock-engage, then Sound/Capture-click flow could not be interactively exercised this session.
+Confidence instead rests on: the unit-tested keyboard paths (the primary, reliable fix), a full pass over
+every `requestPointerLock()` call site (still only the original 3, all explicit Play/Resume/Restart
+gestures), and clean mount-through-loading-stage behavior with no console errors (confirms the `forwardRef`
++ `React.lazy` combination in PlayScreen works). Flagging this gap explicitly rather than claiming full
+interactive verification — the user's own manual playtest is the way to close it.
 
 ## Tests / verification planned
 - `npx vitest run src/ui/routing.test.ts` (done, 8/8 passing).
