@@ -61,6 +61,18 @@
   .oq-style-preview__actions .oq-kit-button { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .oq-style-preview__placeholder { animation: none; } }
+.oq-world-progress { display: grid; grid-template-columns: minmax(0,1.25fr) minmax(320px,.85fr); gap: 24px; align-items: start; }
+.oq-world-progress__preview { display: grid; gap: 20px; }
+.oq-world-progress__preview > img, .oq-world-progress__placeholder { width: 100%; aspect-ratio: 4/3; object-fit: contain; border-radius: 16px; background: var(--oq-inset); }
+.oq-world-progress__preview > img { animation: oq-world-breathe 5s ease-in-out infinite; }
+@keyframes oq-world-breathe { 50% { transform: scale(1.012) rotate(.3deg); } }
+.oq-world-progress__audio { display: grid; gap: 12px; padding-top: 16px; border-top: 1px solid var(--oq-line); }
+.oq-world-progress__audio label { display: grid; gap: 6px; font-weight: 700; }
+.oq-world-progress__audio audio { width: 100%; }
+.oq-world-progress__optional-error { display: grid; gap: 8px; margin-top: 20px; border-left: 4px solid var(--oq-warning-ink); }
+.oq-world-progress__notice, .oq-world-progress__leave-note { margin-top: 16px; color: var(--oq-muted); }
+@media (max-width: 699px) { .oq-world-progress { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .oq-world-progress__preview > img { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .oq-capture__drop { transition: none; } }
 .oq-review { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(280px,.8fr); gap: 24px; align-items: start; }
 .oq-review__visual { display: grid; gap: 16px; }

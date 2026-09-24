@@ -21,7 +21,7 @@ const STAGE_TEXT: Record<JobState, string> = {
   failed: "Generation failed.",
 };
 
-export function GenerationScreen({ jobId, onReady, onCancel }: GenerationScreenProps) {
+function LegacyGenerationScreen({ jobId, onReady, onCancel }: GenerationScreenProps) {
   const { job, connectionIssue, polling, restart } = useJobPolling(jobId);
   const elapsed = useElapsedSeconds(job?.startedAt ?? job?.createdAt);
   const [retrying, setRetrying] = useState(false);
@@ -118,3 +118,6 @@ export function GenerationScreen({ jobId, onReady, onCancel }: GenerationScreenP
     </div>
   );
 }
+
+void LegacyGenerationScreen;
+export { WorldProgressScreen as GenerationScreen } from "./WorldProgressScreen.js";
