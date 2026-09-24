@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="Mousehold">
+  <title>Mousehold</title>
+  <defs>
+    <clipPath id="arch">
+      <path d="M13 48V27a11 11 0 0 1 22 0v21Z"/>
+    </clipPath>
+  </defs>
+  <rect x="0" y="0" width="48" height="48" rx="12" fill="#1d3a2e"/>
+  <g clip-path="url(#arch)">
+    <rect x="13" y="15" width="22" height="33" fill="#f2efe5"/>
+    <circle cx="30" cy="25" r="3.4" fill="#e8a33d"/>
+    <ellipse cx="17" cy="48" rx="14" ry="12" fill="#56997a"/>
+    <ellipse cx="37" cy="47" rx="12" ry="9" fill="#2e6b4f"/>
+  </g>
+</svg>

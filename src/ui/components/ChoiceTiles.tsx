@@ -20,8 +20,11 @@ export interface ChoiceTilesProps<T extends string> {
 export function ChoiceTiles<T extends string>({ legend, value, options, onChange, name, hint }: ChoiceTilesProps<T>) {
   const id = useId();
   return <fieldset className="oq-kit-choices" aria-describedby={hint ? `${id}-hint` : undefined}>
-    <legend>{legend}</legend>
-    {hint && <p id={`${id}-hint`} className="oq-kit-muted">{hint}</p>}
+    {/* A legend is the accessible name for the group, so it stays a legend —
+        but it is styled as the section heading it visually is, rather than
+        being left to float at the browser's default size and position. */}
+    <legend className="oq-kit-choices__legend">{legend}</legend>
+    {hint && <p id={`${id}-hint`} className="oq-kit-choices__hint">{hint}</p>}
     <div className="oq-kit-choices__grid">{options.map(option => <label key={option.value} className="oq-kit-choice">
       <input type="radio" name={name ?? id} value={option.value} checked={value === option.value}
         disabled={option.disabled} onChange={() => onChange(option.value)} />

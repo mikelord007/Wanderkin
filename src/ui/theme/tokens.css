@@ -1,36 +1,131 @@
-/* Pocket Wonder. Scope tokens so legacy screens can migrate independently. */
+/*
+ * Mousehold design tokens.
+ *
+ * The palette is the view from the floor: deep ivy shadow under the furniture,
+ * a warm plaster wall, and one shaft of afternoon marigold. Green carries the
+ * brand because at mouse scale a houseplant is a forest; the warm accent is the
+ * light you are heading towards.
+ *
+ * Scoped to `.oq-theme` / `[data-world-style]` so a screen opts in, and so a
+ * world's chosen look can retint the action colour without touching anything
+ * structural.
+ */
+
+/* Fraunces: the display face. Self-hosted (see public/brand/README.md) so the
+   app renders identically offline and there is no CDN round-trip before the
+   first headline paints. */
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/brand/fonts/fraunces-latin-var.woff2") format("woff2-variations"),
+       url("/brand/fonts/fraunces-latin-var.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 .oq-theme, [data-world-style] {
-  --oq-paper: #f7f4ec;
-  --oq-surface: #fffdf8;
-  --oq-inset: #eeeae2;
-  --oq-ink: #282536;
-  --oq-muted: #625d6b;
-  --oq-line: #d9d3cc;
-  --oq-control-line: #89818d;
-  --oq-action: #6543b5;
-  --oq-action-hover: #50328f;
-  --oq-wash: #eee6ff;
-  --oq-accent-ink: #4c2f85;
-  --oq-success-ink: #286544;
-  --oq-error-ink: #a12e39;
-  --oq-warning-ink: #795011;
+  /* --- Brand constants. Same five values as the logo, so the mark never sits
+     on a background it was not drawn for. --- */
+  --mh-pine: #1d3a2e;
+  --mh-ivy: #2e6b4f;
+  --mh-fern: #56997a;
+  --mh-marigold: #e8a33d;
+  --mh-plaster: #f2efe5;
+
+  /* --- Surfaces --- */
+  --oq-paper: #f2efe5;
+  --oq-surface: #fbf9f3;
+  --oq-inset: #e7e3d6;
+  --oq-shade: var(--mh-pine);
+
+  /* --- Ink --- */
+  --oq-ink: #23312a;
+  --oq-muted: #5f6a5f;
+  --oq-on-shade: #eef2ea;
+  --oq-on-shade-muted: #aebdae;
+
+  /* --- Lines. Two weights: a hairline that only separates, and a control
+     outline strong enough to pass contrast on an interactive edge. --- */
+  --oq-line: #d8d3c3;
+  --oq-control-line: #7c8478;
+
+  /* --- Action --- */
+  --oq-action: var(--mh-ivy);
+  --oq-action-hover: #235540;
+  --oq-on-action: #f7fbf7;
+  --oq-wash: #e3ede4;
+  --oq-accent-ink: #23553f;
+
+  /* --- Status. Held apart from the brand greens so "saved" never reads as
+     decoration and "failed" never reads as a style choice. --- */
+  --oq-success-ink: #1f6146;
+  --oq-success-wash: #dcebdf;
+  --oq-error-ink: #9a3327;
+  --oq-error-wash: #f6e2dd;
+  --oq-warning-ink: #7a5312;
+  --oq-warning-wash: #f6ecd7;
+
+  /* --- Type --- */
   --oq-font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --oq-font-display: Georgia, Cambria, "Times New Roman", serif;
+  --oq-font-display: "Fraunces", "Iowan Old Style", "Palatino Linotype", Palatino, serif;
+  /* Fraunces' personality axes. WONK on, SOFT up: the headline gets the slight
+     lean and rounded terminals that keep a serif from feeling institutional. */
+  --oq-display-variation: "SOFT" 40, "WONK" 1;
+
+  /* --- Spacing. A 4px base rising in a rhythm that is coarse enough to be
+     obvious at a glance — crowding on the old landing came from every gap
+     being within a few pixels of every other. --- */
   --oq-space-1: 4px; --oq-space-2: 8px; --oq-space-3: 12px;
   --oq-space-4: 16px; --oq-space-5: 24px; --oq-space-6: 32px;
-  --oq-space-7: 48px; --oq-space-8: 64px;
-  --oq-round-sm: 8px; --oq-round-md: 16px; --oq-round-lg: 24px;
+  --oq-space-7: 48px; --oq-space-8: 72px; --oq-space-9: 104px;
+  /* Vertical distance between top-level landing sections, fluid so a phone
+     does not inherit desktop-sized silence. */
+  --oq-section: clamp(56px, 8vw, 104px);
+
+  /* --- Shape. Three radii with distinct jobs: a control, a panel, a stage.
+     Everything is not the same rounded rectangle. --- */
+  --oq-round-sm: 10px; --oq-round-md: 16px; --oq-round-lg: 24px;
+  --oq-round-xl: 32px;
   --oq-round-pill: 999px;
-  --oq-elevation: 0 8px 28px #2825360a;
+  --oq-elevation: 0 10px 30px #1d3a2e12;
+  --oq-elevation-lift: 0 18px 44px #1d3a2e1f;
+
   --oq-duration: 160ms;
   --oq-ease: cubic-bezier(.2,.7,.3,1);
   color-scheme: light;
 }
+
+/* A world's chosen look retints the action colour only. Structure, spacing and
+   type stay identical so a hand-painted world is recognisably the same app. */
 [data-world-style="hand-painted"] {
-  --oq-action: #a3442f; --oq-action-hover: #833322;
-  --oq-wash: #f8e5d9; --oq-accent-ink: #843622;
+  --oq-action: #a2472c; --oq-action-hover: #86371f;
+  --oq-wash: #f4e3d6; --oq-accent-ink: #833620;
 }
 [data-world-style="watercolor"] {
-  --oq-action: #246b70; --oq-action-hover: #195459;
-  --oq-wash: #dcefed; --oq-accent-ink: #19565b;
+  --oq-action: #2f6b7a; --oq-action-hover: #235461;
+  --oq-wash: #dcebee; --oq-accent-ink: #235461;
+}
+
+/* The shade scope swaps ink and paper for the one dark band on the landing and
+   for the editor's 3D stages, so those regions get the whole component set
+   without any of it being re-declared. */
+.oq-shade {
+  --oq-paper: var(--mh-pine);
+  --oq-surface: #24463699;
+  --oq-inset: #162d23;
+  --oq-ink: var(--oq-on-shade);
+  --oq-muted: var(--oq-on-shade-muted);
+  --oq-line: #345645;
+  --oq-control-line: #7d9c8a;
+  --oq-action: var(--mh-marigold);
+  --oq-action-hover: #f2b757;
+  --oq-on-action: #22200f;
+  --oq-wash: #2b5040;
+  --oq-accent-ink: #f0d9a8;
+  --oq-error-ink: #f0a79a;
+  --oq-elevation: none;
+  color-scheme: dark;
 }

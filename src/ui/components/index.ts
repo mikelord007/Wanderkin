@@ -5,6 +5,8 @@ export * from "./TextField.js";
 export * from "./Progress.js";
 export * from "./EmptyState.js";
 export * from "./Icon.js";
+export * from "./Logo.js";
+export * from "./StyleExample.js";
 export * from "./Modal.js";
 export * from "./Toast.js";
 export * from "./AudioControls.js";

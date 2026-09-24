@@ -2,34 +2,74 @@
   box-sizing: border-box;
   font-family: var(--oq-font-body);
   font-size: 16px;
-  line-height: 1.55;
+  line-height: 1.6;
   color: var(--oq-ink);
   background: var(--oq-paper);
   accent-color: var(--oq-action);
+  -webkit-font-smoothing: antialiased;
 }
 .oq-theme *, .oq-theme *::before, .oq-theme *::after { box-sizing: border-box; }
-.oq-theme :where(h1,h2,h3,p,figure) { margin: 0; }
-.oq-theme :where(h1,h2) { font-family: var(--oq-font-display); font-weight: 500; letter-spacing: -.035em; line-height: 1.12; }
-.oq-theme h1 { font-size: clamp(2.25rem, 5vw, 4.25rem); }
-.oq-theme h2 { font-size: clamp(1.75rem, 3vw, 2.5rem); }
-.oq-theme h3 { font-size: 1.125rem; line-height: 1.3; }
+.oq-theme :where(h1,h2,h3,h4,p,figure,ul,ol) { margin: 0; }
+
+/* Headings are set in Fraunces with its WONK and SOFT axes engaged — the
+   faintly off-axis serif that keeps a storybook voice without a costume. */
+.oq-theme :where(h1,h2,h3) {
+  font-family: var(--oq-font-display);
+  font-variation-settings: var(--oq-display-variation);
+  font-weight: 600;
+  letter-spacing: -.015em;
+  line-height: 1.1;
+  /* Headlines are short and wrap unpredictably across the app's breakpoints;
+     balancing them is what stops a two-word orphan on the last line. */
+  text-wrap: balance;
+}
+.oq-theme h1 { font-size: clamp(2.3rem, 1.6rem + 2.6vw, 3.9rem); line-height: 1.04; }
+.oq-theme h2 { font-size: clamp(1.7rem, 1.35rem + 1.3vw, 2.4rem); }
+.oq-theme h3 { font-size: clamp(1.1rem, 1.02rem + .3vw, 1.3rem); line-height: 1.25; }
+.oq-theme :where(p, li) { text-wrap: pretty; }
+/* Nothing reads comfortably past ~70 characters. Applied by opt-in rather than
+   globally so table-like and inline layouts are not squeezed. */
+.oq-measure { max-inline-size: 62ch; }
+.oq-measure--tight { max-inline-size: 46ch; }
+
 .oq-theme :where(button,input,textarea,select) { font: inherit; }
 .oq-theme :where(button,a,input,textarea,select,summary,[tabindex]):focus-visible {
-  outline: 3px solid var(--oq-accent-ink); outline-offset: 3px;
-  box-shadow: 0 0 0 3px var(--oq-paper);
+  outline: 3px solid var(--mh-marigold); outline-offset: 2px;
+  border-radius: var(--oq-round-sm);
 }
 .oq-theme a { color: var(--oq-accent-ink); text-underline-offset: 4px; }
 .oq-theme img { max-width: 100%; display: block; }
 .oq-theme :where(button,a) { -webkit-tap-highlight-color: transparent; }
-.oq-kit-container { width: min(100%, 1248px); margin-inline: auto; padding: 32px; }
-.oq-kit-stack { display: flex; flex-direction: column; gap: 24px; }
-.oq-kit-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
-.oq-kit-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,240px),1fr)); gap: 20px; }
+
+/* A region that swaps to the dark token set still has to paint itself; the
+   tokens only decide what the colours are. */
+.oq-shade { color: var(--oq-ink); }
+
+.oq-kit-container { width: min(100%, 1180px); margin-inline: auto; padding-inline: clamp(20px, 4vw, 48px); }
+.oq-kit-stack { display: flex; flex-direction: column; gap: var(--oq-space-5); }
+.oq-kit-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--oq-space-3); }
+.oq-kit-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,272px),1fr)); gap: var(--oq-space-5); }
 .oq-kit-muted { color: var(--oq-muted); }
-.oq-kit-eyebrow { font-size: .75rem; text-transform: uppercase; letter-spacing: .13em; font-weight: 750; color: var(--oq-accent-ink); }
+/* A quiet label, in sentence case. Small-caps tracking would shout on every
+   screen; a coloured lead-in says "this is a label" without the volume. */
+.oq-kit-eyebrow {
+  font-size: .8125rem; font-weight: 700; letter-spacing: .005em;
+  color: var(--oq-accent-ink);
+}
 .oq-kit-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .oq-kit-error { color: var(--oq-error-ink); }
-@media (max-width: 699px) { .oq-kit-container { padding: 20px; } }
+
+/* The Mousehold lockup. Sized from the mark so the wordmark always sits on the
+   same optical baseline as the arch, at any scale. */
+.mh-logo { display: inline-flex; align-items: center; gap: .55em; font-size: 1.25rem; }
+.mh-logo__mark { flex: none; }
+.mh-logo__word {
+  font-family: var(--oq-font-display);
+  font-variation-settings: "SOFT" 40, "WONK" 1;
+  font-weight: 600; font-size: 1em; letter-spacing: -.02em; line-height: 1;
+}
+
+@media (max-width: 699px) { .oq-kit-container { padding-inline: 20px; } }
 @media (prefers-reduced-motion: reduce) {
   .oq-theme *, .oq-theme *::before, .oq-theme *::after {
     animation: none !important; transition: none !important; scroll-behavior: auto !important;

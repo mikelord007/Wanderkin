@@ -1,41 +1,140 @@
+/*
+ * The landing page.
+ *
+ * Structure is two bands: a pine one you arrive in — the view from under the
+ * furniture — and the plaster page below it where the real work (your worlds,
+ * the samples) lives. All of the boldness is spent on that first band and on
+ * the headline; everything after it is deliberately quiet.
+ *
+ * Spacing runs on --oq-section between bands and the 4px scale within them, so
+ * no two gaps land a few pixels apart and read as a mistake.
+ */
+
 .oq-welcome { min-height: 100vh; width: 100%; align-self: flex-start; }
-.oq-welcome__nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 0 24px; border-bottom: 1px solid var(--oq-line); }
-.oq-welcome__brand { display: flex; align-items: center; gap: 10px; font-size: 1.2rem; font-weight: 800; letter-spacing: -.04em; }
-.oq-welcome__brand-mark { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 12px; background: var(--oq-action); color: white; }
-.oq-welcome__hero { display: grid; grid-template-columns: 1fr 1.06fr; gap: 48px; align-items: center; padding-block: 64px; }
-.oq-welcome__intro { display: flex; flex-direction: column; align-items: flex-start; gap: 24px; }
-.oq-welcome__intro h1 { font-size: clamp(2.75rem,4.5vw,4.1rem); }
-.oq-welcome__intro h1 span { color: var(--oq-accent-ink); }
-.oq-welcome__intro > p:not(.oq-kit-eyebrow) { max-width: 410px; color: var(--oq-muted); font-size: 1.0625rem; }
-.oq-welcome__intro .oq-welcome__note { font-size: .875rem !important; }
-.oq-welcome__example { border-radius: 28px; background: var(--oq-wash); border: 1px solid var(--oq-line); padding: 20px; position: relative; }
-.oq-welcome__example-title { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-bottom: 20px; font-size: .875rem; color: var(--oq-accent-ink); font-weight: 650; }
-.oq-welcome__comparison { display: grid; grid-template-columns: .85fr 1.15fr; gap: 12px; align-items: stretch; }
-.oq-welcome__comparison figure { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
-.oq-welcome__photo, .oq-welcome__render { height: 250px; width: 100%; border-radius: 16px; overflow: hidden; position: relative; }
+
+/* --- The arrival band -------------------------------------------------- */
+.oq-welcome__band {
+  background: var(--mh-pine);
+  /* A single shaft of light from the top right — the one piece of decoration
+     on the page, and the reason the palette has a warm accent at all. */
+  background-image: radial-gradient(120% 90% at 82% -20%, #2f5a45 0%, transparent 60%);
+  padding-bottom: clamp(40px, 6vw, 76px);
+}
+
+.oq-welcome__nav {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--oq-space-4); padding-block: var(--oq-space-5);
+}
+.oq-welcome__nav .mh-logo { color: var(--oq-on-shade); }
+
+.oq-welcome__hero {
+  display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: clamp(32px, 5vw, 72px); align-items: center;
+  padding-block: clamp(32px, 5vw, 64px) 0;
+}
+.oq-welcome__intro { display: flex; flex-direction: column; align-items: flex-start; gap: var(--oq-space-5); }
+/* No forced line break: the headline is balanced and capped by measure, so it
+   breaks where the width actually wants it to at every size. */
+.oq-welcome__intro h1 { max-inline-size: 15ch; }
+.oq-welcome__lede { max-inline-size: 46ch; font-size: clamp(1.0625rem, 1rem + .3vw, 1.1875rem); color: var(--oq-on-shade-muted); }
+.oq-welcome__note { font-size: .875rem; color: var(--oq-on-shade-muted); max-inline-size: 50ch; }
+
+/* --- The before / after ------------------------------------------------ */
+.oq-welcome__example {
+  border-radius: var(--oq-round-xl);
+  background: #ffffff0f;
+  border: 1px solid #ffffff24;
+  padding: clamp(14px, 1.6vw, 20px);
+}
+.oq-welcome__comparison { display: grid; grid-template-columns: 1fr 1fr; gap: var(--oq-space-3); }
+.oq-welcome__comparison figure { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.oq-welcome__photo, .oq-welcome__render {
+  aspect-ratio: 4 / 3; width: 100%; border-radius: var(--oq-round-md);
+  overflow: hidden; position: relative;
+}
 .oq-welcome__photo { object-fit: cover; object-position: 63% center; }
-.oq-welcome__render { background: var(--oq-surface); border: 1px solid #ffffff; }
+.oq-welcome__render { background: #16291f; }
 .oq-welcome__model { height: 100%; width: 100%; }
-.oq-welcome__preview-status { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; padding: 16px; font-size: .875rem; color: var(--oq-muted); }
-.oq-welcome__comparison figcaption { font-size: .875rem; font-weight: 650; color: var(--oq-accent-ink); }
-.oq-welcome__example-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #28253626; }
-.oq-welcome__example-footer strong { font-family: var(--oq-font-display); font-size: 1.25rem; font-weight: 500; }
-.oq-welcome__example-footer p { font-size: .875rem; color: var(--oq-muted); }
-.oq-welcome__steps { display: grid; grid-template-columns: repeat(3,1fr); gap: 24px; padding-block: 24px 40px; border-bottom: 1px solid var(--oq-line); }
-.oq-welcome__step { display: flex; gap: 14px; align-items: flex-start; }
-.oq-welcome__step > span { color: var(--oq-accent-ink); font-family: var(--oq-font-display); font-size: 1.7rem; line-height: 1; }
-.oq-welcome__step p { color: var(--oq-muted); font-size: .875rem; margin-top: 6px; }
-.oq-welcome__section { display: flex; flex-direction: column; gap: 24px; padding-block: 40px 0; scroll-margin-top: 24px; }
-.oq-welcome__section-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.oq-welcome__section-heading h2 { font-size: 2rem; }
-.oq-welcome__sample-card { display: flex; align-items: center; gap: 24px; }
-.oq-welcome__sample-card img { width: 96px; height: 96px; border-radius: 12px; object-fit: cover; }
-.oq-welcome__sample-card > div { display: flex; flex-direction: column; gap: 10px; }
-.oq-welcome__sample-card p { font-size: .875rem; color: var(--oq-muted); }
-.oq-welcome__imports { margin-top: 40px; border-top: 1px solid var(--oq-line); padding-top: 24px; }
-.oq-welcome__imports summary { cursor: pointer; min-height: 44px; font-weight: 650; color: var(--oq-muted); }
-.oq-welcome__imports > div { padding-block: 16px; }
-.oq-welcome__footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--oq-line); font-size: .875rem; color: var(--oq-muted); }
-@media(max-width:1000px) { .oq-welcome__hero { gap: 28px; } .oq-welcome__comparison { grid-template-columns: 1fr 1fr; } .oq-welcome__photo, .oq-welcome__render { height: 210px; } .oq-welcome__sample-card { gap: 16px; } }
-@media(max-width:799px) { .oq-welcome__hero { grid-template-columns: 1fr; padding-block: 40px; } .oq-welcome__intro h1 { max-width: 600px; } .oq-welcome__example { max-width: 640px; width: 100%; } .oq-welcome__photo, .oq-welcome__render { height: 250px; } }
-@media(max-width:499px) { .oq-welcome__nav { padding-bottom: 16px; } .oq-welcome__nav .oq-kit-button { padding-inline: 12px; } .oq-welcome__intro h1 { font-size: 2.75rem; } .oq-welcome__intro .oq-kit-row { width: 100%; } .oq-welcome__intro .oq-kit-button { flex: 1; padding-inline: 14px; white-space: nowrap; } .oq-welcome__example { padding: 16px; } .oq-welcome__photo, .oq-welcome__render { height: 190px; } .oq-welcome__example-footer { align-items: flex-start; } .oq-welcome__steps { grid-template-columns: 1fr; gap: 24px; } .oq-welcome__sample-card { align-items: flex-start; } .oq-welcome__sample-card img { width: 64px; height: 80px; } }
+.oq-welcome__preview-status {
+  position: absolute; inset: 0; display: grid; place-content: center;
+  text-align: center; padding: 16px; font-size: .8125rem; color: var(--oq-on-shade-muted);
+}
+.oq-welcome__comparison figcaption { font-size: .875rem; font-weight: 650; color: var(--oq-on-shade); }
+.oq-welcome__comparison figcaption span { display: block; font-weight: 400; color: var(--oq-on-shade-muted); }
+.oq-welcome__example-footer {
+  margin-top: var(--oq-space-4); padding-top: var(--oq-space-3);
+  border-top: 1px solid #ffffff1f;
+  font-size: .8125rem; color: var(--oq-on-shade-muted);
+}
+
+/* --- The three steps. A real sequence, so it earns its numbers. -------- */
+.oq-welcome__steps {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(24px, 3vw, 48px);
+  padding-block: var(--oq-section);
+}
+.oq-welcome__step { display: grid; gap: var(--oq-space-2); }
+.oq-welcome__step > span {
+  width: 34px; height: 34px; display: grid; place-items: center;
+  border-radius: 50%; margin-bottom: var(--oq-space-1);
+  color: var(--oq-accent-ink); background: var(--oq-wash);
+  font-size: .9375rem; font-weight: 750; font-variant-numeric: tabular-nums;
+}
+.oq-welcome__step p { color: var(--oq-muted); max-inline-size: 34ch; }
+
+/* --- Page sections ----------------------------------------------------- */
+.oq-welcome__section {
+  display: flex; flex-direction: column; gap: var(--oq-space-5);
+  padding-bottom: var(--oq-section); scroll-margin-top: var(--oq-space-5);
+}
+.oq-welcome__section-heading { display: flex; justify-content: space-between; align-items: baseline; gap: var(--oq-space-3); flex-wrap: wrap; }
+.oq-welcome__section-heading p { color: var(--oq-muted); font-size: .9375rem; }
+
+/* The thumbnail sits beside the title; the description and the actions get the
+   full card width. Wrapping the whole card in a horizontal flex was what left
+   the action row too narrow to hold two buttons on one line. `1fr` on the
+   description keeps every card's buttons on the same baseline across a row. */
+.oq-welcome__sample-card { display: grid; grid-template-rows: auto 1fr auto; gap: var(--oq-space-3); }
+.oq-welcome__sample-head { display: flex; align-items: center; gap: var(--oq-space-3); min-width: 0; }
+.oq-welcome__sample-head img { flex: none; width: 56px; aspect-ratio: 1; border-radius: var(--oq-round-sm); object-fit: cover; }
+.oq-welcome__sample-card p { font-size: .9375rem; color: var(--oq-muted); text-wrap: pretty; }
+.oq-welcome__sample-card .oq-kit-row { gap: var(--oq-space-2); }
+
+/* --- Import + footer. Quiet by design; these are not the point. -------- */
+.oq-welcome__imports { border-top: 1px solid var(--oq-line); padding-top: var(--oq-space-5); }
+.oq-welcome__imports summary {
+  cursor: pointer; min-height: 44px; display: flex; align-items: center;
+  font-weight: 650; color: var(--oq-muted);
+}
+.oq-welcome__imports > div { padding-top: var(--oq-space-4); }
+.oq-welcome__imports p { margin-top: var(--oq-space-3); font-size: .875rem; }
+.oq-welcome__footer {
+  display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--oq-space-3);
+  margin-top: var(--oq-space-6); padding-block: var(--oq-space-5) var(--oq-space-7);
+  border-top: 1px solid var(--oq-line);
+  font-size: .875rem; color: var(--oq-muted);
+}
+
+/* --- Widths ------------------------------------------------------------
+   Four steps, each one fixing something specific rather than a generic
+   shrink: the hero stacks, the steps go to two-up then one, the sample rows
+   drop their thumbnail beside the text, and the nav loses its wordmark. */
+@media (max-width: 1040px) {
+  .oq-welcome__hero { grid-template-columns: 1fr; align-items: start; }
+  .oq-welcome__intro h1 { max-inline-size: 20ch; }
+  .oq-welcome__example { max-width: 720px; }
+}
+@media (max-width: 860px) {
+  .oq-welcome__steps { grid-template-columns: repeat(2, 1fr); row-gap: var(--oq-space-6); }
+}
+@media (max-width: 620px) {
+  .oq-welcome__steps { grid-template-columns: 1fr; gap: var(--oq-space-5); }
+  .oq-welcome__comparison { gap: var(--oq-space-2); }
+  .oq-welcome__intro .oq-kit-row { width: 100%; }
+  /* Full-width stacked actions rather than two squeezed pills: at this width
+     `nowrap` on a shared row is what pushed the old buttons off the edge. */
+  .oq-welcome__intro .oq-kit-button { width: 100%; }
+}
+@media (max-width: 440px) {
+  .oq-welcome__nav .mh-logo__word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+  .oq-welcome__sample-card .oq-kit-button { flex: 1; }
+}
