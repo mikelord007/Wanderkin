@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import legacyManifest from "../../shared/fixtures/legacy-scene-manifest-v1.json";
 import lostColorsManifest from "../../shared/fixtures/lost-colors.json";
+import workflowFixture from "../../shared/fixtures/world-workflow-v1.json";
 import { migrateSceneManifest, sceneManifestReaderSchema } from "../../shared/manifest-migration.js";
 import { LevelStore } from "../../server/levels.js";
 import { AssetStore } from "../../server/persistence/assetStore.js";
@@ -65,6 +66,17 @@ describe("ObjectQuest v2 schema and publication integration contracts", () => {
 
     // then no authored field or asset reference is lost or silently replaced.
     expect(jsonRoundTrip).toEqual({ ...expected, updatedAt: saved.updatedAt });
+  });
+
+  it("persists the durable workflow snapshot without turning it into a new job submission", async () => {
+    const expected = migrateSceneManifest({ ...lostColorsManifest, workflow: workflowFixture });
+    const { directory, store } = await createStore();
+    const saved = await store.create(expected);
+    const reopened = new LevelStore(directory, new AssetStore(directory), new PhotoStore(directory));
+    const reloaded = await reopened.get(saved.levelId);
+
+    expect(reloaded?.workflow).toEqual(workflowFixture);
+    expect(reloaded?.workflow?.jobs.map((job) => job.jobId)).toEqual(["job-preview-1", "job-mesh-1"]);
   });
 
   it.skip("keeps an existing published version stable after its private source is edited", () => {
