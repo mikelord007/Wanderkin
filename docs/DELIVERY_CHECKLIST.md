@@ -20,9 +20,9 @@ unchecked until that work actually occurs.
 - [x] **Commit summary and integration status** — Worker 12 commit hashes are
   reported in the orchestrator handoff; the branch is based on Integration #3
   merges `8450c5d`, `ddbeb49`, and `a27bd1c`.
-- [x] **Final integration revision recorded** — final pre-verification merge of
-  `main` reported already up to date at `a27bd1c`; Worker 12 runtime revision
-  `218e6c5` was then verified.
+- [x] **Final integration revision recorded** — `main` at `e7cac8e` was merged,
+  bringing Worker 4's creation UI on top of Integration #3. Worker 12 then
+  aligned the delivery guidance in `a5a2a11` and verified the combined branch.
 - [ ] **Deployment URL** — no authorized account/origin exists. The exact
   missing platform, hostname/DNS/TLS, volume, and provider-mode decision is
   stated in [`DEPLOYMENT.md`](DEPLOYMENT.md#deployment-status-and-remaining-requirement).
@@ -73,7 +73,7 @@ unchecked until that work actually occurs.
 ### Automated verification
 
 - [x] `npm run typecheck` passes on the final integrated revision.
-- [x] `npm test` passes: 46 files, 321 tests.
+- [x] `npm test` passes: 49 files, 330 tests.
 - [x] `npm run build` emits both `dist/` and `dist-server/server/index.js`.
 - [x] Docker executable availability was checked with `docker version`; it is
   not installed on this machine, so the image build could not be run.
@@ -82,6 +82,9 @@ unchecked until that work actually occurs.
 
 ### Browser verification
 
+- [x] The focused mocked-provider Chrome walkthrough passes for creation
+  screens 2–7 (`creation-walkthrough.test.ts`, 1/1). This validates UI wiring,
+  not a real provider run.
 - [ ] Welcome → upload/review → style approval → generation → preparation →
   play → completion works in real Chrome on the final integrated revision.
 - [ ] Lost Colors fragment progression and portal gating complete in-browser.
@@ -149,12 +152,13 @@ Complete this block only after merging current `main` immediately before the
 final verification:
 
 ```text
-Verified runtime revision: 218e6c5bdee27a52c89999db2c9f15f32460b6e0
-Integrated main revision: a27bd1c0b5d98f3d89080277eb24893d31ee4dde
+Verified branch revision: a5a2a11701c3652eeb24182833f4e4bc0e840f06
+Integrated main revision: e7cac8e59d261222743a0a6fd9f76ce2c9cf93bb
 npm run typecheck: PASS
-npm test: PASS — 46 files, 321 tests
+npm test: PASS — 49 files, 330 tests
 npm run build: PASS — dist/ and dist-server/ emitted; Vite large-chunk warning
 npm run test:e2e:http: PASS — 6 files, 31 tests
+npx playwright test creation-walkthrough.test.ts: PASS — 1 mocked Chrome case
 npm start smoke: PASS — GET /api/health on port 18787 returned {"status":"ok"}
 Docker build: NOT RUN — docker executable is not installed on this machine
 Real-browser QA: PENDING
