@@ -1,5 +1,9 @@
 # Manual play-test handoff
 
+Snapshot: **2026-09-24**, integrated revision `e269fa9`. This is the
+**no-provider** hands-on path: it must not submit a preview, mesh, quest, audio,
+or postcard job.
+
 Use a current desktop Chromium browser with keyboard and mouse. Start the app
 from the repository root with `npm run dev`, then wait for both URLs below to
 respond before testing.
@@ -37,9 +41,11 @@ port 5173 and the API remains on port 8787. Stop it only after testing is done.
    run and timer.
 3. **Explore:** confirm there is no countdown or elapsed-time display and that
    destinations can be visited at your own pace.
-4. **Three visual styles:** compare Cartoon, Collect, and Explore/adventure
-   presentation in the design kit or creation journey; each should look
-   materially distinct, including color, type, and surface treatment.
+4. **Three visual styles:** compare **Cartoon**, **Hand-painted**, and
+   **Watercolor** using the design kit, bundled/saved variants, or other
+   pre-existing assets. These are styles. Separately verify that **Explore**,
+   **Collect**, and **Race** are gameplay modes. Do not generate a paid preview
+   for this comparison.
 5. **Editor:** open **Adjust course** or **Edit**, move an available course
    marker, save, reload the world, and confirm the adjustment persists.
 6. **Publish and share:** save a private copy, publish it, and open the returned
@@ -48,25 +54,34 @@ port 5173 and the API remains on port 8787. Stop it only after testing is done.
 7. **My worlds:** try the action appropriate to each visible card—Resume/View
    progress, Play, Edit, Retry, Export—and verify private versus published state
    is clear.
-8. **Accessibility and sound:** open **Sound**, toggle mute and subtitles, move
-   each available slider, and confirm labels, values, keyboard focus, and saved
-   settings remain coherent even when optional audio is absent.
-9. **Optional media without a provider:** try the postcard and gameplay
-   highlight buttons. Missing-provider or missing-recording states must be
-   honest and isolated; replay, save, and sharing must remain available.
+8. **Accessibility and sound:** in Lost Colors, open **Sound**, deliberately
+   unmute after entering play, toggle subtitles, move each channel slider, and
+   confirm labels, values, keyboard focus, persistence, and one-shot narration.
+   These are bundled tracks; do not describe them as generated audio.
+9. **Optional media without a provider:** record, preview, and download a
+   gameplay highlight if the browser supports capture. Verify it is labelled
+   actual gameplay. Do **not** click **Create animated postcard**: that starts a
+   paid image-to-video job. Confirm that the unexecuted postcard remains
+   distinct from the local gameplay recording.
 10. **Capture failures:** on **Create my world**, deny camera access and confirm
     a useful fallback to file upload. Then choose an invalid/non-image file and
     confirm a clear validation message without losing the rest of the journey.
 
 ## Do not do this
 
-Do not click **Build my world** during this manual pass. It submits a paid
-provider job. Preview, bundled samples, editing, local persistence, and the
-failure-state checks above are sufficient for this no-provider play-test.
+Do not click **Preview my world**, **Build my world**, **Create animated
+postcard**, or any generation retry during this manual pass. Preview generation
+is not free: it submits a paid image-edit request. You may exercise capture,
+upload validation, object review, style/mode selection, bundled samples,
+editing, local persistence, and gameplay capture, stopping before every paid
+action.
 
 ## Evidence boundary
 
-Bundled samples demonstrate existing geometry and gameplay; they are not a new
-provider generation. Optional audio, postcard, and highlight failures must not
-be presented as successful generated media. See [DEMO.md](DEMO.md) for the full
-demo narrative and [GAMEPLAY.md](GAMEPLAY.md) for runtime details.
+Bundled samples demonstrate existing geometry, gameplay, and bundled audio;
+they are not a new provider generation. A gameplay highlight is a local record
+of play, not generated animation. The current real batch has no saved level,
+generated audio, or postcard, so those claims remain outside this pass. The user
+owns the resulting controls, course-feel, visual, listening, persistence, and
+share acceptance. See [DEMO.md](DEMO.md) for the full demo narrative and
+[GAMEPLAY.md](GAMEPLAY.md) for runtime details.
