@@ -1,4 +1,119 @@
-# Independent QA verification — items 6, 10, 13
+# Independent QA verification — items 6, 10, 13, 11/12
+
+## Update: items 11/12 (character + miniature scale)
+
+Added after the items-6/10/13 section below, same worker/session, extending scope on
+coordinator request. Reviewed the **committed snapshot** at `1c5fb0d` (authored character),
+`10e4cbb` (face fix), `07d9d82` (miniature scale) — not the gameplay owner's in-flight
+uncommitted polish (`src/game/render/PlayerAvatar.tsx`, `src/game/render/character/
+buildCharacter.ts`, `src/game/render/character/characterDesign.ts`, `nimbalyst-local/
+character-preview.ts`, `nimbalyst-local/shoot-sofa.mjs` were all dirty at review time — left
+untouched, not staged, not re-tested against). Confirmed via `git log 3b159b1..HEAD -- <core/
+scale files>` that `src/game/core/characterScale.ts`, `simulation.ts`, `placementValidation.ts`,
+`GameStage.tsx` are **not** part of that dirty set, so both source reading and targeted test
+runs against the live tree faithfully reflect the frozen `07d9d82` snapshot for those files.
+
+Ran only the tests whose full import graph is clean (not touching the dirty character-render
+files), per "no duplicate full suite until all owners frozen":
+`characterScale.test.ts` (14), `authoredCourse.test.ts` (4), `simulation.test.ts` (17),
+`mantle.test.ts` (14), `placementValidation.test.ts` (2) — **51/51 pass**. Did not re-run
+`characterGeometry.test.ts` / `characterRig.test.ts` (both import `characterDesign.ts`, which is
+currently dirty — a live run would validate in-progress polish, not the frozen commit) or the
+full 463-suite. Relying on the gameplay owner's own prior report (163/163 at commit time) for
+the render/animation slice; did not independently re-verify it.
+
+### Findings, severity-ranked
+
+**1. [Low severity, concrete, verified — not "cosmetic" hand-waving] `GameStageProps.config` is dead code, and the previously-disclosed diagnostics mismatch traces to it.**
+`src/game/render/GameStage.tsx` declares `config: MovementConfig` in `GameStageProps` (line 40)
+and `GameView.tsx:604` still passes it (`config={config}`, the *raw authored* `DEFAULT_MOVEMENT_CONFIG`
+from `GameView.tsx:89`) — but `GameStage`'s destructure (lines 64-79) **does not include `config`
+at all**; it is immediately re-derived at line 97 as `const config = simulation.config` (the
+miniature-scaled one), with a clear comment explaining this is deliberate anti-fake-scale
+behavior. So the prop is genuinely inert, not merely unused-but-harmless: nothing reads it.
+I independently traced all three size-critical consumers back to this same `simulation.config`
+object and confirmed they agree: `GameSimulation`'s physics scene (`simulation.ts:184`,
+`createPhysicsScene(..., this.config)`), `GameStage`'s `CameraRig` (`GameStage.tsx:99`), and
+`PlayerAvatar` (confirmed in the committed `10e4cbb` version: reads `config.characterHalfHeight`/
+`characterRadius`/`walkSpeed` directly for body height and foot placement). Collider/render/camera
+consistency is real, not asserted.
+Concrete low-risk correction: delete the unused `config` prop from `GameStageProps` and its
+`GameView.tsx:604` call site (or, if GameView wants to keep passing something, source it from
+`simulation.config` instead of the module-level raw `config`). This doesn't fix a live bug — the
+dead prop is provably never read — but it removes a footgun where a future edit could start
+reading it again and silently reintroduce the exact fake-scale drift this design avoids, and it
+is the direct explanation (confirmed, not just noted) of why `GameView.tsx:335`'s
+`movementConfigId: config.id` diagnostic reflects the raw/authored config object rather than the
+simulation's derived one.
+Also checked the *other* place `GameView.tsx` reuses the raw `config`: `InputController`
+(`GameView.tsx:278`). This is **not** a bug — `InputController` only reads
+`config.camera.minPitchRadians`/`maxPitchRadians`, fields `toMiniatureScale` deliberately leaves
+untouched (only `camera.distance`/`collisionPadding` are scaled) — so authored vs. miniature is
+irrelevant there and no correction is needed.
+
+**2. [Informational, immaterial] Minor test-count discrepancy.** `gameplay.md` states
+"`characterScale.test.ts` (13 new)"; the committed file actually has 14 `it(...)` cases (all 14
+pass). Not a defect, just noting a claim I could check precisely and found slightly off.
+
+**3. [Confirmed correct, no action needed] Idempotency / no double-shrink.**
+`toMiniatureScale` guards with `isMiniatureScale` (capsule height already ≤ target) and returns
+the *same object reference* when already miniature — `characterScale.test.ts` pins this with
+`expect(toMiniatureScale(MINIATURE)).toBe(MINIATURE)` (reference equality, not just deep-equal).
+Verified this is a real strict-identity check, not a weaker approximation.
+
+**4. [Confirmed correct, no action needed] Spawn/respawn/reset consistency.**
+Traced `seat()` (wraps `reseatCapsuleCentre`) to all three places a capsule position is set:
+constructor (`simulation.ts:198`), `respawn()` (`:619`), and `reset()` (`:626`) — all three
+re-seat using the authored-vs-scaled half-height difference before placing the capsule, so a
+saved spawn or checkpoint respawn authored against the old 0.70 m capsule lands the *feet*, not
+the centre, in the same place for the new 0.35 m capsule. No path bypasses this.
+
+**5. [Confirmed correct, no action needed] The `walkMaxSpan` nuance is real and the margin is
+concretely pinned, not just asserted.** `characterScale.test.ts`'s
+`"keeps every previously-walkable gap well inside the unchanged jump range"` test asserts
+`authoredLimits.walkMaxSpan < miniatureLimits.flatJumpRange * 0.75` — i.e. even the **larger**
+(authored, pre-shrink) walk span stays comfortably under 75% of the (scale-invariant) flat jump
+range. Since jump range doesn't change between scales and is always available to the player
+regardless of how the course validator classifies an edge, any gap the old walk-span math judged
+crossable remains reachable (by jump if not by walk) at miniature scale. This is a real proof,
+not a hand-wave — confirmed by reading the assertion, not just the prose comment above it.
+
+**6. [Confirmed correct, no action needed] `placementValidation.ts` validating against the
+*authored* (not miniature) config is genuinely the stricter/safer choice.** Reasoned through
+both categories of limit `deriveMovementLimits` produces: (a) distance-based limits (jump height,
+flat jump range, walk speed, step height, mantle ledge/reach) are proven *exactly equal* between
+scales in the tests, so scale choice is irrelevant there; (b) clearance-based limits only get
+*more permissive* at miniature scale (smaller body fits more gaps), so authored-validated courses
+can only stay valid or improve at miniature scale; (c) `walkMaxSpan` is the one limit that shrinks
+at miniature scale, but per finding 5 above, even the larger authored value is already
+comfortably under the (unchanged) jump range, so this can't create a course that validates as
+walkable under the authored config but becomes truly unreachable at miniature scale. All three
+points independently verified, not accepted on the checkpoint's word.
+
+**7. [Supportive, not authoritative] Visual spot-check.** Viewed `nimbalyst-local/screenshots/
+character/idle-front.png` and `grid-all-states.png`: a single coherent sculpted mesh, legible
+face (eyes, eyebrows, subtle smile, no "bandit mask" or inside-out shading), no visible
+assembled-primitive seams. Consistent with the "authored character" and "readable face" claims.
+Caveat: these screenshots were generated by `nimbalyst-local/character-preview.ts`, which is
+itself currently dirty/uncommitted, so their exact provenance relative to the frozen `10e4cbb`
+commit vs. later in-progress polish is not confirmed — treat as supportive context only. Final
+visual/subjective acceptance is the user's call regardless, per the plan.
+
+### Summary for coordinator (items 11/12)
+
+No functional defects found in the committed miniature-scale/character-consistency logic —
+scale transform, spawn/respawn re-seating, idempotency, and the walkMaxSpan/jump-range safety
+margin all check out under direct source inspection and targeted, passing tests (51/51) run
+against files confirmed unaffected by the current in-flight polish. One concrete, low-risk,
+non-urgent cleanup identified (dead `config` prop on `GameStageProps`) — worth doing whenever
+the gameplay/navigation owners next touch that file, not blocking. The render/animation slice
+(items 11's mesh/rig/animator) was not independently re-tested this round (its tests import
+currently-dirty files); relying on the prior 163/163 report plus today's visual spot-check for
+that part only.
+
+---
+
+# Independent QA verification — items 6, 10, 13 (original)
 
 Worker: fresh Claude-only QA/review worker, coordinator 30e37344-f303-4b8a-80c8-ee9f8fd5f3d6 (session 15c3b0c2-6158-40c2-a52d-926f2afa4f7e per the ledger).
 Runtime model: **Sonnet 5** (`claude-sonnet-5`), per this runtime's own system context — recorded verbatim, not inferred.
