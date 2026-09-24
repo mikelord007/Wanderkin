@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ObjectQuest style spike evidence viewer</title>
+    <style>
+      html, body, #stage { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+      body { background: #111824; font-family: system-ui, sans-serif; }
+      #label {
+        position: fixed; left: 24px; top: 20px; z-index: 2; color: #f8fafc;
+        padding: 9px 13px; border-radius: 8px; background: rgb(9 14 23 / 78%);
+        box-shadow: 0 8px 32px rgb(0 0 0 / 28%); font-size: 17px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="label">Loading…</div>
+    <div id="stage"></div>
+    <script type="module">
+      import * as THREE from "three";
+      import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+
+      const params = new URLSearchParams(location.search);
+      const asset = params.get("asset");
+      const title = params.get("title") ?? "Style spike mesh";
+      document.querySelector("#label").textContent = title;
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.05;
+      document.querySelector("#stage").append(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color("#26364b");
+      scene.fog = new THREE.Fog("#26364b", 8, 20);
+      scene.add(new THREE.HemisphereLight("#e7f2ff", "#392d24", 2.2));
+
+      const sun = new THREE.DirectionalLight("#fff0d5", 4.0);
+      sun.position.set(5, 8, 4);
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(2048, 2048);
+      scene.add(sun);
+
+      const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.01, 100);
+      const loader = new GLTFLoader();
+      const gltf = await loader.loadAsync(asset);
+      const object = gltf.scene;
+      object.traverse((node) => {
+        if (node.isMesh) {
+          node.castShadow = true;
+          node.receiveShadow = true;
+        }
+      });
+      scene.add(object);
+
+      const box = new THREE.Box3().setFromObject(object);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const radius = Math.max(size.length() * 0.5, 0.5);
+      object.position.sub(center);
+
+      const floor = new THREE.Mesh(
+        new THREE.CircleGeometry(radius * 3.2, 64),
+        new THREE.MeshStandardMaterial({ color: "#34445b", roughness: 0.96, metalness: 0 }),
+      );
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = -size.y / 2 - radius * 0.015;
+      floor.receiveShadow = true;
+      scene.add(floor);
+
+      camera.position.set(radius * 1.45, radius * 0.85, radius * 1.55);
+      camera.lookAt(0, -size.y * 0.04, 0);
+      camera.near = Math.max(radius / 100, 0.005);
+      camera.far = radius * 30;
+      camera.updateProjectionMatrix();
+
+      function render() { renderer.render(scene, camera); }
+      render();
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      render();
+      window.__OBJECTQUEST_READY__ = true;
+
+      addEventListener("resize", () => {
+        renderer.setSize(innerWidth, innerHeight);
+        camera.aspect = innerWidth / innerHeight;
+        camera.updateProjectionMatrix();
+        render();
+      });
+    </script>
+  </body>
+</html>
