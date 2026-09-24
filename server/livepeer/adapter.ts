@@ -398,15 +398,7 @@ export class LivepeerAdapter implements ProviderAdapter, GenerationProviderAdapt
     switch (request.kind) {
       case "image-edit":
         toolName = "create_media";
-        args = {
-          action: "generate",
-          model_override: request.capability,
-          source_url: imageUrls[0],
-          prompt: request.instruction,
-          output_format: request.outputMimeType.slice("image/".length),
-          quality_gate: false,
-          ...common,
-        };
+        args = { action: "generate", model_override: request.capability, source_url: imageUrls[0], prompt: request.instruction, quality_gate: false, ...common };
         break;
       case "image-to-3d": {
         toolName = "run_capability";

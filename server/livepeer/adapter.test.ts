@@ -214,9 +214,9 @@ describe("LivepeerAdapter multi-kind contracts", () => {
       model_override: "kontext-edit",
       source_url: "https://agent.livepeer.org/a/source.jpg",
       max_cost_usd: 0.1,
-      output_format: "png",
       quality_gate: false,
     });
+    expect(mcp.calls[1]?.args).not.toHaveProperty("output_format");
   });
 });
 

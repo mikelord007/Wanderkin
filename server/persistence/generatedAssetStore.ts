@@ -38,9 +38,7 @@ export class GeneratedAssetStore {
 
   async storeImage(
     buffer: Buffer,
-    preferredMimeType: GeneratedImageReference["mimeType"],
     provenance: GenerationProvenance,
-    requirePreferredMimeType = false,
   ): Promise<GeneratedImageReference> {
     assertSize(buffer, MAX_GENERATED_IMAGE_BYTES, "image");
     const detected = detectImage(buffer);
@@ -48,9 +46,6 @@ export class GeneratedAssetStore {
       throw new InvalidFileError(
         "Generated image is not a recognized JPEG, PNG, or WebP image (magic bytes did not match).",
       );
-    }
-    if (requirePreferredMimeType && detected.mimeType !== preferredMimeType) {
-      throw new InvalidFileError(`Generated image bytes do not match required ${preferredMimeType}.`);
     }
     return this.store({
       id: randomUUID(),

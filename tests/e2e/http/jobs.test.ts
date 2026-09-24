@@ -247,7 +247,7 @@ describe("POST /api/jobs, status, retry, and restart reconciliation", () => {
     expect(await spend.json()).toMatchObject({ worldId: "world-v2-text", entries: 1, unknownEntries: 0 });
   });
 
-  it("exposes the image format preference through HTTP and forwards it to create_media", async () => {
+  it("keeps the HTTP image format preference without inventing an unsupported provider field", async () => {
     await boot();
     mcp!.setHandler("create_media", (args) => ({
       job_id: `fake-edit-${args.idempotency_key}`,
@@ -279,8 +279,8 @@ describe("POST /api/jobs, status, retry, and restart reconciliation", () => {
     expect(mcp!.callsFor("create_media")).toHaveLength(1);
     expect(mcp!.callsFor("create_media")[0]!.args).toMatchObject({
       model_override: "kontext-edit",
-      output_format: "webp",
     });
+    expect(mcp!.callsFor("create_media")[0]!.args).not.toHaveProperty("output_format");
   });
 
   it("hard-rejects an over-budget v2 mesh before upload or provider submission", async () => {
@@ -320,12 +320,10 @@ describe("POST /api/jobs, status, retry, and restart reconciliation", () => {
     });
     const cutout = await generatedAssets.storeImage(
       readSamplePhoto(1),
-      "image/jpeg",
       provenance("bg-remove", "job-cutout"),
     );
     const styleReference = await generatedAssets.storeImage(
       readSamplePhoto(2),
-      "image/jpeg",
       provenance("kontext-edit", "job-style-preview"),
     );
     const previewCache = new PreviewCacheStore(api!.storageDir);

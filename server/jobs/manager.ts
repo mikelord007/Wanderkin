@@ -803,7 +803,7 @@ export class JobManager {
         const maxBytes = request.kind === "image-edit" ? 25 * 1024 * 1024 : request.kind === "video" ? 200 * 1024 * 1024 : 75 * 1024 * 1024;
         const { buffer } = await downloadBounded(output.url, maxBytes);
         if (request.kind === "image-edit") {
-          const asset = await this.generation.generatedAssets.storeImage(buffer, request.outputMimeType, record.job.provenance!);
+          const asset = await this.generation.generatedAssets.storeImage(buffer, record.job.provenance!);
           await this.generation.ownerSecurity?.inherit("generated-asset", asset.id, "job", record.job.id);
           result = { kind: "image-edit", asset };
         } else if (request.kind === "video") {
