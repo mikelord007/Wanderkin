@@ -4,6 +4,8 @@ import type {
   GenerationJob,
   PhotoReference,
   StyleId,
+  SelectedWorldReferenceV1,
+  WorldWorkflowV1,
 } from "@shared/index.js";
 
 export type CreationStep = "photo" | "review" | "customize" | "preview" | "building" | "ready";
@@ -35,6 +37,9 @@ export interface CreationJobRef {
   kind: NonNullable<GenerationJob["kind"]>;
   error?: string;
   retryable?: boolean;
+  providerJobId?: string;
+  updatedAt?: string;
+  consumedByAssetId?: string;
 }
 
 export interface CreationRecord {
@@ -48,6 +53,8 @@ export interface CreationRecord {
   useOriginalImage: boolean;
   crop: CropSettings;
   selection: CreationSelection;
+  reviewedImageAssetId?: string;
+  selectedReference?: SelectedWorldReferenceV1;
   preview?: ApprovedPreview | {
     cacheKey: string;
     jobId: string;
@@ -107,6 +114,23 @@ export function canBuildWorld(record: CreationRecord): record is CreationRecord 
 export function creationNeedsAttention(record: CreationRecord): CreationAttentionStage | null {
   const order: CreationAttentionStage[] = ["object", "preview", "shape", "story", "music", "narration"];
   return order.find((stage) => record.jobs[stage]?.state === "failed") ?? null;
+}
+
+export function toWorldWorkflow(record: CreationRecord): WorldWorkflowV1 | null {
+  if (!record.reviewedImageAssetId || !record.selectedReference) return null;
+  return {
+    schemaVersion: 1,
+    reviewedImageAssetId: record.reviewedImageAssetId,
+    selectedReference: record.selectedReference,
+    jobs: Object.values(record.jobs).filter((job): job is CreationJobRef => Boolean(job)).map(job => ({
+      kind: job.kind,
+      jobId: job.id,
+      status: job.state,
+      updatedAt: job.updatedAt ?? record.updatedAt,
+      ...(job.providerJobId ? { providerJobId: job.providerJobId } : {}),
+      ...(job.consumedByAssetId ? { consumedByAssetId: job.consumedByAssetId } : {}),
+    })),
+  };
 }
 
 export type PendingWorldStatus = "draft" | "pending" | "needs-attention";

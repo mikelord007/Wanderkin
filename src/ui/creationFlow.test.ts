@@ -6,6 +6,7 @@ import {
   createCreationRecord,
   toPendingWorldItem,
   withCreationUpdate,
+  toWorldWorkflow,
 } from "./creationFlow.js";
 
 const image = {
@@ -62,5 +63,13 @@ describe("creation flow", () => {
       attentionStage: "preview",
     });
   });
-});
 
+  it("exports the exact reviewed and approved identities into the shared workflow block", () => {
+    const record = withCreationUpdate(createCreationRecord("world-1"), {
+      reviewedImageAssetId: "cutout-1",
+      selectedReference: { photoIds: ["photo-1"], reviewedImageAssetId: "cutout-1", approvedPreviewAssetId: "preview-1", style: "cartoon", mode: "collect", atmosphere: "Cloud garden" },
+      jobs: { shape: { id: "shape-1", state: "ready", kind: "image-to-3d", updatedAt: "2026-09-24T00:02:00.000Z", consumedByAssetId: "mesh-1" } },
+    });
+    expect(toWorldWorkflow(record)).toMatchObject({ reviewedImageAssetId: "cutout-1", selectedReference: { approvedPreviewAssetId: "preview-1" }, jobs: [{ jobId: "shape-1", consumedByAssetId: "mesh-1" }] });
+  });
+});

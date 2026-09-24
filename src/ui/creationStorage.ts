@@ -69,6 +69,10 @@ export function updateCreationJob(
         kind: job.kind ?? "image-to-3d",
         ...(job.lastError?.message ? { error: job.lastError.message } : {}),
         ...(job.lastError ? { retryable: job.lastError.retryable } : {}),
+        ...(job.providerJobId ? { providerJobId: job.providerJobId } : {}),
+        updatedAt: job.updatedAt,
+        ...(job.result?.kind === "image-to-3d" ? { consumedByAssetId: job.result.asset.id } : {}),
+        ...(job.result?.kind === "image-edit" ? { consumedByAssetId: job.result.asset.id } : {}),
       },
     },
   }, now);
@@ -92,4 +96,3 @@ function isCreationRecord(value: unknown): value is CreationRecord {
     && Boolean(record.crop)
     && Boolean(record.jobs);
 }
-

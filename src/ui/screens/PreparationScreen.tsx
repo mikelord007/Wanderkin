@@ -5,7 +5,7 @@ import { LoadingScreen } from "../components/LoadingScreen.js";
 import { courseCandidateOptions, replaceSavedCandidate } from "../courseCandidates.js";
 import { attachProvenance, resolveAssetForManifest } from "../manifestProvenance.js";
 import { loadActiveCreation, saveCreationRecord } from "../creationStorage.js";
-import { withCreationUpdate } from "../creationFlow.js";
+import { toWorldWorkflow, withCreationUpdate } from "../creationFlow.js";
 import { WorldReadyScreen } from "./WorldReadyScreen.js";
 import { repairGuidanceFor, type RepairGuidance } from "../../editor/repairGuidance.js";
 import "../../editor/editor.css";
@@ -92,14 +92,16 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
         );
         if (cancelled) return;
 
-        const preparedPrimary = attachProvenance(result.manifest, cleanAsset, resolvedSourcePhotos);
+        const creation = loadActiveCreation();
+        const workflow = creation ? toWorldWorkflow(creation) : null;
+        const basePrimary = attachProvenance(result.manifest, cleanAsset, resolvedSourcePhotos);
+        const preparedPrimary = workflow ? { ...basePrimary, workflow } : basePrimary;
         const preparedCandidates = (result.courseCandidates ?? []).map((candidate: SceneManifest) =>
-          attachProvenance(candidate, cleanAsset, resolvedSourcePhotos),
+          workflow ? { ...attachProvenance(candidate, cleanAsset, resolvedSourcePhotos), workflow } : attachProvenance(candidate, cleanAsset, resolvedSourcePhotos),
         );
         setPrimaryManifest(preparedPrimary);
         setManifest(preparedPrimary);
         setCandidates(preparedCandidates);
-        const creation = loadActiveCreation();
         if (creation) saveCreationRecord(withCreationUpdate(creation, { step: "ready", title: preparedPrimary.name }));
         const guidance = repairGuidanceFor(preparedPrimary);
         setRepairFocus(guidance);
