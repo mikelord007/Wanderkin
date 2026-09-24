@@ -61,6 +61,20 @@ interface RunCapabilitySubmitResponse {
   actual_cost_usd?: number | null;
 }
 
+interface RunCapabilityTextResult {
+  text?: unknown;
+  model_id?: unknown;
+}
+
+interface RunCapabilityOutput {
+  ok?: boolean | null;
+  output_kind?: string | null;
+  result?: RunCapabilityTextResult | null;
+  error?: unknown;
+  cost_usd_estimated?: number | null;
+  cost_paid_usd?: number | null;
+}
+
 interface GetCreateMediaResponse {
   job_id?: string;
   status?: string; // "queued" | "running" | "submitted" | "done" | "failed" | "cancelled" | ...
@@ -78,9 +92,12 @@ interface GetCreateMediaResponse {
   payload?: unknown;
   text?: string;
   content_type?: string;
+  run_output?: RunCapabilityOutput | null;
   cost_usd?: number | null;
   reported_cost_usd?: number | null;
   actual_cost_usd?: number | null;
+  cost_usd_estimated?: number | null;
+  cost_paid_usd?: number | null;
 }
 
 interface DescribeCapabilityResponse {
@@ -134,6 +151,23 @@ function reportedCost(value: {
   return typeof cost === "number" && Number.isFinite(cost) && cost >= 0 ? cost : undefined;
 }
 
+function normalizeOutputKind(value: string | null | undefined): NonNullable<ProviderGenerationStatus["output"]>["outputKind"] | undefined {
+  const kind = value?.toLowerCase();
+  return kind === "3d" || kind === "image" || kind === "audio" || kind === "video" || kind === "text" || kind === "json"
+    ? kind
+    : undefined;
+}
+
+function successfulNestedText(value: { run_output?: RunCapabilityOutput | null }): { text: string; modelId?: string } | undefined {
+  const runOutput = value.run_output;
+  if (runOutput?.ok !== true || normalizeOutputKind(runOutput.output_kind) !== "text") return undefined;
+  if (!runOutput.result || typeof runOutput.result.text !== "string") return undefined;
+  const modelId = typeof runOutput.result.model_id === "string" && runOutput.result.model_id.trim()
+    ? runOutput.result.model_id
+    : undefined;
+  return { text: runOutput.result.text, ...(modelId ? { modelId } : {}) };
+}
+
 function normalizeOutput(value: {
   url?: string | null;
   text?: string;
@@ -141,11 +175,9 @@ function normalizeOutput(value: {
   payload?: unknown;
   output_kind?: string;
   content_type?: string;
+  run_output?: RunCapabilityOutput | null;
 }): ProviderGenerationStatus["output"] | undefined {
-  const rawKind = value.output_kind?.toLowerCase();
-  const outputKind = rawKind === "3d" || rawKind === "image" || rawKind === "audio" || rawKind === "video" || rawKind === "text" || rawKind === "json"
-    ? rawKind
-    : undefined;
+  const outputKind = normalizeOutputKind(value.output_kind);
   if (value.url) {
     return {
       url: value.url,
@@ -155,9 +187,12 @@ function normalizeOutput(value: {
   }
   if (value.text !== undefined) return { text: value.text, outputKind: outputKind ?? "text" };
   const payload = value.payload ?? value.output;
-  if (payload === undefined) return undefined;
-  if (typeof payload === "string") return { text: payload, outputKind: outputKind ?? "text" };
-  return { json: payload, outputKind: outputKind ?? "json" };
+  if (payload !== undefined) {
+    if (typeof payload === "string") return { text: payload, outputKind: outputKind ?? "text" };
+    return { json: payload, outputKind: outputKind ?? "json" };
+  }
+  const nestedText = successfulNestedText(value);
+  return nestedText ? { text: nestedText.text, outputKind: "text" } : undefined;
 }
 
 function orderPhotosForCapability(
@@ -690,6 +725,8 @@ export class LivepeerAdapter implements ProviderAdapter, GenerationProviderAdapt
     actualCapability: ProviderCapabilityId | undefined,
   ): Promise<string | undefined> {
     if (response.served_model_id) return response.served_model_id;
+    const nestedText = successfulNestedText(response);
+    if (nestedText?.modelId) return nestedText.modelId;
     if (!actualCapability) return undefined;
 
     try {
