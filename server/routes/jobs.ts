@@ -29,14 +29,32 @@ const generationBase = {
 };
 
 const generationRequestSchema = z.discriminatedUnion("kind", [
-  z.object({ ...generationBase, kind: z.literal("image-to-3d"), photos: z.array(photoSchema).min(1).max(5), scenePrompt: z.string().max(4000).optional() }),
+  z.object({
+    ...generationBase,
+    kind: z.literal("image-to-3d"),
+    photos: z.array(photoSchema).max(5).optional(),
+    sourceImageAssetIds: z.array(z.string().min(1)).min(1).max(5).optional(),
+    styleReferenceAssetId: z.string().min(1).optional(),
+    scenePrompt: z.string().max(4000).optional(),
+  }),
   z.object({ ...generationBase, kind: z.literal("image-edit"), sourceImageAssetId: z.string().min(1), instruction: z.string().min(1).max(4000), outputMimeType: z.enum(["image/png", "image/jpeg", "image/webp"]) }),
   z.object({ ...generationBase, kind: z.literal("text"), prompt: z.string().min(1).max(8000), output: z.enum(["quest-json", "plain-text"]), maxCharacters: z.number().int().min(1).max(8000) }),
   z.object({ ...generationBase, kind: z.literal("music"), prompt: z.string().min(1).max(4000), durationSeconds: z.number().int().min(1).max(600), instrumental: z.literal(true), loop: z.boolean() }),
   z.object({ ...generationBase, kind: z.literal("sfx"), prompt: z.string().min(1).max(2000), durationSeconds: z.number().int().min(1).max(60), loop: z.boolean() }),
   z.object({ ...generationBase, kind: z.literal("tts"), text: z.string().min(1).max(2000), voice: z.string().min(1).max(200).optional(), language: z.string().min(1).max(32) }),
   z.object({ ...generationBase, kind: z.literal("video"), sourceImageAssetId: z.string().min(1), prompt: z.string().min(1).max(4000), durationSeconds: z.number().int().min(3).max(15), purpose: z.literal("animated-postcard") }),
-]);
+]).superRefine((request, context) => {
+  if (request.kind !== "image-to-3d") return;
+  const inputCount = (request.photos?.length ?? 0) + (request.sourceImageAssetIds?.length ?? 0);
+  if (inputCount < 1) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "At least one photo or sourceImageAssetId is required." });
+  } else if (inputCount > 5) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "At most five combined 3D source images are allowed." });
+  }
+  if (request.styleReferenceAssetId && request.sourceImageAssetIds?.includes(request.styleReferenceAssetId)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "The style reference cannot also be a 3D provider input." });
+  }
+});
 
 const generationEnvelopeSchema = z.object({
   request: generationRequestSchema,
@@ -56,13 +74,20 @@ export function createJobsRouter(
 
   async function sourceImageExists(id: string): Promise<boolean> {
     if (await photos.get(id)) return true;
-    const asset = await generatedAssets?.get(id);
-    return Boolean(asset && !("mediaType" in asset));
+    return Boolean(await generatedAssets?.getProviderImage(id));
   }
 
   async function validateGenerationSources(request: GenerationRequest): Promise<string | undefined> {
     if (request.kind === "image-to-3d") {
-      for (const photo of request.photos) if (!(await photos.get(photo.photoId))) return `Unknown photoId "${photo.photoId}"`;
+      for (const photo of request.photos ?? []) if (!(await photos.get(photo.photoId))) return `Unknown photoId "${photo.photoId}"`;
+      for (const id of request.sourceImageAssetIds ?? []) {
+        if (!(await generatedAssets?.getProviderImage(id))) {
+          return `Unknown or ineligible generated sourceImageAssetId "${id}"`;
+        }
+      }
+      if (request.styleReferenceAssetId && !(await generatedAssets?.getProviderImage(request.styleReferenceAssetId))) {
+        return `Unknown or ineligible styleReferenceAssetId "${request.styleReferenceAssetId}"`;
+      }
     } else if ((request.kind === "image-edit" || request.kind === "video") && !(await sourceImageExists(request.sourceImageAssetId))) {
       return `Unknown sourceImageAssetId "${request.sourceImageAssetId}"`;
     }

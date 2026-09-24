@@ -1,6 +1,8 @@
 import { rmSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { GenerationJob } from "../../../shared/job.js";
+import type { GenerationProvenance } from "../../../shared/provenance.js";
+import { GeneratedAssetStore } from "../../../server/persistence/generatedAssetStore.js";
 import { startApiServer, type ApiServerHandle } from "./helpers/apiServer.js";
 import { startFakeMcpServer, type FakeMcpServer } from "./helpers/fakeMcpServer.js";
 import { readSamplePhoto, uniqueIdempotencyKey } from "./helpers/fixtures.js";
@@ -264,5 +266,83 @@ describe("POST /api/jobs, status, retry, and restart reconciliation", () => {
     expect(await response.json()).toMatchObject({ code: "budget_exceeded", message: expect.stringMatching(/per-request limit/) });
     expect(mcp!.callsFor("upload")).toHaveLength(0);
     expect(mcp!.callsFor("run_capability")).toHaveLength(0);
+  });
+
+  it("uses a generated cutout for 3D, keeps style provenance provider-inert, and reuses its hosted URL on retry", async () => {
+    await boot();
+    const generatedAssets = new GeneratedAssetStore(api!.storageDir);
+    const provenance = (requestedCapability: string, applicationJobId: string): GenerationProvenance => ({
+      providerId: "fake-provider",
+      requestedCapability,
+      servedCapability: requestedCapability,
+      servedModel: "fake/model",
+      applicationJobId,
+      providerJobId: `provider-${applicationJobId}`,
+      timings: { requestedAt: "2026-09-24T00:00:00.000Z" },
+      reportedCost: null,
+    });
+    const cutout = await generatedAssets.storeImage(
+      readSamplePhoto(1),
+      "image/jpeg",
+      provenance("bg-remove", "job-cutout"),
+    );
+    const styleReference = await generatedAssets.storeImage(
+      readSamplePhoto(2),
+      "image/jpeg",
+      provenance("kontext-edit", "job-style-preview"),
+    );
+    const key = uniqueIdempotencyKey("v2-generated-cutout");
+    const request = {
+      schemaVersion: 1,
+      kind: "image-to-3d",
+      capability: "rodin-i3d",
+      idempotencyKey: key,
+      purpose: "world-mesh",
+      sourceImageAssetIds: [cutout.id],
+      styleReferenceAssetId: styleReference.id,
+      scenePrompt: "Preserve the reviewed object silhouette.",
+    } as const;
+    const post = (body: unknown) => fetch(`${api!.baseUrl}/api/jobs/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": key },
+      body: JSON.stringify({ request: body, worldId: "world-generated-cutout" }),
+    });
+
+    mcp!.setHandler("run_capability", () => ({
+      error: "temporary provider failure",
+      error_retryable: true,
+    }));
+    const failedResponse = await post(request);
+    expect(failedResponse.status).toBe(502);
+    const failed = await failedResponse.json() as GenerationJob;
+    expect(failed).toMatchObject({
+      request: {
+        sourceImageAssetIds: [cutout.id],
+        styleReferenceAssetId: styleReference.id,
+      },
+      provenance: {
+        sourceImageAssetIds: [cutout.id],
+        styleReferenceAssetId: styleReference.id,
+      },
+    });
+
+    mcp!.setHandler("run_capability", runCapabilitySucceeds());
+    const retryResponse = await fetch(`${api!.baseUrl}/api/jobs/${failed.id}/retry`, { method: "POST" });
+    expect(retryResponse.status).toBe(200);
+    const retried = await retryResponse.json() as GenerationJob;
+    expect(retried.provenance).toMatchObject({
+      sourceImageAssetIds: [cutout.id],
+      styleReferenceAssetId: styleReference.id,
+    });
+    expect(mcp!.callsFor("upload")).toHaveLength(1);
+    const runCalls = mcp!.callsFor("run_capability");
+    expect(runCalls).toHaveLength(2);
+    expect(runCalls[1]!.args.inputs).toEqual(runCalls[0]!.args.inputs);
+    expect(runCalls[1]!.args.source_url).toBe(runCalls[0]!.args.source_url);
+    expect(JSON.stringify(runCalls[0]!.args)).not.toContain(styleReference.id);
+
+    const conflict = await post({ ...request, styleReferenceAssetId: undefined });
+    expect(conflict.status).toBe(409);
+    expect(mcp!.callsFor("run_capability")).toHaveLength(2);
   });
 });

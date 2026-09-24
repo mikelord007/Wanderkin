@@ -14,7 +14,7 @@ import type {
   ProviderGenerationSubmitRequest,
   ProviderGenerationSubmitResult,
 } from "../jobs/types.js";
-import type { GenerationRequest } from "../../shared/generation.js";
+import type { GenerationRequest, ImageTo3dGenerationRequest } from "../../shared/generation.js";
 import { McpToolError, McpTransportError, type McpToolCaller } from "./mcpClient.js";
 import { capabilityContract, STATIC_CAPABILITY_DESCRIPTORS, findStaticDescriptor } from "./capabilities.js";
 
@@ -176,6 +176,21 @@ function orderPhotosForCapability(
   return [...photos];
 }
 
+/** Normalizes original uploads and reviewed generated images into the one
+ * ordered image-input shape understood by the existing provider adapter.
+ * The style reference is intentionally absent: it is provenance only. */
+function imageTo3dProviderInputs(request: ImageTo3dGenerationRequest): ProviderInputPhoto[] {
+  const photos = [...(request.photos ?? [])];
+  const nextSourceIndex = photos.reduce((max, photo) => Math.max(max, photo.sourceIndex), 0) + 1;
+  return [
+    ...photos,
+    ...(request.sourceImageAssetIds ?? []).map((photoId, index) => ({
+      photoId,
+      sourceIndex: nextSourceIndex + index,
+    })),
+  ];
+}
+
 export class LivepeerAdapter implements ProviderAdapter, GenerationProviderAdapter {
   readonly providerId = "livepeer-agent-mcp";
 
@@ -299,10 +314,19 @@ export class LivepeerAdapter implements ProviderAdapter, GenerationProviderAdapt
         validateId(errors, "sourceImageAssetId", request.sourceImageAssetId);
         break;
       case "image-to-3d": {
+        const inputs = imageTo3dProviderInputs(request);
+        if (request.styleReferenceAssetId !== undefined) {
+          validateId(errors, "styleReferenceAssetId", request.styleReferenceAssetId);
+        }
+        for (const [index, id] of (request.sourceImageAssetIds ?? []).entries()) {
+          validateId(errors, `sourceImageAssetIds[${index}]`, id);
+        }
+        const ids = inputs.map((input) => input.photoId);
+        if (new Set(ids).size !== ids.length) errors.push("Each 3D source image must be selected only once.");
         if (request.capability === "meshy-v7-i3d") {
-          if (request.photos.length !== 1) errors.push("meshy-v7-i3d requires exactly one source image.");
+          if (inputs.length !== 1) errors.push("meshy-v7-i3d requires exactly one source image.");
         } else {
-          return this.validateInput(request.capability, request.photos);
+          errors.push(...this.validateInput(request.capability, inputs).errors);
         }
         break;
       }
@@ -354,7 +378,7 @@ export class LivepeerAdapter implements ProviderAdapter, GenerationProviderAdapt
     if (request.kind === "image-to-3d" && request.capability !== "meshy-v7-i3d") {
       const legacy = await this.submit({
         capability: request.capability,
-        photos: request.photos,
+        photos: imageTo3dProviderInputs(request),
         idempotencyKey: request.idempotencyKey,
         ...(request.scenePrompt !== undefined ? { scenePrompt: request.scenePrompt } : {}),
       });
@@ -488,7 +512,7 @@ export class LivepeerAdapter implements ProviderAdapter, GenerationProviderAdapt
         photoIds = [request.sourceImageAssetId];
         break;
       case "image-to-3d":
-        photoIds = orderPhotosForCapability(request.capability, request.photos).map((photo) => photo.photoId);
+        photoIds = orderPhotosForCapability(request.capability, imageTo3dProviderInputs(request)).map((photo) => photo.photoId);
         break;
       default:
         return [];

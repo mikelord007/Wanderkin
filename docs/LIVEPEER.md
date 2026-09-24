@@ -61,6 +61,35 @@ instruction. `pixverse-i2v` uses the shared `video` kind. The adapter supports
 the shared kinds image-to-3d, image-edit, text, music, sfx, tts, and video;
 the legacy `POST /api/jobs` Rodin/Tripo request remains unchanged.
 
+The image-to-3D request accepts either original uploads, reviewed generated
+images, or both:
+
+```ts
+{
+  kind: "image-to-3d";
+  photos?: readonly ProviderInputPhoto[];
+  sourceImageAssetIds?: readonly string[];
+  styleReferenceAssetId?: string;
+  scenePrompt?: string;
+  // plus the common schemaVersion/capability/idempotencyKey/purpose fields
+}
+```
+
+At least one `photos` or `sourceImageAssetIds` entry is required, with five
+combined inputs maximum. Original uploads are submitted first in their normal
+capability order; generated inputs follow in `sourceImageAssetIds` order. A
+generated input must be a size-bounded image produced by `bg-remove`,
+`kontext-edit`, or `gpt-image-edit`. `styleReferenceAssetId` identifies the
+approved visual direction for refresh/provenance consistency and is never
+uploaded or sent in the provider payload. The route also rejects a style
+reference that is repeated in `sourceImageAssetIds`.
+
+The complete normalized request is stored on `GenerationJob`; generated input
+ids and the style-reference id are also copied into `GenerationProvenance`.
+The durable per-job upload URL cache remains keyed by the idempotency key, so a
+retry or boot recovery rebuilds the same provider request without re-hosting
+the bytes or substituting the style preview.
+
 The spend ledger (`storage/spend-ledger.json`) reserves the catalog estimate
 before submission and replaces it with provider-reported USD when supplied.
 An unavailable estimate is persisted with status `unknown`; it is never

@@ -26,6 +26,8 @@ describe("GeneratedAssetStore", () => {
     expect(asset).toMatchObject({ mimeType: "image/png", width: 640, height: 480, sizeBytes: 33, provenance });
     expect(asset.url).toMatch(/^\/api\/generated-assets\/files\/[a-f0-9]{64}\.png$/);
     expect((await store.get(asset.id))?.sha256).toBe(asset.sha256);
+    expect((await store.getProviderImage(asset.id))?.id).toBe(asset.id);
+    expect((await store.getImageBytes(asset.id)).buffer).toEqual(png);
   });
 
   it("rejects content that does not match the expected media type", async () => {
@@ -41,5 +43,6 @@ describe("GeneratedAssetStore", () => {
     const video = await store.storeVideo(mp4, { durationSeconds: 5, provenance });
     expect(audio).toMatchObject({ mediaType: "audio", kind: "narration", transcript: "hello" });
     expect(video).toMatchObject({ mediaType: "video", kind: "animated-postcard", source: "generated-animation" });
+    expect(await store.getProviderImage(audio.id)).toBeUndefined();
   });
 });

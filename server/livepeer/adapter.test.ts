@@ -150,6 +150,25 @@ describe("LivepeerAdapter multi-kind contracts", () => {
     }).errors.join(" ")).toMatch(/exactly one/);
   });
 
+  it("accepts an ordered generated-image source and rejects an empty 3D selection", () => {
+    expect(adapter.validateGenerationInput({
+      kind: "image-to-3d",
+      capability: "rodin-i3d",
+      schemaVersion: 1,
+      idempotencyKey: "cutout-mesh",
+      purpose: "world-mesh",
+      sourceImageAssetIds: ["generated-cutout"],
+      styleReferenceAssetId: "approved-preview",
+    }).valid).toBe(true);
+    expect(adapter.validateGenerationInput({
+      kind: "image-to-3d",
+      capability: "rodin-i3d",
+      schemaVersion: 1,
+      idempotencyKey: "empty-mesh",
+      purpose: "world-mesh",
+    }).errors.join(" ")).toMatch(/requires between 1 and 5/);
+  });
+
   it("submits TTS with the exact text field and no image upload", async () => {
     const mcp = fakeMcp({
       create_media: () => ({ job_id: "mjob_tts", status: "submitted", capability_used: "chatterbox-tts" }),

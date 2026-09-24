@@ -142,9 +142,18 @@ function requestMatchesGeneration(existing: GenerationRequest | undefined, incom
 }
 
 function photosForGeneration(request: GenerationRequest): readonly ProviderInputPhoto[] {
-  return request.kind === "image-to-3d"
-    ? request.photos
-    : request.kind === "image-edit" || request.kind === "video"
+  if (request.kind === "image-to-3d") {
+    const photos = [...(request.photos ?? [])];
+    const nextSourceIndex = photos.reduce((max, photo) => Math.max(max, photo.sourceIndex), 0) + 1;
+    return [
+      ...photos,
+      ...(request.sourceImageAssetIds ?? []).map((photoId, index) => ({
+        photoId,
+        sourceIndex: nextSourceIndex + index,
+      })),
+    ];
+  }
+  return request.kind === "image-edit" || request.kind === "video"
       ? [{ photoId: request.sourceImageAssetId, sourceIndex: 1 }]
       : [];
 }
@@ -170,6 +179,12 @@ function buildProvenance(job: GenerationJob): GenerationProvenance {
       ...(completedMs !== undefined ? { totalMilliseconds: Math.max(0, completedMs - requestedMs) } : {}),
     },
     reportedCost: job.provenance?.reportedCost ?? null,
+    ...(job.request?.kind === "image-to-3d" && job.request.sourceImageAssetIds?.length
+      ? { sourceImageAssetIds: [...job.request.sourceImageAssetIds] }
+      : {}),
+    ...(job.request?.kind === "image-to-3d" && job.request.styleReferenceAssetId
+      ? { styleReferenceAssetId: job.request.styleReferenceAssetId }
+      : {}),
   };
 }
 
@@ -427,18 +442,8 @@ export class JobManager {
       uiMessage: friendlyMessage("queued"),
       kind: request.kind,
       request,
-      provenance: {
-        providerId: PROVIDER_ID,
-        requestedCapability: request.capability,
-        servedCapability: null,
-        servedModel: null,
-        applicationJobId: "",
-        providerJobId: null,
-        timings: { requestedAt: now },
-        reportedCost: null,
-      },
     };
-    job.provenance = { ...job.provenance!, applicationJobId: job.id };
+    job.provenance = buildProvenance(job);
     return {
       job,
       internal: {
