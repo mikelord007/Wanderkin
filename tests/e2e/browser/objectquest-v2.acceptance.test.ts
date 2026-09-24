@@ -1,5 +1,5 @@
 import { runB5, runB6, runB10, runB11, runB14, runB15, runB19 } from "./objectquest-v2.creation-scenarios.js";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, stat } from "node:fs/promises";
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { createEmptyManifest, migrateSceneManifest, type SceneManifest } from "../../../shared/index.js";
 import { startApiServer, type ApiServerHandle } from "../http/helpers/apiServer.js";
@@ -14,6 +14,7 @@ const lostColorsFixture = JSON.parse(
 
 test.beforeAll(async () => {
   await mkdir("test-results/worker7", { recursive: true });
+  await mkdir("test-results/worker8", { recursive: true });
   mcp = await startFakeMcpServer(defaultMcpHandlers());
   api = await startApiServer({ mcpEndpoint: mcp.url });
 });
@@ -90,6 +91,61 @@ async function publish(levelId: string, body: unknown) {
   });
   expect(response.status).toBe(201);
   return response.json() as Promise<{ shareId: string; versionId: string; challenge: unknown; manifest: SceneManifest }>;
+}
+
+interface GameplayDiagnostics {
+  playerPosition: readonly [number, number, number];
+  cameraYaw: number;
+}
+
+async function driveTo(page: Page, target: readonly [number, number], timeout = 20_000): Promise<void> {
+  const held = new Set<"w" | "a" | "s" | "d">();
+  const deadline = Date.now() + timeout;
+  try {
+    while (Date.now() < deadline) {
+      const current = await page.evaluate(() => window.__objectquest?.get() as GameplayDiagnostics | null ?? null);
+      if (!current) {
+        if (await page.getByRole("button", { name: "Play again" }).count()) return;
+        await page.waitForTimeout(50);
+        continue;
+      }
+      const dx = target[0] - current.playerPosition[0];
+      const dz = target[1] - current.playerPosition[2];
+      const distance = Math.hypot(dx, dz);
+      if (distance < 0.28) return;
+      const length = distance || 1;
+      const x = dx / length;
+      const z = dz / length;
+      const forward = x * Math.sin(current.cameraYaw) + z * Math.cos(current.cameraYaw);
+      const right = x * -Math.cos(current.cameraYaw) + z * Math.sin(current.cameraYaw);
+      const wanted = new Set<"w" | "a" | "s" | "d">();
+      if (forward > .18) wanted.add("w"); else if (forward < -.18) wanted.add("s");
+      if (right > .18) wanted.add("d"); else if (right < -.18) wanted.add("a");
+      for (const key of held) if (!wanted.has(key)) { await page.keyboard.up(key); held.delete(key); }
+      for (const key of wanted) if (!held.has(key)) { await page.keyboard.down(key); held.add(key); }
+      await page.waitForTimeout(70);
+    }
+  } finally {
+    for (const key of held) await page.keyboard.up(key);
+  }
+  const final = await page.evaluate(() => window.__objectquest?.get() ?? null);
+  throw new Error(`Timed out driving to ${target.join(",")}; final diagnostics: ${JSON.stringify(final)}`);
+}
+
+async function openSavedWorld(page: Page, manifest: SceneManifest): Promise<void> {
+  await page.goto("/");
+  const card = page.getByRole("article").filter({ hasText: manifest.name }).last();
+  await card.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(page.locator(".oq-screen--play canvas")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Play$/ })).toBeVisible();
+}
+
+async function completeSingleCheckpointWorld(page: Page, warmupMilliseconds = 0): Promise<void> {
+  await page.getByRole("button", { name: /^Play$/ }).click();
+  await expect.poll(() => page.evaluate(() => document.pointerLockElement !== null)).toBe(true);
+  if (warmupMilliseconds) await page.waitForTimeout(warmupMilliseconds);
+  await driveTo(page, [2, 0]);
+  await expect(page.getByRole("button", { name: "Play again" })).toBeVisible({ timeout: 20_000 });
 }
 
 /**
@@ -328,25 +384,125 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
     await runB15(page, context);
   });
 
-  test.skip("B16 records, previews, and downloads an actual gameplay highlight where supported", async ({ page }) => {
-    // 1. In a supported browser, start capture from visible gameplay controls.
-    // 2. Move/collect/finish, stop capture, and preview the recorded real frames.
-    // 3. Download and validate non-empty playable media plus title/time overlay.
-    // 4. UI labels it gameplay capture, handles permission/cancel cleanly, and
-    //    does not claim AI animation or submit provider video generation.
-    void page;
-    throw new Error("Browser contract stub B16: connect Worker 8 gameplay capture/export");
+  test("B16 records, previews, and downloads an actual gameplay highlight where supported", async ({ page }) => {
+    const manifest = await seedLevel(helperWorld("worker8-b16"));
+    const providerCallsBefore = mcp.callsFor("create_media").length;
+    await openSavedWorld(page, manifest);
+    await page.getByRole("button", { name: "Start gameplay capture" }).click();
+    await expect(page.getByRole("button", { name: "Stop gameplay capture" })).toBeVisible();
+    await completeSingleCheckpointWorld(page, 1200);
+
+    const preview = page.getByLabel("Actual gameplay highlight preview");
+    await expect(preview).toBeVisible();
+    await expect(page.getByText("Actual gameplay", { exact: true })).toBeVisible();
+    const media = await preview.evaluate(async (element: HTMLVideoElement) => {
+      const response = await fetch(element.src);
+      return { size: (await response.arrayBuffer()).byteLength, type: response.headers.get("content-type"), width: element.videoWidth };
+    });
+    expect(media.size).toBeGreaterThan(100);
+    expect(media.type).toContain("video/webm");
+
+    await page.screenshot({ path: "test-results/worker8/B16-gameplay-highlight.png", fullPage: true });
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download gameplay highlight" }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/gameplay-highlight\.webm$/);
+    const downloadPath = await download.path();
+    expect(downloadPath).not.toBeNull();
+    expect((await stat(downloadPath!)).size).toBeGreaterThan(100);
+    expect(mcp.callsFor("create_media")).toHaveLength(providerCallsBefore);
   });
 
-  test.skip("B17 resumes, previews, and downloads a postcard from a real successful job", async ({ page }) => {
-    // 1. Capture/select a world screenshot and explicitly submit one authorized
-    //    postcard job after recording the bounded price/cost policy.
-    // 2. Leave and resume from My worlds using the same job ID.
-    // 3. Preview and download the non-empty provider result; verify provenance,
-    //    requested/served capability/model, timing, and reported cost/unknown.
-    // 4. Label it generated postcard and keep gameplay highlight separate.
-    void page;
-    throw new Error("Browser contract stub B17: requires Worker 8 UI plus authorized real-provider evidence");
+  test("B17 resumes, previews, and downloads a postcard from a mocked successful image-to-video job", async ({ page }) => {
+    const manifest = await seedLevel(helperWorld("worker8-b17"));
+    await page.goto("/");
+    const postcardBytes = Buffer.from(await page.evaluate(async () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 320; canvas.height = 180;
+      const context = canvas.getContext("2d")!;
+      const stream = canvas.captureStream(12);
+      const recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+      const stopped = new Promise<Blob>((resolve) => { recorder.onstop = () => resolve(new Blob(chunks, { type: "video/webm" })); });
+      recorder.start(40);
+      context.fillStyle = "#84d6ac"; context.fillRect(0, 0, 320, 180);
+      context.fillStyle = "#2d2254"; context.font = "bold 24px sans-serif"; context.fillText("Animated postcard", 45, 98);
+      await new Promise((resolve) => setTimeout(resolve, 180));
+      recorder.stop();
+      const bytes = new Uint8Array(await (await stopped).arrayBuffer());
+      let binary = ""; for (const byte of bytes) binary += String.fromCharCode(byte);
+      return btoa(binary);
+    }), "base64");
+
+    const videoAsset = {
+      schemaVersion: 1, mediaType: "video", kind: "animated-postcard", id: "mock-postcard-video",
+      url: "/fixtures/postcard.webm", sha256: "6".repeat(64), sizeBytes: postcardBytes.byteLength,
+      mimeType: "video/webm", durationSeconds: 5, width: 320, height: 180, source: "generated-animation",
+      provenance: {
+        providerId: "mock-livepeer", requestedCapability: "pixverse-i2v", servedCapability: "pixverse-i2v",
+        servedModel: "fixture/pixverse-i2v", applicationJobId: "job-worker8-b17", providerJobId: "provider-worker8-b17",
+        timings: { requestedAt: "2026-09-24T11:00:00.000Z", completedAt: "2026-09-24T11:00:45.000Z", totalMilliseconds: 45_000 },
+        reportedCost: { amount: 0.34125, currency: "USD", unit: "generated-second" },
+      },
+    } as const;
+    const readyJob = {
+      schemaVersion: 1, id: "job-worker8-b17", idempotencyKey: "postcard_worker8-b17", providerId: "mock-livepeer",
+      providerJobId: "provider-worker8-b17", capabilityRequested: "pixverse-i2v", capabilityUsed: "pixverse-i2v",
+      fallbackFired: null, state: "ready", photoOrder: [1], createdAt: "2026-09-24T11:00:00.000Z",
+      updatedAt: "2026-09-24T11:00:45.000Z", completedAt: "2026-09-24T11:00:45.000Z",
+      retryCount: 0, maxRetries: 3, kind: "video", resultAssetId: videoAsset.id,
+      provenance: videoAsset.provenance, result: { kind: "video", asset: videoAsset },
+    } as const;
+    let submitted = false;
+    let screenshotPayload = "";
+    await page.route("**/fixtures/postcard.webm", (route) => route.fulfill({ status: 200, contentType: "video/webm", body: postcardBytes }));
+    await page.route("**/api/postcards/worker8-b17/screenshot", async (route) => {
+      screenshotPayload = (route.request().postDataJSON() as { imageBase64: string }).imageBase64;
+      await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({
+        id: "mock-screenshot", url: "/fixtures/screenshot.png", sha256: "a".repeat(64), sizeBytes: 2048,
+        mimeType: "image/png", width: 1280, height: 720, provenance: { ...videoAsset.provenance, requestedCapability: "browser-world-capture" },
+      }) });
+    });
+    await page.route("**/api/postcards/worker8-b17", async (route) => {
+      if (route.request().method() === "POST") {
+        submitted = true;
+        const saved = { ...manifest, media: { audio: [], video: [videoAsset] } };
+        const response = await fetch(`${api.baseUrl}/api/levels/${manifest.levelId}`, {
+          method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(saved),
+        });
+        if (!response.ok) throw new Error(`Mock postcard persistence failed: ${await response.text()}`);
+      }
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(submitted
+        ? { state: "job", cacheHit: route.request().method() === "GET", job: readyJob }
+        : { state: "none", cacheHit: false }) });
+    });
+
+    await openSavedWorld(page, manifest);
+    await completeSingleCheckpointWorld(page);
+    await page.getByRole("button", { name: "Create animated postcard" }).click();
+    await expect(page.getByLabel("Generated animated postcard preview")).toBeVisible();
+    expect(submitted).toBe(true);
+    expect(screenshotPayload.length).toBeGreaterThan(100);
+
+    await page.reload();
+    const card = page.getByRole("article").filter({ hasText: manifest.name }).last();
+    await expect(card.getByText(/Generated animation · Animated postcard/)).toBeVisible();
+    await expect(card.getByLabel("Generated animated postcard preview")).toBeVisible();
+    await page.screenshot({ path: "test-results/worker8/B17-animated-postcard.png", fullPage: true });
+    const downloadPromise = page.waitForEvent("download");
+    await card.getByRole("link", { name: "Download postcard" }).click();
+    const download = await downloadPromise;
+    const downloadPath = await download.path();
+    expect(downloadPath).not.toBeNull();
+    expect((await stat(downloadPath!)).size).toBeGreaterThan(100);
+
+    const stored = await (await fetch(`${api.baseUrl}/api/levels/${manifest.levelId}`)).json() as SceneManifest;
+    expect(stored.media?.video[0]?.provenance).toMatchObject({
+      requestedCapability: "pixverse-i2v", servedCapability: "pixverse-i2v", servedModel: "fixture/pixverse-i2v",
+      applicationJobId: "job-worker8-b17", providerJobId: "provider-worker8-b17",
+      reportedCost: { amount: 0.34125, currency: "USD" },
+    });
   });
 
   test("B18 replays a saved world without submitting any generation job", async ({ page }) => {

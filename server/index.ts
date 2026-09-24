@@ -22,6 +22,8 @@ import { QuestOrchestrator, questGatewayFromManager } from "./quest/orchestrator
 import { createQuestRouter } from "./quest/routes.js";
 import { AudioOrchestrator, audioGatewayFromManager } from "./audio/orchestrator.js";
 import { createAudioRouter } from "./audio/routes.js";
+import { createPostcardsRouter } from "./postcards/routes.js";
+import { PostcardCacheStore } from "./postcards/store.js";
 import { logServerError } from "./util/sanitize.js";
 
 /**
@@ -39,6 +41,8 @@ const generatedAssetStore = new GeneratedAssetStore(env.storageDir);
 const jobStore = new JobStore(env.storageDir);
 const spendLedger = new SpendLedger(env.storageDir);
 const previewCache = new PreviewCacheStore(env.storageDir);
+const levelStore = new LevelStore(env.storageDir, assetStore, photoStore);
+const postcardCache = new PostcardCacheStore(env.storageDir);
 const sourceBytes = {
   async getPhotoBytes(id: string) {
     return (await photoStore.get(id))
@@ -54,7 +58,6 @@ const jobManager = new JobManager(jobStore, adapter, assetStore, photoStore, {
   perWorldLimitUsd: env.livepeerMaxWorldUsd,
   maxRetries: env.livepeerMaxAutomaticRetries,
 });
-const levelStore = new LevelStore(env.storageDir, assetStore, photoStore);
 const questOrchestrator = new QuestOrchestrator(questGatewayFromManager(jobManager), levelStore);
 const audioOrchestrator = new AudioOrchestrator(audioGatewayFromManager(jobManager), levelStore);
 
@@ -71,6 +74,7 @@ app.use(createUploadsRouter(photoStore));
 app.use(createPhotosRouter(photoStore));
 app.use(createAssetsRouter(assetStore));
 app.use(createGeneratedAssetsRouter(generatedAssetStore));
+app.use(createPostcardsRouter(levelStore, generatedAssetStore, jobManager, postcardCache));
 app.use(createJobsRouter(jobManager, adapter, photoStore, generatedAssetStore, previewCache, spendLedger));
 app.use(createQuestRouter(questOrchestrator));
 app.use(createAudioRouter(audioOrchestrator));

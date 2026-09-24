@@ -17,7 +17,14 @@ type GeneratedBinaryAssetDraft =
 export const MAX_GENERATED_IMAGE_BYTES = 25 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 75 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
-const ALLOWED_PROVIDER_IMAGE_CAPABILITIES = new Set(["bg-remove", "kontext-edit", "gpt-image-edit"]);
+const ALLOWED_PROVIDER_IMAGE_CAPABILITIES = new Set([
+  "bg-remove",
+  "kontext-edit",
+  "gpt-image-edit",
+  // Deterministic browser captures are valid image-to-video inputs. Their
+  // provenance stays explicitly local and is never confused with AI output.
+  "browser-world-capture",
+]);
 
 export class GeneratedAssetStore {
   private readonly index: JsonFileStore<Record<string, GeneratedBinaryAsset>>;
