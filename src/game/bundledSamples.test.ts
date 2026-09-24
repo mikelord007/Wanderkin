@@ -8,5 +8,9 @@ describe("bundled Lost Colors sample", () => {
     expect(LOST_COLORS_SAMPLE.experience.collectibles).toHaveLength(3);
     expect(LOST_COLORS_SAMPLE.experience.finishPortal?.activation).toBe("all-required-collectibles");
     expect(LOST_COLORS_SAMPLE.courseValidation.status).not.toBe("unvalidated");
+    expect(LOST_COLORS_SAMPLE.media.audio.filter((asset) => asset.kind === "sfx")).toHaveLength(7);
+    expect(LOST_COLORS_SAMPLE.media.audio.some((asset) => asset.kind === "music")).toBe(true);
+    expect(LOST_COLORS_SAMPLE.media.audio.some((asset) => asset.kind === "narration")).toBe(true);
+    expect(Math.max(...LOST_COLORS_SAMPLE.media.audio.map((asset) => asset.sizeBytes))).toBeLessThan(200_000);
   });
 });
