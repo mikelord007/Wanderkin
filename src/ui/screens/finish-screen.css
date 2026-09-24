@@ -1,11 +1,12 @@
 .oq-finish {
   position: relative;
+  height: max-content;
   min-height: 100dvh;
   display: grid;
   grid-template-columns: minmax(280px, 1.05fr) minmax(320px, .95fr);
   align-items: center;
   gap: clamp(32px, 7vw, 96px);
-  overflow: hidden;
+  overflow: visible;
   padding: clamp(28px, 6vw, 88px);
   color: var(--oq-ink);
   background: linear-gradient(145deg, #fffaf1 0%, #f7efff 52%, #e9f7ed 100%);
