@@ -29,6 +29,22 @@ and [`LIVE_VALIDATION_RESULT_2026-09-24.md`](LIVE_VALIDATION_RESULT_2026-09-24.m
 The final 37/6/0 report supersedes earlier in-flight browser counts; it does not
 turn skipped cases into passes.
 
+Concrete automated anchors include
+[`shared/manifest.test.ts`](../shared/manifest.test.ts),
+[`server/jobs/manager.test.ts`](../server/jobs/manager.test.ts),
+[`server/audio/orchestrator.test.ts`](../server/audio/orchestrator.test.ts),
+[`server/quest/orchestrator.test.ts`](../server/quest/orchestrator.test.ts),
+[`server/postcards/service.test.ts`](../server/postcards/service.test.ts),
+[`server/publications.test.ts`](../server/publications.test.ts),
+[`src/audio/audio.test.ts`](../src/audio/audio.test.ts),
+[`src/capture/recorder.test.ts`](../src/capture/recorder.test.ts),
+[`src/game/modes/session.test.ts`](../src/game/modes/session.test.ts),
+[`scripts/live-validation/run.test.ts`](../scripts/live-validation/run.test.ts),
+[`audio-accessibility.qa.test.ts`](../tests/e2e/browser/qa/audio-accessibility.qa.test.ts),
+and [`provider-copy.qa.test.ts`](../tests/e2e/browser/qa/provider-copy.qa.test.ts).
+These files identify the contracts behind the summary; their presence is not a
+substitute for the dated run results above.
+
 ## Required automated coverage
 
 | ID | Acceptance item | Implemented | Automated/browser evidence | Live/hands-on boundary |
