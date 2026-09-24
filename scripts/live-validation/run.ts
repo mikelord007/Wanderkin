@@ -13,6 +13,8 @@ type Args = {
   photo: string;
   includePostcard: boolean;
   includeAlternateEdit: boolean;
+  reusePhotoId?: string;
+  reuseCutoutAssetId?: string;
   publishLevelId?: string;
 };
 
@@ -26,6 +28,11 @@ export function parseArgs(argv: readonly string[]): Args {
   };
   const max = Number(value("--max-usd") ?? "1.50");
   if (!Number.isFinite(max) || max < 0) throw new Error("--max-usd must be a non-negative number.");
+  const reusePhotoId = value("--reuse-photo-id");
+  const reuseCutoutAssetId = value("--reuse-cutout-asset-id");
+  if (Boolean(reusePhotoId) !== Boolean(reuseCutoutAssetId)) {
+    throw new Error("--reuse-photo-id and --reuse-cutout-asset-id must be supplied together.");
+  }
   return {
     api: (value("--api") ?? "http://127.0.0.1:8787").replace(/\/$/, ""),
     dryRun: argv.includes("--dry-run"),
@@ -33,6 +40,7 @@ export function parseArgs(argv: readonly string[]): Args {
     photo: resolve(value("--photo") ?? resolve(ROOT, "public/samples/photo-4.jpg")),
     includePostcard: !argv.includes("--no-postcard"),
     includeAlternateEdit: !argv.includes("--no-alternate-edit"),
+    ...(reusePhotoId && reuseCutoutAssetId ? { reusePhotoId, reuseCutoutAssetId } : {}),
     ...(value("--publish-level-id") ? { publishLevelId: value("--publish-level-id") } : {}),
   };
 }
@@ -78,6 +86,15 @@ export function shouldReconcileStoredProviderJob(job: Json): boolean {
     && job.lastError?.retryable !== false;
 }
 
+function isResumeReconciliation(args: Args, step: PlannedRequest): boolean {
+  return Boolean(args.reusePhotoId && args.reuseCutoutAssetId)
+    && (step.id === "cutout" || step.id === "style-preview");
+}
+
+export function resumePlanTotal(args: Args, plan: readonly PlannedRequest[]): number {
+  return planTotal(plan.filter((step) => !isResumeReconciliation(args, step)));
+}
+
 function evidenceFor(step: PlannedRequest, job: Json, startedAt: number): Json {
   const result = job.result;
   const asset = result?.asset;
@@ -100,16 +117,23 @@ function evidenceFor(step: PlannedRequest, job: Json, startedAt: number): Json {
 }
 
 export function renderDryRun(args: Args, plan: readonly PlannedRequest[]): string {
+  const plannedSpend = resumePlanTotal(args, plan);
+  const dryRunValues: Record<string, string> = {
+    ...(args.reusePhotoId ? { $uploadedPhotoId: args.reusePhotoId } : {}),
+    ...(args.reuseCutoutAssetId ? { $cutoutAssetId: args.reuseCutoutAssetId } : {}),
+  };
   const lines = [
     `ObjectQuest live validation DRY RUN`,
     `API: ${args.api}`,
     `Input: ${args.photo}`,
     `World: ${VALIDATION_WORLD_ID}`,
-    `Guard: $${args.maxUsd.toFixed(4)}; planned: $${planTotal(plan).toFixed(4)}; retries: 0 required`,
+    `Guard: $${args.maxUsd.toFixed(4)}; planned new spend: $${plannedSpend.toFixed(4)}; retries: 0 required`,
   ];
   for (const [index, step] of plan.entries()) {
-    lines.push(`${String(index + 1).padStart(2, "0")}. ${step.id} -> POST ${step.purpose === "style-preview" ? "/api/jobs/previews" : "/api/jobs/generate"} | ${step.capability} | $${step.estimatedUsd.toFixed(4)}`);
-    lines.push(`    ${JSON.stringify({ request: step.request, worldId: VALIDATION_WORLD_ID, maxCostUsd: step.estimatedUsd })}`);
+    const reconcile = isResumeReconciliation(args, step);
+    const request = replacePlaceholders(step.request, dryRunValues);
+    lines.push(`${String(index + 1).padStart(2, "0")}. ${step.id} -> ${reconcile ? "RECONCILE/REUSE" : "POST"} ${step.purpose === "style-preview" ? "/api/jobs/previews" : "/api/jobs/generate"} | ${step.capability} | $${reconcile ? "0.0000" : step.estimatedUsd.toFixed(4)}`);
+    lines.push(`    ${JSON.stringify({ request, worldId: VALIDATION_WORLD_ID, maxCostUsd: step.estimatedUsd })}`);
   }
   lines.push("Then: approve preview -> save draft level -> POST publish (or record explicit repair-required response). No billable request was submitted.");
   return lines.join("\n");
@@ -183,21 +207,35 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   if (args.publishLevelId) { await publishReviewed(args.api, args.publishLevelId); return; }
   const plan = buildPlan({ includePostcard: args.includePostcard, includeAlternateEdit: args.includeAlternateEdit });
   const guard = new BudgetGuard(args.maxUsd);
-  if (planTotal(plan) > args.maxUsd) guard.reserve({ id: "complete-batch", estimatedUsd: planTotal(plan) });
+  const plannedSpend = resumePlanTotal(args, plan);
+  if (plannedSpend > args.maxUsd) guard.reserve({ id: "complete-batch", estimatedUsd: plannedSpend });
   if (args.dryRun) { console.log(renderDryRun(args, plan)); return; }
 
-  const form = new FormData();
-  const bytes = await readFile(args.photo);
-  form.append("photos", new Blob([bytes], { type: "image/jpeg" }), "photo-4.jpg");
-  const uploaded = await responseJson(await fetch(`${args.api}/api/uploads`, { method: "POST", body: form }));
-  const uploadedPhoto = uploaded[0];
-  if (!uploadedPhoto?.id) throw new Error("Upload did not return a photo id.");
+  let uploadedPhoto: Json;
+  if (args.reusePhotoId && args.reuseCutoutAssetId) {
+    uploadedPhoto = {
+      id: args.reusePhotoId,
+      url: `/api/photos/files/${args.reusePhotoId}.jpg`,
+      order: 1,
+      label: "Bundled representative source photo 4",
+    };
+  } else {
+    const form = new FormData();
+    const bytes = await readFile(args.photo);
+    form.append("photos", new Blob([bytes], { type: "image/jpeg" }), "photo-4.jpg");
+    const uploaded = await responseJson(await fetch(`${args.api}/api/uploads`, { method: "POST", body: form }));
+    uploadedPhoto = uploaded[0];
+    if (!uploadedPhoto?.id) throw new Error("Upload did not return a photo id.");
+  }
 
-  const values: Record<string, string> = { "$uploadedPhotoId": uploadedPhoto.id };
+  const values: Record<string, string> = {
+    "$uploadedPhotoId": uploadedPhoto.id,
+    ...(args.reuseCutoutAssetId ? { "$cutoutAssetId": args.reuseCutoutAssetId } : {}),
+  };
   const jobs = new Map<string, Json>();
   const evidence: Json[] = [];
   for (const step of plan) {
-    guard.reserve(step);
+    if (!isResumeReconciliation(args, step)) guard.reserve(step);
     const request = replacePlaceholders(step.request, values) as Json;
     const startedAt = Date.now();
     const path = step.purpose === "style-preview" ? "/api/jobs/previews" : "/api/jobs/generate";
@@ -217,7 +255,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
         failedStep: step.id,
         completedAt: new Date().toISOString(),
         maxUsd: args.maxUsd,
-        plannedMaximumUsd: planTotal(plan),
+        plannedMaximumUsd: plannedSpend,
         reservedByRunnerUsd: guard.reservedUsd,
         ledger,
         jobs: evidence,
@@ -243,14 +281,14 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     startedFrom: args.photo,
     completedAt: new Date().toISOString(),
     maxUsd: args.maxUsd,
-    plannedMaximumUsd: planTotal(plan),
+    plannedMaximumUsd: plannedSpend,
     reservedByRunnerUsd: guard.reservedUsd,
     ledger,
     jobs: evidence,
     level,
   });
   console.log(`Validation batch complete. Evidence: ${path}`);
-  console.log(JSON.stringify({ plannedMaximumUsd: planTotal(plan), ledger, level }, null, 2));
+  console.log(JSON.stringify({ plannedMaximumUsd: plannedSpend, ledger, level }, null, 2));
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

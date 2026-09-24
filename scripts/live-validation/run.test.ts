@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BudgetGuard, buildPlan, planTotal } from "./plan.js";
-import { parseArgs, renderDryRun, shouldReconcileStoredProviderJob } from "./run.js";
+import { parseArgs, renderDryRun, resumePlanTotal, shouldReconcileStoredProviderJob } from "./run.js";
 
 describe("live-validation planner", () => {
   it("keeps the complete batch bounded and covers every claimed capability", () => {
@@ -40,6 +40,30 @@ describe("live-validation planner", () => {
     expect(output).toContain("No billable request was submitted");
     expect(output).toContain("POST /api/jobs/previews");
     expect(output).toContain("pixverse-i2v");
+  });
+
+  it("plans resume reconciliation without reserving cutout or preview spend", () => {
+    const args = parseArgs([
+      "--dry-run",
+      "--max-usd", "3",
+      "--reuse-photo-id", "photo-existing",
+      "--reuse-cutout-asset-id", "cutout-existing",
+    ]);
+    const plan = buildPlan();
+    const output = renderDryRun(args, plan);
+
+    expect(args).toMatchObject({ reusePhotoId: "photo-existing", reuseCutoutAssetId: "cutout-existing" });
+    expect(resumePlanTotal(args, plan)).toBe(1.3828);
+    expect(output).toContain("planned new spend: $1.3828");
+    expect(output).toContain("01. cutout -> RECONCILE/REUSE /api/jobs/generate | bg-remove | $0.0000");
+    expect(output).toContain("02. style-preview -> RECONCILE/REUSE /api/jobs/previews | kontext-edit | $0.0000");
+    expect(output).toContain('\"sourceImageAssetId\":\"photo-existing\"');
+    expect(output).toContain('\"sourceImageAssetId\":\"cutout-existing\"');
+  });
+
+  it("requires both stored resume ids", () => {
+    expect(() => parseArgs(["--reuse-photo-id", "photo-existing"]))
+      .toThrow("--reuse-photo-id and --reuse-cutout-asset-id must be supplied together.");
   });
 
   it("reconciles only a stored retryable failure that already has a provider job", () => {
