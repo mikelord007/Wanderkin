@@ -295,7 +295,9 @@ describe("POST /api/jobs, status, retry, and restart reconciliation", () => {
     const previewCache = new PreviewCacheStore(api!.storageDir);
     const previewKey = "a".repeat(64);
     await previewCache.put(previewKey, "job-style-preview");
-    await previewCache.approve(previewKey, "job-style-preview", styleReference.id);
+    // Exercise backward compatibility with approvals written before cache
+    // records carried a direct generated-asset id.
+    await previewCache.approve(previewKey, "job-style-preview");
     const key = uniqueIdempotencyKey("v2-generated-cutout");
     const request = {
       schemaVersion: 1,

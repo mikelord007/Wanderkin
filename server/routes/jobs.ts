@@ -77,6 +77,15 @@ export function createJobsRouter(
     return Boolean(await generatedAssets?.getProviderImage(id));
   }
 
+  async function isApprovedPreviewAsset(id: string): Promise<boolean> {
+    const asset = await generatedAssets?.getProviderImage(id);
+    if (!asset || !previewCache) return false;
+    return Boolean(
+      (await previewCache.findApprovedByAssetId(id))
+      ?? (await previewCache.findApprovedByJobId(asset.provenance.applicationJobId)),
+    );
+  }
+
   async function validateGenerationSources(request: GenerationRequest): Promise<string | undefined> {
     if (request.kind === "image-to-3d") {
       for (const photo of request.photos ?? []) if (!(await photos.get(photo.photoId))) return `Unknown photoId "${photo.photoId}"`;
@@ -84,7 +93,7 @@ export function createJobsRouter(
         if (!(await generatedAssets?.getProviderImage(id))) {
           return `Unknown or ineligible generated sourceImageAssetId "${id}"`;
         }
-        if (await previewCache?.findApprovedByAssetId(id)) {
+        if (await isApprovedPreviewAsset(id)) {
           return `Approved style preview "${id}" cannot be used as a 3D provider input`;
         }
       }
@@ -92,7 +101,7 @@ export function createJobsRouter(
         if (!(await generatedAssets?.getProviderImage(request.styleReferenceAssetId))) {
           return `Unknown or ineligible styleReferenceAssetId "${request.styleReferenceAssetId}"`;
         }
-        if (!(await previewCache?.findApprovedByAssetId(request.styleReferenceAssetId))) {
+        if (!(await isApprovedPreviewAsset(request.styleReferenceAssetId))) {
           return `styleReferenceAssetId "${request.styleReferenceAssetId}" is not an approved preview`;
         }
       }

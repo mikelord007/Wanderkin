@@ -60,4 +60,9 @@ export class PreviewCacheStore {
   async findApprovedByAssetId(assetId: string): Promise<PreviewCacheRecord | undefined> {
     return Object.values(await this.file.read()).find((record) => record.approved && record.assetId === assetId);
   }
+
+  /** Compatibility lookup for approvals written before assetId was added. */
+  async findApprovedByJobId(jobId: string): Promise<PreviewCacheRecord | undefined> {
+    return Object.values(await this.file.read()).find((record) => record.approved && record.jobId === jobId);
+  }
 }
