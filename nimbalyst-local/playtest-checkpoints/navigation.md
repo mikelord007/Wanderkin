@@ -112,10 +112,22 @@ interactive verification — the user's own manual playtest is the way to close 
 - Full `npx vitest run` before committing to check for regressions outside my owned files.
 
 ## Commits
-None yet — first commit lands once App.tsx routing is implemented and tested.
+1. `398c7ebecf9f8d67cc20421119920ef2cc4d219f` — feat: give every screen a real, restorable URL
+   (`src/App.tsx`, `src/ui/routing.ts`, `src/ui/routing.test.ts`).
+2. `c15ddaa8a6f69f72f3c83c0fe98919ee38fe231f` — fix: make Sound and gameplay capture usable while
+   pointer-locked (`src/game/input/inputController.ts`(+test), `src/game/types.ts`, `src/game/index.ts`,
+   `src/game/GameView.tsx`, `src/game/hud/Hud.tsx`, `src/ui/screens/PlayScreen.tsx`).
+
+Both items 6 and 13 are done, typechecked, and committed. `git status` confirms no uncommitted changes in any
+owned path. Full `npx vitest run`: 435/437 passing; the 2 failures are pre-existing, in
+`src/game/render/character/characterAnimator.test.ts`, entirely inside `src/game/render/*` which belongs to
+the Opus character/animation worker (untracked/in-progress on this MAIN) — not touched or caused by this
+worker.
 
 ## Next step
-Finish rewriting `src/App.tsx` to use `routing.ts`, run the full test suite, browser-verify direct load/
-refresh/back-forward, then commit routing as one atomic increment via `developer_git_commit_proposal`
-(paths: `src/ui/routing.ts`, `src/ui/routing.test.ts`, `src/App.tsx`). Pointer-lock work follows as a second
-commit.
+Both owned items are complete. If resumed after a quota gap, verify nothing changed underneath (peer
+workers share MAIN): re-run `git log --oneline -5` for these two hashes, `npx vitest run` for a regression
+check, and re-read this file before doing anything else. Optional follow-up if time/quota remains: a real
+interactive pointer-lock click-through test once a working headless (or non-headless) 3D render path is
+available — currently blocked by the documented headless "stalls at first frame" limitation, not by this
+worker's code. Nothing outstanding is owed to another worker; no material dependency was hit.
