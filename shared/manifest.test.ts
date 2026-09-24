@@ -7,6 +7,7 @@ import legacyFixture from "./fixtures/legacy-scene-manifest-v1.json";
 import { migrateSceneManifest, sceneManifestReaderSchema } from "./manifest-migration.js";
 import lostColorsFixture from "./fixtures/lost-colors.json";
 import generationJobCases from "./fixtures/generation-job-cases.json";
+import { SAMPLE_LEVELS } from "../src/scene/samples.js";
 
 describe("createEmptyManifest", () => {
   it("produces a schema-versioned manifest with the shared coordinate convention", () => {
@@ -43,6 +44,17 @@ describe("legacy manifest compatibility", () => {
     expect(migrated.experience.quest.title).toBe(legacyFixture.name);
     expect(migrated.experience.collectibles).toEqual([]);
   });
+
+  it("loads both original bundled sample manifests through the compatible reader", () => {
+    expect(SAMPLE_LEVELS).toHaveLength(2);
+    for (const sample of SAMPLE_LEVELS) {
+      const migrated = migrateSceneManifest(JSON.parse(JSON.stringify(sample)));
+      expect(migrated.levelId).toBe(sample.levelId);
+      expect(migrated.assets).toEqual(sample.assets);
+      expect(migrated.entities).toEqual(sample.entities);
+      expect(migrated.experience.mode.kind).toBe("explore");
+    }
+  });
 });
 
 describe("v2 reference fixtures", () => {
@@ -54,6 +66,9 @@ describe("v2 reference fixtures", () => {
     expect(manifest.experience.collectibles).toHaveLength(3);
     expect(manifest.experience.finishPortal?.activation).toBe("all-required-collectibles");
     expect(manifest.experience.quest.title).toBe("The Lost Colors of Teacup Island");
+
+    const roundTrip = migrateSceneManifest(JSON.parse(JSON.stringify(manifest)));
+    expect(roundTrip).toEqual(manifest);
   });
 
   it("provides matching request and response fixtures for every job kind", () => {
