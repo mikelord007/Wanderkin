@@ -219,3 +219,18 @@ for `src/ui`'s screen components.
   font-loading dependency); the "loading…" / "preview unavailable" state
   surfaces via a DOM banner instead.
 - Ramp helpers expose heading around Y; their rise/run comes from dimensions.
+
+## My worlds and missing assets
+
+`src/ui/worlds.ts` is the shared saved/pending list boundary. Worker-owned
+pending and failed generation adapters can append typed items without
+duplicating saved-world behavior. Editor drafts are enumerated from the
+existing per-level localStorage records: unsaved drafts show **Resume**,
+saved worlds show **Play / Edit / Export**, and saved worlds with a draft
+show **Resume / Play saved / Edit / Export**.
+
+Play preflights the manifest's durable asset URLs with read-only `HEAD`
+requests. A missing or expired asset stays in My worlds with a repair message
+instead of opening a blank canvas. The player error boundary independently
+offers **Retry loading / My worlds** in case an asset disappears after that
+check. Neither path creates or retries a generation job.

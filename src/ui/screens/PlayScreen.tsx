@@ -19,15 +19,28 @@ interface PlayScreenProps {
  * exit/complete callbacks. */
 export function PlayScreen({ manifest, onExit, onComplete, publishedVersionId }: PlayScreenProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryAttempt, setRetryAttempt] = useState(0);
 
   if (loadError) {
     return (
       <div className="oq-screen oq-screen--play">
         <div className="oq-panel oq-panel--error">
-          <p className="oq-error-text">{loadError}</p>
+          <h1>This world couldn’t load</h1>
+          <p className="oq-error-text">A saved 3D asset may be missing or expired. Restore it, then retry loading.</p>
+          <details><summary>Technical detail</summary><p>{loadError}</p></details>
           <div className="oq-actions">
+            <button
+              type="button"
+              className="oq-button oq-button--primary"
+              onClick={() => {
+                setLoadError(null);
+                setRetryAttempt((attempt) => attempt + 1);
+              }}
+            >
+              Retry loading
+            </button>
             <button type="button" className="oq-button oq-button--ghost" onClick={onExit}>
-              Back
+              My worlds
             </button>
           </div>
         </div>
@@ -37,7 +50,7 @@ export function PlayScreen({ manifest, onExit, onComplete, publishedVersionId }:
 
   return (
     <div className="oq-screen oq-screen--play oq-screen--full-bleed">
-      <ErrorBoundary onError={setLoadError}>
+      <ErrorBoundary key={retryAttempt} onError={setLoadError}>
         <Suspense fallback={<LoadingScreen stage="Loading the game…" />}>
           <GameView
             manifest={manifest}
