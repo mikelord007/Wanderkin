@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import type { PhotoStore } from "../persistence/photoStore.js";
 import { assertValidPhoto, InvalidFileError, MAX_PHOTO_BYTES } from "../persistence/validate.js";
@@ -24,10 +24,15 @@ export function createUploadsRouter(
 ): Router {
   const router = Router();
 
-  router.post("/api/uploads", upload.array("photos", 10), async (req, res) => {
-    const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+  const handleUpload = async (req: Request, res: Response): Promise<void> => {
+    const files = (req.files as Express.Multer.File[] | undefined)
+      ?? (req.file ? [req.file as Express.Multer.File] : []);
     if (files.length === 0) {
-      res.status(400).json({ message: 'No photos received (expected multipart field "photos")' });
+      res.status(400).json({
+        message: req.path === "/api/screenshots"
+          ? 'No screenshot received (expected multipart field "screenshot")'
+          : 'No photos received (expected multipart field "photos")',
+      });
       return;
     }
     let releaseBudget: (() => void) | undefined;
@@ -70,7 +75,10 @@ export function createUploadsRouter(
     } finally {
       releaseBudget?.();
     }
-  });
+  };
+
+  router.post("/api/uploads", upload.array("photos", 10), handleUpload);
+  router.post("/api/screenshots", upload.single("screenshot"), handleUpload);
 
   return router;
 }

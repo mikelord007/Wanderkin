@@ -109,6 +109,15 @@ describe("POST /api/uploads + GET /api/photos/files/:name", () => {
     expect(await res.json()).toEqual({ message: expect.stringMatching(/decoded-pixel limit/i) });
   });
 
+  it("applies the same byte, dimension, owner, and decode-budget path to screenshots", async () => {
+    const form = new FormData();
+    form.append("screenshot", new Blob([new Uint8Array(readSamplePhoto(2))], { type: "image/jpeg" }), "world-shot.jpg");
+    const response = await fetch(`${api.baseUrl}/api/screenshots`, { method: "POST", body: form });
+    expect(response.status).toBe(201);
+    const [screenshot] = await response.json() as Array<{ id: string; url: string }>;
+    expect(screenshot!.url).toMatch(/^\/api\/photos\/files\//);
+  });
+
   it("rejects a request with no files under the expected field name", async () => {
     const form = new FormData();
     form.append("notPhotos", "irrelevant");
