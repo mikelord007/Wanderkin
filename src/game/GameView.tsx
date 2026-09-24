@@ -25,8 +25,10 @@ import { GameSimulation, type SimulationEvent } from "./core/simulation.js";
 import type { TriangleSoup } from "./core/soup.js";
 import { InputController } from "./input/inputController.js";
 import { installDiagnostics, type GameDiagnostics } from "./diagnostics.js";
+import { resolveScenePresentation } from "../scene/style.js";
 import { Hud } from "./hud/Hud.js";
 import { GameStage as StageContents, type HudSignals } from "./render/GameStage.js";
+import { usePrefersReducedMotion } from "./render/useReducedMotion.js";
 import type { GameLoadStage, GameSnapshot, GameViewProps } from "./types.js";
 
 interface Runtime {
@@ -65,8 +67,28 @@ function describeError(error: unknown): string {
   return "An unexpected error occurred while preparing this level.";
 }
 
-export function GameView({ manifest, onExit, onComplete, onProgress }: GameViewProps) {
+export function GameView({
+  manifest,
+  onExit,
+  onComplete,
+  onProgress,
+  styleId,
+  atmosphere,
+  colorRestoration: colorRestorationOverride,
+}: GameViewProps) {
   const config = DEFAULT_MOVEMENT_CONFIG;
+  const reducedMotion = usePrefersReducedMotion();
+  const {
+    style,
+    atmosphere: resolvedAtmosphere,
+    colorRestoration,
+  } = resolveScenePresentation(manifest, {
+    ...(styleId === undefined ? {} : { styleId }),
+    ...(atmosphere === undefined ? {} : { atmosphere }),
+    ...(colorRestorationOverride === undefined
+      ? {}
+      : { colorRestoration: colorRestorationOverride }),
+  });
 
   const [stage, setStage] = useState<GameLoadStage>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -388,6 +410,10 @@ export function GameView({ manifest, onExit, onComplete, onProgress }: GameViewP
             objectiveArrowRef={objectiveArrowRef}
             objectiveDistanceRef={objectiveDistanceRef}
             diagnosticsRef={diagnosticsRef}
+            style={style}
+            atmosphere={resolvedAtmosphere}
+            colorRestoration={colorRestoration}
+            reducedMotion={reducedMotion}
           />
         </Canvas>
       ) : null}

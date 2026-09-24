@@ -1,0 +1,63 @@
+{
+  "run": {
+    "date": "2026-09-24",
+    "session_id": "objectquest_v2_worker3_style_spike_20260924",
+    "input": {
+      "path": "public/samples/photo-4.jpg",
+      "sha256": "8a8287ae03fe5630067b9e9eda6eb1c2f89b6a96c43157ecf6434839fe5e11ff"
+    },
+    "hard_cap_usd": 1.5,
+    "demo_ledger_spend_usd": 0.462,
+    "provider_metered_cost_usd": null,
+    "cost_note": "Both terminal responses reported cost_disposition=spent and their catalog estimates total $0.462. Both cost_paid_usd fields were null, so upstream metered cost is unknown rather than zero."
+  },
+  "style_job": {
+    "requested_capability": "kontext-edit",
+    "actual_capability": "kontext-edit",
+    "job_id": "mjob_7c10fc5aa558",
+    "idempotency_key": "objectquest_v2_style_spike_photo4_cartoon_v1",
+    "status": "done",
+    "fallback_fired": null,
+    "health_before_submit": "ok",
+    "price_before_submit_usd": 0.042,
+    "cost_usd_estimated": 0.042,
+    "cost_paid_usd": null,
+    "cost_disposition": "spent",
+    "elapsed_ms": 7441,
+    "output": {
+      "evidence_path": "docs/evidence/style-spike-cartoon-reference.jpg",
+      "bytes": 256642,
+      "sha256": "42a4eb0b1060ac4a748a267cabc965266e5ea9a78489d4a14065df33618dcc1e"
+    }
+  },
+  "mesh_job": {
+    "requested_capability": "rodin-i3d",
+    "actual_capability": "rodin-i3d",
+    "job_id": "mjob_03a06e271b73",
+    "idempotency_key": "objectquest_v2_style_spike_photo4_cartoon_rodin_v1",
+    "status": "done",
+    "fallback_fired": null,
+    "health_before_submit": "unknown",
+    "availability_before_submit": "available",
+    "status_before_submit": "active",
+    "price_before_submit_usd": 0.42,
+    "cost_usd_estimated": 0.42,
+    "cost_paid_usd": null,
+    "cost_disposition": "spent",
+    "elapsed_ms": 128411,
+    "output": {
+      "committed": false,
+      "local_path": "scripts/spike/output/photo-4-cartoon-rodin.glb",
+      "bytes": 24302428,
+      "sha256": "b397d4d78fc1709ef0aeca77af9a174b41158e3d092812e4c628b9bbe577167e6",
+      "reason_not_committed": "The 24.3 MB spike GLB exceeds the 2 MB evidence-asset limit."
+    }
+  },
+  "baseline_mesh": {
+    "path": "public/samples/rodin.glb",
+    "job_id": "mjob_5c57ebc49690",
+    "source_photo_order": [4, 1, 2, 3, 5],
+    "bytes": 4979900,
+    "sha256": "c750cb2c1fcd2197f8c373b791703bc90073075e11d08cafb0be4d84012d54b8"
+  }
+}

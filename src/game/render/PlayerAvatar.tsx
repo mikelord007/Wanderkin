@@ -39,8 +39,10 @@ const SHELL_COLOUR = "#fff1e2";
 const DARK = "#2b2438";
 const GLOW = "#7cf4ff";
 
-export const PlayerAvatar = forwardRef<PlayerAvatarHandle, { config: MovementConfig }>(
-  function PlayerAvatar({ config }, ref) {
+export const PlayerAvatar = forwardRef<
+  PlayerAvatarHandle,
+  { config: MovementConfig; reducedMotion?: boolean }
+>(function PlayerAvatar({ config, reducedMotion = false }, ref) {
     const root = useRef<THREE.Group>(null);
     const tilt = useRef<THREE.Group>(null);
     const bob = useRef<THREE.Group>(null);
@@ -79,13 +81,15 @@ export const PlayerAvatar = forwardRef<PlayerAvatarHandle, { config: MovementCon
 
         // Walk cycle advances with distance covered, not with time, so the
         // legs stop moving the instant the character stops.
-        if (state.grounded && !state.mantling) {
+        if (reducedMotion) {
+          walkPhase.current = 0;
+        } else if (state.grounded && !state.mantling) {
           walkPhase.current += state.speed * dt * 11;
         } else {
           walkPhase.current += dt * 2;
         }
 
-        const swing = Math.sin(walkPhase.current);
+        const swing = reducedMotion ? 0 : Math.sin(walkPhase.current);
         const airborne = !state.grounded || state.mantling;
 
         if (leftLeg.current && rightLeg.current) {
@@ -102,14 +106,14 @@ export const PlayerAvatar = forwardRef<PlayerAvatarHandle, { config: MovementCon
         }
 
         if (bob.current) {
-          bob.current.position.y = airborne ? 0 : Math.abs(Math.sin(walkPhase.current)) * 0.014 * speedFactor;
+          bob.current.position.y = reducedMotion || airborne ? 0 : Math.abs(Math.sin(walkPhase.current)) * 0.014 * speedFactor;
         }
 
         // Squash on landing, stretch while rising.
-        const targetSquash = airborne ? 1 + Math.max(-0.12, Math.min(0.12, state.verticalVelocity * 0.03)) : 1;
+        const targetSquash = reducedMotion ? 1 : airborne ? 1 + Math.max(-0.12, Math.min(0.12, state.verticalVelocity * 0.03)) : 1;
         squash.current += (targetSquash - squash.current) * Math.min(1, dt * 14);
 
-        const targetLean = airborne ? 0.05 : speedFactor * 0.16;
+        const targetLean = reducedMotion ? 0 : airborne ? 0.05 : speedFactor * 0.16;
         lean.current += (targetLean - lean.current) * Math.min(1, dt * 10);
 
         if (tilt.current) {
@@ -119,7 +123,7 @@ export const PlayerAvatar = forwardRef<PlayerAvatarHandle, { config: MovementCon
 
         if (antenna.current) {
           const material = antenna.current.material as THREE.MeshStandardMaterial;
-          material.emissiveIntensity = 1.6 + Math.sin(walkPhase.current * 0.7) * 0.25;
+          material.emissiveIntensity = reducedMotion ? 1.6 : 1.6 + Math.sin(walkPhase.current * 0.7) * 0.25;
         }
 
         if (shadow.current) {
