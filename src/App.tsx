@@ -148,9 +148,16 @@ export function App() {
           onEditSample={(manifest) =>
             setScreen({ name: "preparation", source: { kind: "manifest", manifest }, isNew: true })
           }
-          onPlaySavedLevel={(manifest) => setScreen({ name: "play", manifest, publishable: true })}
+          onPlaySavedLevel={(manifest) =>
+            manifest.courseValidation.status === "failed"
+              ? setScreen({ name: "preparation", source: { kind: "manifest", manifest }, isNew: false })
+              : setScreen({ name: "play", manifest, publishable: true })
+          }
           onEditSavedLevel={(manifest) =>
             setScreen({ name: "preparation", source: { kind: "manifest", manifest }, isNew: false })
+          }
+          onResumeDraft={(manifest, isPersisted) =>
+            setScreen({ name: "preparation", source: { kind: "manifest", manifest }, isNew: !isPersisted })
           }
           onCreateFromPhotos={() => setScreen({ name: "photos" })}
           onImportGlbReady={(assetId) => {

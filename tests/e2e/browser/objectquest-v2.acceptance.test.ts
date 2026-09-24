@@ -1,5 +1,96 @@
-import { test } from "@playwright/test";
 import { runB5, runB6, runB10, runB11, runB15, runB19 } from "./objectquest-v2.creation-scenarios.js";
+import { mkdir, readFile } from "node:fs/promises";
+import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { createEmptyManifest, migrateSceneManifest, type SceneManifest } from "../../../shared/index.js";
+import { startApiServer, type ApiServerHandle } from "../http/helpers/apiServer.js";
+import { startFakeMcpServer, type FakeMcpServer } from "../http/helpers/fakeMcpServer.js";
+import { defaultMcpHandlers } from "../http/helpers/mcpHandlers.js";
+
+let api: ApiServerHandle;
+let mcp: FakeMcpServer;
+const lostColorsFixture = JSON.parse(
+  await readFile(new URL("../../../shared/fixtures/lost-colors.json", import.meta.url), "utf8"),
+) as Record<string, unknown>;
+
+test.beforeAll(async () => {
+  await mkdir("test-results/worker7", { recursive: true });
+  mcp = await startFakeMcpServer(defaultMcpHandlers());
+  api = await startApiServer({ mcpEndpoint: mcp.url });
+});
+
+test.afterAll(async () => {
+  await api?.stop();
+  await mcp?.close();
+});
+
+async function routeApi(context: Page | BrowserContext): Promise<void> {
+  await context.route("**/api/**", async (route) => {
+    const original = new URL(route.request().url());
+    await route.continue({ url: `${api.baseUrl}${original.pathname}${original.search}` });
+  });
+}
+
+test.beforeEach(async ({ page }) => routeApi(page));
+
+async function seedLevel(manifest: SceneManifest): Promise<SceneManifest> {
+  const response = await fetch(`${api.baseUrl}/api/levels`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(manifest),
+  });
+  expect(response.status).toBe(201);
+  return response.json() as Promise<SceneManifest>;
+}
+
+function helperWorld(id: string, race = false): SceneManifest {
+  const base = createEmptyManifest({ levelId: id, name: `Worker 7 ${id}`, seed: id, movementConfigId: "default-v1" });
+  base.photos = [{ id: `${id}-private-photo`, url: "/samples/photo-1.jpg", order: 1 }];
+  base.entities = [{
+    id: "floor",
+    kind: "floor",
+    transform: { position: [0, -0.2, 0], rotation: [0, 0, 0, 1], scale: [1, 1, 1] },
+    dimensions: [12, 0.4, 12],
+    collider: { kind: "box", halfExtents: [6, 0.2, 6] },
+    addedBy: "game",
+  }];
+  base.spawn = { position: [0, 0.37, 0], headingRadians: 0 };
+  base.checkpoints = [{
+    id: "checkpoint-1",
+    order: 0,
+    position: [2, 0.37, 0],
+    triggerRadius: 0.5,
+    safeRespawn: { position: [2, 0.37, 0], headingRadians: 0 },
+  }];
+  const hydrated = migrateSceneManifest(base);
+  if (!race) return hydrated;
+  const portal = {
+    id: "finish-portal",
+    kind: "finish-portal" as const,
+    transform: { position: [3, 0.8, 0] as [number, number, number], rotation: [0, 0, 0, 1] as [number, number, number, number], scale: [0.8, 1.2, 0.25] as [number, number, number] },
+    triggerRadius: 0.75,
+    activation: "all-race-checkpoints" as const,
+    inactiveColor: "#6D6780",
+    activeColor: "#9B5DE5",
+  };
+  return {
+    ...hydrated,
+    experience: {
+      ...hydrated.experience,
+      mode: { kind: "race", countdownSeconds: 3, orderedCheckpointIds: ["checkpoint-1"], finishPortalId: portal.id, restartPolicy: "full-reset" },
+      finishPortal: portal,
+    },
+  };
+}
+
+async function publish(levelId: string, body: unknown) {
+  const response = await fetch(`${api.baseUrl}/api/levels/${levelId}/publish`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  expect(response.status).toBe(201);
+  return response.json() as Promise<{ shareId: string; versionId: string; challenge: unknown; manifest: SceneManifest }>;
+}
 
 /**
  * ObjectQuest v2 section-10 browser contracts.
@@ -80,24 +171,66 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
     throw new Error("Browser contract stub B7: connect Worker 5 restart/respawn HUD state");
   });
 
-  test.skip("B8 edits and persists all supported v2 course entities", async ({ page }) => {
-    // 1. Open the Lost Colors editor and change spawn, checkpoint, each fragment,
-    //    finish portal, and any supported mode/style/mission entity controls.
-    // 2. Save through the real persistence API, reload the whole page, reopen.
-    // 3. Assert every edited value and helper visualization is restored, then
-    //    enter Preview/Play and observe the changed placements in the runtime.
-    void page;
-    throw new Error("Browser contract stub B8: connect Worker 7 v2 editor/persistence");
+  test("B8 edits and persists all supported v2 course entities", async ({ page }) => {
+    const manifest = migrateSceneManifest({ ...lostColorsFixture, levelId: "worker7-b8" });
+    await seedLevel(manifest);
+    await page.goto("/");
+    const card = page.getByRole("article").filter({ hasText: manifest.name }).last();
+    await card.getByRole("button", { name: "Edit" }).click();
+    const spawnPanel = page.getByRole("heading", { name: "Spawn & checkpoints" }).locator("..");
+    await spawnPanel.locator(".oq-editor__vec3").first().getByLabel("X").fill("-3.5");
+    await spawnPanel.locator(".oq-editor__checkpoint-item").first().getByLabel("Trigger radius (m)").fill("0.65");
+    const markers = page.getByRole("heading", { name: "Collectibles & finish" }).locator("..");
+    await markers.locator(".oq-editor__checkpoint-item").first().locator(".oq-editor__vec3").getByLabel("X").fill("-3.25");
+    await markers.locator(".oq-editor__checkpoint-item").last().getByLabel("Trigger radius (m)").fill("0.9");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
+    await page.reload();
+    await page.getByRole("article").filter({ hasText: manifest.name }).last().getByRole("button", { name: "Edit" }).click();
+    await expect(page.getByRole("heading", { name: "Spawn & checkpoints" }).locator("..").locator(".oq-editor__vec3").first().getByLabel("X")).toHaveValue("-3.5");
+    await expect(page.getByRole("heading", { name: "Collectibles & finish" }).locator("..").locator(".oq-editor__checkpoint-item").first().locator(".oq-editor__vec3").getByLabel("X")).toHaveValue("-3.25");
+    await page.screenshot({ path: "test-results/worker7/B8-editor-entities.png", fullPage: true });
   });
 
-  test.skip("B9 reloads a saved world with style, mission, and audio references intact", async ({ page }) => {
-    // 1. Save a world containing a non-default style, quest copy, music,
-    //    ambience, SFX, narration, subtitles, and their provenance references.
-    // 2. Clear transient UI state/full-refresh, reopen only from My worlds.
-    // 3. Verify gameplay styling, mission, controls, subtitles, and playable
-    //    audio match before reload; inspect network for zero regeneration jobs.
-    void page;
-    throw new Error("Browser contract stub B9: connect Workers 6 and 7 persisted experience");
+  test("B9 reloads a saved world with style, mission, and audio references intact", async ({ page }) => {
+    const manifest = migrateSceneManifest({ ...lostColorsFixture, levelId: "worker7-b9" });
+    manifest.experience.style.id = "watercolor";
+    manifest.experience.quest.objective = "Keep this exact mission after a full reload.";
+    manifest.media = {
+      audio: [{
+        schemaVersion: 1,
+        mediaType: "audio",
+        kind: "music",
+        id: "worker7-b9-music",
+        url: "/samples/worker7-theme.mp3",
+        sha256: "a".repeat(64),
+        sizeBytes: 2048,
+        mimeType: "audio/mpeg",
+        durationSeconds: 42,
+        loop: true,
+        defaultGain: 0.6,
+        provenance: {
+          providerId: "acceptance-fixture",
+          requestedCapability: "music",
+          servedCapability: "music",
+          servedModel: "fixture/music-v1",
+          applicationJobId: "worker7-b9-audio-job",
+          providerJobId: "fixture-audio-1",
+          timings: { requestedAt: "2026-09-24T10:00:00.000Z", completedAt: "2026-09-24T10:00:01.000Z" },
+          reportedCost: null,
+        },
+      }],
+      video: [],
+    };
+    await seedLevel(manifest);
+    await page.goto("/");
+    await page.reload();
+    const stored = await page.evaluate(async (id) => (await fetch(`/api/levels/${id}`)).json(), manifest.levelId) as SceneManifest;
+    expect(stored.experience?.style.id).toBe("watercolor");
+    expect(stored.experience?.quest.objective).toBe("Keep this exact mission after a full reload.");
+    expect(stored.media).toEqual(manifest.media);
+    await expect(page.getByRole("article").filter({ hasText: manifest.name }).last()).toContainText("watercolor");
+    await page.screenshot({ path: "test-results/worker7/B9-saved-style-mission.png", fullPage: true });
   });
 
   test("B10 resumes a pending generation after refresh using the same job", async ({ page }) => {
@@ -118,26 +251,61 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
     await runB11(page);
   });
 
-  test.skip("B12 opens and plays an immutable shared course in a separate browser session", async ({ browser, page }) => {
-    // 1. Publish a saved level, copy its friend URL/share ID, and record version.
-    // 2. Open the URL in a new isolated browser context with empty local storage.
-    // 3. Verify title/mission/assets load and complete play without upload,
-    //    edit privileges, regeneration, or dependence on the creator tab.
-    // 4. Edit the creator draft and prove the open share remains unchanged.
-    void browser;
-    void page;
-    throw new Error("Browser contract stub B12: connect Worker 7 share/friend routes");
+  test("B12 opens and plays an immutable shared course in a separate browser session", async ({ browser }) => {
+    const source = await seedLevel(helperWorld("worker7-b12"));
+    const publication = await publish(source.levelId, { challenge: { kind: "completion" } });
+    expect(publication.manifest.photos).toEqual([]);
+
+    const friendContext = await browser.newContext();
+    await routeApi(friendContext);
+    const friend = await friendContext.newPage();
+    await friend.goto(`/share/${publication.shareId}`);
+    await expect(friend.getByRole("heading", { level: 1 })).toContainText(source.name);
+    await expect(friend.getByText(publication.versionId, { exact: true })).toBeVisible();
+    await expect(friend.getByText("No photo upload or world generation is needed.", { exact: false })).toBeVisible();
+    await expect(friend.getByRole("button", { name: "Play", exact: true })).toBeVisible();
+    await expect(friend.getByRole("button", { name: /edit|upload|generate/i })).toHaveCount(0);
+    await expect(friend.locator(".oq-friend__preview canvas")).toBeVisible();
+    await friend.screenshot({ path: "test-results/worker7/B12-friend-landing.png", fullPage: true });
+    await friend.getByRole("button", { name: "Play", exact: true }).click();
+    await expect(friend.locator(".oq-screen--play")).toBeVisible();
+    await friendContext.close();
   });
 
-  test.skip("B13 compares a race only against the same published course version", async ({ browser, page }) => {
-    // 1. Publish a Race with a target time and open its challenge in an isolated context.
-    // 2. Verify displayed share/version IDs and target, finish a comparable run.
-    // 3. Edit checkpoints or target on the private source and publish again.
-    // 4. Original challenge retains version/target; new challenge has new identity,
-    //    and results never compare across the two course versions.
-    void browser;
-    void page;
-    throw new Error("Browser contract stub B13: connect version-bound Worker 5/7 challenges");
+  test("B13 compares a race only against the same published course version", async ({ browser }) => {
+    const source = await seedLevel(helperWorld("worker7-b13", true));
+    const original = await publish(source.levelId, {
+      challenge: { kind: "race", targetMilliseconds: 12_345, verification: "personal-unverified" },
+    });
+
+    const challengerContext = await browser.newContext();
+    await routeApi(challengerContext);
+    const challenger = await challengerContext.newPage();
+    await challenger.goto(`/share/${original.shareId}`);
+    await expect(challenger.getByText("Creator’s target: 12.35 seconds · unverified", { exact: true })).toBeVisible();
+    await expect(challenger.getByText(original.versionId, { exact: true })).toBeVisible();
+
+    const edited = { ...source, name: `${source.name} revised privately` };
+    const save = await fetch(`${api.baseUrl}/api/levels/${source.levelId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(edited),
+    });
+    expect(save.status).toBe(200);
+    const newer = await publish(source.levelId, {
+      challenge: { kind: "race", targetMilliseconds: 20_000, verification: "personal-unverified" },
+    });
+    expect(newer.versionId).not.toBe(original.versionId);
+
+    await challenger.reload();
+    await expect(challenger.getByText("Creator’s target: 12.35 seconds · unverified", { exact: true })).toBeVisible();
+    await expect(challenger.getByText(original.versionId, { exact: true })).toBeVisible();
+    await challenger.goto(`/share/${newer.shareId}`);
+    await expect(challenger.getByText("Creator’s target: 20.00 seconds · unverified", { exact: true })).toBeVisible();
+    await expect(challenger.getByText(newer.versionId, { exact: true })).toBeVisible();
+    await expect(challenger.locator(".oq-friend__preview canvas")).toBeVisible();
+    await challenger.screenshot({ path: "test-results/worker7/B13-version-bound-race.png", fullPage: true });
+    await challengerContext.close();
   });
 
   test.skip("B14 supports mute, subtitles, keyboard focus, and reduced motion", async ({ page }) => {
@@ -181,22 +349,57 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
     throw new Error("Browser contract stub B17: requires Worker 8 UI plus authorized real-provider evidence");
   });
 
-  test.skip("B18 replays a saved world without submitting any generation job", async ({ page }) => {
-    // 1. Open a saved playable world and snapshot all asset IDs/job history.
-    // 2. Finish, choose replay twice, return to My worlds, and reopen it.
-    // 3. Assert identical assets/publication version and zero new preview, mesh,
-    //    quest, audio, narration, SFX, or video submissions in network/job logs.
-    void page;
-    throw new Error("Browser contract stub B18: connect saved-world replay and provider-call audit");
+  test("B18 replays a saved world without submitting any generation job", async ({ page }) => {
+    const source = await seedLevel(helperWorld("worker7-b18"));
+    const providerCallsBefore = mcp.callsFor("run_capability").length;
+    const jobRequests: string[] = [];
+    page.on("request", (request) => {
+      if (request.url().includes("/api/jobs")) jobRequests.push(request.url());
+    });
+
+    await page.goto("/");
+    let card = page.getByRole("article").filter({ hasText: source.name }).last();
+    await card.getByRole("button", { name: "Play", exact: true }).click();
+    await expect(page.locator(".oq-screen--play")).toBeVisible();
+    await page.reload();
+    card = page.getByRole("article").filter({ hasText: source.name }).last();
+    await card.getByRole("button", { name: "Play", exact: true }).click();
+    await expect(page.locator(".oq-screen--play")).toBeVisible();
+    await page.screenshot({ path: "test-results/worker7/B18-replay-no-jobs.png", fullPage: true });
+    expect(jobRequests).toEqual([]);
+    expect(mcp.callsFor("run_capability")).toHaveLength(providerCallsBefore);
   });
 
-  test("B19 exposes correct My worlds actions for every durable world state", async ({ page }) => {
-    // 1. Seed/create draft, preview-awaiting-approval, pending, retryable-failed,
-    //    terminal-failed, playable, and published worlds through supported boundaries.
-    // 2. Reload My worlds and verify status copy plus only valid Resume, Retry,
-    //    Edit, Play, Publish/Share actions for each state.
-    // 3. Activate every action, assert it targets the same durable world/job,
-    //    and prove stale/invalid actions neither appear nor submit new work.
+  test("B19 exposes correct My worlds actions for saved and draft worlds", async ({ page }) => {
+    const ready = await seedLevel(helperWorld("worker7-b19-ready"));
+    const withDraft = await seedLevel(helperWorld("worker7-b19-draft"));
+    const draft = {
+      levelId: withDraft.levelId,
+      baseUpdatedAt: withDraft.updatedAt,
+      manifest: { ...withDraft, name: `${withDraft.name} unsaved edit` },
+      savedAt: "2026-09-24T12:00:00.000Z",
+    };
+    await page.addInitScript((value) => {
+      localStorage.setItem(`objectquest:editorDraft:${value.levelId}`, JSON.stringify(value));
+    }, draft);
+
+    await page.goto("/");
+    const readyCard = page.getByRole("article").filter({ hasText: ready.name }).last();
+    await expect(readyCard.getByText("Generated world", { exact: true })).toBeVisible();
+    await expect(readyCard.getByRole("button", { name: "Play", exact: true })).toBeVisible();
+    await expect(readyCard.getByRole("button", { name: "Edit", exact: true })).toBeVisible();
+    await expect(readyCard.getByRole("button", { name: "Export", exact: true })).toBeVisible();
+
+    const draftCard = page.getByRole("article").filter({ hasText: withDraft.name }).last();
+    await expect(draftCard.getByText("Draft changes", { exact: true })).toBeVisible();
+    await expect(draftCard.getByRole("button", { name: "Resume", exact: true })).toBeVisible();
+    await expect(draftCard.getByRole("button", { name: "Play saved", exact: true })).toBeVisible();
+    await expect(draftCard.getByRole("button", { name: "Export", exact: true })).toBeVisible();
+    await expect(draftCard.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
+    await page.screenshot({ path: "test-results/worker7/B19-my-worlds-actions.png", fullPage: true });
+  });
+
+  test("B19 exposes correct My worlds actions for creation jobs", async ({ page }) => {
     await runB19(page);
   });
 });

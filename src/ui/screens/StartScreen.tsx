@@ -5,8 +5,9 @@ import type { SceneManifest } from "@shared/index.js";
 import { listDrafts } from "../../editor/draftStorage.js";
 import {
   missingAssetUrls,
+  savedWorldOrigin,
   savedWorldItems,
-  type MyWorldListItem,
+  type WorldListItem,
 } from "../worlds.js";
 import {
   describeApiError,
@@ -26,7 +27,8 @@ interface StartScreenProps {
   onCreateFromPhotos: () => void;
   onImportGlbReady: (assetId: string) => void;
   onImportLevelBundleReady: (manifest: SceneManifest) => void;
-  additionalWorldItems?: readonly Extract<MyWorldListItem, { kind: "pending" | "failed" }>[];
+  additionalWorldItems?: readonly Extract<WorldListItem, { kind: "pending" | "failed" }>[];
+  onResumeDraft?: (manifest: SceneManifest, isPersisted: boolean) => void;
   onResumePendingWorld?: (jobId: string) => void;
   onRetryFailedWorld?: (jobId: string) => void;
 }
@@ -39,6 +41,7 @@ export function StartScreen({
   onCreateFromPhotos,
   onImportGlbReady,
   onImportLevelBundleReady,
+  onResumeDraft,
   additionalWorldItems = [],
   onResumePendingWorld,
   onRetryFailedWorld,
@@ -213,28 +216,30 @@ export function StartScreen({
               if (item.kind === "pending") return <Card key={`pending-${item.id}`} className="oq-kit-stack">
                 <p className="oq-kit-eyebrow">In progress</p><h3>{item.title || "Untitled world"}</h3>
                 <p className="oq-kit-muted">{item.statusText ?? `Generation is ${item.job.state}. Leaving this page does not cancel it.`}</p>
-                <Button onClick={() => onResumePendingWorld?.(item.job.id)} disabled={!onResumePendingWorld}>{item.actionLabel ?? "Resume"}</Button>
+                {onResumePendingWorld ? <Button onClick={() => onResumePendingWorld(item.job.id)}>{item.actionLabel ?? "Resume"}</Button> : null}
               </Card>;
               if (item.kind === "failed") return <Card key={`failed-${item.id}`} className="oq-kit-stack">
                 <p className="oq-kit-eyebrow">Needs attention</p><h3>{item.title || "Untitled world"}</h3>
                 <p className="oq-kit-error">{item.statusText ?? item.job.uiMessage ?? "This generation stage needs another try."}</p>
-                <Button onClick={() => onRetryFailedWorld?.(item.job.id)} disabled={!onRetryFailedWorld}>{item.actionLabel ?? "Retry"}</Button>
+                {onRetryFailedWorld && (item.job.lastError?.retryable || item.actionLabel === "Review choices")
+                  ? <Button onClick={() => onRetryFailedWorld(item.job.id)}>{item.actionLabel ?? "Retry"}</Button>
+                  : <p className="oq-kit-muted">This stage can’t be retried automatically.</p>}
               </Card>;
               if (item.kind === "draft") return <Card key={`draft-${item.id}`} className="oq-kit-stack">
                 <p className="oq-kit-eyebrow">Draft</p><h3>{item.draft.manifest.name || "Untitled world"}</h3>
                 <p className="oq-kit-muted">Unsaved course edits · {item.draft.manifest.experience?.mode.kind ?? "explore"}</p>
-                <Button onClick={() => onEditSavedLevel(item.draft.manifest)}>Resume</Button>
+                <Button onClick={() => (onResumeDraft ?? ((next) => onEditSavedLevel(next)))(item.draft.manifest, false)}>Resume</Button>
               </Card>;
               const { manifest, draft } = item;
               return <Card key={manifest.levelId} className="oq-kit-stack">
-                <p className="oq-kit-eyebrow">{draft ? "Draft changes" : "Private saved world"}</p>
+                <p className="oq-kit-eyebrow">{draft ? "Draft changes" : savedWorldOrigin(manifest) === "generated" ? "Generated world" : savedWorldOrigin(manifest) === "sample-copy" ? "Bundled sample copy" : "Imported world"}</p>
                 <h3>{manifest.name || "Untitled world"}</h3>
                 <p className="oq-kit-muted">{manifest.experience?.style.id ?? "cartoon"} · {manifest.experience?.mode.kind ?? "explore"} · {manifest.checkpoints.length} checkpoints</p>
                 {assetIssues[manifest.levelId] ? <p className="oq-kit-error" role="alert">{assetIssues[manifest.levelId]}</p> : null}
                 <div className="oq-kit-row">
-                  {draft ? <Button onClick={() => onEditSavedLevel(manifest)}>Resume</Button> : <Button onClick={() => handlePlaySaved(manifest)} loading={checkingLevelId === manifest.levelId} loadingLabel="Checking assets…">Play</Button>}
+                  {draft ? <Button onClick={() => (onResumeDraft ?? ((next) => onEditSavedLevel(next)))(draft.manifest, true)}>Resume</Button> : <Button onClick={() => handlePlaySaved(manifest)} loading={checkingLevelId === manifest.levelId} loadingLabel="Checking assets…">Play</Button>}
                   {draft ? <Button variant="secondary" onClick={() => handlePlaySaved(manifest)} loading={checkingLevelId === manifest.levelId} loadingLabel="Checking assets…">Play saved</Button> : null}
-                  <Button variant="secondary" onClick={() => onEditSavedLevel(manifest)}>Edit</Button>
+                  {!draft ? <Button variant="secondary" onClick={() => onEditSavedLevel(manifest)}>Edit</Button> : null}
                   <Button variant="ghost" onClick={() => handleExport(manifest)} disabled={exportingLevelId !== null} loading={exportingLevelId === manifest.levelId} loadingLabel="Exporting…">Export</Button>
                 </div>
               </Card>;

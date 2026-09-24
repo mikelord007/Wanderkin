@@ -3,7 +3,7 @@ import type { EditorDraft } from "../editor/draftStorage.js";
 
 /** Shared My worlds boundary. Worker 4 can append pending/failed job items
  * without owning or duplicating the saved-level rendering rules. */
-export type MyWorldListItem =
+export type WorldListItem =
   | {
       kind: "saved";
       id: string;
@@ -35,9 +35,9 @@ export type MyWorldListItem =
 export function savedWorldItems(
   manifests: readonly SceneManifest[],
   drafts: readonly EditorDraft[],
-): MyWorldListItem[] {
+): WorldListItem[] {
   const draftsByLevel = new Map(drafts.map((draft) => [draft.levelId, draft]));
-  const saved = manifests.map((manifest): MyWorldListItem => ({
+  const saved = manifests.map((manifest): WorldListItem => ({
     kind: "saved",
     id: manifest.levelId,
     manifest,
@@ -45,8 +45,16 @@ export function savedWorldItems(
   }));
   const unsaved = drafts
     .filter((draft) => !manifests.some((manifest) => manifest.levelId === draft.levelId))
-    .map((draft): MyWorldListItem => ({ kind: "draft", id: draft.levelId, draft }));
+    .map((draft): WorldListItem => ({ kind: "draft", id: draft.levelId, draft }));
   return [...unsaved, ...saved];
+}
+
+export function savedWorldOrigin(manifest: SceneManifest): "generated" | "sample-copy" | "imported" {
+  if (manifest.assets.some((asset) => asset.generation || asset.provenance) || manifest.photos.length > 0) {
+    return "generated";
+  }
+  if (manifest.assets.some((asset) => asset.url.startsWith("/samples/"))) return "sample-copy";
+  return "imported";
 }
 
 export async function missingAssetUrls(
