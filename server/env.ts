@@ -53,4 +53,8 @@ export const env = {
   diagnosticsToken: process.env.DIAGNOSTICS_TOKEN ?? "",
   legacyOpen: booleanValue(process.env.OBJECTQUEST_LEGACY_OPEN, process.env.NODE_ENV !== "production"),
   secureOwnerCookie: booleanValue(process.env.OBJECTQUEST_SECURE_COOKIE, process.env.NODE_ENV === "production"),
+  uploadMaxImageWidth: boundedInteger(process.env.UPLOAD_MAX_IMAGE_WIDTH, 12_000, 128, 100_000),
+  uploadMaxImageHeight: boundedInteger(process.env.UPLOAD_MAX_IMAGE_HEIGHT, 12_000, 128, 100_000),
+  uploadMaxImagePixels: boundedInteger(process.env.UPLOAD_MAX_IMAGE_PIXELS, 40_000_000, 16_384, 1_000_000_000),
+  uploadDecodeBudgetBytes: boundedInteger(process.env.UPLOAD_DECODE_BUDGET_BYTES, 256 * 1024 * 1024, 1024 * 1024, 2_147_483_647),
 };

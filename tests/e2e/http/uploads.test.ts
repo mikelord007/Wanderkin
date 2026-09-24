@@ -97,6 +97,18 @@ describe("POST /api/uploads + GET /api/photos/files/:name", () => {
     expect(body.message).toMatch(/limit|large|20/i);
   });
 
+  it("rejects oversized decoded dimensions from the image header before decode", async () => {
+    const oversized = Buffer.alloc(512);
+    oversized.set([137, 80, 78, 71, 13, 10, 26, 10]);
+    oversized.writeUInt32BE(20_000, 16);
+    oversized.writeUInt32BE(20_000, 20);
+    const form = new FormData();
+    form.append("photos", new Blob([oversized], { type: "image/png" }), "pixel-bomb.png");
+    const res = await fetch(`${api.baseUrl}/api/uploads`, { method: "POST", body: form });
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ message: expect.stringMatching(/decoded-pixel limit/i) });
+  });
+
   it("rejects a request with no files under the expected field name", async () => {
     const form = new FormData();
     form.append("notPhotos", "irrelevant");

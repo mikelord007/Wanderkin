@@ -22,6 +22,7 @@ import { logServerError } from "./util/sanitize.js";
 import { createRateLimiter, isBillableRoute, isUploadRoute } from "./security/rateLimit.js";
 import { createDiagnosticsRouter } from "./security/diagnostics.js";
 import { OwnerSecurity } from "./security/owner.js";
+import { ImageDecodeBudget } from "./security/imageDimensions.js";
 
 /**
  * Foundation API shell plus the Livepeer provider/job/asset routes (owned by
@@ -53,6 +54,7 @@ const jobStore = new JobStore(env.storageDir);
 const spendLedger = new SpendLedger(env.storageDir);
 const previewCache = new PreviewCacheStore(env.storageDir);
 const ownerSecurity = new OwnerSecurity(env.storageDir, env.legacyOpen, env.secureOwnerCookie);
+const imageDecodeBudget = new ImageDecodeBudget(env.uploadDecodeBudgetBytes);
 const sourceBytes = {
   async getPhotoBytes(id: string) {
     return (await photoStore.get(id))
@@ -84,7 +86,14 @@ app.get("/api/movement-config", (_req, res) => {
 
 app.use(createCapabilitiesRouter(adapter));
 app.use(createDiagnosticsRouter(spendLedger, env.diagnosticsToken));
-app.use(createUploadsRouter(photoStore, ownerSecurity));
+app.use(createUploadsRouter(photoStore, ownerSecurity, {
+  limits: {
+    maxWidth: env.uploadMaxImageWidth,
+    maxHeight: env.uploadMaxImageHeight,
+    maxPixels: env.uploadMaxImagePixels,
+  },
+  budget: imageDecodeBudget,
+}));
 app.use(createPhotosRouter(photoStore, ownerSecurity));
 app.use(createAssetsRouter(assetStore, ownerSecurity));
 app.use(createGeneratedAssetsRouter(generatedAssetStore, ownerSecurity));
