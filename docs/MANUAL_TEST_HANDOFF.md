@@ -11,6 +11,13 @@ respond before testing.
 - API health: <http://localhost:8787/api/health>
 - Shared-world route pattern: `http://localhost:5173/share/<shareId>`
 
+Confirmed on 2026-09-24: the app and design kit return their expected pages,
+the API health route returns `{"status":"ok"}`, and an unknown `/share/...`
+client URL returns the ObjectQuest SPA for client-side routing.
+
+Leave `npm run dev` running throughout the manual play-test so Vite remains on
+port 5173 and the API remains on port 8787. Stop it only after testing is done.
+
 ## Controls
 
 - `W` `A` `S` `D` or arrow keys: move relative to the camera.
