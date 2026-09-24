@@ -1,0 +1,36 @@
+/* Pocket Wonder. Scope tokens so legacy screens can migrate independently. */
+.oq-theme, [data-world-style] {
+  --oq-paper: #f7f4ec;
+  --oq-surface: #fffdf8;
+  --oq-inset: #eeeae2;
+  --oq-ink: #282536;
+  --oq-muted: #625d6b;
+  --oq-line: #d9d3cc;
+  --oq-control-line: #89818d;
+  --oq-action: #6543b5;
+  --oq-action-hover: #50328f;
+  --oq-wash: #eee6ff;
+  --oq-accent-ink: #4c2f85;
+  --oq-success-ink: #286544;
+  --oq-error-ink: #a12e39;
+  --oq-warning-ink: #795011;
+  --oq-font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --oq-font-display: Georgia, Cambria, "Times New Roman", serif;
+  --oq-space-1: 4px; --oq-space-2: 8px; --oq-space-3: 12px;
+  --oq-space-4: 16px; --oq-space-5: 24px; --oq-space-6: 32px;
+  --oq-space-7: 48px; --oq-space-8: 64px;
+  --oq-round-sm: 8px; --oq-round-md: 16px; --oq-round-lg: 24px;
+  --oq-round-pill: 999px;
+  --oq-elevation: 0 8px 28px #2825360a;
+  --oq-duration: 160ms;
+  --oq-ease: cubic-bezier(.2,.7,.3,1);
+  color-scheme: light;
+}
+[data-world-style="hand-painted"] {
+  --oq-action: #a3442f; --oq-action-hover: #833322;
+  --oq-wash: #f8e5d9; --oq-accent-ink: #843622;
+}
+[data-world-style="watercolor"] {
+  --oq-action: #246b70; --oq-action-hover: #195459;
+  --oq-wash: #dcefed; --oq-accent-ink: #19565b;
+}
