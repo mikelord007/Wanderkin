@@ -14,6 +14,7 @@ import {
   saveActiveSource,
 } from "./ui/jobStorage.js";
 import { createLevel, downloadLevelBundle, saveLevel } from "./ui/api.js";
+import { loadActiveCreation } from "./ui/creationStorage.js";
 
 type Screen =
   | { name: "start" }
@@ -35,6 +36,8 @@ function initialScreen(): Screen {
     };
   }
   if (resume.screen === "photos") return { name: "photos" };
+  const creation = loadActiveCreation();
+  if (creation && creation.step !== "ready") return { name: "photos" };
   return { name: "start" };
 }
 

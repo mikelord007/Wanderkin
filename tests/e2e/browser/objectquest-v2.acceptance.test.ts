@@ -1,4 +1,5 @@
 import { test } from "@playwright/test";
+import { runB5, runB6, runB10, runB11, runB15, runB19 } from "./objectquest-v2.creation-scenarios.js";
 
 /**
  * ObjectQuest v2 section-10 browser contracts.
@@ -51,25 +52,22 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
     throw new Error("Browser contract stub B4: connect Worker 5 mode flows");
   });
 
-  test.skip("B5 uploads or captures an image and reviews the isolated object", async ({ page, context }) => {
+  test("B5 uploads or captures an image and reviews the isolated object", async ({ page, context }) => {
     // 1. Upload a valid rotated photo; review corrected orientation and object.
     // 2. Replace/crop/accept it and prove only the accepted source is selected.
     // 3. If capture is supported, grant camera permission, capture, retake, and
     //    accept through visible controls; record unsupported-device behavior.
     // 4. Confirm no paid generation request occurs during object review.
-    void page;
-    void context;
-    throw new Error("Browser contract stub B5: connect Worker 4 upload/capture/review UI");
+    await runB5(page, context);
   });
 
-  test.skip("B6 requires explicit preview approval before the matching 3D build", async ({ page }) => {
+  test("B6 requires explicit preview approval before the matching 3D build", async ({ page }) => {
     // 1. Choose style A, create its preview, then switch to style B and preview.
     // 2. Inspect network/jobs: neither selection nor preview may submit 3D.
     // 3. Approve B, refresh, and assert the approved preview remains identifiable.
     // 4. Click Build once; assert one image-to-3D request uses B's exact durable
     //    asset/digest, style version, atmosphere, mode, and source identity.
-    void page;
-    throw new Error("Browser contract stub B6: connect Worker 4 approval gate and job evidence");
+    await runB6(page);
   });
 
   test.skip("B7 restarts and respawns without duplicate rewards or stale race time", async ({ page }) => {
@@ -102,24 +100,22 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
     throw new Error("Browser contract stub B9: connect Workers 6 and 7 persisted experience");
   });
 
-  test.skip("B10 resumes a pending generation after refresh using the same job", async ({ page }) => {
+  test("B10 resumes a pending generation after refresh using the same job", async ({ page }) => {
     // 1. Start a deliberately delayed fake/authorized generation and capture
     //    application/provider job IDs while the world is visibly pending.
     // 2. Refresh, navigate away, and return through My worlds Resume.
     // 3. Observe continued progress to ready/failed with identical IDs and one
     //    provider submission; no duplicate uploads or generation are allowed.
-    void page;
-    throw new Error("Browser contract stub B10: connect Worker 4 pending-world resume");
+    await runB10(page);
   });
 
-  test.skip("B11 keeps the level usable when an optional audio or video job fails", async ({ page }) => {
+  test("B11 keeps the level usable when an optional audio or video job fails", async ({ page }) => {
     // 1. Begin with a playable saved level and successful mesh/one media asset.
     // 2. Induce or observe a narration/postcard failure and inspect honest UI.
     // 3. Enter/replay, edit, save, and share the level while that asset is failed.
     // 4. Retry only the failed kind and assert the mesh/course/successful asset
     //    IDs remain unchanged and no image-to-3D request is submitted.
-    void page;
-    throw new Error("Browser contract stub B11: connect optional failure and retry flows");
+    await runB11(page);
   });
 
   test.skip("B12 opens and plays an immutable shared course in a separate browser session", async ({ browser, page }) => {
@@ -155,15 +151,13 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
     throw new Error("Browser contract stub B14: connect Worker 6 and shared accessibility controls");
   });
 
-  test.skip("B15 recovers from camera denial and gives useful invalid-input errors", async ({ page, context }) => {
+  test("B15 recovers from camera denial and gives useful invalid-input errors", async ({ page, context }) => {
     // 1. Deny camera permission and assert a clear explanation plus working upload fallback.
     // 2. Try wrong MIME/magic bytes, empty, oversized, and excessive-dimension images.
     // 3. Each error identifies the remedy, retains safe prior state, and permits
     //    a subsequent valid upload without refresh.
     // 4. Inspect requests to prove invalid inputs reach no billable endpoint.
-    void page;
-    void context;
-    throw new Error("Browser contract stub B15: connect Worker 4 denial and validation UI");
+    await runB15(page, context);
   });
 
   test.skip("B16 records, previews, and downloads an actual gameplay highlight where supported", async ({ page }) => {
@@ -196,14 +190,13 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
     throw new Error("Browser contract stub B18: connect saved-world replay and provider-call audit");
   });
 
-  test.skip("B19 exposes correct My worlds actions for every durable world state", async ({ page }) => {
+  test("B19 exposes correct My worlds actions for every durable world state", async ({ page }) => {
     // 1. Seed/create draft, preview-awaiting-approval, pending, retryable-failed,
     //    terminal-failed, playable, and published worlds through supported boundaries.
     // 2. Reload My worlds and verify status copy plus only valid Resume, Retry,
     //    Edit, Play, Publish/Share actions for each state.
     // 3. Activate every action, assert it targets the same durable world/job,
     //    and prove stale/invalid actions neither appear nor submit new work.
-    void page;
-    throw new Error("Browser contract stub B19: connect Worker 4/7 My worlds state actions");
+    await runB19(page);
   });
 });
