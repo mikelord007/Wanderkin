@@ -1,6 +1,9 @@
 import { rmSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { GenerationJob } from "../../../shared/job.js";
+import type { GenerationProvenance } from "../../../shared/provenance.js";
+import { PreviewCacheStore } from "../../../server/jobs/previewCache.js";
+import { GeneratedAssetStore } from "../../../server/persistence/generatedAssetStore.js";
 import { startApiServer, type ApiServerHandle } from "./helpers/apiServer.js";
 import { startFakeMcpServer, type FakeMcpServer } from "./helpers/fakeMcpServer.js";
 import { readSamplePhoto, uniqueIdempotencyKey } from "./helpers/fixtures.js";
@@ -211,5 +214,142 @@ describe("POST /api/jobs, status, retry, and restart reconciliation", () => {
     expect(unknown.status).toBe(404);
     const unknownBody = (await unknown.json()) as { message: string };
     expect(unknownBody).toEqual({ message: "Job not found" });
+  });
+
+  it("submits and deduplicates a shared v2 text job and records world spend", async () => {
+    await boot();
+    const key = uniqueIdempotencyKey("v2-text");
+    const request = {
+      schemaVersion: 1,
+      kind: "text",
+      capability: "gemini-text",
+      idempotencyKey: key,
+      purpose: "quest-text",
+      prompt: "Return a constrained Lost Colors quest JSON object.",
+      output: "quest-json",
+      maxCharacters: 1200,
+    } as const;
+    const send = () => fetch(`${api!.baseUrl}/api/jobs/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": key },
+      body: JSON.stringify({ request, worldId: "world-v2-text", maxCostUsd: 0.01 }),
+    });
+    const first = await send();
+    const firstJob = await first.json() as GenerationJob;
+    const second = await send();
+    const secondJob = await second.json() as GenerationJob;
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(200);
+    expect(secondJob.id).toBe(firstJob.id);
+    expect(firstJob).toMatchObject({ kind: "text", state: "generating", request: { purpose: "quest-text" } });
+    expect(mcp!.callsFor("run_capability")).toHaveLength(1);
+    const spend = await fetch(`${api!.baseUrl}/api/jobs/spend/world-v2-text`);
+    expect(await spend.json()).toMatchObject({ worldId: "world-v2-text", entries: 1, unknownEntries: 0 });
+  });
+
+  it("hard-rejects an over-budget v2 mesh before upload or provider submission", async () => {
+    await boot();
+    const photo = await uploadPhoto(1);
+    const key = uniqueIdempotencyKey("v2-budget");
+    const response = await fetch(`${api!.baseUrl}/api/jobs/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": key },
+      body: JSON.stringify({
+        request: {
+          schemaVersion: 1, kind: "image-to-3d", capability: "rodin-i3d", idempotencyKey: key,
+          purpose: "world-mesh", photos: [{ photoId: photo.id, sourceIndex: 1 }],
+        },
+        worldId: "world-over-budget",
+        maxCostUsd: 0.1,
+      }),
+    });
+    expect(response.status).toBe(402);
+    expect(await response.json()).toMatchObject({ code: "budget_exceeded", message: expect.stringMatching(/per-request limit/) });
+    expect(mcp!.callsFor("upload")).toHaveLength(0);
+    expect(mcp!.callsFor("run_capability")).toHaveLength(0);
+  });
+
+  it("uses a generated cutout for 3D, keeps style provenance provider-inert, and reuses its hosted URL on retry", async () => {
+    await boot();
+    const generatedAssets = new GeneratedAssetStore(api!.storageDir);
+    const provenance = (requestedCapability: string, applicationJobId: string): GenerationProvenance => ({
+      providerId: "fake-provider",
+      requestedCapability,
+      servedCapability: requestedCapability,
+      servedModel: "fake/model",
+      applicationJobId,
+      providerJobId: `provider-${applicationJobId}`,
+      timings: { requestedAt: "2026-09-24T00:00:00.000Z" },
+      reportedCost: null,
+    });
+    const cutout = await generatedAssets.storeImage(
+      readSamplePhoto(1),
+      "image/jpeg",
+      provenance("bg-remove", "job-cutout"),
+    );
+    const styleReference = await generatedAssets.storeImage(
+      readSamplePhoto(2),
+      "image/jpeg",
+      provenance("kontext-edit", "job-style-preview"),
+    );
+    const previewCache = new PreviewCacheStore(api!.storageDir);
+    const previewKey = "a".repeat(64);
+    await previewCache.put(previewKey, "job-style-preview");
+    // Exercise backward compatibility with approvals written before cache
+    // records carried a direct generated-asset id.
+    await previewCache.approve(previewKey, "job-style-preview");
+    const key = uniqueIdempotencyKey("v2-generated-cutout");
+    const request = {
+      schemaVersion: 1,
+      kind: "image-to-3d",
+      capability: "rodin-i3d",
+      idempotencyKey: key,
+      purpose: "world-mesh",
+      sourceImageAssetIds: [cutout.id],
+      styleReferenceAssetId: styleReference.id,
+      scenePrompt: "Preserve the reviewed object silhouette.",
+    } as const;
+    const post = (body: unknown) => fetch(`${api!.baseUrl}/api/jobs/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": key },
+      body: JSON.stringify({ request: body, worldId: "world-generated-cutout" }),
+    });
+
+    mcp!.setHandler("run_capability", () => ({
+      error: "temporary provider failure",
+      error_retryable: true,
+    }));
+    const failedResponse = await post(request);
+    expect(failedResponse.status).toBe(502);
+    const failed = await failedResponse.json() as GenerationJob;
+    expect(failed).toMatchObject({
+      request: {
+        sourceImageAssetIds: [cutout.id],
+        styleReferenceAssetId: styleReference.id,
+      },
+      provenance: {
+        sourceImageAssetIds: [cutout.id],
+        styleReferenceAssetId: styleReference.id,
+      },
+    });
+
+    mcp!.setHandler("run_capability", runCapabilitySucceeds());
+    const retryResponse = await fetch(`${api!.baseUrl}/api/jobs/${failed.id}/retry`, { method: "POST" });
+    expect(retryResponse.status).toBe(200);
+    const retried = await retryResponse.json() as GenerationJob;
+    expect(retried.provenance).toMatchObject({
+      sourceImageAssetIds: [cutout.id],
+      styleReferenceAssetId: styleReference.id,
+    });
+    expect(mcp!.callsFor("upload")).toHaveLength(1);
+    const runCalls = mcp!.callsFor("run_capability");
+    expect(runCalls).toHaveLength(2);
+    expect(runCalls[1]!.args.inputs).toEqual(runCalls[0]!.args.inputs);
+    expect(runCalls[1]!.args.source_url).toBe(runCalls[0]!.args.source_url);
+    expect(JSON.stringify(runCalls[0]!.args)).not.toContain(styleReference.id);
+
+    const conflict = await post({ ...request, styleReferenceAssetId: undefined });
+    expect(conflict.status).toBe(409);
+    expect(mcp!.callsFor("run_capability")).toHaveLength(2);
   });
 });

@@ -24,7 +24,16 @@ interface GenerationRequestBase {
 
 export interface ImageTo3dGenerationRequest extends GenerationRequestBase {
   kind: "image-to-3d";
-  photos: readonly ProviderInputPhoto[];
+  /** Original uploads, kept for backward compatibility. At least one photo
+   * or generated source image must be supplied. When both are present,
+   * generated images follow photos in the provider input order. */
+  photos?: readonly ProviderInputPhoto[];
+  /** Reviewed generated images (normally a background-removed cutout) used
+   * as provider inputs in this exact order. */
+  sourceImageAssetIds?: readonly string[];
+  /** Approved style preview used only as durable visual-direction evidence.
+   * It must never be submitted as a provider image input. */
+  styleReferenceAssetId?: string;
   scenePrompt?: string;
 }
 
