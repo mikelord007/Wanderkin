@@ -14,7 +14,7 @@ export async function installCreationMock(page: Page, options: { shapeState?: "g
   const cutoutAsset = { ...previewAsset, id: "cutout-1", url: "/samples/photo-4.jpg", sha256: "1".repeat(64) };
   const meshAsset = { id: "mesh-1", url: "/samples/rodin.glb", sha256: "7".repeat(64), sizeBytes: 1024, provenance };
   const states = new Map<string, any>();
-  states.set("shape-1", job("shape-1", "image-to-3d", options.shapeState ?? "ready", { kind: "image-to-3d", asset: meshAsset }));
+  states.set("shape-1", { ...job("shape-1", "image-to-3d", options.shapeState ?? "ready", { kind: "image-to-3d", asset: meshAsset }), resultAssetId: "mesh-1" });
   await page.route("**/api/**", async route => {
     const request = route.request(); const url = new URL(request.url()); const path = url.pathname;
     const body = request.headers()["content-type"]?.includes("application/json") ? request.postDataJSON() : null;
@@ -39,7 +39,7 @@ export async function installCreationMock(page: Page, options: { shapeState?: "g
   return captured;
 }
 
-async function uploadToReview(page: Page) {
+export async function uploadToReview(page: Page) {
   await page.goto("/"); await page.getByRole("button", { name: "Create my world" }).first().click();
   await page.locator('input[type="file"]').setInputFiles("public/samples/photo-4.jpg");
   await page.getByRole("button", { name: "Use this photo" }).click();
