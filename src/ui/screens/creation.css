@@ -1,0 +1,44 @@
+.oq-creation { min-height: 100vh; background: var(--oq-paper); }
+.oq-creation__container { width: min(100%, 944px); margin-inline: auto; padding: 24px 32px 64px; }
+.oq-creation__header { display: grid; gap: 28px; margin-bottom: 32px; }
+.oq-creation__topline { display: grid; grid-template-columns: 120px 1fr 120px; align-items: center; gap: 16px; }
+.oq-creation__progress { grid-column: 2; display: grid; grid-template-columns: repeat(4,1fr); gap: 4px; list-style: none; margin: 0; padding: 0; font-size: .875rem; color: var(--oq-muted); }
+.oq-creation__progress li { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.oq-creation__progress li::after { content: ""; height: 1px; flex: 1; background: var(--oq-line); }
+.oq-creation__progress li:last-child::after { display: none; }
+.oq-creation__progress span { display: grid; place-items: center; flex: 0 0 28px; height: 28px; border: 1px solid var(--oq-control-line); border-radius: 50%; background: var(--oq-surface); font-weight: 700; }
+.oq-creation__progress [aria-current="step"] { color: var(--oq-accent-ink); font-weight: 700; }
+.oq-creation__progress [aria-current="step"] span { color: white; background: var(--oq-action); border-color: var(--oq-action); }
+.oq-creation__progress [data-complete="true"] span { color: var(--oq-success-ink); background: #e2efe5; border-color: #a4c9b1; }
+.oq-creation__heading { display: grid; gap: 8px; max-width: 720px; }
+.oq-creation__heading h1 { font-size: clamp(2rem,5vw,3.25rem); }
+.oq-capture { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(260px,.8fr); gap: 24px; align-items: start; }
+.oq-capture__card { display: grid; gap: 20px; }
+.oq-capture__drop { min-height: 380px; display: grid; place-items: center; align-content: center; gap: 12px; padding: 32px; text-align: center; border: 2px dashed var(--oq-control-line); border-radius: 18px; background: var(--oq-inset); transition: border-color var(--oq-duration) var(--oq-ease), background var(--oq-duration) var(--oq-ease); }
+.oq-capture__drop--active { border-color: var(--oq-action); background: var(--oq-wash); }
+.oq-capture__icon { display: grid; place-items: center; width: 68px; height: 68px; color: var(--oq-accent-ink); background: var(--oq-wash); border-radius: 50%; }
+.oq-capture__icon svg { width: 30px; height: 30px; }
+.oq-capture__actions, .oq-capture__confirm { justify-content: center; }
+.oq-capture__preview { display: grid; gap: 8px; }
+.oq-capture__preview img { width: 100%; aspect-ratio: 4/3; object-fit: contain; image-orientation: from-image; border-radius: 16px; background: var(--oq-inset); }
+.oq-capture__preview figcaption { color: var(--oq-success-ink); font-weight: 700; }
+.oq-capture__tips { display: grid; gap: 16px; padding: 28px 8px; }
+.oq-capture__tips ol { display: grid; gap: 20px; list-style: none; margin: 0; padding: 0; }
+.oq-capture__tips li { display: flex; gap: 12px; }
+.oq-capture__tips li > span { display: grid; place-items: center; flex: 0 0 32px; height: 32px; border-radius: 50%; color: white; background: var(--oq-action); font-weight: 700; }
+.oq-capture__tips li p { margin-top: 2px; color: var(--oq-muted); font-size: .875rem; }
+.oq-capture__video { width: 100%; max-height: 58vh; object-fit: cover; border-radius: 16px; background: var(--oq-inset); }
+@media (max-width: 699px) {
+  .oq-creation__container { padding: 12px 20px 48px; }
+  .oq-creation__topline { grid-template-columns: 1fr; align-items: start; }
+  .oq-creation__progress { grid-column: 1; order: 2; font-size: .75rem; }
+  .oq-creation__progress li { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .oq-creation__progress li::after { display: none; }
+  .oq-creation__progress span { flex-basis: 26px; width: 26px; height: 26px; }
+  .oq-capture { grid-template-columns: 1fr; }
+  .oq-capture__drop { min-height: 300px; padding: 24px 16px; }
+  .oq-capture__actions, .oq-capture__confirm { align-items: stretch; flex-direction: column; }
+  .oq-capture__actions .oq-kit-button, .oq-capture__confirm .oq-kit-button { width: 100%; }
+  .oq-capture__tips { padding-inline: 4px; }
+}
+@media (prefers-reduced-motion: reduce) { .oq-capture__drop { transition: none; } }
