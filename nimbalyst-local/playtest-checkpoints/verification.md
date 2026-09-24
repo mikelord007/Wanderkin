@@ -1,4 +1,162 @@
-# Independent QA verification — items 6, 10, 13, 11/12
+# Independent QA verification — items 6, 10, 13, 11/12, 1-5/7-9
+
+## Update: navigation's async-route race (from the items-6 section below) is now fixed
+
+`fb2500d` (`fix: stop a stale async route resolution from un-navigating the user`) adds
+`createNavigationGuard()` — a generation-token counter — and wires it through all three
+navigation entry points (initial load, `popstate`, `go()`). Read the diff and ran
+`src/ui/routing.test.ts`: **12/12 pass** (8 original + 4 new deferred-fetch regression tests
+covering the exact race). This closes the bug reported earlier in this file. No further action
+needed on item 6.
+
+## Update: items 1-5/7-9 (interface/brand freeze)
+
+Reviewed the committed interface-owner slices `0e5c615` (brand/landing/Look step),
+`3951715` (editor/API copy consistency), `184dadc` (AA contrast fix) — confirmed all three
+hashes match exactly what was reported, no invention. Tree is fully clean at review time (no
+interface files dirty); `npx tsc -p tsconfig.json --noEmit` is clean tree-wide (the previously-
+disclosed `Logo.tsx` error other workers flagged earlier tonight is gone). Source remained
+read-only throughout; no edits made.
+
+### Item 9 — same-source style variants: verified genuine, not a filter trick
+
+- `public/style-previews/provenance.json`'s recorded sha256 for the reference and all three
+  generated originals were independently recomputed from the actual files on disk — **all four
+  match exactly**. The "reference" original is also byte-identical to `public/samples/photo-4.jpg`
+  (same hash), confirming it really is the repo's existing photo, not a new upload standing in.
+- Viewed all four images directly (`room-photo.jpg`, `room-cartoon.jpg`, `room-hand-painted.jpg`,
+  `room-watercolor.jpg`). **This is a real, visual confirmation, not just trusting metadata**: all
+  three "styled" images are unmistakably the same room, camera angle and composition as the
+  reference (same door, same three framed pictures in the same positions, same desk/laptop, same
+  sofa, same dream-catcher on the right) — genuinely re-rendered in three distinct techniques (flat
+  cel-shaded outlines / visible oil brushwork / translucent watercolour washes with paper grain),
+  not a CSS filter or a swapped-in unrelated stock image. This directly satisfies item 9's
+  requirement.
+- `styleExample.test.ts` re-run independently: **8/8 pass**.
+- Cost accounting cross-checked against `provenance.json`: 3 `kontext-edit` calls,
+  `fal-ai/flux-pro/kontext`, `$0.042` each = `$0.126` total, `fallbackUsed: false`,
+  `automaticRetries: 0`. Matches the coordinator's figures exactly, and the file itself is explicit
+  that this is a submission-time estimate, not a settled-charge claim — appropriately hedged, no
+  correction needed. `originals/` total is genuinely ~1.3 MB across the four full-resolution files
+  (`264878 + 540364 + 37279 + 481794` bytes), shipped alongside 1120px web copies for the app to
+  actually use — accepted as reasonable, unrequested to slim down per the coordinator's framing.
+
+### Brand visible surfaces
+
+Swept `src/`/`index.html` for stray old-name text outside storage keys/protocol ids (which are
+correctly, deliberately preserved — `objectquest:*` localStorage keys, `.objectquest.json` bundle
+back-compat, `window.__objectquest` diagnostics global, `objectquest-bundled-cc0` provenance id —
+none of these are user-visible and none should be renamed).
+
+**Found one real, concrete, user-visible miss, outside interface's own owned paths:**
+`src/capture/screenshot.ts:101` — `context.fillText("OBJECTQUEST", 1111, 611)` — draws a solid
+badge reading **"OBJECTQUEST"** into the bottom-right corner of every composed world screenshot
+(`captureWorldScreenshot`, called from `PlayScreen.tsx:92` on course completion). This image is
+what the Finish screen shows and what a player downloads/uses for the animated postcard — a
+real, highly visible branded artifact still carrying the old name, missed by both the interface
+sweep (this file is outside their owned paths — `src/capture/*` is explicitly excluded) and the
+navigation owner's brand sweep (which only touched `capture/recorder.ts`'s filename stem, per
+their own checkpoint, not `capture/screenshot.ts`). Exact scope for whoever takes the fix: one
+line, `src/capture/screenshot.ts:101`, replace the literal string with `BRAND_NAME` (or a
+suitably short uppercase form of it) from `src/brand.ts` — same pattern already used correctly in
+`api.ts` and `recorder.ts`. No screenshot needed to see this one; it's a literal string in source.
+**Severity: medium** — not a functional bug, but a plainly visible, easy-to-fix brand miss on an
+artifact players actually take away from the app.
+
+Everything else brand-visible checked clean: `index.html` title/meta/favicon/theme-color all say
+Mousehold; landing, editor, and API error copy all confirmed on-brand (see below); the
+`722f9fa`/`BRAND_SLUG` recorder fix from the navigation owner is confirmed still in place and
+correct — no residual issue there, the coordinator's note that it's "stale" is right, no new
+finding needed.
+
+### Responsive landing / editor — spot-checked live, not just trusting the interface worker's own screenshots
+
+- `/` at 1440×900 (real screenshot, viewed directly): pine arrival band, marigold "Make my world"
+  button, Fraunces display headline, clean 2-column hero — matches every claim in `interface.md`,
+  no layout defects observed.
+- `/` at 390×844: `document.documentElement.scrollWidth` (374px) does not exceed the viewport
+  (389px) — **no horizontal overflow**, confirming genuinely responsive layout at mobile width
+  (checked via DOM measurement after the browser's own screenshot tool became unreliable
+  mid-session; this is an equally valid, arguably more precise check for "does anything overflow").
+- `/edit/level-0ed836ff` at 390×844: computed `body` background is `rgb(242, 239, 229)` — the new
+  warm plaster tone, confirming the editor genuinely repainted off the old dark-violet identity
+  (not just claimed) — and again no horizontal overflow.
+- Did not independently re-verify the Create step 2 (Look/Adventure headings, item 8) live — doing
+  so needs a real prepared asset, which requires either a generation job or reusing existing saved
+  data; judged not worth the side-effect risk for a layout check already covered by the interface
+  worker's own 1280/390 screenshots and passing tests. Flagging as not independently re-verified
+  rather than silently accepting it.
+
+### Capture/HUD "kept dark" surfaces — determined intentional, not a defect
+
+Read `src/capture/media.css` and `src/game/hud/hud.css` in full. Both use near-black translucent
+panels (`rgba(13,17,25,…)`, `rgba(8,11,16,…)`, `#151321d9`) with near-white text — **not** a
+"dark violet" brand identity left behind; these are neutral dark scrims, a different design
+language than the old `--oq-bg` violet that was actually swept from the editor/finish screens (see
+below). This matches `interface.md`'s own "kept deliberately dark" rationale: the 3D stage, the
+capture pill, and the in-play HUD sit over unpredictable live content (a rendered scene), where a
+light panel from the page theme would be unreadable against dark parts of the scene.
+
+Computed actual WCAG contrast ratios rather than eyeballing it, for the pairs most likely to be
+marginal (small text, stacked/compounded opacity):
+- `.oq-hud__primary` button text `#24160c` on `#ff8a4c`: **7.52:1** (AAA).
+- `.oq-hud__card` paragraph text (74% opacity) on the card background: **~9.56:1** (AAA).
+- `.oq-hud__controls dd` (compounded ~58% effective opacity, the most-reduced text in the file) on
+  its panel background: **~6.32:1** (still comfortably AA, close to AAA).
+- Re-checked the same pairs against a deliberately adversarial assumption — a **bright** part of
+  the 3D scene showing through the translucent panel instead of a dark one (the actual worst case
+  for light-text-on-dark-scrim, since transparency lets scene brightness raise the effective
+  background luminance): most pairs still cleared AA comfortably (5.5-16:1), but
+  **`.oq-hud__objective-label`** (the small uppercase "CHECKPOINTS"-style label, `font-size:
+  0.68rem` ≈ 11px, opacity 0.62, nested inside the `rgba(13,17,25,.62)` objective panel) dropped to
+  **~3.23:1** under this assumption — below the 4.5:1 AA threshold for small text.
+- **This is a theoretical/unconfirmed risk, not a demonstrated defect**: I picked an arbitrary
+  bright-scene RGB value for the "worst case," not one measured from an actual bright moment in
+  real gameplay footage, and I could not get a stable interactive pointer-locked 3D session running
+  in this headless environment to check it empirically (same limitation noted in the item 6/13
+  section below). Flagging with that explicit caveat rather than calling it a confirmed bug.
+  Exact scope if the coordinator wants it addressed: `.oq-hud__objective-label` in
+  `src/game/hud/hud.css` — either raise its opacity or the panel's own background opacity slightly;
+  narrow, low-risk, does not need a redesign.
+- **Verdict: capture/media.css and hud.css do not need a "recolor to match the new brand" —** that
+  would actively hurt legibility over 3D content and was correctly not done. The one item above is
+  a minor, unconfirmed, low-severity contrast question about one small label under an edge-case
+  lighting condition, not a brand-consistency defect.
+
+### Item 7 (editor consistency) / finish-screen sweep
+
+Read the `3951715` diff for `finish-screen.css` directly: the old gradient's lilac middle stop
+(`#f7efff`) and violet-tinted shadow (`#49345f24`) were genuinely replaced with green/plaster tones
+consistent with the rest of the rebrand (`#f6f2e4`, `#e4efe4`, shadow `#1d3a2e26`), and the
+ALL-CAPS eyebrow was converted to sentence case matching the rest of the app. Confirms the
+Play/Finish overlays were actually swept, not just the landing/editor — narrower and more
+convincing than trusting the summary claim in `interface.md` alone.
+
+### Summary for coordinator (interface freeze)
+
+One concrete, medium-severity, easy-to-fix finding: `src/capture/screenshot.ts:101` still stamps
+"OBJECTQUEST" onto every exported world screenshot/postcard — outside interface's own owned paths,
+so not something the freeze should be blocked on, but real and worth a one-line fix by whoever owns
+`src/capture/*` next (was navigation's `PlayFrame.tsx`/`AudioControls.tsx`-adjacent territory).
+One minor, unconfirmed, low-severity contrast question flagged for awareness only (`.oq-hud
+__objective-label` under a hypothetical bright-scene condition I could not empirically trigger).
+Everything else checked — same-source style provenance (hashes + direct visual comparison),
+responsive landing/editor at real widths, brand text sweep, finish-screen violet removal, api.ts/
+recorder brand copy, media cost accounting — came back clean and is independently confirmed, not
+just accepted from the checkpoint's own claims.
+
+### Full combined check: deferred, not run
+
+Per the coordinator's framing, the gameplay owner is still finishing its "bounded camera check" and
+may have uncommitted render polish — item 11/12's moving delta is explicitly not final-approved
+(see the section above; it stands as-is for the last committed snapshot only). Since not every
+owner has declared freeze, I did **not** run the combined typecheck/build/full-unit/HTTP +
+browser pass this round — only a bounded `tsc --noEmit` sanity check (clean) plus the targeted
+test files/browser checks documented above and in the items-11/12 section. Recommend the
+coordinator request the combined check once gameplay's camera-check commit lands and it
+explicitly declares freeze.
+
+---
 
 ## Update: items 11/12 (character + miniature scale)
 
