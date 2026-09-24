@@ -1,72 +1,105 @@
 # ObjectQuest v2 independent acceptance checklist
 
-Worker 10 maintains this checklist independently from
-`docs/ACCEPTANCE_MATRIX.md`. It uses the matrix IDs and wording where they
-match product brief section 10, but a checked item must be backed by Worker 10
-or Worker 11 evidence. Every item intentionally starts unchecked. Existing v1
-evidence is context, not automatic v2 acceptance.
+Snapshot: **2026-09-24**, integrated revision `764d1dd`. This checklist is an
+evidence map, not a single release checkbox. **Implemented** means the code path
+exists. **Automated/browser** means a named local check passed. **Live** means
+ObjectQuest itself submitted or recovered a real provider job. **Hands-on** is
+the user's visual, audio, and gameplay judgment. `N/A` means that dimension is
+not required for the acceptance item; it does not mean “unverified.”
 
-For each status cell, check the box only after recording a test, run log,
-artifact, or limitation in the eventual acceptance evidence. “Live-provider”
-means a real provider execution is required for the claim; mock-only evidence
-must remain labeled as such.
+## Verification baseline
 
-## Starting baseline
+- [x] `npm run typecheck` passed at `764d1dd`.
+- [x] The live-runner suite passed 7/7 and the focused provider-neutral saved-
+  world copy case passed 1/1 in Chrome at `764d1dd`.
+- [x] The full browser suite passed **37**, skipped **6**, and failed **0** of
+  43 cases on isolated port 55210 at `764d1dd`. The run also observed three WAV
+  requests and zero runtime errors for B14. The temporary servers were stopped.
+- [x] The preceding broad revision passed **371 unit tests and 44 HTTP tests**.
+  They were intentionally not rerun for the later runner/docs/evidence/test-only
+  delta, so this is dated prior-revision evidence, not a fresh `764d1dd` run.
+- [x] An earlier production build passed after quest/audio integration; it was
+  not rerun for the later runner/docs/evidence/test-only delta.
+- [ ] No hosted-origin, backup/restore, or final user hands-on run exists.
 
-| ID and acceptance item | Implemented | Automated | Browser | Live-provider | Limitations |
-| --- | --- | --- | --- | --- | --- |
-| Q0 Record starting baseline and investigate regressions | [ ] Baseline revision identified | [ ] Typecheck, build, unit, and HTTP results recorded | [x] [Two complete browser runs](qa/evidence/worker11-suite-results-2026-09-24.md) | [ ] No live call required | [ ] Device, ports, optional artifacts, warnings, and unrun checks stated |
+Primary reports: [`worker11-suite-results-2026-09-24.md`](qa/evidence/worker11-suite-results-2026-09-24.md),
+[`worker11-gameplay-visuals-2026-09-24.md`](qa/evidence/worker11-gameplay-visuals-2026-09-24.md),
+[`worker11-performance-2026-09-24.md`](qa/evidence/worker11-performance-2026-09-24.md),
+and [`LIVE_VALIDATION_RESULT_2026-09-24.md`](LIVE_VALIDATION_RESULT_2026-09-24.md).
+The final 37/6/0 report supersedes earlier in-flight browser counts; it does not
+turn skipped cases into passes.
 
 ## Required automated coverage
 
-| ID and acceptance item | Implemented | Automated | Browser | Live-provider | Limitations |
-| --- | --- | --- | --- | --- | --- |
-| A1 Existing levels still load | [ ] Compatible loader/runtime exists | [ ] Bundled and persisted v1 levels load | [x] B1 and persisted reload verified in [suite evidence](qa/evidence/worker11-suite-results-2026-09-24.md) | [ ] None required | [ ] Record any migrated or unsupported fields |
-| A2 New schema round trips | [ ] v2 schema and serialization exist | [ ] Lost Colors, media, job, and publication data parse/serialize/parse without loss | [x] B2 and persisted references verified; playback limitation recorded | [ ] None required for schema behavior | [ ] Record intentionally normalized/defaulted fields |
-| A3 Migration compatibility | [ ] Legacy migration exists | [ ] `legacy-scene-manifest-v1.json` migrates and imports through persistence | [x] B1, B8, and B9 persistence paths verified | [ ] None required | [ ] List lossy mappings and unsupported legacy versions |
-| A4 Job deduplication per kind | [ ] Stable per-kind idempotency contract exists | [ ] Concurrent duplicates for preview, mesh, audio, narration, and postcard make one provider submission per kind | [x] B6, B10, and B18 browser contracts passed | [ ] One bounded final-run observation linked | [ ] Distinguish same-kind dedupe from independent asset jobs |
-| A5 Polling, errors, and resume | [ ] Durable lifecycle and resume paths exist | [ ] Queued/running/ready/failed, reconnect, restart, retry classification, and same-job resume covered | [ ] B10 and B11 verified | [ ] Real job IDs/states captured for claimed capabilities | [ ] State unobserved provider transitions and retry ceilings |
-| A6 Partial asset failure | [ ] Optional assets fail independently | [ ] Audio/video failure preserves mesh, course, completed assets, publication, and replay | [ ] B11 verified | [ ] Real or deliberately induced optional failure identified | [ ] Induced failures must not be presented as provider incidents |
-| A7 Budget rejection | [ ] Per-request and per-world limits exist | [ ] Rejection occurs before provider submission; unknown cost is never treated as zero | [ ] Creation-flow rejection is understandable | [ ] Current price/budget input recorded; rejection spends nothing | [ ] Record unavailable pricing and configured ceilings |
-| A8 Preview approval and correct input selection | [ ] Approval identity is persisted | [ ] Style choice alone submits nothing; Build uses the exact approved asset and settings after refresh | [x] B5/B6 passed with mocked paid-job routes | [ ] Real approved preview is tied to the bounded mesh request | [ ] Record whether preview is reused, regenerated, or expired |
-| A9 Collectible progression | [ ] Lost Colors state exists | [ ] Unique pickups progress 0/3 to 3/3, restoration is monotonic, duplicate rewards are impossible | [x] [B2 progression](qa/evidence/worker11-gameplay-visuals-2026-09-24.md) and duplicate pickup check passed | [ ] None for mechanics | [ ] Generated SFX requires separate live evidence |
-| A10 Finish rules | [ ] Mode-specific completion exists | [ ] Collect portal gating plus independent Explore and Race finish conditions covered | [x] B2/B4 complete in Chrome | [ ] None required | [ ] State exact goal and portal prerequisites per mode |
-| A11 Restart and respawn state | [ ] Reset/restore policy exists | [ ] Checkpoint, collected set, one-shot narration, rewards, and timer state remain consistent | [ ] B7 verified | [ ] None required | [ ] Record deliberate differences between restart and respawn |
-| A12 Race timing behavior | [ ] Race lifecycle and records exist | [ ] Countdown, monotonic timer, restart, best time, ordered checkpoints, and version-bound comparison covered | [ ] B4, B7, and B13 verified | [ ] None required | [ ] Label records unverified unless server verification exists |
-| A13 Stable published course versions | [ ] Immutable publication exists | [ ] Editing a private source cannot change the original share ID, manifest, or challenge | [x] B12/B13 isolated-context contracts passed | [ ] None required | [ ] Record deletion/availability policy for published assets |
+| ID | Acceptance item | Implemented | Automated/browser evidence | Live/hands-on boundary |
+| --- | --- | --- | --- | --- |
+| A1 | Existing levels still load | Yes | Manifest compatibility plus B1 bundled/persisted replay | Live provider N/A; user feel still open |
+| A2 | New schema round trips | Yes | Manifest, persistence, publication, audio, quest, and postcard references covered | Live provider N/A for serialization |
+| A3 | Migration compatibility | Yes | Legacy fixture import/migration covered | N/A; lossy/defaulted fields remain contract-defined |
+| A4 | Job deduplication per kind | Yes | Manager, audio orchestrator, preview, mesh, narration, and postcard dedupe tests; B6/B10/B18 contracts | Real rows must retain provenance; do not infer all-kind live proof |
+| A5 | Polling, errors, and resume | Yes | Job manager/store, live runner, B10, and My Worlds paths | **Partial live:** rows 1–4 ready; row 5 provider-complete but app recovery pending |
+| A6 | Partial asset failure | Yes | Optional quest/audio/postcard failure tests preserve playable core | Induced/mock failures are not provider incidents |
+| A7 | Budget rejection | Yes | Per-request, per-world, global, and rolling-day pre-submit checks in HTTP/unit coverage | No paid rejection required; actual provider billing remains unknown |
+| A8 | Preview approval/input selection | Yes | B5/B6 and provider-request-copy case passed | Real Kontext output exists; exact visual approval remains user-owned |
+| A9 | Collectible progression | Yes | Unique 0/3→3/3 progression and duplicate prevention; B2 visual evidence | Generated SFX live proof separate |
+| A10 | Finish rules | Yes | Collect portal plus Explore and Race completion covered in B2/B4 | N/A |
+| A11 | Restart/respawn state | Yes | State-machine/unit coverage and integrated browser suite | Final hands-on game-feel review open |
+| A12 | Race timing | Yes | Countdown, timer, restart, best time, ordered checkpoints, and B4/B13 contracts | Times are client-reported, not server-verified |
+| A13 | Stable publication versions | Yes | Publication tests and isolated B12/B13 version-bound play | No deployed-origin refresh or revocation proof |
 
-## Required real-browser scenarios
+## Required browser scenarios
 
-| ID and acceptance item | Implemented | Automated | Browser | Live-provider | Limitations |
-| --- | --- | --- | --- | --- | --- |
-| B1 Play both original bundled sample levels | [ ] Rodin and Tripo remain available | [ ] Sample/runtime regression suites pass | [x] Completed and replayed both in each [full-suite run](qa/evidence/worker11-suite-results-2026-09-24.md) | [ ] None required | [ ] Record device/browser and any control assistance |
-| B2 Complete a Lost Colors sample adventure | [ ] Lost Colors sample is playable | [ ] A9 and A10 pass against `lost-colors.json` | [x] [Four quantified restoration stages plus portal/completion](qa/evidence/worker11-gameplay-visuals-2026-09-24.md) | [ ] Only required for generated media claims | [ ] Separate mechanics evidence from media evidence |
-| B3 Verify all three styles affect gameplay rendering | [ ] Cartoon, Hand-painted, and Watercolor mappings exist | [ ] Renderer mapping assertions pass | [x] [Same-scene screenshots and histogram distances](qa/evidence/worker11-gameplay-visuals-2026-09-24.md) | [ ] Real preview edits evidenced; mesh styling only for the chosen path | [ ] Screenshots alone do not prove gameplay usability |
-| B4 Exercise Explore, Collect, and Race | [ ] All three modes are reachable | [ ] Mode state-machine and finish suites pass | [x] Collect/Race/Explore goals completed; Explore had no timer | [ ] None required | [ ] Record mode-specific shortcuts or shared behavior |
-| B5 Upload or capture an image and review the object | [ ] Upload and supported capture paths exist | [ ] Type, size, dimensions, orientation, crop, and isolation errors covered | [x] Upload/review/crop/accept passed; unavailable camera recorded in B15 | [ ] Background removal only if shipped/claimed | [ ] Record unavailable camera/device paths |
-| B6 Approve a style preview before 3D generation | [ ] Preview approval gates Build | [ ] A8 passes | [x] Mocked paid routes proved approval and exact input selection | [ ] Matching real image-edit and image-to-3D request evidenced | [ ] Network evidence must identify exact approved input |
-| B7 Restart and respawn without duplicate rewards or stale timers | [ ] Both actions are available | [ ] A11 and A12 pass | [ ] Restart Race and fall/respawn in Collect | [ ] None required | [ ] Record reward, checkpoint, narration, and timer observations |
-| B8 Adjust and save course entities in the editor | [ ] v2 entities are editable | [ ] Spawn/checkpoint/fragment/portal mutation and persistence pass | [x] Real-API save/reload editor case passed twice | [ ] None required | [ ] List any read-only generated entities |
-| B9 Reload a saved level with style, mission, and audio intact | [ ] v2 persistence stores all references | [ ] Full store round trip passes | [ ] Save, fully refresh, reopen, and verify rendering, quest, and audio | [ ] Reuse recorded assets without regeneration | [ ] Record missing media fallbacks and cache behavior |
-| B10 Resume a pending generation after refresh | [ ] My worlds exposes pending jobs | [ ] A5 passes | [x] Same seeded job resumed after refresh/My worlds | [ ] One real long-running capability observed when authorized | [ ] Do not synthesize an unobserved real provider state |
-| B11 Optional audio/video failure does not lose the level | [ ] Optional failure UI is isolated | [ ] A6 passes | [ ] Fail/retry narration or postcard while level remains playable, saveable, and shareable | [ ] Real or clearly labeled induced failure | [ ] Preserve successful assets; no mesh regeneration |
-| B12 Open a shared course in a separate browser session | [ ] Friend route is public/playable as designed | [ ] Publication route/storage integration passes | [x] Isolated context opened/played publication without regeneration | [ ] None required | [ ] Record authentication and asset-visibility assumptions |
-| B13 Race comparisons use the same published course | [ ] Challenge binds an immutable version | [ ] A12 and A13 pass | [x] Separate context retained version ID and target after private edit | [ ] None required | [ ] Label client-reported times if not server verified |
-| B14 Exercise mute, subtitles, keyboard focus, and reduced motion | [ ] Preferences and accessible controls exist | [ ] Audio preferences, narration one-shot, focus order, and motion preference covered | [ ] Keyboard-only pass, mute channels, toggle subtitles, and enable reduced motion | [ ] Real narration/music/SFX required for playback claims | [ ] Record unsupported touch/screen-reader combinations separately |
-| B15 Verify camera-denied/upload alternatives and invalid-input errors | [ ] Fallback and validation UI exist | [ ] Permission, format, size, and dimension rejection pass before billing | [ ] Deny camera, continue with upload, and try invalid/oversized files | [ ] None required | [ ] Error copy must be useful and preserve prior safe state |
-| B16 Preview/download an actual gameplay recording | [ ] Gameplay capture/export exists where supported | [ ] Capture lifecycle and export tests pass | [ ] Record real play, preview, download, and inspect title/time overlay | [ ] None required | [ ] Label output as gameplay capture; list browser support |
-| B17 Preview/download a generated postcard after a real job | [ ] Postcard flow exists | [ ] Async video lifecycle and independent failure tests pass | [ ] Submit screenshot, leave/resume, preview, and download result | [ ] One real image-to-video job with provenance and observed/unknown cost | [ ] Do not substitute gameplay footage for generated postcard evidence |
-| B18 Replaying a saved world submits no new generation jobs | [ ] Replay reuses persisted assets | [ ] Provider call count stays unchanged | [x] Two replays observed with zero generation POST | [ ] Confirm zero new live jobs | [ ] Existing asset IDs and publication version must remain stable |
-| B19 My worlds exposes correct state-specific actions | [ ] Draft/pending/failed/playable/published states exist | [ ] State-to-action mapping passes | [x] Seeded draft/pending/failed/playable actions passed | [ ] Real pending/failed state useful but not required for every state | [ ] Clearly label seeded versus provider-observed states |
+| ID | Scenario | Current evidence | Remaining gate |
+| --- | --- | --- | --- |
+| B1 | Play both original bundled samples | Passed and replayed in Worker 11 full-suite evidence | User replay optional, not a provider gate |
+| B2 | Complete Lost Colors | Passed with four restoration stages and portal completion | User game-feel/audio judgment |
+| B3 | See all three styles in gameplay | Cartoon, Hand-painted, and Watercolor same-scene screenshots plus histogram deltas | Visual difference is not proof of arbitrary-object quality |
+| B4 | Exercise Explore, Collect, Race | All three mode goals completed in Chrome | User game-feel judgment |
+| B5 | Upload/capture and review object | Upload/review/crop/accept covered; camera availability limitation recorded | Target-device camera lifecycle remains unverified |
+| B6 | Approve preview before 3D | Mocked paid-route flow and exact request copy passed; one real Kontext output exists | User visual approval and recovered full live run |
+| B7 | Restart/respawn cleanly | Mechanics covered by tests/integrated suite; exact skipped-case mapping was not supplied | User hands-on confirmation remains open |
+| B8 | Adjust/save course entities | Real local API save/reload editor case passed | Generated course repair still awaits live world |
+| B9 | Reload style, mission, audio | Persistence/reference tests and saved-world browser coverage exist | No saved current live-validation world |
+| B10 | Resume pending generation | Seeded same-job resume/My Worlds and live-runner reconciliation covered | Row-5 force-poll recovery still pending |
+| B11 | Optional media failure preserves world | Unit/HTTP/browser contracts cover independent failure | No real provider failure claimed |
+| B12 | Open share separately | Isolated browser context opened and played publication | No deployed direct `/share/:id` refresh |
+| B13 | Compare same published race | Isolated context retained immutable version/target after private edit | Client-reported timing limitation applies |
+| B14 | Mute/subtitles/focus/reduced motion | Integrated browser run observed three WAV requests and zero runtime errors; preference/accessibility tests pass | Generated narration/music/SFX and target-device listening unverified |
+| B15 | Camera denied/upload fallback/errors | Fallback and validation code/tests exist; prior camera-unavailable path recorded | Final physical-device denial flow is user-owned |
+| B16 | Gameplay recording preview/download | Capture/export implementation and browser contracts are integrated | User inspection and browser support matrix remain open |
+| B17 | Generated postcard preview/download | Async screenshot/cache/retry/preview/download implementation and tests are integrated | **No real image-to-video execution**; do not substitute B16 footage |
+| B18 | Replay without new jobs | Passed twice with zero generation POSTs | Confirm on final live world after recovery |
+| B19 | My Worlds actions | Seeded draft/pending/failed/playable actions passed | Current live world has not reached save |
 
-## Real-generation, outage, and performance gates
+The final integrated report contains six skipped tests, but the supplied report
+does not enumerate their IDs. This checklist therefore does not invent an
+ID-to-skip mapping; individual scenario wording above uses only named reports,
+source/test contracts, and explicitly supplied observations.
 
-| ID and acceptance item | Implemented | Automated | Browser | Live-provider | Limitations |
-| --- | --- | --- | --- | --- | --- |
-| L1 Use a bounded representative-object matrix | [ ] Matrix and maximum spend approved | [ ] Provenance fixtures validate | [ ] Review every generated object in preparation and play | [ ] Current prices, job IDs, outputs, timings, and costs/unknowns recorded | [ ] Results apply only to tested objects |
-| L2 Validate appearance and gameplay usability, not HTTP success | [ ] Review rubric exists | [ ] Geometry/collision/course checks pass | [ ] Confirm recognizability and complete or repair each course | [ ] Preserve provider artifacts | [ ] HTTP success alone is insufficient |
-| L3 Complete one real photo-to-play run on the production path | [ ] End-to-end path is connected | [ ] Stored-artifact integration passes | [ ] Photo review through play and save/share completes | [ ] Every claimed AI capability in the run has real evidence | [ ] One success does not prove arbitrary geometry |
-| L4 Obtain evidence for every claimed AI capability | [ ] Provenance model covers all capabilities | [ ] Normalized provenance validates | [ ] Actual output is previewed, played, or downloaded | [ ] Requested/served capability and model, job ID, timing, cost/unknown, and consumer recorded | [ ] Catalog/health/history are not own-run evidence |
-| L5 Keep unverified optional features out of normal flows | [ ] Feature gating exists | [ ] Flag/routing assertions pass | [ ] Normal onboarding omits or labels unavailable options | [ ] Missing evidence prevents a production claim | [ ] Experimental paths remain clearly isolated |
-| L6 Preserve outage-ready bundled examples | [ ] Polished local examples exist | [ ] Offline/local asset load passes | [ ] Play with provider unavailable | [ ] None required | [ ] Bundled worlds are visibly distinguished from live-generated worlds |
-| L7 Assess rendering/loading performance against baseline | [ ] Repeatable measurement path exists | [ ] Metrics collection is repeatable where feasible | [x] [Six 20-second Chrome samples and build size](qa/evidence/worker11-performance-2026-09-24.md) | [ ] None required | [ ] Report observations, not universal FPS guarantees |
+## Live-generation and release gates
+
+| ID | Gate | Status at this snapshot |
+| --- | --- | --- |
+| L1 | Bounded representative-object matrix | **Partial.** Batch is capped below the user's $10 ceiling; rows 1–5 were submitted for one object only. A second object is not authorized yet. |
+| L2 | Judge appearance and usability, not HTTP success | **Open.** Rows 1–4 produced artifacts, but the user has not accepted recognizability/course feel. Provider success alone is insufficient. |
+| L3 | One current real photo-to-play path | **Open.** Background removal, two image edits, and mesh are ready. Quest row 5 needs zero-spend recovery; no saved/playable/shared validation level exists. |
+| L4 | Evidence for every claimed AI capability | **Open.** Own execution exists for background removal, Kontext, GPT image edit, Rodin, and provider-side quest text. Music, ambience, SFX, TTS, and image-to-video have no real execution. |
+| L5 | Keep unverified optional features out of core acceptance | **Pass with caveat.** Audio/postcard failures are optional and fall back; optional companion work remains gated. Demo wording must label bundled versus generated media. |
+| L6 | Outage-ready bundled example | **Implemented/automated.** Lost Colors and bundled audio load without provider calls. User outage-path rehearsal remains open. |
+| L7 | Compare performance with baseline | Worker 11 recorded six 20-second Chrome samples and build size | Observational only; no universal FPS claim or hosted-origin measurement |
+
+## Outstanding acceptance decisions
+
+- [ ] Land and verify the narrow nested quest-response adapter fix, then
+  force-poll provider job `mjob_13e739e8d5af` without resubmitting it.
+- [ ] Submit authorized rows 6–16 only after that recovery; record actual cost
+  as unknown wherever the provider returns no metered value.
+- [ ] Save, repair if necessary, play, complete, publish, and reopen the current
+  generated world without new generation requests.
+- [ ] User accepts or rejects preview/mesh identity, course usability, quest,
+  generated audio/subtitles, postcard labeling/playback, and photo-free share.
+- [ ] Verify a dedicated same-origin deployment, direct share refresh, durable
+  media, pending-job resume, and backup/restore. No authorized target exists.
+
+One successful provider object, if achieved, is evidence only for that object
+and configuration; it does not prove arbitrary geometry.
