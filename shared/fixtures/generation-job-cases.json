@@ -1,0 +1,61 @@
+[
+  {
+    "request": {
+      "schemaVersion": 1,
+      "kind": "image-to-3d",
+      "capability": "rodin-i3d",
+      "idempotencyKey": "fixture-i3d-1",
+      "purpose": "world-mesh",
+      "photos": [{ "photoId": "photo-1", "sourceIndex": 1 }],
+      "scenePrompt": "Preserve the photographed object's recognizable silhouette."
+    },
+    "response": {
+      "schemaVersion": 1,
+      "kind": "image-to-3d",
+      "applicationJobId": "job-i3d-1",
+      "state": "ready",
+      "provenance": {
+        "providerId": "fixture-provider",
+        "requestedCapability": "rodin-i3d",
+        "servedCapability": "rodin-i3d",
+        "servedModel": "fixture/rodin",
+        "applicationJobId": "job-i3d-1",
+        "providerJobId": "provider-i3d-1",
+        "timings": { "requestedAt": "2026-09-24T00:00:00.000Z", "startedAt": "2026-09-24T00:00:01.000Z", "completedAt": "2026-09-24T00:01:01.000Z", "queueMilliseconds": 1000, "executionMilliseconds": 60000, "totalMilliseconds": 61000 },
+        "reportedCost": { "amount": 0.42, "currency": "USD", "unit": "call" }
+      },
+      "result": {
+        "kind": "image-to-3d",
+        "asset": { "id": "mesh-1", "url": "/fixtures/mesh.glb", "sha256": "1111111111111111111111111111111111111111111111111111111111111111", "sizeBytes": 1024 }
+      }
+    }
+  },
+  {
+    "request": { "schemaVersion": 1, "kind": "image-edit", "capability": "kontext-edit", "idempotencyKey": "fixture-edit-1", "purpose": "style-preview", "sourceImageAssetId": "source-image-1", "instruction": "Restyle as a bold cartoon while preserving the object.", "outputMimeType": "image/png" },
+    "response": {
+      "schemaVersion": 1, "kind": "image-edit", "applicationJobId": "job-edit-1", "state": "ready",
+      "provenance": { "providerId": "fixture-provider", "requestedCapability": "kontext-edit", "servedCapability": "kontext-edit", "servedModel": "fixture/kontext", "applicationJobId": "job-edit-1", "providerJobId": "provider-edit-1", "timings": { "requestedAt": "2026-09-24T00:02:00.000Z", "completedAt": "2026-09-24T00:02:09.000Z", "totalMilliseconds": 9000 }, "reportedCost": { "amount": 0.042, "currency": "USD", "unit": "image" } },
+      "result": { "kind": "image-edit", "asset": { "id": "preview-1", "url": "/fixtures/preview.png", "sha256": "2222222222222222222222222222222222222222222222222222222222222222", "sizeBytes": 2048, "mimeType": "image/png", "width": 1024, "height": 1024, "provenance": { "providerId": "fixture-provider", "requestedCapability": "kontext-edit", "servedCapability": "kontext-edit", "servedModel": "fixture/kontext", "applicationJobId": "job-edit-1", "providerJobId": "provider-edit-1", "timings": { "requestedAt": "2026-09-24T00:02:00.000Z", "completedAt": "2026-09-24T00:02:09.000Z", "totalMilliseconds": 9000 }, "reportedCost": { "amount": 0.042, "currency": "USD", "unit": "image" } } } }
+    }
+  },
+  {
+    "request": { "schemaVersion": 1, "kind": "text", "capability": "gemini-text", "idempotencyKey": "fixture-text-1", "purpose": "quest-text", "prompt": "Write constrained Lost Colors quest copy.", "output": "quest-json", "maxCharacters": 1200 },
+    "response": { "schemaVersion": 1, "kind": "text", "applicationJobId": "job-text-1", "state": "ready", "provenance": { "providerId": "fixture-provider", "requestedCapability": "gemini-text", "servedCapability": "gemini-text", "servedModel": "fixture/gemini", "applicationJobId": "job-text-1", "providerJobId": "provider-text-1", "timings": { "requestedAt": "2026-09-24T00:03:00.000Z", "completedAt": "2026-09-24T00:03:02.000Z", "totalMilliseconds": 2000 }, "reportedCost": null }, "result": { "kind": "text", "output": { "text": "The Lost Colors of Teacup Island", "structured": { "title": "The Lost Colors of Teacup Island", "objective": "Find three colors and reach the portal." } } } }
+  },
+  {
+    "request": { "schemaVersion": 1, "kind": "music", "capability": "music", "idempotencyKey": "fixture-music-1", "purpose": "world-soundtrack", "prompt": "Playful instrumental miniature adventure, no vocals.", "durationSeconds": 60, "instrumental": true, "loop": true },
+    "response": { "schemaVersion": 1, "kind": "music", "applicationJobId": "job-music-1", "state": "ready", "provenance": { "providerId": "fixture-provider", "requestedCapability": "music", "servedCapability": "music", "servedModel": "fixture/music", "applicationJobId": "job-music-1", "providerJobId": "provider-music-1", "timings": { "requestedAt": "2026-09-24T00:04:00.000Z", "completedAt": "2026-09-24T00:04:20.000Z", "totalMilliseconds": 20000 }, "reportedCost": { "amount": 0.0315, "currency": "USD", "unit": "call" } }, "result": { "kind": "music", "asset": { "schemaVersion": 1, "mediaType": "audio", "kind": "music", "id": "music-1", "url": "/fixtures/music.mp3", "sha256": "3333333333333333333333333333333333333333333333333333333333333333", "sizeBytes": 4096, "mimeType": "audio/mpeg", "durationSeconds": 60, "loop": true, "defaultGain": 0.7, "provenance": { "providerId": "fixture-provider", "requestedCapability": "music", "servedCapability": "music", "servedModel": "fixture/music", "applicationJobId": "job-music-1", "providerJobId": "provider-music-1", "timings": { "requestedAt": "2026-09-24T00:04:00.000Z", "completedAt": "2026-09-24T00:04:20.000Z", "totalMilliseconds": 20000 }, "reportedCost": { "amount": 0.0315, "currency": "USD", "unit": "call" } } } } }
+  },
+  {
+    "request": { "schemaVersion": 1, "kind": "sfx", "capability": "mirelo-sfx", "idempotencyKey": "fixture-sfx-1", "purpose": "fragment-pickup", "prompt": "A short sparkling color pickup chime.", "durationSeconds": 2, "loop": false },
+    "response": { "schemaVersion": 1, "kind": "sfx", "applicationJobId": "job-sfx-1", "state": "ready", "provenance": { "providerId": "fixture-provider", "requestedCapability": "mirelo-sfx", "servedCapability": "mirelo-sfx", "servedModel": "fixture/mirelo", "applicationJobId": "job-sfx-1", "providerJobId": "provider-sfx-1", "timings": { "requestedAt": "2026-09-24T00:05:00.000Z", "completedAt": "2026-09-24T00:05:03.000Z", "totalMilliseconds": 3000 }, "reportedCost": { "amount": 0.021, "currency": "USD", "unit": "generated-second" } }, "result": { "kind": "sfx", "asset": { "schemaVersion": 1, "mediaType": "audio", "kind": "sfx", "id": "sfx-1", "url": "/fixtures/collect.wav", "sha256": "4444444444444444444444444444444444444444444444444444444444444444", "sizeBytes": 2048, "mimeType": "audio/wav", "durationSeconds": 2, "loop": false, "defaultGain": 0.85, "provenance": { "providerId": "fixture-provider", "requestedCapability": "mirelo-sfx", "servedCapability": "mirelo-sfx", "servedModel": "fixture/mirelo", "applicationJobId": "job-sfx-1", "providerJobId": "provider-sfx-1", "timings": { "requestedAt": "2026-09-24T00:05:00.000Z", "completedAt": "2026-09-24T00:05:03.000Z", "totalMilliseconds": 3000 }, "reportedCost": { "amount": 0.021, "currency": "USD", "unit": "generated-second" } } } } }
+  },
+  {
+    "request": { "schemaVersion": 1, "kind": "tts", "capability": "chatterbox-tts", "idempotencyKey": "fixture-tts-1", "purpose": "quest-narration", "text": "Welcome to Teacup Island. Find the three lost colors.", "voice": "warm-storyteller", "language": "en" },
+    "response": { "schemaVersion": 1, "kind": "tts", "applicationJobId": "job-tts-1", "state": "ready", "provenance": { "providerId": "fixture-provider", "requestedCapability": "chatterbox-tts", "servedCapability": "chatterbox-tts", "servedModel": "fixture/chatterbox", "applicationJobId": "job-tts-1", "providerJobId": "provider-tts-1", "timings": { "requestedAt": "2026-09-24T00:06:00.000Z", "completedAt": "2026-09-24T00:06:06.000Z", "totalMilliseconds": 6000 }, "reportedCost": null }, "result": { "kind": "tts", "asset": { "schemaVersion": 1, "mediaType": "audio", "kind": "narration", "id": "narration-1", "url": "/fixtures/narration.wav", "sha256": "5555555555555555555555555555555555555555555555555555555555555555", "sizeBytes": 8192, "mimeType": "audio/wav", "durationSeconds": 8, "loop": false, "defaultGain": 1, "transcript": "Welcome to Teacup Island. Find the three lost colors.", "provenance": { "providerId": "fixture-provider", "requestedCapability": "chatterbox-tts", "servedCapability": "chatterbox-tts", "servedModel": "fixture/chatterbox", "applicationJobId": "job-tts-1", "providerJobId": "provider-tts-1", "timings": { "requestedAt": "2026-09-24T00:06:00.000Z", "completedAt": "2026-09-24T00:06:06.000Z", "totalMilliseconds": 6000 }, "reportedCost": null } } } }
+  },
+  {
+    "request": { "schemaVersion": 1, "kind": "video", "capability": "pixverse-i2v", "idempotencyKey": "fixture-video-1", "purpose": "animated-postcard", "sourceImageAssetId": "world-screenshot-1", "prompt": "A gentle orbit around the restored colorful world.", "durationSeconds": 5 },
+    "response": { "schemaVersion": 1, "kind": "video", "applicationJobId": "job-video-1", "state": "ready", "provenance": { "providerId": "fixture-provider", "requestedCapability": "pixverse-i2v", "servedCapability": "pixverse-i2v", "servedModel": "fixture/pixverse", "applicationJobId": "job-video-1", "providerJobId": "provider-video-1", "timings": { "requestedAt": "2026-09-24T00:07:00.000Z", "completedAt": "2026-09-24T00:07:30.000Z", "totalMilliseconds": 30000 }, "reportedCost": { "amount": 0.34125, "currency": "USD", "unit": "generated-second" } }, "result": { "kind": "video", "asset": { "schemaVersion": 1, "mediaType": "video", "kind": "animated-postcard", "id": "postcard-1", "url": "/fixtures/postcard.mp4", "sha256": "6666666666666666666666666666666666666666666666666666666666666666", "sizeBytes": 16384, "mimeType": "video/mp4", "durationSeconds": 5, "width": 1280, "height": 720, "source": "generated-animation", "provenance": { "providerId": "fixture-provider", "requestedCapability": "pixverse-i2v", "servedCapability": "pixverse-i2v", "servedModel": "fixture/pixverse", "applicationJobId": "job-video-1", "providerJobId": "provider-video-1", "timings": { "requestedAt": "2026-09-24T00:07:00.000Z", "completedAt": "2026-09-24T00:07:30.000Z", "totalMilliseconds": 30000 }, "reportedCost": { "amount": 0.34125, "currency": "USD", "unit": "generated-second" } } } } }
+  }
+]
