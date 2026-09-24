@@ -17,6 +17,11 @@ function boundedInteger(value: string | undefined, fallback: number, min: number
   return Number.isInteger(parsed) && parsed >= min && parsed <= max ? parsed : fallback;
 }
 
+function nonNegativeInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
 /** Server-only environment access. Never import this module from src/. */
 export const env = {
   port: Number(process.env.PORT ?? 8787),
@@ -28,4 +33,10 @@ export const env = {
   livepeerMaxRequestUsd: positiveNumber(process.env.LIVEPEER_MAX_REQUEST_USD, 2),
   livepeerMaxWorldUsd: positiveNumber(process.env.LIVEPEER_MAX_WORLD_USD, 8),
   livepeerMaxAutomaticRetries: boundedInteger(process.env.LIVEPEER_MAX_AUTOMATIC_RETRIES, 3, 0, 5),
+  billableRateLimit: boundedInteger(process.env.BILLABLE_RATE_LIMIT, 10, 1, 10_000),
+  uploadRateLimit: boundedInteger(process.env.UPLOAD_RATE_LIMIT, 30, 1, 10_000),
+  rateLimitWindowSeconds: boundedInteger(process.env.RATE_LIMIT_WINDOW_SECONDS, 60, 1, 86_400),
+  // Trusting forwarding headers is an explicit deployment choice. Keep it
+  // disabled unless a trusted reverse proxy overwrites X-Forwarded-For.
+  trustProxyHops: nonNegativeInteger(process.env.TRUST_PROXY_HOPS, 0),
 };

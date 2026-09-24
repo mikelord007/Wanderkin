@@ -19,6 +19,7 @@ import { createGeneratedAssetsRouter } from "./routes/generatedAssets.js";
 import { createJobsRouter } from "./routes/jobs.js";
 import { createLevelsRouter, LevelStore } from "./levels.js";
 import { logServerError } from "./util/sanitize.js";
+import { createRateLimiter, isBillableRoute, isUploadRoute } from "./security/rateLimit.js";
 
 /**
  * Foundation API shell plus the Livepeer provider/job/asset routes (owned by
@@ -27,7 +28,21 @@ import { logServerError } from "./util/sanitize.js";
  * registered from their `server/levels.ts`.
  */
 const app = express();
+app.set("trust proxy", env.trustProxyHops);
 app.use(express.json({ limit: "10mb" }));
+
+const billableRateLimiter = createRateLimiter({
+  limit: env.billableRateLimit,
+  windowMs: env.rateLimitWindowSeconds * 1_000,
+  message: "Too many generation requests. Please wait before trying again.",
+});
+const uploadRateLimiter = createRateLimiter({
+  limit: env.uploadRateLimit,
+  windowMs: env.rateLimitWindowSeconds * 1_000,
+  message: "Too many uploads. Please wait before trying again.",
+});
+app.use((req, res, next) => isBillableRoute(req) ? billableRateLimiter(req, res, next) : next());
+app.use((req, res, next) => isUploadRoute(req) ? uploadRateLimiter(req, res, next) : next());
 
 const photoStore = new PhotoStore(env.storageDir);
 const assetStore = new AssetStore(env.storageDir);
