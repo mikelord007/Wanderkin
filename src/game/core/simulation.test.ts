@@ -35,7 +35,7 @@ function input(overrides: Partial<SimulationInput> = {}): SimulationInput {
 }
 
 async function makeSim(manifest: SceneManifest): Promise<GameSimulation> {
-  return GameSimulation.create({ manifest, config: CONFIG, assetGeometry: new Map() });
+  return GameSimulation.create({ manifest, config: CONFIG, assetGeometry: new Map(), miniature: false });
 }
 
 function run(sim: GameSimulation, steps: number, controls: SimulationInput = NEUTRAL_INPUT): void {

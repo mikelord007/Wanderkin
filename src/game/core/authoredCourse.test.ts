@@ -77,12 +77,27 @@ describe("authored Rodin climb", () => {
     }
   });
 
-  it("climbs onto the furniture surface using the contextual mantle", async () => {
+  // Run the same climb at both scales. The miniature case is the one that
+  // matters for the tiny-character work: it is direct evidence that shrinking
+  // the body did not make an authored course unclimbable.
+  it.each([
+    { label: "at the authored capsule scale", miniature: false },
+    { label: "at miniature capsule scale", miniature: true },
+  ])("climbs onto the furniture surface using the contextual mantle $label", async ({
+    miniature,
+  }) => {
     const simulation = await GameSimulation.create({
       manifest: authoredLevel(),
       config: CONFIG,
       assetGeometry: new Map(),
+      miniature,
     });
+
+    // Derived from the config the simulation is actually running, not from the
+    // authored one: at miniature scale the capsule's centre sits half as far
+    // above the surface it is standing on.
+    const halfCapsule =
+      simulation.config.characterHalfHeight + simulation.config.characterRadius;
 
     try {
       for (let i = 0; i < 60; i += 1) simulation.stepFixed(NEUTRAL_INPUT);
@@ -109,7 +124,7 @@ describe("authored Rodin climb", () => {
           expect(event.type).not.toBe("respawn");
         }
 
-        if (simulation.playerPosition.y > FURNITURE_TOP + HALF_CAPSULE_HEIGHT - 0.05) break;
+        if (simulation.playerPosition.y > FURNITURE_TOP + halfCapsule - 0.05) break;
       }
 
       // The loop exits mid-mantle, before the controller has resolved
@@ -127,7 +142,7 @@ describe("authored Rodin climb", () => {
       expect(mantlesPerformed).toBeGreaterThanOrEqual(2);
       expect(mantlesPerformed).toBeLessThanOrEqual(4);
       expect(simulation.isGrounded).toBe(true);
-      expect(simulation.playerPosition.y).toBeGreaterThan(FURNITURE_TOP + HALF_CAPSULE_HEIGHT - 0.05);
+      expect(simulation.playerPosition.y).toBeGreaterThan(FURNITURE_TOP + halfCapsule - 0.05);
       expect(heightsReached.at(-1)).toBeGreaterThan(UPPER_STEP.top);
     } finally {
       simulation.dispose();

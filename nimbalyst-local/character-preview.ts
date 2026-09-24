@@ -117,6 +117,51 @@ const subjects: Subject[] = active.map((scenario, index) => {
   return { scenario, model, animator, holder, tilt };
 });
 
+/**
+ * Scale comparison. Assets are normalised so their longest horizontal extent
+ * becomes 8 game metres (DEFAULT_ASSUMED_EXTENT_METERS), so a real 2 m sofa
+ * ends up 8 m long, ~3.4 m tall and with a ~1.7 m seat. This puts a block of
+ * exactly those proportions next to the character at the authored 0.70 m height
+ * and at the new 0.35 m height.
+ */
+const SOFA = { length: 8, height: 3.4, depth: 3.4, seat: 1.68, backThickness: 0.7 };
+const sofaSubjects: { holder: THREE.Group; model: ReturnType<typeof buildCharacter>; animator: CharacterAnimator; tilt: THREE.Group; height: number }[] = [];
+
+if (params.get("scene") === "sofa") {
+  for (const subject of subjects) scene.remove(subject.holder);
+  subjects.length = 0;
+
+  const upholstery = new THREE.MeshStandardMaterial({ color: "#8a6f5c", roughness: 0.9 });
+  const seat = new THREE.Mesh(
+    new THREE.BoxGeometry(SOFA.length, SOFA.seat, SOFA.depth - SOFA.backThickness),
+    upholstery,
+  );
+  seat.position.set(0, SOFA.seat / 2, (SOFA.backThickness) / 2);
+  const back = new THREE.Mesh(
+    new THREE.BoxGeometry(SOFA.length, SOFA.height, SOFA.backThickness),
+    upholstery,
+  );
+  back.position.set(0, SOFA.height / 2, -(SOFA.depth - SOFA.backThickness) / 2);
+  for (const part of [seat, back]) {
+    part.castShadow = true;
+    part.receiveShadow = true;
+    scene.add(part);
+  }
+
+  // Left: today's authored 0.70 m capsule. Right: the new 0.35 m one.
+  for (const [index, height] of [0.7, 0.35].entries()) {
+    const model = buildCharacter();
+    const animator = new CharacterAnimator();
+    const holder = new THREE.Group();
+    const tilt = new THREE.Group();
+    tilt.add(model.group);
+    holder.add(tilt);
+    holder.position.set(-2 + index * 4, SOFA.seat + height / 2, 1.1);
+    scene.add(holder);
+    sofaSubjects.push({ holder, model, animator, tilt, height });
+  }
+}
+
 const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.01, 100);
 addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
@@ -159,6 +204,37 @@ function frame(fixedDelta?: number): void {
     const lateral = HEIGHT / Math.sqrt(Math.max(pose.squash, 0.2));
     subject.tilt.scale.set(lateral, HEIGHT * pose.squash, lateral);
     subject.model.lanternMaterial.emissiveIntensity = 0.95 + pose.lanternPulse * 0.28;
+  }
+
+  for (const subject of sofaSubjects) {
+    const pose = subject.animator.update({
+      speed: WALK_SPEED,
+      walkSpeed: WALK_SPEED,
+      grounded: true,
+      mantling: false,
+      verticalVelocity: 0,
+      yaw: 0,
+      deltaSeconds: dt,
+      reducedMotion: false,
+    });
+    const bones = subject.model.rig.bones;
+    for (let i = 0; i < bones.length; i += 1) {
+      bones[i]!.rotation.set(pose.euler[i * 3]!, pose.euler[i * 3 + 1]!, pose.euler[i * 3 + 2]!);
+    }
+    subject.model.group.position.y = pose.bobY;
+    subject.tilt.rotation.x = pose.leanX;
+    const lateral = subject.height / Math.sqrt(Math.max(pose.squash, 0.2));
+    subject.tilt.scale.set(lateral, subject.height * pose.squash, lateral);
+    subject.model.lanternMaterial.emissiveIntensity = 0.95 + pose.lanternPulse * 0.28;
+  }
+
+  if (sofaSubjects.length) {
+    camera.position.set(1.5, 3.4, 9.5);
+    camera.lookAt(0, 1.5, 0);
+    renderer.render(scene, camera);
+    label.textContent = `sofa scale: 0.70 m (left) vs 0.35 m (right)\nsofa ${SOFA.length} m long, ${SOFA.height} m tall, seat ${SOFA.seat} m`;
+    if (fixedDelta === undefined) requestAnimationFrame(() => frame());
+    return;
   }
 
   const spread = Math.ceil(Math.sqrt(active.length));

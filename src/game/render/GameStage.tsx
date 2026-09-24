@@ -63,7 +63,6 @@ export interface GameStageProps {
 
 export function GameStage({
   simulation,
-  config,
   manifest,
   assets,
   input,
@@ -89,6 +88,13 @@ export function GameStage({
   const avatar = useRef<PlayerAvatarHandle>(null);
   const frames = useRef(0);
   const announcedFirstFrame = useRef(false);
+
+  // The scale the physics is actually running at, which is the authored
+  // `config` prop after `characterScale.ts`. Framing the camera and sizing the
+  // avatar from the raw prop instead would let the visible character drift
+  // away from its own collider — exactly the fake-scale failure this is meant
+  // to avoid — so the prop is deliberately not read here.
+  const config = simulation.config;
 
   const rig = useMemo(() => new CameraRig(rapier, config), [rapier, config]);
 

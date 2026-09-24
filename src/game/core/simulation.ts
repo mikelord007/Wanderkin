@@ -37,6 +37,7 @@ import {
   type CheckpointState,
 } from "./checkpoints.js";
 import { probeMantle, type MantleProbeResult, type MantleTarget } from "./mantle.js";
+import { reseatCapsuleCentre, toMiniatureScale } from "./characterScale.js";
 import {
   createPhysicsScene,
   initRapier,
@@ -95,8 +96,17 @@ export type SimulationEvent =
 
 export interface SimulationOptions {
   manifest: SceneManifest;
+  /** The authored tuning set, as written. See {@link SimulationOptions.miniature}. */
   config: MovementConfig;
   assetGeometry: AssetGeometryMap;
+  /**
+   * Shrink the character's body to miniature scale before use (default true).
+   * See `characterScale.ts` for what this does and does not change; set false
+   * to run a config exactly as given, which analysis tools and the physics
+   * regression tests do so their numbers stay comparable to the authored
+   * tuning.
+   */
+  miniature?: boolean;
 }
 
 function smoothstep(t: number): number {
@@ -109,7 +119,16 @@ function lerpVec(a: Vec3Like, b: Vec3Like, t: number): Vec3Like {
 
 export class GameSimulation {
   readonly manifest: SceneManifest;
+  /**
+   * The tuning actually driving physics, the camera and the avatar — the
+   * authored config after the miniature-scale transform. Renderers must read
+   * scale from here rather than from the shared default, or the visible
+   * character will drift away from its own collider.
+   */
   readonly config: MovementConfig;
+  /** The tuning as authored, before scaling. Saved manifests are positioned
+   * against this one. */
+  readonly authoredConfig: MovementConfig;
   readonly scene: PhysicsScene;
   readonly checkpointState: CheckpointState;
   readonly warnings: string[];
@@ -157,14 +176,16 @@ export class GameSimulation {
   constructor(RAPIER: RapierModule, options: SimulationOptions) {
     this.RAPIER = RAPIER;
     this.manifest = options.manifest;
-    this.config = options.config;
+    this.authoredConfig = options.config;
+    this.config =
+      options.miniature === false ? options.config : toMiniatureScale(options.config);
 
     const collision = buildSceneCollision(options.manifest, options.assetGeometry);
-    this.scene = createPhysicsScene(RAPIER, collision, options.manifest, options.config);
+    this.scene = createPhysicsScene(RAPIER, collision, options.manifest, this.config);
     this.checkpointState = createCheckpointState(options.manifest);
     this.warnings = [...this.scene.warnings, ...this.checkpointState.warnings];
 
-    const radius = options.config.characterRadius;
+    const radius = this.config.characterRadius;
     this.controller = this.scene.world.createCharacterController(radius * CONTROLLER_OFFSET_RATIO);
     this.controller.setUp({ x: 0, y: 1, z: 0 });
     this.controller.setSlideEnabled(true);
@@ -174,7 +195,7 @@ export class GameSimulation {
     this.controller.enableSnapToGround(radius * SNAP_TO_GROUND_RATIO);
     this.controller.setApplyImpulsesToDynamicBodies(false);
 
-    this.position = fromTuple(options.manifest.spawn.position);
+    this.position = this.seat(fromTuple(options.manifest.spawn.position));
     this.previousPosition = copy(this.position);
     this.facingYaw = options.manifest.spawn.headingRadians;
     this.previousFacingYaw = this.facingYaw;
@@ -583,17 +604,26 @@ export class GameSimulation {
     this.position = { x: t.x, y: t.y, z: t.z };
   }
 
+  /**
+   * A manifest position is the capsule's centre as the author placed it, for
+   * the authored capsule height. Re-seat it so the feet land on the surface
+   * the author meant rather than dropping in from above.
+   */
+  private seat(position: Vec3Like): Vec3Like {
+    return reseatCapsuleCentre(position, this.authoredConfig, this.config);
+  }
+
   /** Sends the player to the last activated checkpoint (or the spawn). */
   respawn(reason: "fell" | "manual"): void {
     const pose = respawnPose(this.checkpointState, this.manifest);
-    this.teleport(fromTuple(pose.position), pose.headingRadians);
+    this.teleport(this.seat(fromTuple(pose.position)), pose.headingRadians);
     this.events.push({ type: "respawn", reason, headingRadians: pose.headingRadians });
   }
 
   /** Full restart: back to the level spawn with no checkpoints collected. */
   reset(): void {
     resetCheckpointState(this.checkpointState);
-    this.teleport(fromTuple(this.manifest.spawn.position), this.manifest.spawn.headingRadians);
+    this.teleport(this.seat(fromTuple(this.manifest.spawn.position)), this.manifest.spawn.headingRadians);
     this.events = [];
     this.accumulator = 0;
     this.alpha = 0;

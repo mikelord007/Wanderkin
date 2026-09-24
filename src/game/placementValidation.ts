@@ -119,6 +119,16 @@ function structuralIssues(manifest: SceneManifest, experience: LevelExperience):
 export function validateExperiencePlacements(
   manifest: SceneManifest,
   assetGeometry: AssetGeometryMap,
+  /**
+   * Deliberately the *authored* config rather than the miniature scale the
+   * level is actually played at (`core/characterScale.ts`). This is a publish
+   * gate, so it should err towards refusing a placement, and the authored
+   * capsule is the stricter of the two: it demands more clearance while every
+   * crossing distance stays identical. The cost is a conservative false
+   * negative — an author can be told a placement is out of reach when the
+   * smaller character could in fact get there — which is the right direction
+   * for a gate to be wrong in.
+   */
   movement: MovementConfig = DEFAULT_MOVEMENT_CONFIG,
 ): PlacementValidationResult {
   const experience = manifest.experience;

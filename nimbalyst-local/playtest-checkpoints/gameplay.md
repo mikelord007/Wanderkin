@@ -93,23 +93,95 @@ on negative zero. Full `src/game` + `src/editor` suite: 163/163 pass.
 `tsc --noEmit` clean for all my paths (the only two errors in the tree are in
 `src/ui/components/Logo.tsx`, the branding worker's in-flight file).
 
-- Slice B: designed; needs a coordinator decision on one line (see Blockers).
-- Dirty/owned paths: `src/game/render/character/**`, `src/game/render/PlayerAvatar.tsx`,
-  this checkpoint.
+**Slice B (item 12) — miniature scale: implemented and tested, no shared/ or
+GameView edit needed after all.**
+
+The ownership request below is now **withdrawn**. I found a wiring that keeps the
+whole change inside my own paths: every gameplay consumer of the movement config
+(physics collider, mantle, camera rig, avatar) flows through `GameSimulation`,
+which is mine, so the scale transform is applied there and `GameStage` (mine)
+reads `simulation.config` instead of the raw prop. `GameView.tsx` and
+`shared/movement.ts` are untouched.
+
+- `src/game/core/characterScale.ts` (new) — `toMiniatureScale()` shrinks the
+  capsule 0.70 m -> 0.35 m (radius 0.18 -> 0.09, half-height 0.17 -> 0.085),
+  sets mantle clearance to the new capsule height, and pulls the camera boom
+  2.5 -> 1.25 with padding 0.15 -> 0.075. It leaves gravity, walkSpeed,
+  jumpHeight, airControl, groundFriction and the mantle ledge/reach envelope
+  exactly as authored. It is a no-op on an already-miniature config, so moving
+  these numbers into the shared tuning set later is a one-line change that
+  cannot double-shrink. Also `reseatCapsuleCentre()`, which lowers a saved
+  spawn/respawn centre by the half-height difference so the feet land where the
+  author put them instead of dropping in from above. Saved data is not touched;
+  this is a read-time correction.
+- `src/game/core/simulation.ts` — applies the transform once, exposes both
+  `config` (live) and `authoredConfig`, re-seats spawn/respawn/reset. New
+  `miniature?: boolean` option (default true) so the physics regression tests
+  and tools can run the authored numbers.
+- `src/game/render/GameStage.tsx` — camera rig and avatar now size from
+  `simulation.config`. This is the anti-fake-scale guarantee: there is no path
+  by which the drawn character can be a different size from its collider.
+- `src/game/placementValidation.ts` — documented as deliberately staying on the
+  *authored* config. It is a publish gate and the authored capsule is the
+  stricter of the two, so it can only produce conservative false negatives.
+
+Correction to my earlier reasoning, found by the tests: the claim that a
+body-only shrink moves *every* affected limit in the permissive direction was
+wrong. `walkMaxSpan` shrinks too, because the planner sizes its surface sampling
+cells from the character's radius. It is still safe — the old walk span (0.63 m)
+is well under the unchanged flat jump range (~1.08 m), so such a gap becomes a
+jump edge rather than an unreachable one — but the code doc and the test now
+state that accurately rather than claiming a blanket guarantee.
+
+Evidence:
+- `characterScale.test.ts` (13 new): capsule height and proportions, capability
+  envelope untouched, clearance contract, camera framing invariant in character
+  heights, idempotence, no mutation, the reachability-limit analysis above, the
+  re-seat round trip against the editor's own `capsuleCenterYAboveSurface`, and
+  a live simulation standing the small capsule on a floor with no spawn drop.
+- `authoredCourse.test.ts` now runs the real authored Rodin climb **at both
+  scales** and both complete: direct end-to-end evidence that shrinking the body
+  did not make an authored course unclimbable.
+- Full repository suite: **463/463 pass**. `tsc --noEmit` clean for every path I
+  touched.
+- Visual: `nimbalyst-local/screenshots/character/scale-vs-sofa.png` renders the
+  character at 0.70 m and 0.35 m on a block with the real normalised sofa
+  proportions (8 m long, 3.4 m tall, 1.68 m seat). At 0.35 m it is a speck on
+  the cushion with the backrest towering over it.
+  `run-inside-capsule.png` shows the body sitting inside its own collider.
+
+- Dirty/owned paths: all committed (see below).
 
 ## Blockers / requests to coordinator
 
-**Scale needs one edit outside my ownership.** Preferred: let me change the five numeric
-values in `shared/movement.ts DEFAULT_MOVEMENT_CONFIG` (`characterRadius`,
-`characterHalfHeight`, `mantle.requiredClearanceHeight`, `camera.distance`,
-`camera.collisionPadding`) — no schema/interface change, no new field, no id change.
-Alternative if `shared/` must stay untouched: the navigation owner applies a one-line
-`GameView.tsx` change from `DEFAULT_MOVEMENT_CONFIG` to a `MINIATURE_MOVEMENT_CONFIG` I
-export from `src/game/core/`; that variant leaves the editor's spawn placement computing
-against the old capsule height, so it is strictly worse. I am building the derived config
-in my own path either way so the decision does not block Slice A.
+**WITHDRAWN — none outstanding.** The earlier request for narrow ownership of
+`shared/movement.ts DEFAULT_MOVEMENT_CONFIG` is no longer needed; the scale is wired
+entirely inside my own paths (see Slice B). No file outside my assigned ownership was
+edited. No dependency on the navigation/input owner: `GameView.tsx`, `src/game/input/**`
+and `src/game/hud/**` are untouched and `PlayerAvatar`'s handle and props are unchanged,
+so there is no interface to negotiate.
+
+Two things for the coordinator to be aware of, neither blocking:
+
+1. `GameView.tsx:335` reports `movementConfigId: config.id` in diagnostics from its own
+   prop, so the diagnostics panel will say `default-v1` while physics runs the miniature
+   derivative of it. Cosmetic, in a file I do not own. If the navigation owner wants it
+   exact, the one-line fix is to read it from the simulation. I did not touch it.
+2. The right long-term home for these five numbers is `shared/movement.ts`. Moving them
+   there is a one-line change whenever someone owns that file, and
+   `toMiniatureScale` is written to become a no-op at that point rather than
+   shrinking the character twice. There is a test pinning that.
+
+## Budget
+
+Zero LivePeer spend. No provider calls of any kind were made or are needed: the character
+is authored in code and its face is drawn procedurally onto a canvas at runtime. No new
+npm dependencies.
 
 ## Next step
 
-Build `src/game/render/character/` (geometry, rig, animator) with tests, then rewire
-`PlayerAvatar.tsx`.
+Both assigned items are delivered, tested and committed. Remaining work is polish and the
+user's own subjective play-test. Candidate follow-ups, in priority order: run the real
+bundled sample level in-browser at the new scale to sanity-check camera framing in a
+cluttered scene (needs a temp port and a level fixture, no protected service touched);
+soften the scarf's rest curve; add a light idle "look around" toward the next objective.

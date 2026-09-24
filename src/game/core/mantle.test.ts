@@ -30,7 +30,7 @@ beforeAll(async () => {
 });
 
 async function makeSim(manifest: SceneManifest): Promise<GameSimulation> {
-  return GameSimulation.create({ manifest, config: CONFIG, assetGeometry: new Map() });
+  return GameSimulation.create({ manifest, config: CONFIG, assetGeometry: new Map(), miniature: false });
 }
 
 /**
@@ -205,7 +205,7 @@ describe("destination clearance", () => {
       // 0.52 + 0.9 = 1.42 the raised clearance demands.
       extras: [boxEntity("ceiling", [6, 0.2, 6], [2.4, 1.4, 0])],
     });
-    const sim = await GameSimulation.create({ manifest, config, assetGeometry: new Map() });
+    const sim = await GameSimulation.create({ manifest, config, assetGeometry: new Map(), miniature: false });
     try {
       for (let i = 0; i < 60; i += 1) sim.stepFixed(NEUTRAL_INPUT);
       const result = probeMantle(
