@@ -153,4 +153,8 @@ describe("PostcardService", () => {
     expect(postcardPrompt(manifest)).toContain("cheerful floating island");
     expect(postcardPrompt(manifest)).toContain("Do not add captions");
   });
+
+  it("invalidates the cache fingerprint when the postcard title changes", () => {
+    expect(fingerprintWorld({ ...manifest, name: `${manifest.name} revised` })).not.toBe(fingerprintWorld(manifest));
+  });
 });

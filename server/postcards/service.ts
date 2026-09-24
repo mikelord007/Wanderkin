@@ -18,6 +18,7 @@ export function fingerprintWorld(manifest: SceneManifest): string {
   const durableWorld = {
     schemaVersion: manifest.schemaVersion,
     levelId: manifest.levelId,
+    name: manifest.name,
     seed: manifest.seed,
     calibration: manifest.calibration,
     assets: manifest.assets.map(({ id, url, sha256 }) => ({ id, url, sha256 })),
