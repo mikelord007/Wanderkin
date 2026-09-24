@@ -1,15 +1,21 @@
 import { randomUUID } from "node:crypto";
 import type { GenerationJob, JobError } from "../../shared/job.js";
+import type { GenerationRequest, GenerationResult } from "../../shared/generation.js";
+import type { GenerationProvenance } from "../../shared/provenance.js";
 import { isTerminalJobState } from "../../shared/job.js";
 import { JOB_SCHEMA_VERSION } from "../../shared/schema-version.js";
 import type { ProviderAdapter, ProviderInputPhoto } from "../../shared/provider.js";
 import { McpToolError, McpTransportError } from "../livepeer/mcpClient.js";
 import { AssetStore } from "../persistence/assetStore.js";
 import type { StoredAssetRecord } from "../persistence/assetStore.js";
+import { GeneratedAssetStore } from "../persistence/generatedAssetStore.js";
 import { downloadBounded, UnsafeUrlError, DownloadTooLargeError } from "../persistence/fetchSafe.js";
 import { MAX_GLB_BYTES } from "../persistence/validate.js";
 import type { PhotoStore } from "../persistence/photoStore.js";
 import { sanitizeMessage } from "../util/sanitize.js";
+import { estimateRequestCost } from "../livepeer/capabilities.js";
+import type { GenerationProviderAdapter, ProviderGenerationStatus } from "./types.js";
+import { BudgetExceededError, SpendLedger } from "./spendLedger.js";
 import {
   INITIAL_BACKOFF_MS,
   MAX_BACKOFF_MS,
@@ -84,6 +90,9 @@ function toJobError(err: unknown): JobError {
   if (err instanceof DownloadTooLargeError) {
     return { message: sanitizeMessage(err.message), code: "download_too_large", retryable: false, occurredAt };
   }
+  if (err instanceof BudgetExceededError) {
+    return { message: err.message, code: err.code, retryable: false, occurredAt };
+  }
   const message = err instanceof Error ? err.message : String(err);
   return { message: sanitizeMessage(message), code: "unknown", retryable: true, occurredAt };
 }
@@ -128,6 +137,66 @@ function requestMatchesExisting(
   return true;
 }
 
+function requestMatchesGeneration(existing: GenerationRequest | undefined, incoming: GenerationRequest): boolean {
+  return existing !== undefined && JSON.stringify(existing) === JSON.stringify(incoming);
+}
+
+function photosForGeneration(request: GenerationRequest): readonly ProviderInputPhoto[] {
+  return request.kind === "image-to-3d"
+    ? request.photos
+    : request.kind === "image-edit" || request.kind === "video"
+      ? [{ photoId: request.sourceImageAssetId, sourceIndex: 1 }]
+      : [];
+}
+
+function buildProvenance(job: GenerationJob): GenerationProvenance {
+  const completedAt = job.completedAt;
+  const requestedMs = new Date(job.createdAt).getTime();
+  const startedMs = job.startedAt ? new Date(job.startedAt).getTime() : undefined;
+  const completedMs = completedAt ? new Date(completedAt).getTime() : undefined;
+  return {
+    providerId: job.providerId,
+    requestedCapability: job.capabilityRequested,
+    servedCapability: job.capabilityUsed,
+    servedModel: job.provenance?.servedModel ?? null,
+    applicationJobId: job.id,
+    providerJobId: job.providerJobId,
+    timings: {
+      requestedAt: job.createdAt,
+      ...(job.startedAt ? { startedAt: job.startedAt } : {}),
+      ...(completedAt ? { completedAt } : {}),
+      ...(startedMs !== undefined ? { queueMilliseconds: Math.max(0, startedMs - requestedMs) } : {}),
+      ...(startedMs !== undefined && completedMs !== undefined ? { executionMilliseconds: Math.max(0, completedMs - startedMs) } : {}),
+      ...(completedMs !== undefined ? { totalMilliseconds: Math.max(0, completedMs - requestedMs) } : {}),
+    },
+    reportedCost: job.provenance?.reportedCost ?? null,
+  };
+}
+
+function parseQuestJson(text: string, alreadyParsed: unknown): Record<string, unknown> {
+  let value = alreadyParsed;
+  if (value === undefined) {
+    try {
+      value = JSON.parse(text);
+    } catch {
+      throw new Error("Quest generation did not return valid JSON");
+    }
+  }
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("Quest generation must return a JSON object");
+  }
+  const record = value as Record<string, unknown>;
+  for (const field of ["title", "intro", "objective", "narrationScript"]) {
+    if (record[field] !== undefined && typeof record[field] !== "string") {
+      throw new Error(`Quest field "${field}" must be text`);
+    }
+  }
+  if (typeof record.title !== "string" || typeof record.objective !== "string") {
+    throw new Error("Quest JSON must include text fields title and objective");
+  }
+  return record;
+}
+
 export class JobManager {
   private timer: NodeJS.Timeout | null = null;
   /** Per-key async mutex (promise chain, same pattern as JsonFileStore) —
@@ -140,9 +209,16 @@ export class JobManager {
 
   constructor(
     private readonly store: JobStore,
-    private readonly adapter: ProviderAdapter,
+    private readonly adapter: ProviderAdapter & Partial<GenerationProviderAdapter>,
     private readonly assets: AssetStore,
     private readonly photos: PhotoStore,
+    private readonly generation?: {
+      generatedAssets: GeneratedAssetStore;
+      spendLedger: SpendLedger;
+      perRequestLimitUsd: number;
+      perWorldLimitUsd: number;
+      maxRetries?: number;
+    },
   ) {}
 
   /** Marks a job whose submit outcome is permanently ambiguous (no
@@ -203,13 +279,21 @@ export class JobManager {
             await this.markIdempotencyRetentionExpired(current);
             return;
           }
-          await this.submitToProvider(current, {
-            capability: current.job.capabilityRequested,
-            photos: current.internal.originalRequest.photos,
-            ...(current.internal.originalRequest.scenePrompt !== undefined
-              ? { scenePrompt: current.internal.originalRequest.scenePrompt }
-              : {}),
-          });
+          if (current.job.request) {
+            await this.submitGenerationToProvider(
+              current,
+              current.job.request,
+              this.generation?.perRequestLimitUsd ?? Number.MAX_SAFE_INTEGER,
+            );
+          } else {
+            await this.submitToProvider(current, {
+              capability: current.job.capabilityRequested,
+              photos: current.internal.originalRequest.photos,
+              ...(current.internal.originalRequest.scenePrompt !== undefined
+                ? { scenePrompt: current.internal.originalRequest.scenePrompt }
+                : {}),
+            });
+          }
         });
       }
     }
@@ -276,6 +360,143 @@ export class JobManager {
       const submitted = await this.submitToProvider(record, request);
       return { status: "created", job: toPublicJob(submitted) };
     });
+  }
+
+  /** Shared v2 entry point for every generation kind. Budget reservation,
+   * durable job creation, and provider submission are serialized under the
+   * request's idempotency key. */
+  async submitGenerationOrReconcile(
+    request: GenerationRequest,
+    options: { requestLimitOverrideUsd?: number; worldId?: string } = {},
+  ): Promise<SubmitOutcome> {
+    if (!this.generation || !this.adapter.validateGenerationInput || !this.adapter.submitGeneration) {
+      throw new Error("Multi-kind generation services are not configured");
+    }
+    return this.runExclusive(`idem:${request.idempotencyKey}`, async () => {
+      const existing = await this.store.findByIdempotencyKey(request.idempotencyKey);
+      if (existing) {
+        if (!requestMatchesGeneration(existing.job.request, request)) {
+          return { status: "conflict", job: toPublicJob(existing) };
+        }
+        return { status: "reconciled", job: toPublicJob(existing) };
+      }
+
+      const validation = this.adapter.validateGenerationInput!(request);
+      if (!validation.valid) {
+        throw new McpToolError(`Input validation failed: ${validation.errors.join("; ")}`, "run_capability", false, validation);
+      }
+      const record = this.buildGenerationRecord(request);
+      const estimateUsd = estimateRequestCost(request);
+      const effectiveRequestLimit = Math.min(
+        this.generation!.perRequestLimitUsd,
+        options.requestLimitOverrideUsd ?? this.generation!.perRequestLimitUsd,
+      );
+      await this.generation!.spendLedger.reserve({
+        jobId: record.job.id,
+        worldId: options.worldId ?? null,
+        capability: request.capability,
+        kind: request.kind,
+        estimateUsd,
+        perRequestLimitUsd: effectiveRequestLimit,
+        perWorldLimitUsd: this.generation!.perWorldLimitUsd,
+      });
+      await this.store.put(record);
+      const submitted = await this.submitGenerationToProvider(record, request, effectiveRequestLimit);
+      return { status: "created", job: toPublicJob(submitted) };
+    });
+  }
+
+  private buildGenerationRecord(request: GenerationRequest): JobRecord {
+    const now = new Date().toISOString();
+    const photos = photosForGeneration(request);
+    const job: GenerationJob = {
+      schemaVersion: JOB_SCHEMA_VERSION,
+      id: `job_${randomUUID()}`,
+      idempotencyKey: request.idempotencyKey,
+      providerId: PROVIDER_ID,
+      providerJobId: null,
+      capabilityRequested: request.capability,
+      capabilityUsed: null,
+      fallbackFired: null,
+      state: "queued",
+      photoOrder: photos.map((photo) => photo.sourceIndex),
+      createdAt: now,
+      updatedAt: now,
+      retryCount: 0,
+      maxRetries: this.generation?.maxRetries ?? MAX_RETRIES,
+      uiMessage: friendlyMessage("queued"),
+      kind: request.kind,
+      request,
+      provenance: {
+        providerId: PROVIDER_ID,
+        requestedCapability: request.capability,
+        servedCapability: null,
+        servedModel: null,
+        applicationJobId: "",
+        providerJobId: null,
+        timings: { requestedAt: now },
+        reportedCost: null,
+      },
+    };
+    job.provenance = { ...job.provenance!, applicationJobId: job.id };
+    return {
+      job,
+      internal: {
+        nextPollAt: 0,
+        backoffMs: INITIAL_BACKOFF_MS,
+        originalRequest: {
+          photos,
+          ...(request.kind === "image-to-3d" && request.scenePrompt !== undefined ? { scenePrompt: request.scenePrompt } : {}),
+        },
+      },
+    };
+  }
+
+  private async submitGenerationToProvider(
+    record: JobRecord,
+    request: GenerationRequest,
+    requestLimitUsd: number,
+  ): Promise<JobRecord> {
+    if (!this.adapter.submitGeneration) throw new Error("Multi-kind adapter is not configured");
+    record.job.state = photosForGeneration(request).length > 0 ? "uploading" : "generating";
+    record.job.uiMessage = friendlyMessage(record.job.state);
+    record.job.updatedAt = new Date().toISOString();
+    await this.store.put(record);
+
+    try {
+      const result = await this.adapter.submitGeneration({ ...request, maxCostUsd: requestLimitUsd });
+      record.job.providerJobId = result.providerJobId;
+      record.job.capabilityUsed = result.capabilityUsed;
+      record.job.fallbackFired = result.fallbackFired;
+      record.job.startedAt = new Date().toISOString();
+      record.job.updatedAt = record.job.startedAt;
+      record.job.provenance = {
+        ...buildProvenance(record.job),
+        servedCapability: result.capabilityUsed,
+        servedModel: result.servedModel ?? null,
+        providerJobId: result.providerJobId,
+        reportedCost: result.reportedCostUsd !== undefined
+          ? { amount: result.reportedCostUsd, currency: "USD" }
+          : null,
+      };
+      await this.generation?.spendLedger.reconcile(record.job.id, result.reportedCostUsd ?? null);
+
+      if (result.inlineOutput) {
+        await this.finalizeGenerationOutput(record, result.inlineOutput, result.servedModel);
+      } else {
+        record.job.state = "generating";
+        record.job.uiMessage = friendlyMessage("generating");
+        record.internal.nextPollAt = Date.now() + INITIAL_BACKOFF_MS;
+        record.internal.backoffMs = INITIAL_BACKOFF_MS;
+      }
+    } catch (err) {
+      record.job.state = "failed";
+      record.job.uiMessage = friendlyMessage("failed");
+      record.job.lastError = toJobError(err);
+      record.job.updatedAt = new Date().toISOString();
+    }
+    await this.store.put(record);
+    return record;
   }
 
   private buildRecord(request: CreateJobRequest, idempotencyKey: string): JobRecord {
@@ -365,6 +586,7 @@ export class JobManager {
   private async pollAndAdvanceLocked(record: JobRecord, opts: { force?: boolean } = {}): Promise<GenerationJob> {
     if (!record.job.providerJobId) return toPublicJob(record);
     if (isTerminalJobState(record.job.state) && !opts.force) return toPublicJob(record);
+    if (record.job.request) return this.pollGenerationLocked(record);
 
     try {
       const status = await this.adapter.getStatus(record.job.providerJobId);
@@ -423,6 +645,143 @@ export class JobManager {
     return toPublicJob(record);
   }
 
+  private async pollGenerationLocked(record: JobRecord): Promise<GenerationJob> {
+    if (!record.job.providerJobId || !record.job.request || !this.adapter.getGenerationStatus) return toPublicJob(record);
+    try {
+      const status = await this.adapter.getGenerationStatus(record.job.providerJobId);
+      record.internal.lastProviderStatusRaw = status;
+      if (status.actualCapabilityUsed) record.job.capabilityUsed = status.actualCapabilityUsed;
+      if (status.actualFallbackFired !== undefined) record.job.fallbackFired = status.actualFallbackFired;
+      if (status.actualRegisteredModel || status.reportedCostUsd !== undefined) {
+        record.job.provenance = {
+          ...buildProvenance(record.job),
+          servedCapability: status.actualCapabilityUsed ?? record.job.capabilityUsed,
+          servedModel: status.actualRegisteredModel ?? record.job.provenance?.servedModel ?? null,
+          reportedCost: status.reportedCostUsd !== undefined
+            ? { amount: status.reportedCostUsd, currency: "USD" }
+            : (record.job.provenance?.reportedCost ?? null),
+        };
+      }
+      await this.generation?.spendLedger.reconcile(record.job.id, status.reportedCostUsd ?? null);
+
+      if (status.state === "failed") {
+        record.job.state = "failed";
+        record.job.uiMessage = friendlyMessage("failed");
+        record.job.lastError = {
+          message: sanitizeMessage(status.error?.message ?? "Generation failed."),
+          retryable: status.error?.retryable ?? true,
+          occurredAt: new Date().toISOString(),
+        };
+        record.job.completedAt = new Date().toISOString();
+        record.job.updatedAt = record.job.completedAt;
+        record.job.provenance = buildProvenance(record.job);
+      } else if (status.state === "ready" && status.output) {
+        await this.finalizeGenerationOutput(record, status.output, status.actualRegisteredModel);
+      } else {
+        record.internal.backoffMs = Math.min(record.internal.backoffMs * 1.6, MAX_BACKOFF_MS);
+        record.internal.nextPollAt = Date.now() + record.internal.backoffMs;
+        record.job.updatedAt = new Date().toISOString();
+      }
+    } catch (err) {
+      const terminalStatus = terminalProviderStatus(err);
+      record.internal.lastProviderStatusRaw = err instanceof McpToolError ? err.raw : toJobError(err);
+      if (terminalStatus) {
+        record.job.state = "failed";
+        record.job.uiMessage = friendlyMessage("failed");
+        record.job.lastError = safeProviderFailure(terminalStatus);
+        record.job.completedAt = new Date().toISOString();
+        record.job.updatedAt = record.job.completedAt;
+        record.job.provenance = buildProvenance(record.job);
+      } else {
+        record.internal.backoffMs = Math.min(record.internal.backoffMs * 1.6, MAX_BACKOFF_MS);
+        record.internal.nextPollAt = Date.now() + record.internal.backoffMs;
+      }
+    }
+    await this.store.put(record);
+    return toPublicJob(record);
+  }
+
+  private async finalizeGenerationOutput(
+    record: JobRecord,
+    output: NonNullable<ProviderGenerationStatus["output"]>,
+    servedModel?: string,
+  ): Promise<void> {
+    const request = record.job.request;
+    if (!request || !this.generation) throw new Error("Generation output has no durable request context");
+    record.job.state = output.url ? "downloading" : "generating";
+    record.job.uiMessage = output.url ? friendlyMessage("downloading") : friendlyMessage("generating");
+    record.job.completedAt = new Date().toISOString();
+    record.job.updatedAt = record.job.completedAt;
+    record.job.provenance = {
+      ...buildProvenance(record.job),
+      servedModel: servedModel ?? record.job.provenance?.servedModel ?? null,
+    };
+    await this.store.put(record);
+
+    try {
+      let result: GenerationResult;
+      if (request.kind === "image-to-3d") {
+        if (!output.url) throw new Error("3D provider output did not include a URL");
+        await this.finalizeReady(record, output.url, servedModel);
+        return;
+      }
+      if (request.kind === "text") {
+        const text = output.text ?? (typeof output.json === "string" ? output.json : JSON.stringify(output.json));
+        if (!text || text.length > request.maxCharacters) {
+          throw new Error(`Generated text must contain at most ${request.maxCharacters} characters`);
+        }
+        const structured = request.output === "quest-json" ? parseQuestJson(text, output.json) : undefined;
+        result = {
+          kind: "text",
+          output: { text, ...(structured !== undefined ? { structured } : {}) },
+        };
+      } else {
+        if (!output.url) throw new Error(`${request.kind} provider output did not include a URL`);
+        const maxBytes = request.kind === "image-edit" ? 25 * 1024 * 1024 : request.kind === "video" ? 200 * 1024 * 1024 : 75 * 1024 * 1024;
+        const { buffer } = await downloadBounded(output.url, maxBytes);
+        if (request.kind === "image-edit") {
+          const asset = await this.generation.generatedAssets.storeImage(buffer, request.outputMimeType, record.job.provenance!);
+          result = { kind: "image-edit", asset };
+        } else if (request.kind === "video") {
+          const asset = await this.generation.generatedAssets.storeVideo(buffer, {
+            durationSeconds: request.kind === "tts" ? 0 : request.durationSeconds,
+            provenance: record.job.provenance!,
+          });
+          result = { kind: "video", asset };
+        } else {
+          const kind = request.kind === "music"
+            ? "music"
+            : request.kind === "tts"
+              ? "narration"
+              : request.purpose.toLowerCase().includes("ambience") ? "ambience" : "sfx";
+          const asset = await this.generation.generatedAssets.storeAudio(buffer, {
+            kind,
+            durationSeconds: request.durationSeconds,
+            loop: request.kind === "tts" ? false : request.loop,
+            defaultGain: request.kind === "music" ? 0.7 : request.kind === "tts" ? 1 : 0.85,
+            ...(request.kind === "tts" ? { transcript: request.text } : {}),
+            provenance: record.job.provenance!,
+          });
+          result = request.kind === "music"
+            ? { kind: "music", asset: { ...asset, kind: "music" } }
+            : request.kind === "tts"
+              ? { kind: "tts", asset: { ...asset, kind: "narration" } }
+              : { kind: "sfx", asset: { ...asset, kind: asset.kind === "ambience" ? "ambience" : "sfx" } };
+        }
+      }
+      record.job.result = result;
+      if ("asset" in result) record.job.resultAssetId = result.asset.id;
+      record.job.state = "ready";
+      record.job.uiMessage = request.kind === "image-to-3d" ? friendlyMessage("ready") : "Generated asset is ready.";
+      record.job.updatedAt = record.job.completedAt!;
+    } catch (err) {
+      record.job.state = "failed";
+      record.job.uiMessage = friendlyMessage("failed");
+      record.job.lastError = toJobError(err);
+      record.job.updatedAt = new Date().toISOString();
+    }
+  }
+
   private async finalizeReady(
     record: JobRecord,
     resultAssetUrl: string,
@@ -447,6 +806,10 @@ export class JobManager {
         orderedPhotos,
       );
       record.job.resultAssetId = asset.id;
+      if (record.job.request?.kind === "image-to-3d") {
+        record.job.result = { kind: "image-to-3d", asset };
+        record.job.provenance = buildProvenance(record.job);
+      }
       record.job.state = "ready";
       record.job.uiMessage = friendlyMessage("ready");
       record.job.completedAt = new Date().toISOString();
@@ -532,13 +895,19 @@ export class JobManager {
       delete record.job.lastError;
       await this.store.put(record);
 
-      const updated = await this.submitToProvider(record, {
-        capability: record.job.capabilityRequested,
-        photos: record.internal.originalRequest.photos,
-        ...(record.internal.originalRequest.scenePrompt !== undefined
-          ? { scenePrompt: record.internal.originalRequest.scenePrompt }
-          : {}),
-      });
+      const updated = record.job.request
+        ? await this.submitGenerationToProvider(
+            record,
+            record.job.request,
+            this.generation?.perRequestLimitUsd ?? Number.MAX_SAFE_INTEGER,
+          )
+        : await this.submitToProvider(record, {
+            capability: record.job.capabilityRequested,
+            photos: record.internal.originalRequest.photos,
+            ...(record.internal.originalRequest.scenePrompt !== undefined
+              ? { scenePrompt: record.internal.originalRequest.scenePrompt }
+              : {}),
+          });
       return toPublicJob(updated);
     });
   }

@@ -5,7 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProviderAdapter, ProviderStatusResult, ProviderSubmitResult } from "../../shared/provider.js";
 import { McpToolError, McpTransportError } from "../livepeer/mcpClient.js";
 import { AssetStore } from "../persistence/assetStore.js";
+import { GeneratedAssetStore } from "../persistence/generatedAssetStore.js";
 import { PhotoStore } from "../persistence/photoStore.js";
+import type { GenerationRequest } from "../../shared/generation.js";
+import type { GenerationProviderAdapter, ProviderGenerationStatus } from "./types.js";
+import { SpendLedger } from "./spendLedger.js";
 import { JobStore } from "./store.js";
 import { JobManager } from "./manager.js";
 
@@ -105,6 +109,106 @@ describe("JobManager", () => {
   function build(adapter: ProviderAdapter) {
     return new JobManager(new JobStore(dir), adapter, new AssetStore(dir), new PhotoStore(dir));
   }
+
+  function buildMulti(adapter: ProviderAdapter & GenerationProviderAdapter, storageDir = dir) {
+    return new JobManager(
+      new JobStore(storageDir),
+      adapter,
+      new AssetStore(storageDir),
+      new PhotoStore(storageDir),
+      {
+        generatedAssets: new GeneratedAssetStore(storageDir),
+        spendLedger: new SpendLedger(storageDir),
+        perRequestLimitUsd: 2,
+        perWorldLimitUsd: 8,
+        maxRetries: 2,
+      },
+    );
+  }
+
+  function fakeMultiAdapter(overrides: Partial<GenerationProviderAdapter> = {}): ProviderAdapter & GenerationProviderAdapter {
+    return {
+      ...fakeAdapter(),
+      validateGenerationInput: vi.fn(() => ({ valid: true, errors: [] })),
+      submitGeneration: vi.fn(async (request) => ({
+        providerJobId: `provider-${request.idempotencyKey}`,
+        capabilityUsed: request.capability,
+        fallbackFired: null,
+      })),
+      getGenerationStatus: vi.fn(async (): Promise<ProviderGenerationStatus> => ({ state: "generating" })),
+      ...overrides,
+    };
+  }
+
+  const v2Requests: GenerationRequest[] = [
+    { schemaVersion: 1, kind: "image-edit", capability: "kontext-edit", idempotencyKey: "edit", purpose: "style-preview", sourceImageAssetId: "p", instruction: "cartoon", outputMimeType: "image/png" },
+    { schemaVersion: 1, kind: "image-edit", capability: "bg-remove", idempotencyKey: "bg", purpose: "object-cutout", sourceImageAssetId: "p", instruction: "remove background", outputMimeType: "image/png" },
+    { schemaVersion: 1, kind: "image-to-3d", capability: "rodin-i3d", idempotencyKey: "mesh", purpose: "world-mesh", photos: [{ photoId: "p", sourceIndex: 1 }] },
+    { schemaVersion: 1, kind: "text", capability: "gemini-text", idempotencyKey: "text", purpose: "quest", prompt: "quest json", output: "quest-json", maxCharacters: 1200 },
+    { schemaVersion: 1, kind: "music", capability: "music", idempotencyKey: "music", purpose: "soundtrack", prompt: "instrumental", durationSeconds: 60, instrumental: true, loop: true },
+    { schemaVersion: 1, kind: "sfx", capability: "mirelo-sfx", idempotencyKey: "sfx", purpose: "pickup", prompt: "chime", durationSeconds: 2, loop: false },
+    { schemaVersion: 1, kind: "tts", capability: "chatterbox-tts", idempotencyKey: "tts", purpose: "narration", text: "Welcome", language: "en" },
+    { schemaVersion: 1, kind: "video", capability: "pixverse-i2v", idempotencyKey: "video", purpose: "animated-postcard", sourceImageAssetId: "p", prompt: "orbit", durationSeconds: 5 },
+  ];
+
+  it("deduplicates every v2 generation kind (including the background-removal image-edit profile)", async () => {
+    const adapter = fakeMultiAdapter();
+    const manager = buildMulti(adapter);
+    for (const request of v2Requests) {
+      const first = await manager.submitGenerationOrReconcile(request, { worldId: "world-1" });
+      const second = await manager.submitGenerationOrReconcile(request, { worldId: "world-1" });
+      expect(first.status, request.idempotencyKey).toBe("created");
+      expect(second.status, request.idempotencyKey).toBe("reconciled");
+      expect(second.job.id).toBe(first.job.id);
+    }
+    expect(adapter.submitGeneration).toHaveBeenCalledTimes(v2Requests.length);
+  });
+
+  it("hard-rejects a request that exceeds the configured budget before provider submission", async () => {
+    const adapter = fakeMultiAdapter();
+    const manager = buildMulti(adapter);
+    const costly = v2Requests.find((request) => request.capability === "rodin-i3d")!;
+    await expect(manager.submitGenerationOrReconcile(costly, { requestLimitOverrideUsd: 0.1, worldId: "world-budget" }))
+      .rejects.toMatchObject({ code: "budget_exceeded", retryable: false });
+    expect(adapter.submitGeneration).not.toHaveBeenCalled();
+  });
+
+  it("records shared provenance and preserves a ready mesh when an independent TTS job fails", async () => {
+    vi.mocked(downloadBounded).mockResolvedValue({ buffer: minimalGlb(), contentType: "model/gltf-binary" });
+    const adapter = fakeMultiAdapter({
+      getGenerationStatus: vi.fn(async (providerJobId): Promise<ProviderGenerationStatus> => {
+        if (providerJobId.includes("tts")) return { state: "failed", error: { message: "voice unavailable", retryable: true } };
+        return {
+          state: "ready",
+          actualCapabilityUsed: "rodin-i3d",
+          actualFallbackFired: null,
+          actualRegisteredModel: "fal-ai/hyper3d/rodin/v2.5",
+          reportedCostUsd: 0.42,
+          output: { url: "https://provider.example/mesh.glb", outputKind: "3d" },
+        };
+      }),
+    });
+    const manager = buildMulti(adapter);
+    const meshRequest = v2Requests.find((request) => request.kind === "image-to-3d")!;
+    const ttsRequest = v2Requests.find((request) => request.kind === "tts")!;
+    const mesh = await manager.submitGenerationOrReconcile(meshRequest, { worldId: "world-partial" });
+    const tts = await manager.submitGenerationOrReconcile(ttsRequest, { worldId: "world-partial" });
+    const readyMesh = await manager.pollAndAdvance(mesh.job.id, { force: true });
+    const failedTts = await manager.pollAndAdvance(tts.job.id, { force: true });
+    expect(readyMesh).toMatchObject({
+      state: "ready",
+      kind: "image-to-3d",
+      provenance: {
+        requestedCapability: "rodin-i3d",
+        servedCapability: "rodin-i3d",
+        servedModel: "fal-ai/hyper3d/rodin/v2.5",
+        reportedCost: { amount: 0.42, currency: "USD" },
+      },
+      result: { kind: "image-to-3d", asset: { id: expect.any(String) } },
+    });
+    expect(failedTts?.state).toBe("failed");
+    expect((await manager.getPublic(mesh.job.id))?.state).toBe("ready");
+  });
 
   it("submits once on create and the job is retrievable by idempotency key without a second submit", async () => {
     const adapter = fakeAdapter();
