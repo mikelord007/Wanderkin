@@ -38,6 +38,7 @@ import {
 } from "./manifestEdits.js";
 import { clearDraft, resolveDraft, saveDraft, type EditorDraft } from "./draftStorage.js";
 import { saveThenExport } from "./exportFlow.js";
+import type { RepairGuidance } from "./repairGuidance.js";
 import "./editor.css";
 
 export interface LevelEditorProps {
@@ -47,6 +48,7 @@ export interface LevelEditorProps {
   onExport?: (manifest: SceneManifest) => void | Promise<void>;
   onPlay: (manifest: SceneManifest) => void;
   onBack: () => void;
+  repairFocus?: RepairGuidance | null;
 }
 
 function initialEditorState(manifest: SceneManifest) {
@@ -67,6 +69,7 @@ export function LevelEditor({
   onExport,
   onPlay,
   onBack,
+  repairFocus = null,
 }: LevelEditorProps) {
   const initial = useState(() => initialEditorState(manifest))[0];
   const baseUpdatedAtRef = useRef(manifest.updatedAt);
@@ -81,7 +84,7 @@ export function LevelEditor({
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(
     () => workingManifest.entities.find((e) => e.kind === "generated-mesh")?.id ?? null,
   );
-  const [placementMode, setPlacementMode] = useState<PlacementMode>(null);
+  const [placementMode, setPlacementMode] = useState<PlacementMode>(() => repairFocus?.placementMode ?? null);
   const [placementError, setPlacementError] = useState<string | null>(null);
   const [entityBounds, setEntityBounds] = useState<Record<string, EntityBounds>>({});
   const [previewErrors, setPreviewErrors] = useState<Set<string>>(new Set());
@@ -244,6 +247,15 @@ export function LevelEditor({
 
   return (
     <div className="oq-editor">
+      {repairFocus ? (
+        <div className="oq-editor__banner oq-editor__banner--repair" role="status">
+          <div>
+            <strong>One course fix needs your attention</strong>
+            <p>{repairFocus.message}</p>
+          </div>
+          <span>The matching placement tool is ready in the preview.</span>
+        </div>
+      ) : null}
       {stalePromptDraft ? (
         <div className="oq-editor__banner oq-editor__banner--warning">
           <p>

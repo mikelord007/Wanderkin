@@ -27,6 +27,23 @@
   align-items: flex-start;
 }
 
+.oq-editor__banner--repair {
+  border-color: #f5a623;
+  background: #30233a;
+  align-items: flex-start;
+}
+
+.oq-editor__banner--repair strong {
+  display: block;
+  color: #fff4dc;
+  margin-bottom: 0.25rem;
+}
+
+.oq-editor__banner--repair > span {
+  color: #d8d0e9;
+  font-size: 0.8rem;
+}
+
 .oq-editor__banner-actions {
   display: flex;
   gap: 0.6rem;
@@ -264,6 +281,39 @@
   outline: 2px solid #f5a623;
 }
 
+.oq-world-ready {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
+  gap: 1.25rem;
+  align-items: center;
+  padding: 1.25rem;
+}
+
+.oq-world-ready__copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.8rem;
+}
+
+.oq-world-ready__copy h2,
+.oq-world-ready__copy p {
+  margin: 0;
+}
+
+.oq-world-ready__objective {
+  color: #d8d0e9;
+  font-weight: 650;
+}
+
+.oq-world-ready__preview {
+  height: clamp(360px, 55vh, 580px);
+  min-height: 360px;
+  border: 1px solid #382f54;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
 @media (max-width: 860px) {
   .oq-editor__layout {
     grid-template-columns: 1fr;
@@ -272,5 +322,9 @@
   .oq-editor__panels {
     max-height: none;
     overflow-y: visible;
+  }
+
+  .oq-world-ready {
+    grid-template-columns: 1fr;
   }
 }
