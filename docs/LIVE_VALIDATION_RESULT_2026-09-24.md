@@ -1,6 +1,6 @@
 # ObjectQuest v2 live-validation result — 2026-09-24
 
-Status: **rows 1–5 ready; the row-5 quest was recovered from its existing provider job at zero new spend; rows 6–16 await separate authorization to resume**.
+Status: **rows 1–5 ready; the authorized remaining-row attempt stopped safely when row 6 music was rejected before provider dispatch; rows 7–16 remain unsubmitted**.
 
 ## Dry-run checkpoint
 
@@ -75,7 +75,7 @@ Validation stopped at quest: Provider reported "done" but returned no output. Pa
 | 3 | GPT image-edit alternate | `job_f9bcf342-6254-4b38-9fa0-d32c797cb89f` / `mjob_4a0b2bde417b` | `gpt-image-edit` / `openai/gpt-image-2/edit` | **Ready**, no fallback; provider total 77,457 ms | PNG, 684,261 bytes, SHA-256 `93c3895a6dbf68121eb8f50487efd44a0e2601a4ee5bf6c2653c133aa1501106` |
 | 4 | Rodin mesh | `job_662f0c8a-52f1-4e33-adad-fcff355e014d` / `mjob_0001ef7f3201` | `rodin-i3d` / `fal-ai/hyper3d/rodin/v2.5` | **Ready**, no fallback; provider total 138,789 ms | GLB, 4,680,412 bytes, SHA-256 `f0855519fb1314e14703ef91a7778b6992f2f4c80b64910cfe4781e719b0e24c` |
 | 5 | Quest | `job_8df572b8-0ded-4e8b-b524-c3361698a1ca` / `mjob_13e739e8d5af` | `gemini-text` / `fal-ai/any-llm` | **Recovered ready**, no fallback and zero new provider submission; originally stopped after 10,478 ms | Structured quest JSON, canonical SHA-256 `47561633496011cc62324b3d7b8225b5600c1f9178e3a5a2e82bfb6fd1f5bb6e` |
-| 6 | Music | — | — | Not submitted after runner stop | — |
+| 6 | Music | `job_38ac4480-6e6c-4ed5-99ef-a0e0448cb1e0` / no provider job | `music` / not served | **Failed before dispatch**, no fallback: shared `create_media` contract rejected 60 seconds because its maximum is 15 | None; provider explicitly reported nothing dispatched or charged |
 | 7 | Ambience | — | — | Not submitted after runner stop | — |
 | 8 | Fragment-pickup SFX | — | — | Not submitted after runner stop | — |
 | 9 | Portal-activate SFX | — | — | Not submitted after runner stop | — |
@@ -87,22 +87,24 @@ Validation stopped at quest: Provider reported "done" but returned no output. Pa
 | 15 | Narration | — | — | Not submitted after runner stop | — |
 | 16 | Animated postcard | — | — | Not submitted after runner stop | — |
 
-### Current cumulative spend
+### Current cumulative ledger
 
-- Ledger estimate/reservation: **$0.6932** across five entries: the original
-  cutout and preview plus the GPT alternate, Rodin mesh, and quest.
-- New runner reservation during the resumed attempt: **$0.6501**.
-- All five provider-reported costs are `null`; the provider-reported total is
+- Ledger estimate/reservation: **$0.7247** across six entries: the five
+  provider-backed ready rows totaling `$0.6932`, plus a retained `$0.0315`
+  reservation for the pre-dispatch music rejection.
+- The latest runner guard had conservatively counted **$0.6816** when it
+  stopped: reconciled rows 3–5 plus the rejected row-6 reservation.
+- All provider-reported costs are `null`; the provider-reported total is
   **unknown**, not zero.
 - Neither reconciliation added a ledger entry or incurred new estimated
   spend.
 - Recovering row 5 retained five ledger entries and **$0.6932**, with zero
   estimate/reservation delta. Only the existing quest entry's `updatedAt`
   changed when it finalized.
-- Rows 6–16 are the only fresh remaining calls, mathematically **$0.7327**.
-  The runner's conservative resume guard still counts reconciled rows 3–5 and
-  therefore reports **$1.3828**; that is reservation accounting, not expected
-  fresh provider spend.
+- The remaining-row attempt retained a `$0.0315` music reservation even though
+  provider validation rejected that request before dispatch. Rows 7–16 were
+  not submitted. The runner's conservative resume guard counted reconciled
+  rows 3–5 and reached `$0.6816` before the stop.
 
 ## Zero-spend quest recovery
 
@@ -134,6 +136,88 @@ before recovery and
 `4e3d5f91f451acc1277697a2ba8a1a12b75b2760c51c3ec96bdaef8756337e64`
 afterward. Cutout, preview, alternate, and mesh bytes still match their
 recorded hashes and sizes.
+
+## Remaining-row attempt and music contract blocker
+
+Before this attempt, forced read-only discovery reported `music`,
+`mirelo-sfx`, `chatterbox-tts`, and `pixverse-i2v` available/active with the
+same displayed rates. Exact request quotes totaled `$0.7326`, within the
+plan's conservative `$0.7327`. Pixverse retained the previously documented
+warning that its unpinned-resolution quote is a lower bound. The dry-run
+exited 0 without changing the five-job store or `$0.6932` ledger, and stored
+requests for rows 1–5 matched the runner's resolved requests exactly.
+
+The authorized runner reconciled rows 1–5, then submitted the fixed row-6
+application request for a 60-second instrumental track. The provider MCP tool
+rejected it during argument validation:
+
+```text
+create_media was refused before it ran, so nothing was dispatched and nothing
+was charged. duration must be at most 15.
+```
+
+The resulting app job is
+`job_38ac4480-6e6c-4ed5-99ef-a0e0448cb1e0`, with provider job ID `null`,
+`retryable: false`, retry count 0, no served capability/model, no fallback,
+and reported cost `null`. No retry or replacement request was made. Rows 7–16
+remain unsubmitted.
+
+Read-only inspection of the current `create_media` tool schema confirmed a
+shared integer `duration` bound of 3–15 seconds. This conflicts with the
+action description's promise that music accepts a duration and with the
+`music` capability quote, which priced the exact 60-second request at
+`$0.0315`. It affects more than row 6: the 20-second ambience exceeds the
+maximum, while the planned 1-, 2-, 1-, 2-, and 2-second event cues fall below
+the minimum. Only the two planned 3-second cues, narration, and 5-second
+postcard are valid unchanged.
+
+The preflight missed this because `describe_capability` omitted a music
+duration range, `cap_price` priced the exact 60-second request, `cap_route`
+returned SAFE, and the runner's dry-run checks app health and locally typed
+templates rather than the provider tool schema. This is not runner-only:
+the production audio orchestrator also requests 60-second music, 20-second
+ambience, and the same seven cue durations, while app and adapter validation
+allow music for 1–600 seconds and SFX for 1–60 seconds.
+
+The app ledger retained the music estimate despite the provider's explicit
+pre-dispatch/no-charge result: entries changed 5→6 and estimate/reservation
+changed `$0.6932`→`$0.7247`. This is conservative ledger state, not evidence
+of a sixth paid provider job. Actual paid cost for the five completed provider
+jobs remains unknown; the rejected music call is explicitly uncharged.
+
+### Validated zero-call recovery plan
+
+No recovery call has been made. A contract-compatible plan is: 15-second
+loopable music (`$0.0315`), 15-second loopable ambience (`$0.1575`), seven
+3-second event cues (`$0.2205`), unchanged narration (`$0.0029` ceiling;
+`$0.0028` exact quote), and the unchanged 5-second postcard (`$0.3413`). The
+fresh conservative estimate is **$0.7537** and the exact current quotes sum to
+**$0.7536**. The postcard quote remains a provider-described lower bound
+because resolution is not pinned.
+
+The changed music request cannot reuse `oq-live-20260924-music`: its stored
+60-second body would conflict with a 15-second body. Its failed record has no
+provider job, and retry would target that obsolete request; therefore recovery
+requires a new versioned idempotency key. Rows 7–16 have no application or
+provider jobs, so their unused keys can be retained with the corrected request
+bodies. Successful rows 1–5 require no upload, reset, regeneration, or new
+provider call.
+
+Conservatively retaining the explicitly uncharged `$0.0315` reservation, the
+current batch ledger `$0.7247` plus the corrected future plan `$0.7537` would
+be **$1.4784**, below the `$3` batch guard. Including the earlier `$0.462`
+style spike gives **$1.9404** against the cumulative `$10` ceiling, leaving
+**$8.0596**. Before any corrected run, the current project total is `$1.1867`
+and headroom is `$8.8133`. Provider-metered cost for completed calls remains
+unknown and must not be inferred from these estimates.
+
+The minimal repair belongs in `server/livepeer/adapter.ts` and
+`server/routes/jobs.ts` to enforce the observed 3–15-second wrapper contract
+before ledger reservation, plus `server/audio/prompts.ts` and
+`scripts/live-validation/plan.ts` to emit supported durations and a new music
+key. Focused regression coverage belongs in the existing adapter, audio
+orchestrator, HTTP generation-validation, and live-runner tests. No broad
+recursive normalization, schema, dependency, or UI change is indicated.
 
 ## Initial per-row execution record
 
@@ -245,15 +329,18 @@ entry, reservation, or provider submission.
 ## Five-layer distinction
 
 1. **Catalog availability:** the 2026-09-24 plan snapshot listed all requested
-   capabilities as available/active. Immediately before spending, the app's
-   live capability endpoint reconfirmed `rodin-i3d` and `tripo-mv3d`; that
-   endpoint exposes only the 3D descriptors.
+   capabilities as available/active. Immediately before the remaining-row
+   attempt, read-only discovery reconfirmed `music`, `mirelo-sfx`,
+   `chatterbox-tts`, and `pixverse-i2v` as available/active at unchanged
+   displayed rates. The shared tool schema conflict was not reflected in the
+   capability card or exact price quote.
 2. **Historical health:** the plan's seven-day provider history remains
    contextual evidence only; it is not this ObjectQuest run.
 3. **Our execution:** ObjectQuest has ready, no-fallback jobs for `bg-remove`,
    `kontext-edit`, `gpt-image-edit`, `rodin-i3d`, and `gemini-text`. The text
    job was recovered by polling its original provider job after the adapter
-   learned the observed nested-output contract. Rows 6–16 were not executed.
+   learned the observed nested-output contract. Row 6 created an app job but
+   was rejected before provider dispatch. Rows 7–16 were not submitted.
 4. **Visual quality:** human inspection in real Chrome supports only the
    cutout-preservation finding above. Preview and mesh artifacts exist but
    were intentionally left for the user's hands-on review. There is no audio
@@ -264,8 +351,8 @@ entry, reservation, or provider submission.
 ## Evidence hashes
 
 - Runner and recovery evidence JSON: SHA-256
-  `6f9ccac97ebc76ae039bf47f48767f4cc0985342891f7d8cb8694e86bab4949d`
-  (10,668 bytes).
+  `8282eb0da0d9a2df5aefd68c0843725becbf880c27af3b6bd804f9280f5c5dc2`
+  (17,562 bytes).
 - Recovered canonical quest JSON: SHA-256
   `47561633496011cc62324b3d7b8225b5600c1f9178e3a5a2e82bfb6fd1f5bb6e`
   (478 bytes).
@@ -293,13 +380,14 @@ entry, reservation, or provider submission.
 
 ## Cleanup and local-state integrity
 
-- Final spend endpoint: `knownUsd: 0.6932`, `unknownEntries: 0`,
-  `entries: 5`, `reservedUsd: 0.6932`.
+- Final spend endpoint: `knownUsd: 0.7247`, `unknownEntries: 0`,
+  `entries: 6`, `reservedUsd: 0.7247`. The sixth entry is the retained
+  estimate for the explicitly uncharged pre-dispatch music rejection.
 - Final saved-level count: 0.
 - Ignored spend ledger SHA-256:
-  `4e3d5f91f451acc1277697a2ba8a1a12b75b2760c51c3ec96bdaef8756337e64`.
+  `21b4bf78146bd05c64f11365ac30e7b29ac9fd8d37b19feb8f18d866bb65e1fe`.
 - Ignored durable jobs index SHA-256:
-  `08422f087e9d4ed3300af94307d9d4eec1338d5b7161de360f82eee8a28c37a9`.
+  `b32d9fdbb4865b68d839588ead5c5ca1230534b174e2ed3ceb41709cdc331560`.
 - Generated media, storage, durable jobs/ledger, runtime Vite configuration,
   and runner logs remain uncommitted under ignored paths.
 - The isolated API remains running at `http://127.0.0.1:18799` and the client
