@@ -1,5 +1,6 @@
 import { Component, lazy, Suspense, useState, type ReactNode } from "react";
-import type { SceneManifest } from "@shared/index.js";
+import type { PublishedLevelVersion, SceneManifest } from "@shared/index.js";
+import type { GameCompletionResult } from "../../game/types.js";
 import { LoadingScreen } from "../components/LoadingScreen.js";
 
 const GameView = lazy(() =>
@@ -9,13 +10,14 @@ const GameView = lazy(() =>
 interface PlayScreenProps {
   manifest: SceneManifest;
   onExit: () => void;
-  onComplete: () => void;
+  onComplete: (result: GameCompletionResult) => void;
+  publishedVersionId?: PublishedLevelVersion["versionId"];
 }
 
 /** Thin wrapper — GameView owns gameplay HUD, mantle prompt, pause, and
  * respawn controls. This screen only supplies the lazy boundary and the
  * exit/complete callbacks. */
-export function PlayScreen({ manifest, onExit, onComplete }: PlayScreenProps) {
+export function PlayScreen({ manifest, onExit, onComplete, publishedVersionId }: PlayScreenProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   if (loadError) {
@@ -37,7 +39,12 @@ export function PlayScreen({ manifest, onExit, onComplete }: PlayScreenProps) {
     <div className="oq-screen oq-screen--play oq-screen--full-bleed">
       <ErrorBoundary onError={setLoadError}>
         <Suspense fallback={<LoadingScreen stage="Loading the game…" />}>
-          <GameView manifest={manifest} onExit={onExit} onComplete={onComplete} />
+          <GameView
+            manifest={manifest}
+            onExit={onExit}
+            onComplete={onComplete}
+            {...(publishedVersionId === undefined ? {} : { publishedVersionId })}
+          />
         </Suspense>
       </ErrorBoundary>
     </div>

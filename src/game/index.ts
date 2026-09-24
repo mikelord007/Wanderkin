@@ -8,7 +8,7 @@
  */
 
 export { GameView } from "./GameView.js";
-export type { GameSnapshot, GameViewProps, GameLoadStage } from "./types.js";
+export type { GameCompletionResult, GameSnapshot, GameViewProps, GameLoadStage } from "./types.js";
 
 export { GameplayEventBus, gameplayEvents } from "./events.js";
 export type {
@@ -27,6 +27,18 @@ export type {
   WorldIntroStore,
 } from "./modes/session.js";
 export { localRaceBestTimes, localWorldIntros } from "./modes/session.js";
+export { createRaceVariant } from "./modes/raceVariant.js";
+export { LOST_COLORS_SAMPLE } from "./bundledSamples.js";
+export {
+  assertPlayableExperience,
+  PlacementValidationError,
+  validateExperiencePlacements,
+} from "./placementValidation.js";
+export type {
+  PlacementKind,
+  PlacementRepairIssue,
+  PlacementValidationResult,
+} from "./placementValidation.js";
 export { ColorRestorationAdapter } from "./restorationAdapter.js";
 export type { ColorRestorationSink } from "./restorationAdapter.js";
 

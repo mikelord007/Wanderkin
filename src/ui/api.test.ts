@@ -1,8 +1,40 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, describeApiError, exportLevelBundle, importLevelBundle } from "./api.js";
+import {
+  ApiError,
+  describeApiError,
+  exportLevelBundle,
+  getSharedLevel,
+  importLevelBundle,
+  publishLevel,
+} from "./api.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("publication API", () => {
+  it("publishes privately by default and reads the stable share without generation calls", async () => {
+    const publication = { versionId: "version-1", shareId: "share-1" };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(publication), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(publication), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await publishLevel("level-1", { kind: "completion" });
+    await getSharedLevel("share-1");
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/levels/level-1/publish",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ challenge: { kind: "completion" }, includesSourcePhotos: false }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/shares/share-1", undefined);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/api/jobs"))).toBe(false);
+  });
 });
 
 describe("describeApiError", () => {
