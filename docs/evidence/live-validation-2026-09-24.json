@@ -277,6 +277,206 @@
           "sizeBytes": 4680412
         }
       ]
+    },
+    {
+      "runId": "objectquest-live-1790256659546",
+      "status": "failed-pre-dispatch",
+      "failedStep": "music",
+      "completedAt": "2026-09-24T13:30:59.546Z",
+      "maxUsd": 3,
+      "plannedMaximumUsd": 1.3828,
+      "reservedByRunnerUsd": 0.6816,
+      "freshPlanEstimateUsd": 0.7327,
+      "freshDiscoveryQuoteUsd": 0.7326,
+      "discovery": {
+        "music": {
+          "available": true,
+          "status": "active",
+          "modelId": "fal-ai/minimax-music/v2",
+          "displayPriceUsd": 0.0315,
+          "unit": "track",
+          "exactRequestQuoteUsd": 0.0315
+        },
+        "mirelo-sfx": {
+          "available": true,
+          "status": "active",
+          "modelId": "Mirelo-AI/sfx1.6/text-to-audio",
+          "displayPriceUsd": 0.0105,
+          "unit": "second"
+        },
+        "chatterbox-tts": {
+          "available": true,
+          "status": "active",
+          "modelId": "fal-ai/chatterbox/text-to-speech",
+          "displayPriceUsd": 0.02625,
+          "unit": "1000_characters",
+          "exactRequestQuoteUsd": 0.0028
+        },
+        "pixverse-i2v": {
+          "available": true,
+          "status": "active",
+          "modelId": "fal-ai/pixverse/c1/image-to-video",
+          "displayPriceUsd": 0.06825,
+          "unit": "second",
+          "exactRequestQuoteUsd": 0.3413,
+          "warning": "The provider still describes an unpinned-resolution quote as a lower bound."
+        }
+      },
+      "reusedRows": [
+        {
+          "step": "cutout",
+          "applicationJobId": "job_737935e2-c54b-4c18-a6a6-782a7a4c69c8",
+          "providerJobId": "mjob_a2426904c928",
+          "state": "ready",
+          "requestMatched": true
+        },
+        {
+          "step": "style-preview",
+          "applicationJobId": "job_ef2fde65-65e2-4d16-b8df-e75d53c93d85",
+          "providerJobId": "mjob_d3d1797a1657",
+          "state": "ready",
+          "requestMatched": true
+        },
+        {
+          "step": "alternate-edit",
+          "applicationJobId": "job_f9bcf342-6254-4b38-9fa0-d32c797cb89f",
+          "providerJobId": "mjob_4a0b2bde417b",
+          "state": "ready",
+          "requestMatched": true
+        },
+        {
+          "step": "mesh",
+          "applicationJobId": "job_662f0c8a-52f1-4e33-adad-fcff355e014d",
+          "providerJobId": "mjob_0001ef7f3201",
+          "state": "ready",
+          "requestMatched": true
+        },
+        {
+          "step": "quest",
+          "applicationJobId": "job_8df572b8-0ded-4e8b-b524-c3361698a1ca",
+          "providerJobId": "mjob_13e739e8d5af",
+          "state": "ready",
+          "requestMatched": true
+        }
+      ],
+      "failedJob": {
+        "step": "music",
+        "applicationJobId": "job_38ac4480-6e6c-4ed5-99ef-a0e0448cb1e0",
+        "providerJobId": null,
+        "idempotencyKey": "oq-live-20260924-music",
+        "state": "failed",
+        "retryable": false,
+        "requestedCapability": "music",
+        "servedCapability": null,
+        "servedModel": null,
+        "fallbackFired": null,
+        "requestedDurationSeconds": 60,
+        "reportedCost": null,
+        "error": "create_media rejected duration before dispatch: maximum 15 seconds.",
+        "providerDispatchOccurred": false,
+        "providerCharge": "explicitly none for this rejected call"
+      },
+      "contractConflict": {
+        "providerTool": "create_media",
+        "durationMinimumSeconds": 3,
+        "durationMaximumSeconds": 15,
+        "musicPlanDurationSeconds": 60,
+        "ambiencePlanDurationSeconds": 20,
+        "shortCuePlanDurationsSeconds": [
+          1,
+          2,
+          1,
+          2,
+          2,
+          3,
+          3
+        ],
+        "impact": "Music and ambience exceed the shared maximum; five event cues fall below its minimum. Only the two existing 3-second cues, narration, and 5-second postcard are valid unchanged.",
+        "preflightGap": "describe_capability omitted a music duration range, cap_price priced the exact 60-second request, cap_route returned SAFE, and runner dry-run performs health/template checks rather than provider schema validation."
+      },
+      "validatedRecoveryPlan": {
+        "music": {
+          "durationSeconds": 15,
+          "loop": true,
+          "estimatedUsd": 0.0315,
+          "requiresNewIdempotencyKey": true,
+          "reason": "The failed 60-second request is already stored under oq-live-20260924-music. Reusing that key with a changed body conflicts; retry would target the obsolete body and has maxRetries 0."
+        },
+        "ambience": {
+          "durationSeconds": 15,
+          "loop": true,
+          "estimatedUsd": 0.1575,
+          "existingJob": false
+        },
+        "eventSfx": {
+          "count": 7,
+          "durationSecondsEach": 3,
+          "estimatedUsd": 0.2205,
+          "existingJobs": false
+        },
+        "narration": {
+          "characters": 107,
+          "requestValidUnchanged": true,
+          "estimatedUsd": 0.0029,
+          "exactQuoteUsd": 0.0028,
+          "expectedOutput": "WAV audio"
+        },
+        "postcard": {
+          "durationSeconds": 5,
+          "requestValidUnchanged": true,
+          "estimatedUsd": 0.3413,
+          "expectedOutput": "MP4 video without audio",
+          "warning": "Unpinned-resolution price remains a provider-described lower bound."
+        },
+        "freshPlanEstimateUsd": 0.7537,
+        "freshExactQuoteUsd": 0.7536,
+        "conservativeBatchLedgerAfterUsd": 1.4784,
+        "priorStyleSpikeUsd": 0.462,
+        "conservativeProjectTotalAfterUsd": 1.9404,
+        "remainingUnderProjectCeilingUsd": 8.0596,
+        "batchCapUsd": 3,
+        "projectCeilingUsd": 10
+      },
+      "scopeDiagnosis": {
+        "runnerOnly": false,
+        "productionAudioOrchestratorMusicSeconds": 60,
+        "productionAudioOrchestratorAmbienceSeconds": 20,
+        "productionAudioOrchestratorShortCueSeconds": [
+          1,
+          2,
+          1,
+          2,
+          2,
+          3,
+          3
+        ],
+        "applicationValidationMusicRangeSeconds": "1-600",
+        "applicationValidationSfxRangeSeconds": "1-60",
+        "providerToolRangeSeconds": "3-15"
+      },
+      "ledger": {
+        "worldId": "live-validation-photo4-20260924",
+        "entriesBefore": 5,
+        "entriesAfter": 6,
+        "estimatedUsdBefore": 0.6932,
+        "estimatedUsdAfter": 0.7247,
+        "estimatedUsdDelta": 0.0315,
+        "reportedUsdDelta": null,
+        "note": "The app retained the music estimate/reservation even though provider validation rejected the request before dispatch."
+      },
+      "unsubmittedRows": [
+        "ambience",
+        "fragment-pickup",
+        "portal-activate",
+        "checkpoint",
+        "fall-respawn",
+        "race-start",
+        "race-finish",
+        "completion",
+        "narration",
+        "postcard"
+      ],
+      "level": null
     }
   ]
 }
