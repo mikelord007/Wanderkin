@@ -344,9 +344,9 @@ JPEG header). This rules out an error body and confirms the provider treated
 The application failure was local: `GeneratedAssetStore.storeImage` correctly
 sniffed the bytes as JPEG, then rejected them because the detected MIME did not
 equal the request's preferred `outputMimeType`. Generated image finalization
-must therefore accept JPEG, PNG, or WebP by magic bytes and persist the detected
-MIME and extension while retaining the requested format only in the provider
-request.
+now accepts JPEG, PNG, or WebP by magic bytes and persists the detected MIME,
+dimensions, and extension. The requested output format is still sent to the
+provider as a preference, but it is no longer treated as a post-condition.
 
 - Worker 1's shared contracts intentionally have no separate
   `background-removal` kind; the exact server mapping is the `image-edit`

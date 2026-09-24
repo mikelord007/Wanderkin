@@ -66,7 +66,7 @@ export function createPostcardsRouter(
         releaseBudget = imagePolicy.budget.acquire(dimensions.width * dimensions.height * 4);
       }
       const owner = security?.issue(req, res);
-      const asset = await assets.storeImage(buffer, "image/png", localCaptureProvenance(buffer));
+      const asset = await assets.storeImage(buffer, "image/png", localCaptureProvenance(buffer), true);
       if (owner) await security?.claim("generated-asset", asset.id, owner.ownerId);
       res.status(201).json(asset);
     } catch (error) {
