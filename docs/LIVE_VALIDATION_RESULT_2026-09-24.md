@@ -1,9 +1,54 @@
 # ObjectQuest v2 live-validation result — 2026-09-24
 
-Status: **rows 1–5 remain ready; corrected rows 6–8 are ready; the bounded
-audio run stopped without retry when row 9 portal-activate's provider runner
-was abandoned after losing its heartbeat; rows 10–15 remain unsubmitted and
-row 16 remains SKIPPED/BLOCKED**.
+Status: **rows 1–8 remain ready; the one authorized row-9 replacement and row
+10 checkpoint are ready; recovery stopped without retry when row 11
+fall-respawn suffered a second provider `runner_abandoned` failure; rows 12–15
+remain unsubmitted and row 16 remains SKIPPED/BLOCKED**.
+
+## One-off portal recovery — stopped at the next provider failure
+
+At MAIN `c51c399b79dbe0fb53c87fbec9ad101a48f41697`, the recovery-only
+dry-run proved exactly seven possible submissions: a byte-identical
+three-second portal request with the sole change to versioned key
+`oq-live-20260924-portal-activate-v2`, followed by the six unused original
+keys for rows 10–15. It revalidated ready rows 1–8, the untouched original
+failed portal job, the ten-entry `$0.9767` ledger, `$0.1919` recovery ceiling,
+and zero retry/upload/level-save/publish/postcard paths.
+
+The authorized replacement succeeded after 163,576 ms as application job
+`job_e6ca6d26-95e4-4a57-9957-ccb339f7b898`, provider job
+`mjob_30c95ec86443`, served capability/model `mirelo-sfx` /
+`Mirelo-AI/sfx1.6/text-to-audio`, no fallback, and null reported cost. Its
+266,318-byte RIFF/WAVE asset `44281ef7-112f-45e5-b135-3739dc8f1154`
+matches SHA-256
+`f66162797f8d0dc6bb8f2c114f9d6423be54c1cf157714e325b70c9605e5db30`.
+The original failed portal job and reservation were not changed.
+
+Checkpoint then succeeded after 22,844 ms as application job
+`job_ad9d29da-c845-4942-a20e-73867b01e4dd`, provider job
+`mjob_94a0a8679b31`, with the same named capability/model, no fallback, and
+null reported cost. Its 266,318-byte RIFF/WAVE asset
+`e57434dc-4764-471a-886d-0b3674d3d1b5` matches SHA-256
+`a5157262e1820d3f122cd7fdf6c8701e5b89107fe4e0ba7d896a5d5a03470b8e`.
+
+Fall-respawn then failed after 146,041 ms on its first and only submission:
+application job `job_43353949-fb25-4589-93ea-e2b84b05cdaa`, provider job
+`mjob_4a4a42d7fc56`. Its durable raw envelope again reports HTTP 200/entered,
+`runner_abandoned`, no heartbeat for 143 seconds, no media produced,
+`url:null`, `run_output:null`, `persisted:false`, no fallback, null served
+model, `$0.0315` estimate with `release_pending`, no recorded release, and
+null paid cost. This second independent abandonment shows a recurring Mirelo
+provider-runner liveness problem in this execution window. The harness stopped;
+race-start, race-finish, completion, and narration were never submitted. No
+retry or second replacement was attempted.
+
+The conservative ledger is now `$1.0712` across 13 entries; including the
+earlier `$0.4620` spike gives `$1.5332`. Actual paid cost remains unknown. The
+private hands-on level remains byte-identical at levels hash
+`dbe0dfd604d6677b86f8d6f892b9440e7ca527530b693a24a25cac0f9f86554b`
+with zero attached audio/video. Because the full semantic SFX set is still
+incomplete, browser decode/playback and API attachment were intentionally not
+performed; there is no shifted partial SFX mapping, new world, or publication.
 
 ## Corrected audio-only execution — stopped at first provider failure
 

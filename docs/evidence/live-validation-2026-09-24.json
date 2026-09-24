@@ -715,6 +715,152 @@
         "browserDecodePlayback": "not run because the required audio set did not complete and no partial attachment was made",
         "seamlessLoopQuality": "unverified; loop fields remain playback intent only"
       }
+    },
+    {
+      "runId": "objectquest-live-audio-recovery-20260924T143335Z",
+      "status": "failed-provider-runner-abandoned-stopped-no-retry",
+      "integratedRevision": "c51c399b79dbe0fb53c87fbec9ad101a48f41697",
+      "completedAt": "2026-09-24T14:39:12.477Z",
+      "executionControl": {
+        "dryRunSubmissions": 7,
+        "sequential": true,
+        "portalReplacementFirst": true,
+        "stopOnFirstUnexpectedFailure": true,
+        "retryCalls": 0,
+        "secondReplacementCalls": 0,
+        "uploads": 0,
+        "levelWrites": 0,
+        "publishCalls": 0,
+        "postcardCalls": 0,
+        "automaticRetries": 0,
+        "authorizedRecoveryMaximumUsd": 0.1919,
+        "perRequestMaximumUsd": 0.5,
+        "batchMaximumUsd": 3,
+        "projectMaximumUsd": 10
+      },
+      "preservedOriginalPortalFailure": {
+        "applicationJobId": "job_0ea8326f-b76f-46d6-aba1-5b2d03a02a14",
+        "providerJobId": "mjob_f9db028110fb",
+        "idempotencyKey": "oq-live-20260924-portal-activate",
+        "state": "failed",
+        "retryCount": 0,
+        "mutated": false
+      },
+      "completedRows": [
+        {
+          "step": "portal-activate-v2",
+          "applicationJobId": "job_e6ca6d26-95e4-4a57-9957-ccb339f7b898",
+          "providerJobId": "mjob_30c95ec86443",
+          "idempotencyKey": "oq-live-20260924-portal-activate-v2",
+          "servedCapability": "mirelo-sfx",
+          "servedModel": "Mirelo-AI/sfx1.6/text-to-audio",
+          "fallbackFired": null,
+          "reportedCost": null,
+          "timings": { "queueMilliseconds": 2860, "executionMilliseconds": 160716, "totalMilliseconds": 163576 },
+          "artifact": {
+            "id": "44281ef7-112f-45e5-b135-3739dc8f1154",
+            "kind": "sfx",
+            "mimeType": "audio/wav",
+            "sizeBytes": 266318,
+            "durationSeconds": 3,
+            "loop": false,
+            "sha256": "f66162797f8d0dc6bb8f2c114f9d6423be54c1cf157714e325b70c9605e5db30",
+            "hashVerified": true,
+            "fileSignature": "RIFF/WAVE"
+          }
+        },
+        {
+          "step": "checkpoint",
+          "applicationJobId": "job_ad9d29da-c845-4942-a20e-73867b01e4dd",
+          "providerJobId": "mjob_94a0a8679b31",
+          "idempotencyKey": "oq-live-20260924-checkpoint",
+          "servedCapability": "mirelo-sfx",
+          "servedModel": "Mirelo-AI/sfx1.6/text-to-audio",
+          "fallbackFired": null,
+          "reportedCost": null,
+          "timings": { "queueMilliseconds": 4576, "executionMilliseconds": 18268, "totalMilliseconds": 22844 },
+          "artifact": {
+            "id": "e57434dc-4764-471a-886d-0b3674d3d1b5",
+            "kind": "sfx",
+            "mimeType": "audio/wav",
+            "sizeBytes": 266318,
+            "durationSeconds": 3,
+            "loop": false,
+            "sha256": "a5157262e1820d3f122cd7fdf6c8701e5b89107fe4e0ba7d896a5d5a03470b8e",
+            "hashVerified": true,
+            "fileSignature": "RIFF/WAVE"
+          }
+        }
+      ],
+      "failedRow": {
+        "step": "fall-respawn",
+        "applicationJobId": "job_43353949-fb25-4589-93ea-e2b84b05cdaa",
+        "providerJobId": "mjob_4a4a42d7fc56",
+        "idempotencyKey": "oq-live-20260924-fall-respawn",
+        "requestedCapability": "mirelo-sfx",
+        "fallbackFired": null,
+        "servedModel": null,
+        "reportedCost": null,
+        "retryable": false,
+        "retryCount": 0,
+        "maxRetries": 0,
+        "safeErrorCode": "provider_failed",
+        "safeError": "The provider rejected the generation request. Check the selected model settings and try again.",
+        "rawProviderDiagnosis": {
+          "status": "failed",
+          "isError": true,
+          "runnerOutcome": "runner_abandoned",
+          "entered": true,
+          "httpStatus": 200,
+          "heartbeatMissingSeconds": 143,
+          "providerError": "The background worker running this job stopped responding (no heartbeat for 143s after it started). No media was produced. Re-run the request — short renders now run inline and are not affected.",
+          "url": null,
+          "runOutput": null,
+          "persisted": false,
+          "capabilityUsed": null,
+          "servedModel": null,
+          "fallbackFired": null,
+          "costDisposition": "release_pending",
+          "spendRelease": null,
+          "costUsdEstimated": 0.0315,
+          "costPaidUsd": null
+        },
+        "timings": { "queueMilliseconds": 2269, "executionMilliseconds": 143772, "totalMilliseconds": 146041 }
+      },
+      "unsubmittedRows": ["race-start", "race-finish", "completion", "narration"],
+      "ledger": {
+        "worldId": "live-validation-photo4-20260924",
+        "entriesBefore": 10,
+        "entriesAfter": 13,
+        "estimatedUsdBefore": 0.9767,
+        "estimatedUsdAfter": 1.0712,
+        "freshReservedUsd": 0.0945,
+        "priorStyleSpikeUsd": 0.462,
+        "conservativeProjectTotalUsd": 1.5332,
+        "actualPaidCost": null
+      },
+      "level": {
+        "levelId": "live-validation-photo4-20260924-hands-on",
+        "audioAssetsBefore": 0,
+        "audioAssetsAfter": 0,
+        "videoAssetsBefore": 0,
+        "videoAssetsAfter": 0,
+        "attached": false,
+        "published": false,
+        "levelsJsonSha256Before": "dbe0dfd604d6677b86f8d6f892b9440e7ca527530b693a24a25cac0f9f86554b",
+        "levelsJsonSha256After": "dbe0dfd604d6677b86f8d6f892b9440e7ca527530b693a24a25cac0f9f86554b"
+      },
+      "durableState": {
+        "jobsJsonSha256": "2882ddcae6380cc72015d61f714494ca28763865661314736aaa8eb54911e2ab",
+        "ledgerJsonSha256": "b1e393b950e5782ed82d6204da782109aaf17aab88f70bb3005f3f8dad42fdfb",
+        "generatedAssetsJsonSha256": "66fb5507004cf32cb1ffebc1ddcfb35d9c3d2525bc1274517be6c538a99b1c66"
+      },
+      "verification": {
+        "storedReadyHashesMatch": true,
+        "readyFileSignaturesMatchMime": true,
+        "browserDecodePlayback": "not run because the full required set did not complete",
+        "attachment": "not attempted; no partial or shifted SFX mapping"
+      }
     }
   ]
 }
