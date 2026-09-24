@@ -27,6 +27,7 @@ export type {
   WorldIntroStore,
 } from "./modes/session.js";
 export { localRaceBestTimes, localWorldIntros } from "./modes/session.js";
+export { createRaceVariant } from "./modes/raceVariant.js";
 export { ColorRestorationAdapter } from "./restorationAdapter.js";
 export type { ColorRestorationSink } from "./restorationAdapter.js";
 

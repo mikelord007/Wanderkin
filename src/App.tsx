@@ -14,6 +14,7 @@ import {
   saveActiveSource,
 } from "./ui/jobStorage.js";
 import { createLevel, downloadLevelBundle, saveLevel } from "./ui/api.js";
+import { createRaceVariant } from "./game/modes/raceVariant.js";
 
 type Screen =
   | { name: "start" }
@@ -170,14 +171,8 @@ export function App() {
         <FinishScreen
           manifest={screen.manifest}
           onReplay={() => setScreen({ name: "play", manifest: screen.manifest })}
-          onBackToLevel={() =>
-            setScreen({
-              name: "preparation",
-              source: { kind: "manifest", manifest: screen.manifest },
-              isNew: false,
-            })
-          }
-          onBackToStart={goStart}
+          onTryRace={() => setScreen({ name: "play", manifest: createRaceVariant(screen.manifest) })}
+          onCreateAnother={() => setScreen({ name: "photos" })}
         />
       );
 
