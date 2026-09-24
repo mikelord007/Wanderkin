@@ -118,7 +118,7 @@ export const PlayerAvatar = forwardRef<
         tilt.current.scale.set(lateral, height * pose.squash, lateral);
       }
 
-      model.lanternMaterial.emissiveIntensity = 1.7 + pose.lanternPulse * 0.45;
+      model.lanternMaterial.emissiveIntensity = 0.95 + pose.lanternPulse * 0.28;
       model.lanternLight.intensity = 0.32 + pose.lanternPulse * 0.1;
 
       if (shadow.current) {

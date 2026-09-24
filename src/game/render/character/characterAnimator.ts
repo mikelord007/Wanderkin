@@ -102,7 +102,9 @@ const LEG: SpringTuning = { omega: 27, zeta: 0.95 };
 const CORE: SpringTuning = { omega: 19, zeta: 0.85 };
 const ARM: SpringTuning = { omega: 15, zeta: 0.6 };
 const LOOK: SpringTuning = { omega: 13, zeta: 0.55 };
-const CLOTH: SpringTuning = { omega: 9.5, zeta: 0.26 };
+// Loose enough to lag and wobble, damped enough that the tail never overshoots
+// up over the character's own head.
+const CLOTH: SpringTuning = { omega: 10.5, zeta: 0.42 };
 
 function tuningFor(name: string): SpringTuning {
   if (name.startsWith("scarf")) return CLOTH;
@@ -188,8 +190,8 @@ export function poseIdle(out: Layer, time: number): void {
   set(out.euler, HEAD, -0.03 - breath * 0.02, glance * 0.3, sway * 0.02);
 
   // Arms hang slightly away from the body and drift with the breath.
-  set(out.euler, SHOULDER_L, breath * 0.03, 0, -0.16 - sway * 0.02);
-  set(out.euler, SHOULDER_R, breath * 0.03, 0, 0.16 + sway * 0.02);
+  set(out.euler, SHOULDER_L, breath * 0.03, 0, -0.22 - sway * 0.025);
+  set(out.euler, SHOULDER_R, breath * 0.03, 0, 0.22 + sway * 0.025);
   set(out.euler, ELBOW_L, 0.2, 0, -0.06);
   set(out.euler, ELBOW_R, 0.2, 0, 0.06);
   set(out.euler, WRIST_L, 0.08, 0, 0);
@@ -360,12 +362,16 @@ export function poseMantle(out: Layer, progress: number): void {
   set(out.euler, NECK, -0.28 * reach + 0.1 * pull, 0, 0);
   set(out.euler, HEAD, -0.36 * reach + 0.14 * pull, 0, 0);
 
-  // Overhead through the whole move; the elbows close as the body comes up.
-  const overhead = -2.45 - 0.2 * reach;
-  set(out.euler, SHOULDER_L, overhead, 0.12, -0.2);
-  set(out.euler, SHOULDER_R, overhead, -0.12, 0.2);
-  set(out.euler, ELBOW_L, 0.25 + pull * 0.95, 0, -0.1);
-  set(out.euler, ELBOW_R, 0.25 + pull * 0.95, 0, 0.1);
+  // Overhead through the whole move. The elbows only close a little: folding
+  // them hard drags the hands back down to chest height, which reads as
+  // holding something rather than as hauling yourself over a lip.
+  // Spread as well as raised, so the hands grip the lip out to either side
+  // instead of parking in front of the character's own face.
+  const overhead = -2.6 - 0.15 * reach;
+  set(out.euler, SHOULDER_L, overhead, 0.12, -0.5);
+  set(out.euler, SHOULDER_R, overhead, -0.12, 0.5);
+  set(out.euler, ELBOW_L, 0.18 + pull * 0.5, 0, -0.1);
+  set(out.euler, ELBOW_R, 0.18 + pull * 0.5, 0, 0.1);
   set(out.euler, WRIST_L, -0.3, 0, 0);
   set(out.euler, WRIST_R, -0.3, 0, 0);
 
@@ -594,14 +600,17 @@ export class CharacterAnimator {
     // Scarf. Positive X on these bones swings the tail back and up, so the
     // stream grows with speed; the sideways term throws it out of a turn, and
     // the airborne term lifts it as the character drops.
-    const stream = speedFactor * 0.95 + (airborne ? clamp(-input.verticalVelocity * 0.075, -0.2, 0.55) : 0);
+    const stream = speedFactor * 0.62 + (airborne ? clamp(-input.verticalVelocity * 0.05, -0.16, 0.3) : 0);
     const sideways = clamp(this.yawRate * 0.16, -0.6, 0.6);
-    const flutter = Math.sin(this.clock * 3.7) * (0.05 + speedFactor * 0.14);
+    const flutter = Math.sin(this.clock * 3.7) * (0.04 + speedFactor * 0.1);
     for (let i = 0; i < SCARF.length; i += 1) {
       const bone = SCARF[i]!;
-      const falloff = 1 - i * 0.16;
+      // Tapers hard down the tail, and capped: the three joints compound, so
+      // without both of these the scarf whips up over the character's own head
+      // on a jump, which reads as a bug rather than as momentum.
+      const falloff = 1 - i * 0.3;
       this.target.euler[bone * 3] =
-        this.target.euler[bone * 3]! + (stream * 0.55 + flutter) * falloff;
+        this.target.euler[bone * 3]! + clamp((stream * 0.55 + flutter) * falloff, -0.24, 0.32);
       this.target.euler[bone * 3 + 1] =
         this.target.euler[bone * 3 + 1]! + sideways * falloff;
       this.target.euler[bone * 3 + 2] =

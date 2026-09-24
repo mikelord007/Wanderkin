@@ -14,7 +14,7 @@
 
 import * as THREE from "three";
 import { FACE_UV_ORIGIN, FACE_UV_SPAN } from "./characterGeometry.js";
-import { PALETTE } from "./characterDesign.js";
+import { FACE_ANCHORS, headSurfaceV } from "./characterDesign.js";
 
 const SIZE = 512;
 
@@ -26,9 +26,14 @@ function py(v: number): number {
   return (1 - v) * SIZE;
 }
 
-/** Head sweep parameter (0 at the neck, 1 at the crown) → atlas V. */
-function headV(t: number): number {
-  return FACE_UV_ORIGIN + t * FACE_UV_SPAN;
+/**
+ * Height in character units → atlas V. Goes through `headSurfaceV` rather than
+ * treating V as height directly: the head's rings are not evenly spaced, so
+ * the two are not the same thing and eyeballing it puts the art on the wrong
+ * feature.
+ */
+function headV(height: number): number {
+  return FACE_UV_ORIGIN + headSurfaceV(height) * FACE_UV_SPAN;
 }
 
 /** Angle around the head in turns (0 = dead ahead, ± = left/right) → atlas U.
@@ -36,6 +41,34 @@ function headV(t: number): number {
  * so dead ahead is the middle of that span. */
 function headU(turns: number): number {
   return FACE_UV_ORIGIN + (0.5 + turns) * FACE_UV_SPAN;
+}
+
+/**
+ * The head's UVs wrap a full turn across the art region horizontally but only
+ * the head's height vertically, so one unit of U covers roughly three times as
+ * much surface as one unit of V. Anything drawn round comes out three times too
+ * wide on the model — which is how the first pass produced a bandit mask
+ * instead of a pair of eyes. Divide every horizontal extent by this.
+ */
+const U_STRETCH = 3.1;
+
+/** Draws an ellipse that is actually round once projected onto the head. */
+function roundOnHead(
+  context: CanvasRenderingContext2D,
+  centreU: number,
+  centreV: number,
+  radius: number,
+  aspect = 1,
+): void {
+  context.ellipse(
+    px(centreU),
+    py(centreV),
+    (SIZE * radius * aspect) / U_STRETCH,
+    SIZE * radius,
+    0,
+    0,
+    Math.PI * 2,
+  );
 }
 
 function eye(
@@ -46,20 +79,22 @@ function eye(
 ): void {
   const cx = px(centreU);
   const cy = py(centreV);
+  const rx = (SIZE * radius * 1.12) / U_STRETCH;
+  const ry = SIZE * radius;
 
   context.fillStyle = "#241d33";
   context.beginPath();
-  context.ellipse(cx, cy, radius, radius * 1.18, 0, 0, Math.PI * 2);
+  roundOnHead(context, centreU, centreV, radius, 1.12);
   context.fill();
 
   // Two highlights: a large one for life, a small one for sparkle. Without
   // these the eyes read as flat holes once the character is a few pixels tall.
   context.fillStyle = "#ffffff";
   context.beginPath();
-  context.ellipse(cx - radius * 0.3, cy - radius * 0.42, radius * 0.34, radius * 0.34, 0, 0, Math.PI * 2);
+  context.ellipse(cx - rx * 0.3, cy - ry * 0.4, rx * 0.36, ry * 0.36, 0, 0, Math.PI * 2);
   context.fill();
   context.beginPath();
-  context.ellipse(cx + radius * 0.34, cy + radius * 0.3, radius * 0.16, radius * 0.16, 0, 0, Math.PI * 2);
+  context.ellipse(cx + rx * 0.34, cy + ry * 0.3, rx * 0.17, ry * 0.17, 0, 0, Math.PI * 2);
   context.fill();
 }
 
@@ -67,64 +102,70 @@ export function drawFaceAtlas(context: CanvasRenderingContext2D): void {
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, SIZE, SIZE);
 
+  const EYE_TURNS = 0.062;
+
   // Cheeks first, so the eyes and mouth sit on top of them.
-  const cheekY = headV(0.42);
-  context.fillStyle = "rgba(255, 138, 120, 0.42)";
-  for (const turns of [-0.105, 0.105]) {
+  context.fillStyle = "rgba(255, 126, 104, 0.4)";
+  for (const turns of [-0.115, 0.115]) {
     context.beginPath();
-    context.ellipse(px(headU(turns)), py(cheekY), SIZE * 0.035, SIZE * 0.023, 0, 0, Math.PI * 2);
+    roundOnHead(context, headU(turns), headV(FACE_ANCHORS.cheek), 0.017, 2.1);
     context.fill();
   }
 
-  const eyeV = headV(0.52);
-  eye(context, headU(-0.062), eyeV, SIZE * 0.042);
-  eye(context, headU(0.062), eyeV, SIZE * 0.042);
+  const eyeV = headV(FACE_ANCHORS.eyes);
+  eye(context, headU(-EYE_TURNS), eyeV, 0.034);
+  eye(context, headU(EYE_TURNS), eyeV, 0.034);
 
   // Brows: short, slightly raised, which is most of the character's warmth.
-  context.strokeStyle = "#3a2f4d";
-  context.lineWidth = SIZE * 0.012;
+  const browHalfWidth = (SIZE * 0.03) / U_STRETCH;
+  context.strokeStyle = "#4a3a5e";
+  context.lineWidth = SIZE * 0.008;
   context.lineCap = "round";
   for (const [turns, tilt] of [
-    [-0.062, -1],
-    [0.062, 1],
+    [-EYE_TURNS, -1],
+    [EYE_TURNS, 1],
   ] as const) {
     const bx = px(headU(turns));
-    const by = py(headV(0.63));
+    const by = py(headV(FACE_ANCHORS.brow));
     context.beginPath();
-    context.moveTo(bx - SIZE * 0.032, by + SIZE * 0.006 * tilt);
-    context.quadraticCurveTo(bx, by - SIZE * 0.014, bx + SIZE * 0.032, by - SIZE * 0.006 * tilt);
+    context.moveTo(bx - browHalfWidth, by + SIZE * 0.005 * tilt);
+    context.quadraticCurveTo(bx, by - SIZE * 0.011, bx + browHalfWidth, by - SIZE * 0.005 * tilt);
     context.stroke();
   }
 
   // Mouth: an open, upturned curve rather than a line, so it reads at a
   // distance and from slightly above (the default camera pitch).
-  context.strokeStyle = "#5a3b3b";
-  context.lineWidth = SIZE * 0.014;
+  const mouthHalfWidth = (SIZE * 0.05) / U_STRETCH;
+  context.strokeStyle = "#8a4c3e";
+  context.lineWidth = SIZE * 0.009;
   const mx = px(headU(0));
-  const my = py(headV(0.33));
+  const my = py(headV(FACE_ANCHORS.mouth));
   context.beginPath();
-  context.moveTo(mx - SIZE * 0.028, my);
-  context.quadraticCurveTo(mx, my + SIZE * 0.028, mx + SIZE * 0.028, my);
+  context.moveTo(mx - mouthHalfWidth, my);
+  context.quadraticCurveTo(mx, my + SIZE * 0.022, mx + mouthHalfWidth, my);
   context.stroke();
 
-  // Knitted-cap texture: a band of stitches along the brim, which is what
-  // stops the cap reading as a plain painted sphere.
-  context.strokeStyle = "rgba(210, 186, 160, 0.7)";
-  context.lineWidth = SIZE * 0.006;
-  for (let i = 0; i <= 36; i += 1) {
-    const turns = -0.5 + i / 36;
+  // Knitted-cap texture: a band of stitches over the crown, which is what
+  // stops the cap reading as a plain painted sphere. Drawn dark because the
+  // cap's vertex colour multiplies through it.
+  context.strokeStyle = "rgba(120, 175, 172, 0.85)";
+  context.lineWidth = SIZE * 0.005;
+  for (let i = 0; i <= 44; i += 1) {
+    const turns = -0.5 + i / 44;
     const x = px(headU(turns));
     context.beginPath();
-    context.moveTo(x, py(headV(0.76)));
-    context.lineTo(x, py(headV(0.86)));
+    context.moveTo(x, py(headV(FACE_ANCHORS.capBrim)));
+    context.lineTo(x, py(headV(FACE_ANCHORS.capCrown)));
     context.stroke();
   }
 
-  // Goggle strap shading just under the brim.
-  context.fillStyle = PALETTE.goggles;
-  context.globalAlpha = 0.18;
-  context.fillRect(px(FACE_UV_ORIGIN), py(headV(0.74)), px(FACE_UV_SPAN), SIZE * 0.012);
-  context.globalAlpha = 1;
+  // A ribbed band right on the brim, so the cap has an edge of its own.
+  context.strokeStyle = "rgba(20, 70, 70, 0.55)";
+  context.lineWidth = SIZE * 0.009;
+  context.beginPath();
+  context.moveTo(px(FACE_UV_ORIGIN), py(headV(FACE_ANCHORS.capBrim)));
+  context.lineTo(px(FACE_UV_ORIGIN + FACE_UV_SPAN), py(headV(FACE_ANCHORS.capBrim)));
+  context.stroke();
 }
 
 /**

@@ -66,10 +66,10 @@ export const BONES: readonly BoneDefinition[] = [
 
   { name: "shoulder.L", parent: "chest", rest: [0.135, 0.125, 0] },
   { name: "elbow.L", parent: "shoulder.L", rest: [0.165, -0.02, 0] },
-  { name: "wrist.L", parent: "elbow.L", rest: [0.18, -0.145, 0] },
+  { name: "wrist.L", parent: "elbow.L", rest: [0.178, -0.122, 0] },
   { name: "shoulder.R", parent: "chest", rest: [-0.135, 0.125, 0] },
   { name: "elbow.R", parent: "shoulder.R", rest: [-0.165, -0.02, 0] },
-  { name: "wrist.R", parent: "elbow.R", rest: [-0.18, -0.145, 0] },
+  { name: "wrist.R", parent: "elbow.R", rest: [-0.178, -0.122, 0] },
 
   { name: "hip.L", parent: "hips", rest: [0.068, -0.175, 0] },
   { name: "knee.L", parent: "hip.L", rest: [0.072, -0.315, 0] },
@@ -110,8 +110,10 @@ export type ZoneName = (typeof ZONE)[keyof typeof ZONE];
 export const PALETTE: Record<ZoneName, string> = {
   suit: "#f0743c",
   suitDark: "#c44f27",
-  cap: "#ffeede",
-  skin: "#ffd8b8",
+  // Cap and scarf share a cool teal against the warm suit, so the head reads
+  // as a hat over a face rather than as one pale dome.
+  cap: "#2fa8a2",
+  skin: "#ffd9bc",
   mitten: "#fff3e3",
   boot: "#3b3350",
   scarf: "#63e0d8",
@@ -180,9 +182,12 @@ const TORSO: PartDefinition = {
   startCap: "pole",
   endCap: "open",
   rings: [
-    { at: [0, -0.225, 0], rx: 0.05, rz: 0.046, zone: ZONE.suitDark, weights: [W("hips")] },
-    { at: [0, -0.205, 0], rx: 0.104, rz: 0.09, squareness: 1.25, zone: ZONE.suitDark, weights: [W("hips")] },
-    { at: [0, -0.175, 0], rx: 0.14, rz: 0.116, squareness: 1.3, zone: ZONE.suitDark, weights: [W("hips")] },
+    // The pelvis is capped high and narrow. Capping it lower left the cone tip
+    // hanging below where the thighs close over it, showing up as a bulge
+    // between the legs that read as a modelling mistake.
+    { at: [0, -0.2, 0], rx: 0.062, rz: 0.056, zone: ZONE.suitDark, weights: [W("hips")] },
+    { at: [0, -0.186, 0], rx: 0.105, rz: 0.092, squareness: 1.25, zone: ZONE.suitDark, weights: [W("hips")] },
+    { at: [0, -0.168, 0], rx: 0.138, rz: 0.116, squareness: 1.3, zone: ZONE.suitDark, weights: [W("hips")] },
     { at: [0, -0.13, 0], rx: 0.132, rz: 0.108, squareness: 1.2, zone: ZONE.suitDark, weights: [W("hips", 0.6), W("spine", 0.4)] },
     { at: [0, -0.075, 0], rx: 0.116, rz: 0.097, squareness: 1.1, zone: ZONE.suit, weights: [W("hips", 0.25), W("spine", 0.75)] },
     { at: [0, -0.02, 0], rx: 0.128, rz: 0.11, offsetZ: 0.004, squareness: 1.15, zone: ZONE.suit, weights: [W("spine", 0.7), W("chest", 0.3)] },
@@ -209,33 +214,73 @@ const HEAD: PartDefinition = {
   faceMapped: true,
   rings: [
     { at: [0, 0.205, 0], rx: 0.066, rz: 0.064, zone: ZONE.skin, weights: [W("head")] },
-    { at: [0, 0.235, 0], rx: 0.112, rz: 0.108, zone: ZONE.skin, weights: [W("head")] },
-    { at: [0, 0.268, 0], rx: 0.143, rz: 0.139, offsetZ: 0.004, zone: ZONE.skin, weights: [W("head")] },
-    { at: [0, 0.3, 0], rx: 0.158, rz: 0.153, offsetZ: 0.006, zone: ZONE.skin, weights: [W("head")] },
-    { at: [0, 0.335, 0], rx: 0.164, rz: 0.158, offsetZ: 0.006, zone: ZONE.skin, weights: [W("head")] },
-    { at: [0, 0.362, 0], rx: 0.162, rz: 0.156, offsetZ: 0.004, zone: ZONE.skin, weights: [W("head")] },
-    // The cap's brim: a slight flare, so it reads as a knitted band.
-    { at: [0, 0.378, 0], rx: 0.166, rz: 0.16, zone: ZONE.cap, weights: [W("head")] },
-    { at: [0, 0.4, 0], rx: 0.156, rz: 0.151, zone: ZONE.cap, weights: [W("head")] },
-    { at: [0, 0.428, 0], rx: 0.132, rz: 0.128, zone: ZONE.cap, weights: [W("head")] },
-    { at: [0, 0.453, 0], rx: 0.098, rz: 0.095, zone: ZONE.cap, weights: [W("head")] },
+    { at: [0, 0.235, 0], rx: 0.108, rz: 0.104, zone: ZONE.skin, weights: [W("head")] },
+    { at: [0, 0.268, 0], rx: 0.136, rz: 0.132, offsetZ: 0.004, zone: ZONE.skin, weights: [W("head")] },
+    { at: [0, 0.3, 0], rx: 0.15, rz: 0.146, offsetZ: 0.006, zone: ZONE.skin, weights: [W("head")] },
+    { at: [0, 0.33, 0], rx: 0.155, rz: 0.15, offsetZ: 0.006, zone: ZONE.skin, weights: [W("head")] },
+    { at: [0, 0.356, 0], rx: 0.153, rz: 0.148, offsetZ: 0.003, zone: ZONE.skin, weights: [W("head")] },
+    // The cap's brim, then a rounded crown.
+    { at: [0, 0.376, 0], rx: 0.146, rz: 0.142, zone: ZONE.cap, weights: [W("head")] },
+    { at: [0, 0.4, 0], rx: 0.138, rz: 0.134, zone: ZONE.cap, weights: [W("head")] },
+    { at: [0, 0.428, 0], rx: 0.12, rz: 0.116, zone: ZONE.cap, weights: [W("head")] },
+    { at: [0, 0.452, 0], rx: 0.094, rz: 0.091, zone: ZONE.cap, weights: [W("head")] },
     { at: [0, 0.47, 0], rx: 0.058, rz: 0.056, zone: ZONE.cap, weights: [W("head")] },
-    { at: [0, 0.481, 0], rx: 0.026, rz: 0.025, zone: ZONE.cap, weights: [W("head")] },
+    { at: [0, 0.479, 0], rx: 0.028, rz: 0.027, zone: ZONE.cap, weights: [W("head")] },
   ],
 };
 
-/** Goggles pushed up onto the cap's brim. A band, not a pair of discs. */
+/**
+ * Goggles pushed up onto the forehead, just under the cap's brim. A band, not
+ * a pair of discs — and deliberately ABOVE {@link FACE_ANCHORS.brow}, because a
+ * band that overlaps the eyes hides the character's whole expression.
+ */
 const GOGGLES: PartDefinition = {
   name: "goggles",
   sides: 20,
   startCap: "open",
   endCap: "open",
   rings: [
-    { at: [0, 0.362, 0], rx: 0.168, rz: 0.162, zone: ZONE.goggles, weights: [W("head")] },
-    { at: [0, 0.376, 0], rx: 0.172, rz: 0.166, zone: ZONE.goggles, weights: [W("head")] },
-    { at: [0, 0.39, 0], rx: 0.168, rz: 0.162, zone: ZONE.goggles, weights: [W("head")] },
+    { at: [0, 0.344, 0], rx: 0.158, rz: 0.154, offsetZ: 0.004, zone: ZONE.goggles, weights: [W("head")] },
+    { at: [0, 0.356, 0], rx: 0.16, rz: 0.156, offsetZ: 0.004, zone: ZONE.goggles, weights: [W("head")] },
+    { at: [0, 0.368, 0], rx: 0.155, rz: 0.151, offsetZ: 0.003, zone: ZONE.goggles, weights: [W("head")] },
   ],
 };
+
+/**
+ * Heights, in character units, the face art is drawn at. The head's UVs run
+ * along its *ring index*, and the rings are not evenly spaced in y, so art
+ * placed by eye in UV space drifts off the feature it belongs to — which is
+ * how the first version put the goggle band straight across the eyes. Anchor
+ * the art to real heights and convert with {@link headSurfaceV}.
+ */
+export const FACE_ANCHORS = {
+  mouth: 0.256,
+  cheek: 0.278,
+  eyes: 0.3,
+  brow: 0.328,
+  capBrim: 0.382,
+  capCrown: 0.462,
+} as const;
+
+/** Lowest and highest head ring, i.e. the span the face atlas covers. */
+export const HEAD_RING_HEIGHTS: readonly number[] = HEAD.rings.map((ring) => ring.at[1]);
+
+/**
+ * Height in character units → the head's sweep parameter (0 at the neck, 1 at
+ * the crown), which is exactly what the generated UVs interpolate along.
+ */
+export function headSurfaceV(height: number): number {
+  const heights = HEAD_RING_HEIGHTS;
+  const last = heights.length - 1;
+  if (height <= heights[0]!) return 0;
+  if (height >= heights[last]!) return 1;
+  for (let i = 0; i < last; i += 1) {
+    const low = heights[i]!;
+    const high = heights[i + 1]!;
+    if (height <= high) return (i + (height - low) / (high - low)) / last;
+  }
+  return 1;
+}
 
 /** Cloth collar flaring out under the chin; hides the neck join completely. */
 const COLLAR: PartDefinition = {
@@ -264,12 +309,14 @@ function arm(side: 1 | -1, suffix: "L" | "R"): PartDefinition {
       { at: [x(0.142), 0.108, 0], rx: 0.055, rz: 0.055, zone: ZONE.suit, weights: [W(`shoulder.${suffix}`)] },
       { at: [x(0.155), 0.05, 0], rx: 0.047, rz: 0.047, zone: ZONE.suit, weights: [W(`shoulder.${suffix}`)] },
       { at: [x(0.163), -0.005, 0], rx: 0.042, rz: 0.042, zone: ZONE.suit, weights: [W(`shoulder.${suffix}`, 0.5), W(`elbow.${suffix}`, 0.5)] },
-      { at: [x(0.17), -0.06, 0], rx: 0.038, rz: 0.038, zone: ZONE.suitDark, weights: [W(`elbow.${suffix}`)] },
-      { at: [x(0.177), -0.118, 0], rx: 0.036, rz: 0.036, zone: ZONE.suitDark, weights: [W(`elbow.${suffix}`, 0.55), W(`wrist.${suffix}`, 0.45)] },
-      // Mitten: bulges out past the cuff, tapers to a rounded tip.
-      { at: [x(0.18), -0.15, 0.002], rx: 0.049, rz: 0.046, squareness: 1.2, zone: ZONE.mitten, weights: [W(`wrist.${suffix}`)] },
-      { at: [x(0.181), -0.182, 0.006], rx: 0.05, rz: 0.047, squareness: 1.2, zone: ZONE.mitten, weights: [W(`wrist.${suffix}`)] },
-      { at: [x(0.181), -0.208, 0.008], rx: 0.038, rz: 0.036, zone: ZONE.mitten, weights: [W(`wrist.${suffix}`)] },
+      { at: [x(0.17), -0.055, 0], rx: 0.038, rz: 0.038, zone: ZONE.suitDark, weights: [W(`elbow.${suffix}`)] },
+      { at: [x(0.176), -0.1, 0], rx: 0.036, rz: 0.036, zone: ZONE.suitDark, weights: [W(`elbow.${suffix}`, 0.55), W(`wrist.${suffix}`, 0.45)] },
+      // Mitten: bulges well out past the cuff so the hands stay legible as
+      // hands, and ends above hip height so they do not merge into the
+      // silhouette of the legs.
+      { at: [x(0.178), -0.128, 0.003], rx: 0.055, rz: 0.051, squareness: 1.2, zone: ZONE.mitten, weights: [W(`wrist.${suffix}`)] },
+      { at: [x(0.179), -0.158, 0.008], rx: 0.057, rz: 0.053, squareness: 1.2, zone: ZONE.mitten, weights: [W(`wrist.${suffix}`)] },
+      { at: [x(0.179), -0.184, 0.01], rx: 0.042, rz: 0.04, zone: ZONE.mitten, weights: [W(`wrist.${suffix}`)] },
     ],
   };
 }

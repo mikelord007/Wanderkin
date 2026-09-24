@@ -8,6 +8,9 @@ import { describe, expect, it } from "vitest";
 import {
   CHARACTER_PARTS,
   CHARACTER_UNIT_HALF_WIDTH,
+  FACE_ANCHORS,
+  HEAD_RING_HEIGHTS,
+  headSurfaceV,
   type PartDefinition,
 } from "./characterDesign.js";
 import {
@@ -158,6 +161,51 @@ describe("character mesh", () => {
     const index = range.start + 3 * columns + frontColumn;
     expect(vertex(index)[2]).toBeGreaterThan(0);
     expect(data.uvs[index * 2]!).toBeCloseTo(FACE_UV_ORIGIN + FACE_UV_SPAN / 2, 5);
+  });
+
+  it("leaves the face clear of the goggle band", () => {
+    // The first version of this design put the goggles straight across the
+    // eyes, because the face art was positioned in UV space by eye while the
+    // head's UVs actually run along its ring index. Everything on the face has
+    // to sit below the lowest goggle ring.
+    const goggles = CHARACTER_PARTS.find((part) => part.name === "goggles")!;
+    const lowestBand = Math.min(...goggles.rings.map((ring) => ring.at[1]));
+    for (const [feature, height] of Object.entries(FACE_ANCHORS)) {
+      if (feature.startsWith("cap")) {
+        expect(height, `${feature} should be above the goggles`).toBeGreaterThan(lowestBand);
+      } else {
+        expect(height, `${feature} is hidden behind the goggles`).toBeLessThan(lowestBand);
+      }
+    }
+  });
+
+  it("converts a face height to the head's sweep parameter", () => {
+    // Exactly the conversion the face art depends on; a linear height→V
+    // assumption would fail here because the head's rings are not evenly spaced.
+    const last = HEAD_RING_HEIGHTS.length - 1;
+    expect(headSurfaceV(HEAD_RING_HEIGHTS[0]!)).toBe(0);
+    expect(headSurfaceV(HEAD_RING_HEIGHTS[last]!)).toBe(1);
+    expect(headSurfaceV(-5)).toBe(0);
+    expect(headSurfaceV(5)).toBe(1);
+    for (let i = 0; i <= last; i += 1) {
+      expect(headSurfaceV(HEAD_RING_HEIGHTS[i]!)).toBeCloseTo(i / last, 9);
+    }
+    // Monotonic across the whole span.
+    let previous = -1;
+    for (let step = 0; step <= 100; step += 1) {
+      const height = 0.19 + (step / 100) * 0.3;
+      const v = headSurfaceV(height);
+      expect(v).toBeGreaterThanOrEqual(previous);
+      previous = v;
+    }
+  });
+
+  it("puts the eye height on skin, not on the cap", () => {
+    const head = CHARACTER_PARTS.find((part) => part.name === "head")!;
+    const eyeRing = head.rings.find((ring) => ring.at[1] === FACE_ANCHORS.eyes);
+    expect(eyeRing?.zone).toBe("skin");
+    const crownRing = head.rings.find((ring) => ring.at[1] > FACE_ANCHORS.capBrim);
+    expect(crownRing?.zone).toBe("cap");
   });
 
   it("builds a stable cross-section frame even when a sweep runs along +Z", () => {

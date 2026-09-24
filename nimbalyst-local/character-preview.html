@@ -1,0 +1,27 @@
+<!doctype html>
+<!--
+  Throwaway visual harness for the authored character. Not part of the app and
+  not referenced by it: it renders the character alone, with no API, no asset
+  download and no saved-world access, so the mesh and the animation can be
+  eyeballed and screenshotted on a temporary port.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Character preview</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #1a1622; overflow: hidden; }
+      canvas { display: block; }
+      #label {
+        position: fixed; left: 12px; top: 12px; z-index: 2;
+        font: 13px/1.5 ui-monospace, monospace; color: #ffe9d2;
+        background: rgba(0,0,0,0.45); padding: 6px 10px; border-radius: 6px;
+        white-space: pre;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="label">booting…</div>
+    <script type="module" src="./character-preview.ts"></script>
+  </body>
+</html>

@@ -84,7 +84,9 @@ export function buildCharacter(options: { outline?: boolean } = {}): CharacterMo
   const lanternMaterial = new THREE.MeshStandardMaterial({
     color: LANTERN_COLOUR,
     emissive: new THREE.Color(LANTERN_COLOUR),
-    emissiveIntensity: 1.7,
+    // Bright enough to find in shadow, dim enough not to blow out to a white
+    // hole in the character's back under the game's key light.
+    emissiveIntensity: 0.95,
     roughness: 0.25,
   });
   const lantern = new THREE.Mesh(
