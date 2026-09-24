@@ -5,9 +5,10 @@ interface FinishScreenProps {
   onReplay: () => void;
   onBackToLevel: () => void;
   onBackToStart: () => void;
+  isShared?: boolean;
 }
 
-export function FinishScreen({ manifest, onReplay, onBackToLevel, onBackToStart }: FinishScreenProps) {
+export function FinishScreen({ manifest, onReplay, onBackToLevel, onBackToStart, isShared = false }: FinishScreenProps) {
   return (
     <div className="oq-screen oq-screen--finish">
       <div className="oq-finish-card">
@@ -21,7 +22,7 @@ export function FinishScreen({ manifest, onReplay, onBackToLevel, onBackToStart 
             Play again
           </button>
           <button type="button" className="oq-button oq-button--secondary" onClick={onBackToLevel}>
-            Back to saved level
+            {isShared ? "Back to challenge" : "Back to saved level"}
           </button>
           <button type="button" className="oq-button oq-button--ghost" onClick={onBackToStart}>
             Return to start

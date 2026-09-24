@@ -2,6 +2,7 @@ import { z } from "zod";
 import { COORDINATE_CONVENTION } from "./geometry.js";
 import type { LevelExperience } from "./experience.js";
 import type { SceneManifest } from "./manifest.js";
+import { worldWorkflowSchema } from "./workflow.js";
 import {
   LEVEL_EXPERIENCE_SCHEMA_VERSION,
   QUEST_TEXT_SCHEMA_VERSION,
@@ -260,6 +261,7 @@ export const sceneManifestReaderSchema = z
     }),
     experience: levelExperienceSchema.optional(),
     media: z.object({ audio: z.array(audioAsset), video: z.array(videoAsset) }).optional(),
+    workflow: worldWorkflowSchema.optional(),
   })
   .superRefine((manifest, context) => {
     const orders = manifest.checkpoints.map((item) => item.order).sort((a, b) => a - b);

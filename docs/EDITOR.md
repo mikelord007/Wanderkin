@@ -8,9 +8,10 @@ Owner: Level tools and persistence worker. Covers `src/editor/**`,
 | File | Purpose |
 | --- | --- |
 | `LevelEditor.tsx` | Named export `LevelEditor`, the contract component from `docs/CONTRACTS.md` (`{ manifest, onSave, onPlay, onBack }`) plus optional `isPersisted`/`onExport` hooks for the portable-bundle UI. Orchestrates the panels below and the 3D preview. |
-| `Preview3D.tsx` | React Three Fiber canvas: renders every manifest entity (generated mesh + helper geometry), spawn/checkpoint markers, and reports click-to-place hits and generated-mesh bounding boxes back up to `LevelEditor`. |
+| `Preview3D.tsx` | React Three Fiber canvas: renders every manifest entity (generated mesh + helper geometry), spawn/checkpoint/fragment/portal markers, and reports click-to-place hits and generated-mesh bounding boxes back up to `LevelEditor`. |
 | `geometry.ts` | Pure math: capsule-center ⇄ surface-Y conversion, heading ⇄ quaternion, floor-align delta, calibration scale factor. Fully unit-tested. |
-| `manifestEdits.ts` | Pure, immutable `SceneManifest` mutators (spawn, checkpoints, helper geometry, transforms, calibration). Every mutation calls `markManuallyAdjusted`, which flips `courseValidation.status` to `"manually-adjusted"` with an honest note — this editor cannot itself re-run controller/physics validation (that lives in `src/game`), so it never claims a course is still `"validated"` after an edit. |
+| `manifestEdits.ts` | Pure, immutable `SceneManifest` mutators (spawn, checkpoints, color fragments, finish portal, helper geometry, transforms, calibration). Every mutation calls `markManuallyAdjusted`, which flips `courseValidation.status` to `"manually-adjusted"` with an honest note — this editor cannot itself re-run controller/physics validation (that lives in `src/game`), so it never claims a course is still `"validated"` after an edit. |
+| `repairGuidance.ts` | Maps failed conservative validation into one plain-language repair and the matching placement tool (for example, “Move this checkpoint closer to the previous platform”). Technical evidence remains available but is not the primary instruction. |
 | `draftStorage.ts` | localStorage draft persistence, keyed by `levelId` and the manifest's `updatedAt` at the time editing started (see "Unsaved draft persistence" below). |
 
 ### Capsule-center convention
@@ -25,6 +26,23 @@ surface hit point, and `LevelEditor.handleSurfaceClick` is the only place
 that converts it to a capsule-center Y before writing it into the
 manifest. Numeric position inputs edit the capsule-center Y directly (as
 documented on the type).
+
+Color fragments and the finish portal use the same click-to-place surface
+test as spawn/checkpoint markers. Fragment add/remove operations also update
+Explore optional ids or Collect required ids/count/restoration steps, so an
+editor action cannot leave the v2 experience block internally inconsistent.
+Removing a portal is disabled for Collect mode because that mode requires a
+valid finish target.
+
+### World-ready and guided-repair entry
+
+Newly prepared courses now stop on a world-ready view with the rendered
+object, mission, and **Enter world** as the primary action. The technical
+editor opens only when the player deliberately chooses **Adjust course** or
+**World settings**, or when conservative validation reports a concrete
+problem. A reported problem opens with a specific human-readable instruction
+and its placement tool already active. Existing saved worlds opened through
+an explicit Edit action continue directly to the editor.
 
 ### Preview loader
 

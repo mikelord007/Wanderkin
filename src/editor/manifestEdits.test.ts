@@ -1,18 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { createEmptyManifest, identityTransform } from "@shared/index.js";
+import {
+  createEmptyManifest,
+  identityTransform,
+  migrateSceneManifest,
+  sceneManifestReaderSchema,
+} from "@shared/index.js";
 import type { SceneManifest } from "@shared/index.js";
 import {
   addCheckpoint,
+  addColorFragment,
+  addFinishPortal,
   addHelperEntity,
   markManuallyAdjusted,
   removeCheckpoint,
+  removeColorFragment,
+  removeFinishPortal,
   removeHelperEntity,
   reorderCheckpoint,
   setSpawn,
   updateCalibration,
   updateCheckpoint,
+  updateColorFragment,
   updateEntityTransform,
   updateHelperDimensions,
+  updateFinishPortal,
 } from "./manifestEdits.js";
 
 function baseManifest(): SceneManifest {
@@ -87,6 +98,90 @@ describe("spawn and checkpoints", () => {
     const id = manifest.checkpoints[0]!.id;
     expect(reorderCheckpoint(manifest, id, "up")).toBe(manifest);
     expect(reorderCheckpoint(manifest, id, "down")).toBe(manifest);
+  });
+});
+
+describe("collectibles and finish portal", () => {
+  it("adds, updates, and removes fragments while keeping Explore references consistent", () => {
+    const manifest = migrateSceneManifest(baseManifest());
+    const added = addColorFragment(manifest, [1, 2, 3]);
+    const fragment = added.experience!.collectibles[0]!;
+    expect(fragment.transform.position).toEqual([1, 2, 3]);
+    expect(added.experience!.mode).toMatchObject({
+      kind: "explore",
+      optionalCollectibleIds: [fragment.id],
+    });
+
+    const updated = updateColorFragment(added, fragment.id, {
+      color: "#123456",
+      triggerRadius: 0.8,
+      transform: { ...fragment.transform, position: [4, 5, 6] },
+    });
+    expect(updated.experience!.collectibles[0]).toMatchObject({
+      color: "#123456",
+      triggerRadius: 0.8,
+      transform: { position: [4, 5, 6] },
+    });
+
+    const removed = removeColorFragment(updated, fragment.id);
+    expect(removed.experience!.collectibles).toEqual([]);
+    expect(removed.experience!.mode).toMatchObject({ kind: "explore", optionalCollectibleIds: [] });
+    expect(removed.courseValidation.status).toBe("manually-adjusted");
+  });
+
+  it("keeps Collect requirements, counts, and restoration steps valid", () => {
+    const explore = migrateSceneManifest(baseManifest());
+    const portal = addFinishPortal(explore, [0, 1, 2]).experience!.finishPortal!;
+    const collect: SceneManifest = {
+      ...explore,
+      experience: {
+        ...explore.experience!,
+        finishPortal: portal,
+        mode: {
+          kind: "collect",
+          requiredCollectibleIds: [],
+          requiredCount: 0,
+          finishPortalId: portal.id,
+          restorationSteps: [],
+        },
+        collectibles: [],
+      },
+    };
+    const withTwo = addColorFragment(addColorFragment(collect, [1, 1, 1]), [2, 1, 1]);
+    expect(sceneManifestReaderSchema.safeParse(withTwo).success).toBe(true);
+    expect(withTwo.experience?.mode).toMatchObject({ requiredCount: 2, restorationSteps: [0.5, 1] });
+    const firstId = withTwo.experience!.collectibles[0]!.id;
+    const withOne = removeColorFragment(withTwo, firstId);
+    expect(sceneManifestReaderSchema.safeParse(withOne).success).toBe(true);
+    expect(withOne.experience?.mode).toMatchObject({ requiredCount: 1, restorationSteps: [1] });
+    expect(withOne.experience?.collectibles[0]).toMatchObject({ order: 0, restorationAmount: 1 });
+  });
+
+  it("adds and updates a finish portal, but does not remove a Collect mode requirement", () => {
+    const manifest = migrateSceneManifest(baseManifest());
+    const added = addFinishPortal(manifest, [0, 2, 4]);
+    expect(added.experience!.finishPortal).toMatchObject({
+      transform: { position: [0, 2, 4] },
+      activation: "always",
+    });
+    const updated = updateFinishPortal(added, { triggerRadius: 1.25 });
+    expect(updated.experience!.finishPortal?.triggerRadius).toBe(1.25);
+    expect(removeFinishPortal(updated).experience!.finishPortal).toBeNull();
+
+    const collect = {
+      ...added,
+      experience: {
+        ...added.experience!,
+        mode: {
+          kind: "collect" as const,
+          requiredCollectibleIds: [],
+          requiredCount: 0,
+          finishPortalId: added.experience!.finishPortal!.id,
+          restorationSteps: [],
+        },
+      },
+    };
+    expect(removeFinishPortal(collect)).toBe(collect);
   });
 });
 

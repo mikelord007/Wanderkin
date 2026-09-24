@@ -1,11 +1,13 @@
 import { useCallback, useState } from "react";
-import type { GenerationJob, SceneManifest } from "@shared/index.js";
+import type { GenerationJob, PublishedLevelVersion, SceneManifest } from "@shared/index.js";
 import { StartScreen } from "./ui/screens/StartScreen.js";
 import { PhotosScreen } from "./ui/screens/PhotosScreen.js";
 import { GenerationScreen } from "./ui/screens/GenerationScreen.js";
 import { PreparationScreen, type PreparationSource } from "./ui/screens/PreparationScreen.js";
 import { PlayScreen } from "./ui/screens/PlayScreen.js";
 import { FinishScreen } from "./ui/screens/FinishScreen.js";
+import { FriendLandingScreen } from "./ui/screens/FriendLandingScreen.js";
+import { publishedManifestForPlay, shareIdFromPath } from "./ui/shareRouting.js";
 import {
   clearActiveSource,
   clearPendingSubmission,
@@ -18,13 +20,16 @@ import { loadActiveCreation } from "./ui/creationStorage.js";
 
 type Screen =
   | { name: "start" }
+  | { name: "friend"; shareId: string }
   | { name: "photos" }
   | { name: "generation"; jobId: string }
   | { name: "preparation"; source: PreparationSource; isNew: boolean }
-  | { name: "play"; manifest: SceneManifest }
-  | { name: "finish"; manifest: SceneManifest };
+  | { name: "play"; manifest: SceneManifest; publication?: PublishedLevelVersion }
+  | { name: "finish"; manifest: SceneManifest; publication?: PublishedLevelVersion };
 
 function initialScreen(): Screen {
+  const shareId = shareIdFromPath(window.location.pathname);
+  if (shareId) return { name: "friend", shareId };
   const resume = resolveResumeState();
   if (resume.screen === "generation") return { name: "generation", jobId: resume.jobId };
   if (resume.screen === "preparation") {
@@ -136,6 +141,21 @@ export function App() {
         />
       );
 
+    case "friend":
+      return (
+        <FriendLandingScreen
+          shareId={screen.shareId}
+          onPlay={(publication) =>
+            setScreen({
+              name: "play",
+              manifest: publishedManifestForPlay(publication),
+              publication,
+            })
+          }
+          onHome={goStart}
+        />
+      );
+
     case "photos":
       return <PhotosScreen onJobStarted={handleJobStarted} onBack={goStart} />;
 
@@ -160,8 +180,18 @@ export function App() {
       return (
         <PlayScreen
           manifest={screen.manifest}
-          onExit={goStart}
-          onComplete={() => setScreen({ name: "finish", manifest: screen.manifest })}
+          onExit={() =>
+            screen.publication
+              ? setScreen({ name: "friend", shareId: screen.publication.shareId })
+              : goStart()
+          }
+          onComplete={() =>
+            setScreen(
+              screen.publication
+                ? { name: "finish", manifest: screen.manifest, publication: screen.publication }
+                : { name: "finish", manifest: screen.manifest },
+            )
+          }
         />
       );
 
@@ -169,13 +199,22 @@ export function App() {
       return (
         <FinishScreen
           manifest={screen.manifest}
-          onReplay={() => setScreen({ name: "play", manifest: screen.manifest })}
+          isShared={Boolean(screen.publication)}
+          onReplay={() =>
+            setScreen(
+              screen.publication
+                ? { name: "play", manifest: screen.manifest, publication: screen.publication }
+                : { name: "play", manifest: screen.manifest },
+            )
+          }
           onBackToLevel={() =>
-            setScreen({
-              name: "preparation",
-              source: { kind: "manifest", manifest: screen.manifest },
-              isNew: false,
-            })
+            screen.publication
+              ? setScreen({ name: "friend", shareId: screen.publication.shareId })
+              : setScreen({
+                  name: "preparation",
+                  source: { kind: "manifest", manifest: screen.manifest },
+                  isNew: false,
+                })
           }
           onBackToStart={goStart}
         />

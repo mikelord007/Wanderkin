@@ -12,25 +12,27 @@
 import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import type { Checkpoint, SceneManifest } from "@shared/index.js";
-
-const ACTIVE = new THREE.Color("#ffd166");
-const PENDING = new THREE.Color("#5b6b86");
-const DONE = new THREE.Color("#5ddc9a");
+import type { Checkpoint, SceneManifest, StyleDefinition } from "@shared/index.js";
 
 export interface CheckpointMarkersProps {
   manifest: SceneManifest;
   /** Id of the next checkpoint, or null once the course is complete. */
   activeId: string | null;
   collectedIds: ReadonlySet<string>;
+  style: StyleDefinition;
+  reducedMotion: boolean;
 }
 
 function CheckpointMarker({
   checkpoint,
   state,
+  style,
+  reducedMotion,
 }: {
   checkpoint: Checkpoint;
   state: "active" | "pending" | "collected";
+  style: StyleDefinition;
+  reducedMotion: boolean;
 }) {
   const core = useRef<THREE.Mesh>(null);
   const halo = useRef<THREE.Mesh>(null);
@@ -39,25 +41,34 @@ function CheckpointMarker({
   useFrame((_, delta) => {
     const time = performance.now() / 1000;
     if (core.current) {
-      core.current.rotation.y += delta * (state === "active" ? 1.1 : 0.2);
-      core.current.rotation.x += delta * 0.35;
-      const bob = state === "active" ? Math.sin(time * 2.2) * 0.035 : 0;
+      if (!reducedMotion) {
+        core.current.rotation.y += delta * (state === "active" ? 1.1 : 0.2);
+        core.current.rotation.x += delta * 0.35;
+      }
+      const bob = !reducedMotion && state === "active" ? Math.sin(time * 2.2) * 0.035 : 0;
       core.current.position.y = bob;
-      const pulse = state === "active" ? 1 + Math.sin(time * 3.4) * 0.08 : 1;
+      const pulse = !reducedMotion && state === "active" ? 1 + Math.sin(time * 3.4) * 0.08 : 1;
       core.current.scale.setScalar(pulse);
     }
     if (halo.current) {
       const material = halo.current.material as THREE.MeshBasicMaterial;
-      material.opacity = state === "active" ? 0.14 + Math.sin(time * 2.6) * 0.05 : 0.05;
+      material.opacity = state === "active" && !reducedMotion ? 0.14 + Math.sin(time * 2.6) * 0.05 : state === "active" ? 0.14 : 0.05;
     }
     if (beam.current) {
       beam.current.visible = state === "active";
       const material = beam.current.material as THREE.MeshBasicMaterial;
-      material.opacity = 0.1 + Math.sin(time * 2.6) * 0.04;
+      material.opacity = reducedMotion ? 0.1 : 0.1 + Math.sin(time * 2.6) * 0.04;
     }
   });
 
-  const colour = state === "collected" ? DONE : state === "active" ? ACTIVE : PENDING;
+  const colour = new THREE.Color(
+    state === "collected"
+      ? style.sceneColors.colorFragments[1]
+      : state === "active"
+        ? style.sceneColors.colorFragments[0]
+        : style.uiAccents.secondary,
+  );
+  const beamColour = style.sceneColors.finishPortal;
   const coreRadius = Math.min(checkpoint.triggerRadius * 0.34, 0.16);
 
   return (
@@ -90,7 +101,7 @@ function CheckpointMarker({
       <mesh ref={beam} position={[0, 1.2, 0]}>
         <cylinderGeometry args={[coreRadius * 0.7, coreRadius * 0.9, 2.4, 12, 1, true]} />
         <meshBasicMaterial
-          color={ACTIVE}
+          color={beamColour}
           transparent
           opacity={0.12}
           depthWrite={false}
@@ -100,19 +111,27 @@ function CheckpointMarker({
       </mesh>
 
       {state === "active" ? (
-        <pointLight color={ACTIVE} intensity={1.1} distance={2.6} decay={2} />
+        <pointLight color={beamColour} intensity={1.1} distance={2.6} decay={2} />
       ) : null}
     </group>
   );
 }
 
-export function CheckpointMarkers({ manifest, activeId, collectedIds }: CheckpointMarkersProps) {
+export function CheckpointMarkers({
+  manifest,
+  activeId,
+  collectedIds,
+  style,
+  reducedMotion,
+}: CheckpointMarkersProps) {
   return (
     <group>
       {manifest.checkpoints.map((checkpoint) => (
         <CheckpointMarker
           key={checkpoint.id}
           checkpoint={checkpoint}
+          style={style}
+          reducedMotion={reducedMotion}
           state={
             collectedIds.has(checkpoint.id)
               ? "collected"

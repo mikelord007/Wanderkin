@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useRef, type MutableRefObject, type RefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import type { MovementConfig, SceneManifest } from "@shared/index.js";
+import type { MovementConfig, SceneManifest, StyleDefinition } from "@shared/index.js";
 import type { LoadedSceneAsset } from "../assets/loadSceneAsset.js";
 import type { RapierModule } from "../core/physicsWorld.js";
 import type { GameSimulation, SimulationEvent } from "../core/simulation.js";
@@ -22,6 +22,7 @@ import { PlayerAvatar, type PlayerAvatarHandle } from "./PlayerAvatar.js";
 import { SceneEntities } from "./SceneEntities.js";
 import { SceneLighting } from "./SceneLighting.js";
 import { CheckpointMarkers } from "./Checkpoints.js";
+import { SceneEnvironment } from "./SceneEnvironment.js";
 
 /** Frame-by-frame values the HUD cares about. Compared shallowly upstream. */
 export interface HudSignals {
@@ -48,6 +49,10 @@ export interface GameStageProps {
   objectiveArrowRef: RefObject<HTMLDivElement>;
   objectiveDistanceRef: RefObject<HTMLSpanElement>;
   diagnosticsRef: MutableRefObject<GameDiagnostics | null>;
+  style: StyleDefinition;
+  atmosphere: string | undefined;
+  colorRestoration: number;
+  reducedMotion: boolean;
 }
 
 export function GameStage({
@@ -66,6 +71,10 @@ export function GameStage({
   objectiveArrowRef,
   objectiveDistanceRef,
   diagnosticsRef,
+  style,
+  atmosphere,
+  colorRestoration,
+  reducedMotion,
 }: GameStageProps) {
   const camera = useThree((state) => state.camera);
   const avatar = useRef<PlayerAvatarHandle>(null);
@@ -194,10 +203,27 @@ export function GameStage({
 
   return (
     <>
-      <SceneLighting bounds={simulation.bounds} />
-      <SceneEntities manifest={manifest} assets={assets} />
-      <CheckpointMarkers manifest={manifest} activeId={activeCheckpointId} collectedIds={collectedIds} />
-      <PlayerAvatar ref={avatar} config={config} />
+      <SceneLighting bounds={simulation.bounds} style={style} />
+      <SceneEnvironment
+        bounds={simulation.bounds}
+        style={style}
+        atmosphere={atmosphere}
+        reducedMotion={reducedMotion}
+      />
+      <SceneEntities
+        manifest={manifest}
+        assets={assets}
+        style={style}
+        colorRestoration={colorRestoration}
+      />
+      <CheckpointMarkers
+        manifest={manifest}
+        activeId={activeCheckpointId}
+        collectedIds={collectedIds}
+        style={style}
+        reducedMotion={reducedMotion}
+      />
+      <PlayerAvatar ref={avatar} config={config} reducedMotion={reducedMotion} />
     </>
   );
 }

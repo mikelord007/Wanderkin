@@ -5,6 +5,7 @@ import type { ProviderCapabilityId } from "./provider.js";
 import type { LevelExperience } from "./experience.js";
 import type { LevelMedia } from "./media.js";
 import type { GenerationProvenance } from "./provenance.js";
+import type { WorldWorkflowV1 } from "./workflow.js";
 
 /**
  * Records where a piece of level geometry came from. `null` on an entity
@@ -147,6 +148,8 @@ export interface SceneManifest {
   experience?: LevelExperience;
   /** Generated optional media. Its failure must never invalidate the level. */
   media?: LevelMedia;
+  /** Durable creation/resume snapshot. Jobs themselves remain server-owned. */
+  workflow?: WorldWorkflowV1;
 }
 
 export function createEmptyManifest(params: {
