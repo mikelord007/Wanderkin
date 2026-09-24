@@ -64,6 +64,8 @@ const jobManager = new JobManager(jobStore, adapter, assetStore, photoStore, {
   perRequestLimitUsd: env.livepeerMaxRequestUsd,
   perWorldLimitUsd: env.livepeerMaxWorldUsd,
   maxRetries: env.livepeerMaxAutomaticRetries,
+  maxInFlight: env.providerMaxInFlight,
+  concurrencyRetrySeconds: env.providerConcurrencyRetrySeconds,
 });
 
 app.get("/api/health", (_req, res) => {

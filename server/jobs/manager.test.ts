@@ -110,7 +110,11 @@ describe("JobManager", () => {
     return new JobManager(new JobStore(dir), adapter, new AssetStore(dir), new PhotoStore(dir));
   }
 
-  function buildMulti(adapter: ProviderAdapter & GenerationProviderAdapter, storageDir = dir) {
+  function buildMulti(
+    adapter: ProviderAdapter & GenerationProviderAdapter,
+    storageDir = dir,
+    limits: { maxInFlight?: number; concurrencyRetrySeconds?: number } = {},
+  ) {
     return new JobManager(
       new JobStore(storageDir),
       adapter,
@@ -122,6 +126,8 @@ describe("JobManager", () => {
         perRequestLimitUsd: 2,
         perWorldLimitUsd: 8,
         maxRetries: 2,
+        maxInFlight: 100,
+        ...limits,
       },
     );
   }
@@ -171,6 +177,16 @@ describe("JobManager", () => {
     await expect(manager.submitGenerationOrReconcile(costly, { requestLimitOverrideUsd: 0.1, worldId: "world-budget" }))
       .rejects.toMatchObject({ code: "budget_exceeded", retryable: false });
     expect(adapter.submitGeneration).not.toHaveBeenCalled();
+  });
+
+  it("rejects a new provider job when the global in-flight cap is full", async () => {
+    const adapter = fakeMultiAdapter();
+    const manager = buildMulti(adapter, dir, { maxInFlight: 1, concurrencyRetrySeconds: 23 });
+    await manager.submitGenerationOrReconcile(v2Requests[3]!, { worldId: "world-first" });
+
+    await expect(manager.submitGenerationOrReconcile(v2Requests[4]!, { worldId: "world-second" }))
+      .rejects.toMatchObject({ code: "provider_concurrency_exceeded", retryAfterSeconds: 23 });
+    expect(adapter.submitGeneration).toHaveBeenCalledTimes(1);
   });
 
   it("records shared provenance and preserves a ready mesh when an independent TTS job fails", async () => {

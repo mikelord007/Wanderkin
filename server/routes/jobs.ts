@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import type { ProviderAdapter, ProviderInputPhoto } from "../../shared/provider.js";
 import type { GenerationRequest, ImageEditGenerationRequest } from "../../shared/generation.js";
-import type { JobManager } from "../jobs/manager.js";
+import { ProviderConcurrencyExceededError, type JobManager } from "../jobs/manager.js";
 import { BudgetExceededError, type SpendLedger } from "../jobs/spendLedger.js";
 import type { PreviewCacheStore } from "../jobs/previewCache.js";
 import { McpToolError } from "../livepeer/mcpClient.js";
@@ -72,6 +72,13 @@ export function createJobsRouter(
 ): Router {
   const router = Router();
 
+  function sendConcurrencyError(err: unknown, res: Response): boolean {
+    if (!(err instanceof ProviderConcurrencyExceededError)) return false;
+    res.setHeader("Retry-After", String(err.retryAfterSeconds));
+    res.status(429).json({ message: err.message });
+    return true;
+  }
+
   async function sourceImageExists(id: string): Promise<boolean> {
     if (await photos.get(id)) return true;
     return Boolean(await generatedAssets?.getProviderImage(id));
@@ -137,6 +144,7 @@ export function createJobsRouter(
       }
       res.status(outcome.status === "reconciled" ? 200 : outcome.job.state === "failed" ? 502 : 201).json(outcome.job);
     } catch (err) {
+      if (sendConcurrencyError(err, res)) return;
       if (err instanceof BudgetExceededError) { res.status(402).json({ message: err.message, code: err.code }); return; }
       if (err instanceof McpToolError) { res.status(400).json({ message: err.message }); return; }
       throw err;
@@ -187,10 +195,16 @@ export function createJobsRouter(
     // submitOrReconcile is the sole atomic entry point — it holds a
     // per-idempotency-key lock across the exists-check and the create, so
     // two concurrent POSTs with the same key can never both submit.
-    const outcome = await jobManager.submitOrReconcile(
-      { capability, photos: requestPhotos, ...(scenePrompt !== undefined ? { scenePrompt } : {}) },
-      idempotencyKey,
-    );
+    let outcome;
+    try {
+      outcome = await jobManager.submitOrReconcile(
+        { capability, photos: requestPhotos, ...(scenePrompt !== undefined ? { scenePrompt } : {}) },
+        idempotencyKey,
+      );
+    } catch (err) {
+      if (sendConcurrencyError(err, res)) return;
+      throw err;
+    }
 
     if (outcome.status === "conflict") {
       res.status(409).json({
@@ -244,6 +258,7 @@ export function createJobsRouter(
       const record = await previewCache.put(cacheKey, outcome.job.id);
       res.status(outcome.status === "reconciled" ? 200 : 201).json({ cacheHit: false, approved: record.approved, cacheKey, job: outcome.job });
     } catch (err) {
+      if (sendConcurrencyError(err, res)) return;
       if (err instanceof BudgetExceededError) { res.status(402).json({ message: err.message, code: err.code }); return; }
       if (err instanceof McpToolError) { res.status(400).json({ message: err.message }); return; }
       throw err;
@@ -288,7 +303,13 @@ export function createJobsRouter(
   });
 
   router.post("/api/jobs/:id/retry", async (req, res) => {
-    const job = await jobManager.retry(req.params.id as string);
+    let job;
+    try {
+      job = await jobManager.retry(req.params.id as string);
+    } catch (err) {
+      if (sendConcurrencyError(err, res)) return;
+      throw err;
+    }
     if (!job) {
       res.status(404).json({ message: "Job not found" });
       return;

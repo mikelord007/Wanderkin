@@ -38,6 +38,16 @@ export type SubmitOutcome =
    * refuses to guess which one the caller meant. */
   | { status: "conflict"; job: GenerationJob };
 
+export class ProviderConcurrencyExceededError extends Error {
+  readonly code = "provider_concurrency_exceeded";
+  readonly retryable = true;
+
+  constructor(readonly retryAfterSeconds: number) {
+    super("The generation service is at capacity. Please retry shortly.");
+    this.name = "ProviderConcurrencyExceededError";
+  }
+}
+
 const MAX_RETRIES = 3;
 const PROVIDER_ID = "livepeer-agent-mcp";
 const TERMINAL_PROVIDER_STATUSES = new Set(["failed", "cancelled", "canceled"]);
@@ -233,8 +243,21 @@ export class JobManager {
       perRequestLimitUsd: number;
       perWorldLimitUsd: number;
       maxRetries?: number;
+      maxInFlight?: number;
+      concurrencyRetrySeconds?: number;
     },
   ) {}
+
+  private async assertProviderCapacity(excludeJobId?: string): Promise<void> {
+    const limit = this.generation?.maxInFlight ?? 4;
+    const records = await this.store.all();
+    const inFlight = records.filter(
+      (record) => record.job.id !== excludeJobId && !isTerminalJobState(record.job.state),
+    ).length;
+    if (inFlight >= limit) {
+      throw new ProviderConcurrencyExceededError(this.generation?.concurrencyRetrySeconds ?? 15);
+    }
+  }
 
   /** Marks a job whose submit outcome is permanently ambiguous (no
    * `providerJobId`, and past the provider's confirmed idempotency
@@ -371,7 +394,10 @@ export class JobManager {
       }
 
       const record = this.buildRecord(request, idempotencyKey);
-      await this.store.put(record);
+      await this.runExclusive("provider-capacity", async () => {
+        await this.assertProviderCapacity();
+        await this.store.put(record);
+      });
       const submitted = await this.submitToProvider(record, request);
       return { status: "created", job: toPublicJob(submitted) };
     });
@@ -406,16 +432,19 @@ export class JobManager {
         this.generation!.perRequestLimitUsd,
         options.requestLimitOverrideUsd ?? this.generation!.perRequestLimitUsd,
       );
-      await this.generation!.spendLedger.reserve({
-        jobId: record.job.id,
-        worldId: options.worldId ?? null,
-        capability: request.capability,
-        kind: request.kind,
-        estimateUsd,
-        perRequestLimitUsd: effectiveRequestLimit,
-        perWorldLimitUsd: this.generation!.perWorldLimitUsd,
+      await this.runExclusive("provider-capacity", async () => {
+        await this.assertProviderCapacity();
+        await this.generation!.spendLedger.reserve({
+          jobId: record.job.id,
+          worldId: options.worldId ?? null,
+          capability: request.capability,
+          kind: request.kind,
+          estimateUsd,
+          perRequestLimitUsd: effectiveRequestLimit,
+          perWorldLimitUsd: this.generation!.perWorldLimitUsd,
+        });
+        await this.store.put(record);
       });
-      await this.store.put(record);
       const submitted = await this.submitGenerationToProvider(record, request, effectiveRequestLimit);
       return { status: "created", job: toPublicJob(submitted) };
     });
@@ -895,10 +924,13 @@ export class JobManager {
         return this.markIdempotencyRetentionExpired(record);
       }
 
-      record.job.retryCount += 1;
-      record.job.state = "queued";
-      delete record.job.lastError;
-      await this.store.put(record);
+      await this.runExclusive("provider-capacity", async () => {
+        await this.assertProviderCapacity(record.job.id);
+        record.job.retryCount += 1;
+        record.job.state = "queued";
+        delete record.job.lastError;
+        await this.store.put(record);
+      });
 
       const updated = record.job.request
         ? await this.submitGenerationToProvider(

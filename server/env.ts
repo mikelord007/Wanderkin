@@ -33,6 +33,8 @@ export const env = {
   livepeerMaxRequestUsd: positiveNumber(process.env.LIVEPEER_MAX_REQUEST_USD, 2),
   livepeerMaxWorldUsd: positiveNumber(process.env.LIVEPEER_MAX_WORLD_USD, 8),
   livepeerMaxAutomaticRetries: boundedInteger(process.env.LIVEPEER_MAX_AUTOMATIC_RETRIES, 3, 0, 5),
+  providerMaxInFlight: boundedInteger(process.env.PROVIDER_MAX_IN_FLIGHT, 4, 1, 100),
+  providerConcurrencyRetrySeconds: boundedInteger(process.env.PROVIDER_CONCURRENCY_RETRY_SECONDS, 15, 1, 3_600),
   billableRateLimit: boundedInteger(process.env.BILLABLE_RATE_LIMIT, 10, 1, 10_000),
   uploadRateLimit: boundedInteger(process.env.UPLOAD_RATE_LIMIT, 30, 1, 10_000),
   rateLimitWindowSeconds: boundedInteger(process.env.RATE_LIMIT_WINDOW_SECONDS, 60, 1, 86_400),
