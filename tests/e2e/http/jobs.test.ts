@@ -283,6 +283,110 @@ describe("POST /api/jobs, status, retry, and restart reconciliation", () => {
     expect(mcp!.callsFor("create_media")[0]!.args).not.toHaveProperty("output_format");
   });
 
+  it("rejects unsupported create_media durations before ledger or provider side effects and preserves valid boundaries", async () => {
+    await boot();
+    const requestFor = (kind: "music" | "sfx", durationSeconds: number, idempotencyKey: string) => kind === "music"
+      ? {
+          schemaVersion: 1 as const,
+          kind,
+          capability: "music",
+          idempotencyKey,
+          purpose: "audio:music",
+          prompt: "gentle instrumental",
+          durationSeconds,
+          instrumental: true as const,
+          loop: true,
+        }
+      : {
+          schemaVersion: 1 as const,
+          kind,
+          capability: "mirelo-sfx",
+          idempotencyKey,
+          purpose: "audio:checkpoint",
+          prompt: "short bright checkpoint confirmation",
+          durationSeconds,
+          loop: false,
+        };
+    const post = (request: ReturnType<typeof requestFor>, worldId: string) => fetch(`${api!.baseUrl}/api/jobs/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": request.idempotencyKey },
+      body: JSON.stringify({ request, worldId, maxCostUsd: 0.2 }),
+    });
+
+    for (const [kind, duration] of [
+      ["music", 2],
+      ["music", 16],
+      ["sfx", 2],
+      ["sfx", 16],
+      ["sfx", 3.5],
+    ] as const) {
+      const key = uniqueIdempotencyKey(`invalid-${kind}-${String(duration).replace(".", "-")}`);
+      const worldId = `world-${key}`;
+      const response = await post(requestFor(kind, duration, key), worldId);
+      expect(response.status, `${kind} ${duration}`).toBe(400);
+      expect(await response.json()).toMatchObject({
+        message: expect.stringContaining("durationSeconds must be an integer from 3 through 15 for Livepeer create_media"),
+      });
+      const spend = await fetch(`${api!.baseUrl}/api/jobs/spend/${worldId}`);
+      expect(await spend.json()).toMatchObject({ entries: 0, knownUsd: 0, reservedUsd: 0 });
+    }
+    expect(mcp!.callsFor("create_media")).toHaveLength(0);
+
+    mcp!.setHandler("create_media", (args) => ({
+      job_id: `fake-media-${args.idempotency_key}`,
+      status: "submitted",
+      capability_used: args.model_override,
+      fallback_fired: null,
+    }));
+    for (const [kind, duration] of [
+      ["music", 3],
+      ["music", 15],
+      ["sfx", 3],
+      ["sfx", 15],
+    ] as const) {
+      const key = uniqueIdempotencyKey(`valid-${kind}-${duration}`);
+      const response = await post(requestFor(kind, duration, key), `world-${key}`);
+      expect(response.status, `${kind} ${duration}`).toBe(201);
+    }
+    expect(mcp!.callsFor("create_media").map((call) => call.args.duration)).toEqual([3, 15, 3, 15]);
+  });
+
+  it("maps unbounded postcard video cost to a stable nonretryable response before provider or ledger side effects", async () => {
+    await boot();
+    const photo = await uploadPhoto(1);
+    const key = uniqueIdempotencyKey("unbounded-video");
+    const worldId = `world-${key}`;
+    const response = await fetch(`${api!.baseUrl}/api/jobs/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": key },
+      body: JSON.stringify({
+        worldId,
+        maxCostUsd: 1,
+        request: {
+          schemaVersion: 1,
+          kind: "video",
+          capability: "pixverse-i2v",
+          idempotencyKey: key,
+          purpose: "animated-postcard",
+          sourceImageAssetId: photo.id,
+          prompt: "A gentle camera drift.",
+          durationSeconds: 5,
+        },
+      }),
+    });
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      message: "Animated postcards are temporarily unavailable.",
+      code: "cost_not_bounded",
+      retryable: false,
+    });
+    expect(mcp!.callsFor("upload")).toHaveLength(0);
+    expect(mcp!.callsFor("create_media")).toHaveLength(0);
+    const spend = await fetch(`${api!.baseUrl}/api/jobs/spend/${worldId}`);
+    expect(await spend.json()).toMatchObject({ entries: 0, knownUsd: 0, reservedUsd: 0 });
+  });
+
   it("hard-rejects an over-budget v2 mesh before upload or provider submission", async () => {
     await boot();
     const photo = await uploadPhoto(1);

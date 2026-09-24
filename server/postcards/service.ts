@@ -8,7 +8,6 @@ import type { GeneratedAssetStore } from "../persistence/generatedAssetStore.js"
 import type { PostcardCacheRecord, PostcardCacheStore } from "./store.js";
 
 export const POSTCARD_DURATION_SECONDS = 5;
-export const POSTCARD_MAX_COST_USD = 0.34125;
 
 export type PostcardStatus =
   | { state: "none"; cacheHit: false }
@@ -112,7 +111,7 @@ export class PostcardService {
     }
     const outcome: SubmitOutcome = await this.jobs.submitGenerationOrReconcile(
       requestFor(manifest, fingerprint, screenshotAssetId),
-      { worldId: levelId, requestLimitOverrideUsd: POSTCARD_MAX_COST_USD, ...(ownerId ? { ownerId } : {}) },
+      { worldId: levelId, ...(ownerId ? { ownerId } : {}) },
     );
     if (outcome.status === "conflict") throw new Error("POSTCARD_CONFLICT");
     const record: PostcardCacheRecord = {

@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { fileURLToPath } from "node:url";
 import { BudgetGuard, buildPlan, planTotal, VALIDATION_WORLD_ID, type PlannedRequest } from "./plan.js";
 
@@ -11,15 +12,20 @@ type Args = {
   dryRun: boolean;
   maxUsd: number;
   photo: string;
-  includePostcard: boolean;
+  skipPostcard: boolean;
   includeAlternateEdit: boolean;
   reusePhotoId?: string;
   reuseCutoutAssetId?: string;
+  reuseReadyJobIds: Partial<Record<ReusableStepId, string>>;
   publishLevelId?: string;
 };
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const TERMINAL = new Set(["ready", "failed"]);
+const REUSABLE_STEPS = ["cutout", "style-preview", "alternate-edit", "mesh", "quest"] as const;
+type ReusableStepId = typeof REUSABLE_STEPS[number];
+const POSTCARD_BLOCK_REASON =
+  "The current create_media wrapper cannot pin postcard resolution or audio, and cap_price is a lower bound rather than an enforceable maximum.";
 
 export function parseArgs(argv: readonly string[]): Args {
   const value = (flag: string) => {
@@ -33,13 +39,43 @@ export function parseArgs(argv: readonly string[]): Args {
   if (Boolean(reusePhotoId) !== Boolean(reuseCutoutAssetId)) {
     throw new Error("--reuse-photo-id and --reuse-cutout-asset-id must be supplied together.");
   }
+  const reuseReadyJobIds: Partial<Record<ReusableStepId, string>> = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    if (argv[index] !== "--reuse-ready-job") continue;
+    const mapping = argv[index + 1];
+    const separator = mapping?.indexOf("=") ?? -1;
+    const step = separator > 0 ? mapping!.slice(0, separator) : "";
+    const jobId = separator > 0 ? mapping!.slice(separator + 1) : "";
+    if (!REUSABLE_STEPS.includes(step as ReusableStepId) || !jobId) {
+      throw new Error(`--reuse-ready-job must be one of ${REUSABLE_STEPS.join(", ")} followed by =<application-job-id>.`);
+    }
+    if (reuseReadyJobIds[step as ReusableStepId]) {
+      throw new Error(`--reuse-ready-job was supplied more than once for ${step}.`);
+    }
+    reuseReadyJobIds[step as ReusableStepId] = jobId;
+  }
+  const reuseCount = Object.keys(reuseReadyJobIds).length;
+  const skipPostcard = argv.includes("--skip-postcard") || argv.includes("--no-postcard");
+  if (reuseCount > 0 && reuseCount !== REUSABLE_STEPS.length) {
+    throw new Error(`Audio-only resume requires ready application job ids for all of: ${REUSABLE_STEPS.join(", ")}.`);
+  }
+  if (reuseCount > 0 && (!reusePhotoId || !reuseCutoutAssetId)) {
+    throw new Error("Audio-only resume requires --reuse-photo-id and --reuse-cutout-asset-id.");
+  }
+  if (reuseCount > 0 && argv.includes("--no-alternate-edit")) {
+    throw new Error("Audio-only resume cannot omit the already completed alternate-edit row.");
+  }
+  if (reuseCount > 0 && !skipPostcard) {
+    throw new Error("Audio-only resume requires --skip-postcard because row 16 has no enforceable price maximum.");
+  }
   return {
     api: (value("--api") ?? "http://127.0.0.1:8787").replace(/\/$/, ""),
     dryRun: argv.includes("--dry-run"),
     maxUsd: max,
     photo: resolve(value("--photo") ?? resolve(ROOT, "public/samples/photo-4.jpg")),
-    includePostcard: !argv.includes("--no-postcard"),
+    skipPostcard,
     includeAlternateEdit: !argv.includes("--no-alternate-edit"),
+    reuseReadyJobIds,
     ...(reusePhotoId && reuseCutoutAssetId ? { reusePhotoId, reuseCutoutAssetId } : {}),
     ...(value("--publish-level-id") ? { publishLevelId: value("--publish-level-id") } : {}),
   };
@@ -86,13 +122,28 @@ export function shouldReconcileStoredProviderJob(job: Json): boolean {
     && job.lastError?.retryable !== false;
 }
 
-function isResumeReconciliation(args: Args, step: PlannedRequest): boolean {
-  return Boolean(args.reusePhotoId && args.reuseCutoutAssetId)
-    && (step.id === "cutout" || step.id === "style-preview");
+export function assertReadyReuse(step: Pick<PlannedRequest, "id">, request: Json, job: Json): void {
+  if (job.state !== "ready" || job.idempotencyKey !== request.idempotencyKey || !isDeepStrictEqual(job.request, request)) {
+    throw new Error(
+      `Stored ${step.id} job ${job.id ?? "<unknown>"} is not a byte-for-byte ready match for ${request.idempotencyKey}; stopped before fresh media submission.`,
+    );
+  }
+  if (job.fallbackFired) {
+    throw new Error(`Stored ${step.id} job ${job.id ?? "<unknown>"} used fallback ${job.fallbackFired}; stopped before fresh media submission.`);
+  }
+}
+
+function isReadyReuse(args: Args, step: PlannedRequest): step is PlannedRequest & { id: ReusableStepId } {
+  return REUSABLE_STEPS.includes(step.id as ReusableStepId)
+    && Boolean(args.reuseReadyJobIds[step.id as ReusableStepId]);
+}
+
+function isBlockedPostcard(args: Args, step: PlannedRequest): boolean {
+  return args.skipPostcard && step.id === "postcard";
 }
 
 export function resumePlanTotal(args: Args, plan: readonly PlannedRequest[]): number {
-  return planTotal(plan.filter((step) => !isResumeReconciliation(args, step)));
+  return planTotal(plan.filter((step) => !isReadyReuse(args, step) && !isBlockedPostcard(args, step)));
 }
 
 function evidenceFor(step: PlannedRequest, job: Json, startedAt: number): Json {
@@ -130,12 +181,23 @@ export function renderDryRun(args: Args, plan: readonly PlannedRequest[]): strin
     `Guard: $${args.maxUsd.toFixed(4)}; planned new spend: $${plannedSpend.toFixed(4)}; retries: 0 required`,
   ];
   for (const [index, step] of plan.entries()) {
-    const reconcile = isResumeReconciliation(args, step);
+    const reuse = isReadyReuse(args, step);
+    const blockedPostcard = isBlockedPostcard(args, step);
+    if (blockedPostcard) {
+      lines.push(`${String(index + 1).padStart(2, "0")}. ${step.id} -> SKIPPED/BLOCKED | ${step.capability} | $0.0000`);
+      lines.push(`    Reason: ${POSTCARD_BLOCK_REASON}`);
+      continue;
+    }
     const request = replacePlaceholders(step.request, dryRunValues);
-    lines.push(`${String(index + 1).padStart(2, "0")}. ${step.id} -> ${reconcile ? "RECONCILE/REUSE" : "POST"} ${step.purpose === "style-preview" ? "/api/jobs/previews" : "/api/jobs/generate"} | ${step.capability} | $${reconcile ? "0.0000" : step.estimatedUsd.toFixed(4)}`);
+    const action = reuse
+      ? `GET/REUSE /api/jobs/${args.reuseReadyJobIds[step.id as ReusableStepId]}`
+      : `POST ${step.purpose === "style-preview" ? "/api/jobs/previews" : "/api/jobs/generate"}`;
+    lines.push(`${String(index + 1).padStart(2, "0")}. ${step.id} -> ${action} | ${step.capability} | $${reuse ? "0.0000" : step.estimatedUsd.toFixed(4)}`);
     lines.push(`    ${JSON.stringify({ request, worldId: VALIDATION_WORLD_ID, maxCostUsd: step.estimatedUsd })}`);
   }
-  lines.push("Then: approve preview -> save draft level -> POST publish (or record explicit repair-required response). No billable request was submitted.");
+  lines.push(Object.keys(args.reuseReadyJobIds).length === REUSABLE_STEPS.length
+    ? "Then: verify rows 1-5 read-only -> execute fresh audio rows -> save draft level -> POST publish (or record explicit repair-required response). No billable request was submitted."
+    : "Then: approve preview -> save draft level -> POST publish (or record explicit repair-required response). No billable request was submitted.");
   return lines.join("\n");
 }
 
@@ -205,7 +267,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const health = await getJson(args.api, "/api/health");
   if (health.status !== "ok") throw new Error(`API health check failed: ${JSON.stringify(health)}`);
   if (args.publishLevelId) { await publishReviewed(args.api, args.publishLevelId); return; }
-  const plan = buildPlan({ includePostcard: args.includePostcard, includeAlternateEdit: args.includeAlternateEdit });
+  const plan = buildPlan({ includePostcard: true, includeAlternateEdit: args.includeAlternateEdit });
   const guard = new BudgetGuard(args.maxUsd);
   const plannedSpend = resumePlanTotal(args, plan);
   if (plannedSpend > args.maxUsd) guard.reserve({ id: "complete-batch", estimatedUsd: plannedSpend });
@@ -234,9 +296,35 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   };
   const jobs = new Map<string, Json>();
   const evidence: Json[] = [];
+  const blocked: Json[] = plan.filter((step) => isBlockedPostcard(args, step)).map((step) => ({
+    step: step.id,
+    status: "blocked",
+    reason: POSTCARD_BLOCK_REASON,
+    quotedLowerBoundUsd: step.estimatedUsd,
+    reservedUsd: 0,
+    applicationJobId: null,
+    providerJobId: null,
+  }));
   for (const step of plan) {
-    if (!isResumeReconciliation(args, step)) guard.reserve(step);
+    if (isBlockedPostcard(args, step)) {
+      continue;
+    }
     const request = replacePlaceholders(step.request, values) as Json;
+    if (isReadyReuse(args, step)) {
+      const jobId = args.reuseReadyJobIds[step.id];
+      const job = await getJson(args.api, `/api/jobs/${encodeURIComponent(jobId!)}`);
+      assertReadyReuse(step, request, job);
+      jobs.set(step.id, job);
+      evidence.push({ ...evidenceFor(step, job, Date.now()), status: "reused", estimatedUsd: 0, originalEstimatedUsd: step.estimatedUsd });
+      const reusedAssetId = job.result?.asset?.id;
+      if (step.id === "cutout" && reusedAssetId) values.$cutoutAssetId = reusedAssetId;
+      if (step.id === "style-preview") {
+        if (!reusedAssetId) throw new Error(`Stored style-preview job ${jobId} omitted its asset id.`);
+        values.$approvedPreviewAssetId = reusedAssetId;
+      }
+      continue;
+    }
+    guard.reserve(step);
     const startedAt = Date.now();
     const path = step.purpose === "style-preview" ? "/api/jobs/previews" : "/api/jobs/generate";
     const submitted = await postJson(args.api, path, { request, worldId: VALIDATION_WORLD_ID, maxCostUsd: step.estimatedUsd }, { "Idempotency-Key": request.idempotencyKey });
@@ -259,6 +347,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
         reservedByRunnerUsd: guard.reservedUsd,
         ledger,
         jobs: evidence,
+        blocked,
       });
       const reason = job.state !== "ready"
         ? (job.lastError?.message ?? "job did not become ready")
@@ -285,10 +374,14 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     reservedByRunnerUsd: guard.reservedUsd,
     ledger,
     jobs: evidence,
+    blocked,
     level,
+    status: blocked.length > 0 ? "required-audio-ready-postcard-blocked" : "complete",
   });
-  console.log(`Validation batch complete. Evidence: ${path}`);
-  console.log(JSON.stringify({ plannedMaximumUsd: plannedSpend, ledger, level }, null, 2));
+  console.log(blocked.length > 0
+    ? `Required audio rows ready; postcard remains blocked. Evidence: ${path}`
+    : `Validation batch complete. Evidence: ${path}`);
+  console.log(JSON.stringify({ plannedMaximumUsd: plannedSpend, ledger, blocked, level }, null, 2));
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

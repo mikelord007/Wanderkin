@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { GenerationRequest } from "../../shared/generation.js";
 import type { McpToolCaller, McpToolCallOptions } from "./mcpClient.js";
 import { McpToolError, McpTransportError } from "./mcpClient.js";
 import { LivepeerAdapter, type PhotoBytesProvider } from "./adapter.js";
@@ -177,13 +178,35 @@ describe("LivepeerAdapter multi-kind contracts", () => {
       { schemaVersion: 1, kind: "image-edit", capability: "bg-remove", idempotencyKey: "bg", purpose: "object-cutout", sourceImageAssetId: "p", instruction: "Remove the background", outputMimeType: "image/png" },
       { schemaVersion: 1, kind: "image-to-3d", capability: "rodin-i3d", idempotencyKey: "mesh", purpose: "world-mesh", photos: [{ photoId: "p", sourceIndex: 1 }] },
       { schemaVersion: 1, kind: "text", capability: "gemini-text", idempotencyKey: "text", purpose: "quest-text", prompt: "Return quest JSON", output: "quest-json", maxCharacters: 1200 },
-      { schemaVersion: 1, kind: "music", capability: "music", idempotencyKey: "music", purpose: "soundtrack", prompt: "gentle instrumental", durationSeconds: 60, instrumental: true, loop: true },
+      { schemaVersion: 1, kind: "music", capability: "music", idempotencyKey: "music", purpose: "soundtrack", prompt: "gentle instrumental", durationSeconds: 15, instrumental: true, loop: true },
       { schemaVersion: 1, kind: "sfx", capability: "mirelo-sfx", idempotencyKey: "sfx", purpose: "pickup", prompt: "soft chime", durationSeconds: 3, loop: false },
       { schemaVersion: 1, kind: "tts", capability: "chatterbox-tts", idempotencyKey: "tts", purpose: "narration", text: "Welcome explorer", language: "en" },
       { schemaVersion: 1, kind: "video", capability: "pixverse-i2v", idempotencyKey: "video", purpose: "animated-postcard", sourceImageAssetId: "p", prompt: "slow orbit", durationSeconds: 5 },
     ] as const;
 
     for (const request of requests) expect(adapter.validateGenerationInput(request).valid, request.kind).toBe(true);
+  });
+
+  it("enforces the shared create_media integer duration boundary for music, SFX, and video", () => {
+    const requestFor = (kind: "music" | "sfx" | "video", durationSeconds: number): GenerationRequest => {
+      if (kind === "music") {
+        return { schemaVersion: 1, kind, capability: "music", idempotencyKey: `music-${durationSeconds}`, purpose: "soundtrack", prompt: "gentle instrumental", durationSeconds, instrumental: true, loop: true };
+      }
+      if (kind === "sfx") {
+        return { schemaVersion: 1, kind, capability: "mirelo-sfx", idempotencyKey: `sfx-${durationSeconds}`, purpose: "pickup", prompt: "soft chime", durationSeconds, loop: false };
+      }
+      return { schemaVersion: 1, kind, capability: "pixverse-i2v", idempotencyKey: `video-${durationSeconds}`, purpose: "animated-postcard", sourceImageAssetId: "p", prompt: "slow orbit", durationSeconds };
+    };
+
+    for (const kind of ["music", "sfx", "video"] as const) {
+      expect(adapter.validateGenerationInput(requestFor(kind, 3)).valid, `${kind} duration 3`).toBe(true);
+      expect(adapter.validateGenerationInput(requestFor(kind, 15)).valid, `${kind} duration 15`).toBe(true);
+      for (const duration of [2, 16, 3.5]) {
+        const result = adapter.validateGenerationInput(requestFor(kind, duration));
+        expect(result.valid, `${kind} duration ${duration}`).toBe(false);
+        expect(result.errors.join(" ")).toContain("integer from 3 through 15 for Livepeer create_media");
+      }
+    }
   });
 
   it("rejects incompatible capabilities and provider-bounded options before submission", () => {
@@ -195,7 +218,7 @@ describe("LivepeerAdapter multi-kind contracts", () => {
     expect(adapter.validateGenerationInput({
       kind: "sfx",
       capability: "mirelo-sfx",
-      schemaVersion: 1, idempotencyKey: "bad-sfx", purpose: "rain", prompt: "rain", durationSeconds: 61, loop: true,
+      schemaVersion: 1, idempotencyKey: "bad-sfx", purpose: "rain", prompt: "rain", durationSeconds: 16, loop: true,
     }).valid).toBe(false);
     expect(adapter.validateGenerationInput({
       kind: "image-to-3d",
@@ -245,6 +268,44 @@ describe("LivepeerAdapter multi-kind contracts", () => {
       name: "create_media",
       args: { action: "tts", text: "Welcome explorer", model_override: "chatterbox-tts", async: true },
     });
+    expect(mcp.calls[0]!.args).not.toHaveProperty("language");
+  });
+
+  it("passes valid audio durations unchanged without inventing provider loop or ambience fields", async () => {
+    const mcp = fakeMcp({
+      create_media: (args) => ({ job_id: `mjob_${args.model_override}`, status: "submitted", capability_used: args.model_override }),
+    });
+    const live = new LivepeerAdapter(mcp, fakePhotos());
+    await live.submitGeneration({
+      schemaVersion: 1,
+      kind: "music",
+      capability: "music",
+      idempotencyKey: "music-valid",
+      purpose: "audio:music",
+      prompt: "gentle instrumental",
+      durationSeconds: 15,
+      instrumental: true,
+      loop: true,
+      maxCostUsd: 1,
+    });
+    await live.submitGeneration({
+      schemaVersion: 1,
+      kind: "sfx",
+      capability: "mirelo-sfx",
+      idempotencyKey: "sfx-valid",
+      purpose: "audio:ambience",
+      prompt: "gentle room tone",
+      durationSeconds: 3,
+      loop: true,
+      maxCostUsd: 1,
+    });
+
+    expect(mcp.calls.map((call) => call.args.duration)).toEqual([15, 3]);
+    expect(mcp.calls[0]!.args).toMatchObject({ action: "music", instrumental: true });
+    for (const call of mcp.calls) {
+      expect(call.args).not.toHaveProperty("loop");
+      expect(call.args).not.toHaveProperty("ambience");
+    }
   });
 
   it("uploads an image once and submits a bounded style edit", async () => {
@@ -353,6 +414,27 @@ describe("LivepeerAdapter.submit", () => {
     await expect(
       adapter.submit({ capability: "tripo-mv3d", idempotencyKey: "k", photos: [{ photoId: "a", sourceIndex: 1 }] }),
     ).rejects.toBeInstanceOf(McpToolError);
+    expect(mcp.calls).toHaveLength(0);
+  });
+
+  it("rejects an invalid create_media duration before calling the provider", async () => {
+    const mcp = fakeMcp({});
+    const adapter = new LivepeerAdapter(mcp, fakePhotos());
+    await expect(adapter.submitGeneration({
+      schemaVersion: 1,
+      kind: "music",
+      capability: "music",
+      idempotencyKey: "bad-duration",
+      purpose: "audio:music",
+      prompt: "gentle instrumental",
+      durationSeconds: 2,
+      instrumental: true,
+      loop: true,
+      maxCostUsd: 1,
+    })).rejects.toMatchObject({
+      message: expect.stringContaining("integer from 3 through 15 for Livepeer create_media"),
+      retryable: false,
+    });
     expect(mcp.calls).toHaveLength(0);
   });
 

@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { GenerationProvenance } from "../../shared/provenance.js";
 import type { LevelStore } from "../levels.js";
 import type { JobManager } from "../jobs/manager.js";
+import { RequestCostNotBoundedError } from "../livepeer/capabilities.js";
 import type { GeneratedAssetStore } from "../persistence/generatedAssetStore.js";
 import {
   assertImageDimensions,
@@ -126,6 +127,9 @@ export function createPostcardsRouter(
       if (code === "WORLD_NOT_FOUND") res.status(404).json({ message: "World not found" });
       else if (code === "INVALID_SCREENSHOT") res.status(400).json({ message: "The screenshot is not a valid local world capture." });
       else if (code === "POSTCARD_CONFLICT") res.status(409).json({ message: "The cached postcard request conflicts with this world." });
+      else if (error instanceof RequestCostNotBoundedError) {
+        res.status(503).json({ message: error.message, code: error.code, retryable: error.retryable });
+      }
       else throw error;
     }
   });
@@ -141,6 +145,10 @@ export function createPostcardsRouter(
     } catch (error) {
       if (error instanceof Error && error.message === "WORLD_NOT_FOUND") {
         res.status(404).json({ message: "World not found" });
+        return;
+      }
+      if (error instanceof RequestCostNotBoundedError) {
+        res.status(503).json({ message: error.message, code: error.code, retryable: error.retryable });
         return;
       }
       throw error;

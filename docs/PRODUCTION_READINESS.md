@@ -162,10 +162,11 @@ schema-valid, but has not been reviewed in a playable world. Gameplay recording
 support varies by browser, and generated postcard media has no real
 quality/playback evidence yet.
 
-**Production action.** Reuse rows 1–5, apply the contract/price/dry-run guards
-to the authorized rows 6–16, and treat them as unverified until terminal
-artifacts are recorded. Then hand the saved world to the user for listening,
-visual, gameplay, persistence, and labeling acceptance.
+**Production action.** Reuse rows 1–5 read-only. Keep paid execution paused;
+when separately authorized, apply the contract/price/dry-run guards to audio
+rows 6–15 and leave row 16 postcard blocked until it has an enforceable price
+maximum. Treat every unexecuted row as unverified. Then hand the saved world to
+the user for listening, visual, gameplay, persistence, and labeling acceptance.
 
 ## Mobile browsers
 
@@ -186,6 +187,7 @@ advertise mobile play until touch controls and a target-device matrix pass.
 The code is suitable for a controlled, single-instance local/hackathon demo
 with bundled fallbacks. It is not production-deployed, the current real
 photo-to-play batch is incomplete, and user hands-on acceptance remains open.
-The highest remaining gates are terminal evidence for live rows 6–16,
-generated-world save/play/share, user quality/gameplay review, tested
-backup/restore, and an authorized dedicated deployment origin.
+The highest remaining gates are terminal evidence for paused audio rows 6–15,
+a bounded postcard contract, generated-world save/play/share, user
+quality/gameplay review, tested backup/restore, and an authorized dedicated
+deployment origin.

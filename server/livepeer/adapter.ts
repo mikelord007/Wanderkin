@@ -120,6 +120,9 @@ const DESCRIBE_HTTP_TIMEOUT_MS = 8_000;
 
 const DISCOVERY_CACHE_TTL_MS = 5 * 60_000;
 
+const CREATE_MEDIA_DURATION_MIN_SECONDS = 3;
+const CREATE_MEDIA_DURATION_MAX_SECONDS = 15;
+
 const TRIPO_SEED_MODULUS = 2_147_483_647;
 const RODIN_SEED_MODULUS = 65_536;
 
@@ -140,6 +143,18 @@ function validateText(errors: string[], field: string, value: string, min: numbe
 
 function validateId(errors: string[], field: string, value: string): void {
   if (!value.trim()) errors.push(`${field} is required.`);
+}
+
+function validateCreateMediaDuration(errors: string[], durationSeconds: number): void {
+  if (
+    !Number.isInteger(durationSeconds)
+    || durationSeconds < CREATE_MEDIA_DURATION_MIN_SECONDS
+    || durationSeconds > CREATE_MEDIA_DURATION_MAX_SECONDS
+  ) {
+    errors.push(
+      `durationSeconds must be an integer from ${CREATE_MEDIA_DURATION_MIN_SECONDS} through ${CREATE_MEDIA_DURATION_MAX_SECONDS} for Livepeer create_media.`,
+    );
+  }
 }
 
 function reportedCost(value: {
@@ -373,15 +388,11 @@ export class LivepeerAdapter implements ProviderAdapter, GenerationProviderAdapt
         break;
       case "music":
         validateText(errors, "prompt", request.prompt, 1, 4_000);
-        if (!Number.isInteger(request.durationSeconds) || request.durationSeconds < 1 || request.durationSeconds > 600) {
-          errors.push("durationSeconds must be an integer from 1 through 600.");
-        }
+        validateCreateMediaDuration(errors, request.durationSeconds);
         break;
       case "sfx":
         validateText(errors, "prompt", request.prompt, 1, 2_000);
-        if (!Number.isInteger(request.durationSeconds) || request.durationSeconds < 1 || request.durationSeconds > 60) {
-          errors.push("durationSeconds must be an integer from 1 through 60.");
-        }
+        validateCreateMediaDuration(errors, request.durationSeconds);
         break;
       case "tts":
         validateText(errors, "text", request.text, 1, 2_000);
@@ -391,9 +402,7 @@ export class LivepeerAdapter implements ProviderAdapter, GenerationProviderAdapt
       case "video":
         validateText(errors, "prompt", request.prompt, 1, 4_000);
         validateId(errors, "sourceImageAssetId", request.sourceImageAssetId);
-        if (!Number.isInteger(request.durationSeconds) || request.durationSeconds < 3 || request.durationSeconds > 15) {
-          errors.push("durationSeconds must be an integer from 3 through 15.");
-        }
+        validateCreateMediaDuration(errors, request.durationSeconds);
         break;
     }
     return { valid: errors.length === 0, errors };
@@ -402,9 +411,12 @@ export class LivepeerAdapter implements ProviderAdapter, GenerationProviderAdapt
   async submitGeneration(request: ProviderGenerationSubmitRequest): Promise<ProviderGenerationSubmitResult> {
     const validation = this.validateGenerationInput(request);
     if (!validation.valid) {
+      const validationTool = request.kind === "image-to-3d" || request.kind === "text"
+        ? "run_capability"
+        : "create_media";
       throw new McpToolError(
         `Input validation failed: ${validation.errors.join("; ")}`,
-        "run_capability",
+        validationTool,
         false,
         validation,
       );

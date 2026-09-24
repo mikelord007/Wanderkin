@@ -1,13 +1,25 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import lostColorsFixture from "../../shared/fixtures/lost-colors.json";
 import { migrateSceneManifest } from "../../shared/manifest-migration.js";
 import type { GenerationJob } from "../../shared/job.js";
 import type { GeneratedImageReference } from "../../shared/generation.js";
 import type { SceneManifest } from "../../shared/manifest.js";
+import type { ProviderAdapter } from "../../shared/provider.js";
+import { JobManager } from "../jobs/manager.js";
+import { SpendLedger } from "../jobs/spendLedger.js";
+import { JobStore } from "../jobs/store.js";
+import { AssetStore } from "../persistence/assetStore.js";
+import { GeneratedAssetStore } from "../persistence/generatedAssetStore.js";
+import { PhotoStore } from "../persistence/photoStore.js";
+import type { GenerationProviderAdapter } from "../jobs/types.js";
 import type { PostcardCacheRecord } from "./store.js";
-import { POSTCARD_MAX_COST_USD, PostcardService, fingerprintWorld, postcardPrompt } from "./service.js";
+import { PostcardService, fingerprintWorld, postcardPrompt } from "./service.js";
 
 const manifest = migrateSceneManifest(lostColorsFixture);
+const RECORDED_POSTCARD_COST_USD = 0.34125;
 
 const provenance = {
   providerId: "fixture-provider",
@@ -17,7 +29,7 @@ const provenance = {
   applicationJobId: "job-postcard",
   providerJobId: "provider-postcard",
   timings: { requestedAt: "2026-09-24T10:00:00.000Z", completedAt: "2026-09-24T10:00:05.000Z" },
-  reportedCost: { amount: POSTCARD_MAX_COST_USD, currency: "USD", unit: "generated-second" },
+  reportedCost: { amount: RECORDED_POSTCARD_COST_USD, currency: "USD", unit: "generated-second" },
 } as const;
 
 function job(state: GenerationJob["state"]): GenerationJob {
@@ -118,7 +130,7 @@ describe("PostcardService", () => {
         durationSeconds: 5,
         sourceImageAssetId: screenshot.id,
       }),
-      { worldId: manifest.levelId, requestLimitOverrideUsd: POSTCARD_MAX_COST_USD },
+      { worldId: manifest.levelId },
     );
   });
 
@@ -143,7 +155,7 @@ describe("PostcardService", () => {
         requestedCapability: "pixverse-i2v",
         servedCapability: "pixverse-i2v",
         servedModel: "fixture/pixverse",
-        reportedCost: { amount: POSTCARD_MAX_COST_USD, currency: "USD" },
+        reportedCost: { amount: RECORDED_POSTCARD_COST_USD, currency: "USD" },
       },
     });
   });
@@ -156,5 +168,56 @@ describe("PostcardService", () => {
 
   it("invalidates the cache fingerprint when the postcard title changes", () => {
     expect(fingerprintWorld({ ...manifest, name: `${manifest.name} revised` })).not.toBe(fingerprintWorld(manifest));
+  });
+
+  it("blocks product postcard creation before a real manager creates a job, ledger entry, cache record, or provider request", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "objectquest-postcard-guard-"));
+    try {
+      const jobStore = new JobStore(dir);
+      const ledger = new SpendLedger(dir);
+      const submitGeneration = vi.fn(async () => ({
+        providerJobId: "must-not-submit",
+        capabilityUsed: "pixverse-i2v",
+        fallbackFired: null,
+      }));
+      const adapter = {
+        providerId: "fake",
+        discoverCapabilities: vi.fn(async () => []),
+        validateInput: vi.fn(() => ({ valid: true, errors: [] })),
+        submit: vi.fn(async () => ({ providerJobId: "legacy", capabilityUsed: "rodin-i3d", fallbackFired: null })),
+        getStatus: vi.fn(async () => ({ state: "generating" as const, progress: { known: false as const } })),
+        validateGenerationInput: vi.fn(() => ({ valid: true, errors: [] })),
+        submitGeneration,
+        getGenerationStatus: vi.fn(async () => ({ state: "generating" as const })),
+      } satisfies ProviderAdapter & GenerationProviderAdapter;
+      const manager = new JobManager(jobStore, adapter, new AssetStore(dir), new PhotoStore(dir), {
+        generatedAssets: new GeneratedAssetStore(dir),
+        spendLedger: ledger,
+        perRequestLimitUsd: 2,
+        perWorldLimitUsd: 8,
+        maxRetries: 2,
+        maxInFlight: 100,
+        globalLimitUsd: 100,
+        dailyLimitUsd: 20,
+      });
+      const cache = { get: vi.fn(async () => undefined), put: vi.fn(async () => undefined) };
+      const service = new PostcardService(
+        { get: vi.fn(async () => manifest), save: vi.fn(async (_id: string, next: SceneManifest) => next) },
+        { getProviderImage: vi.fn(async () => screenshot) },
+        manager,
+        cache,
+      );
+
+      await expect(service.create(manifest.levelId, screenshot.id)).rejects.toMatchObject({
+        code: "cost_not_bounded",
+        retryable: false,
+      });
+      expect(submitGeneration).not.toHaveBeenCalled();
+      expect(await jobStore.all()).toHaveLength(0);
+      expect((await ledger.summaryForWorld(manifest.levelId)).entries).toBe(0);
+      expect(cache.put).not.toHaveBeenCalled();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

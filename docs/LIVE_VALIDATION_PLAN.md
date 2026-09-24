@@ -2,7 +2,16 @@
 
 Date refreshed: **2026-09-24**  
 Budget owner: ObjectQuest v2 orchestrator  
-Status: **planned and dry-run tested; no paid call made by this worker**
+Status: **historical original plan; superseded after the row-6 contract rejection**
+
+> Do not execute the original full-batch command below. The current safe
+> recovery is audio-only: rows 1–5 are read-only reused, music is 15 seconds
+> under new key `oq-live-20260924-music-v2`, ambience is 15 seconds, all seven
+> event cues are 3 seconds, and the unchanged narration ceiling is `$0.0029`.
+> Fresh maximum: **$0.4124**. The postcard is separately
+> **SKIPPED/BLOCKED**, because the wrapper cannot pin resolution/audio and its
+> price quote is only a lower bound. See `scripts/live-validation/README.md`
+> for the paused, exact resume command. No paid recovery is authorised.
 
 This is the exact batch to present for spend authorisation. It uses one bundled
 representative source, `public/samples/photo-4.jpg`, and only ObjectQuest's

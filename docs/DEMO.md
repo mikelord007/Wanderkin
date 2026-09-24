@@ -164,11 +164,12 @@ logo alone.
 `mjob_0001ef7f3201` (Rodin). Explain that quest job
 `mjob_13e739e8d5af` was recovered ready from its existing provider result at
 zero new spend, with four validated fields and model `fal-ai/any-llm`. Rows
-6–16 are authorized/in flight but have no successful evidence yet. Then
+6–15 are paused with no successful evidence; row 6 was rejected before
+dispatch and row 16 postcard is contract/pricing blocked. Then
 show the $0.042 Kontext and $0.420 Rodin style spike and the 2026-09-18 Rodin
-success. The current batch estimate is $0.6932 and the combined batch-plus-
-spike estimate is $1.1552 before any rows 6–16 results; provider-metered costs
-are unknown, not zero.
+success. The current batch ledger is $0.7247 including the retained row-6
+reservation, and the combined batch-plus-spike estimate is $1.1867;
+provider-metered costs are unknown, not zero.
 
 ## Provider-down fallback path
 

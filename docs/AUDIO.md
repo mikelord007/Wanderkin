@@ -25,14 +25,24 @@ Validation rejects extra fields, markup, URLs, executable/instructional content,
 
 ## Generated audio
 
-`server/audio` submits all jobs concurrently through Worker 2's `JobManager`:
+`server/audio` submits all jobs concurrently through the shared `JobManager`:
 
-- one 60-second loopable instrumental `music` job;
-- one 20-second loopable ambience `sfx` job;
-- seven short `sfx` jobs: fragment pickup, portal activate, checkpoint, fall/respawn, race start, race finish, completion;
+- one 15-second instrumental `music` job, marked to loop during game playback;
+- one 15-second ambience `sfx` job, marked to loop during game playback;
+- seven 3-second `sfx` jobs: fragment pickup, portal activate, checkpoint, fall/respawn, race start, race finish, completion;
 - one `tts` job using the validated narration script.
 
 Prompts begin with the matching shared style audio fields. Each cue has an input-derived idempotency key. Submitting unchanged inputs therefore reconciles the stored job instead of starting new generation. Refresh reads existing job IDs; retry addresses only the failed job. `Promise.allSettled` isolates submission errors, and `playable: true` is invariant for every audio result. Only ready assets are attached to `manifest.media.audio`, retaining gateway provenance.
+
+Livepeer's shared `create_media` wrapper currently accepts only integer
+durations from 3 through 15 seconds. ObjectQuest rejects music, SFX, and video
+requests outside that range before ledger reservation or provider submission;
+it never clamps them. The wrapper has no loop or ambience flag. The request's
+`loop` field is retained as ObjectQuest playback intent and is not forwarded
+to the provider. A prompt may ask for a clean loop, but that is unverified
+creative guidance, not evidence that the generated file is seamless. For TTS,
+the provider receives the required `text`; application metadata
+`language: "en"` is not forwarded as an unsupported provider field.
 
 The current shared media schema has no explicit SFX cue field. Until an additive `cue?: AudioCue` field is approved, generated SFX are persisted in the canonical order documented by `EFFECT_CUES`: fragment pickup, portal activate, checkpoint, fall/respawn, race start, race finish, completion.
 
@@ -61,7 +71,7 @@ No paid call was made. If separately authorized, validate one minimal request pe
 ```
 
 ```json
-{"request":{"schemaVersion":1,"kind":"sfx","capability":"mirelo-sfx","idempotencyKey":"live-sfx-validation-1","purpose":"sfx-live-validation","prompt":"Short sparkling color pickup chime, clean game-ready sound, no speech.","durationSeconds":1,"loop":false},"worldId":"live-validation","maxCostUsd":0.015}
+{"request":{"schemaVersion":1,"kind":"sfx","capability":"mirelo-sfx","idempotencyKey":"live-sfx-validation-1","purpose":"sfx-live-validation","prompt":"Short sparkling color pickup chime, clean game-ready sound, no speech.","durationSeconds":3,"loop":false},"worldId":"live-validation","maxCostUsd":0.04}
 ```
 
 ```json

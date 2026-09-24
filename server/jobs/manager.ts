@@ -14,7 +14,12 @@ import { MAX_GLB_BYTES } from "../persistence/validate.js";
 import type { PhotoStore } from "../persistence/photoStore.js";
 import type { OwnerSecurity } from "../security/owner.js";
 import { sanitizeMessage } from "../util/sanitize.js";
-import { capabilityContract, estimateRequestCost } from "../livepeer/capabilities.js";
+import {
+  assertRequestCostBounded,
+  capabilityContract,
+  estimateRequestCost,
+  RequestCostNotBoundedError,
+} from "../livepeer/capabilities.js";
 import type { GenerationProviderAdapter, ProviderGenerationStatus } from "./types.js";
 import { BudgetExceededError, SpendLedger } from "./spendLedger.js";
 import {
@@ -102,6 +107,9 @@ function toJobError(err: unknown): JobError {
     return { message: sanitizeMessage(err.message), code: "download_too_large", retryable: false, occurredAt };
   }
   if (err instanceof BudgetExceededError) {
+    return { message: err.message, code: err.code, retryable: false, occurredAt };
+  }
+  if (err instanceof RequestCostNotBoundedError) {
     return { message: err.message, code: err.code, retryable: false, occurredAt };
   }
   const message = err instanceof Error ? err.message : String(err);
@@ -322,6 +330,16 @@ export class JobManager {
             return;
           }
           if (current.job.request) {
+            try {
+              assertRequestCostBounded(current.job.request);
+            } catch (error) {
+              current.job.state = "failed";
+              current.job.lastError = toJobError(error);
+              current.job.completedAt = new Date().toISOString();
+              current.job.updatedAt = current.job.completedAt;
+              await this.store.put(current);
+              return;
+            }
             await this.submitGenerationToProvider(
               current,
               current.job.request,
@@ -443,6 +461,8 @@ export class JobManager {
         }
         return { status: "reconciled", job: toPublicJob(existing) };
       }
+
+      assertRequestCostBounded(request);
 
       const validation = this.adapter.validateGenerationInput!(request);
       if (!validation.valid) {
@@ -948,6 +968,8 @@ export class JobManager {
         }
         return this.pollAndAdvanceLocked(record, { force: true });
       }
+
+      if (record.job.request) assertRequestCostBounded(record.job.request);
 
       if (record.job.retryCount >= record.job.maxRetries) {
         return toPublicJob(record);

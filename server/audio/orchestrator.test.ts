@@ -26,8 +26,11 @@ describe("audio orchestration", () => {
   it("builds every requested kind with style-specific prompts and stable cache keys", () => {
     const requests = buildAudioRequests(input);
     expect(requests).toHaveLength(10);
-    expect(requests.find((item) => item.cue === "music")?.request).toMatchObject({ kind: "music", instrumental: true, loop: true });
-    expect(requests.find((item) => item.cue === "ambience")?.request).toMatchObject({ kind: "sfx", loop: true });
+    expect(requests.find((item) => item.cue === "music")?.request).toMatchObject({ kind: "music", durationSeconds: 15, instrumental: true, loop: true });
+    expect(requests.find((item) => item.cue === "ambience")?.request).toMatchObject({ kind: "sfx", durationSeconds: 15, loop: true });
+    const eventSfx = requests.filter((item) => item.request.kind === "sfx" && item.cue !== "ambience");
+    expect(eventSfx).toHaveLength(7);
+    for (const item of eventSfx) expect(item.request).toMatchObject({ durationSeconds: 3, loop: false });
     expect(requests.find((item) => item.cue === "narration")?.request).toMatchObject({ kind: "tts", text: input.narrationScript });
     expect(audioKey(input, "music")).toBe(audioKey({ ...input }, "music"));
   });

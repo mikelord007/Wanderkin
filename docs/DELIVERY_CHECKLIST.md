@@ -72,12 +72,14 @@ claim that the corresponding live output or gameplay feel has been accepted.
 - [x] Row 5 reused provider job `mjob_13e739e8d5af`: one force-poll recovered
   the same app job, served model `fal-ai/any-llm`, no fallback, validated four
   fields, null actual cost, and no ledger/estimate increase.
-- [ ] Rows 6–16: music, ambience, seven SFX cues, narration, and postcard are
-  authorized/in flight under the existing budget but have no success evidence
-  at this timestamp. Fresh estimate: $0.7327.
+- [ ] Row 6 failed before dispatch because its obsolete 60-second music body
+  violated the shared 3–15-second wrapper schema. Rows 7–15 are unsubmitted;
+  the corrected audio-only maximum is $0.4124 and paid recovery is paused.
+  Row 16 postcard is separately blocked because its lower-bound quote is not
+  an enforceable maximum when resolution/audio cannot be pinned.
 - [ ] One current generated world is saved, repaired if necessary, completed,
   published, and opened in a fresh context. No level/share exists yet because
-  rows 6–16 and the save/play step have not completed.
+  rows 7–15 and the save/play step have not completed.
 - [ ] User hands-on acceptance covers preview/mesh identity, course feel and
   repair, real quest text, generated audio/subtitles, postcard labeling and
   playback, persistence, and the photo-free share.

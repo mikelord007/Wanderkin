@@ -395,6 +395,7 @@
         "preflightGap": "describe_capability omitted a music duration range, cap_price priced the exact 60-second request, cap_route returned SAFE, and runner dry-run performs health/template checks rather than provider schema validation."
       },
       "validatedRecoveryPlan": {
+        "status": "superseded by independent contract review; retained as the original diagnosis",
         "music": {
           "durationSeconds": 15,
           "loop": true,
@@ -436,6 +437,30 @@
         "remainingUnderProjectCeilingUsd": 8.0596,
         "batchCapUsd": 3,
         "projectCeilingUsd": 10
+      },
+      "supersedingRecoveryReview": {
+        "paidExecutionPaused": true,
+        "rowsReusedReadOnly": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "freshRows": "6-15",
+        "musicIdempotencyKey": "oq-live-20260924-music-v2",
+        "freshAudioMaximumUsd": 0.4124,
+        "currentBatchLedgerUsd": 0.7247,
+        "conservativeBatchAfterUsd": 1.1371,
+        "priorStyleSpikeUsd": 0.462,
+        "conservativeProjectAfterUsd": 1.5991,
+        "postcard": {
+          "row": 16,
+          "status": "SKIPPED/BLOCKED",
+          "reservedUsd": 0,
+          "reason": "The wrapper cannot pin resolution or audio, and cap_price is a lower bound rather than an enforceable maximum."
+        },
+        "loopSemantics": "Request loop fields are ObjectQuest playback intent. The wrapper exposes no loop or ambience flag, so seamless upstream output remains unverified."
       },
       "scopeDiagnosis": {
         "runnerOnly": false,

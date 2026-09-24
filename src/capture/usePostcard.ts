@@ -1,20 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { GenerationJob, VideoAssetReference } from "@shared/index.js";
-import {
-  createAnimatedPostcard,
-  getPostcardStatus,
-  retryAnimatedPostcard,
-  uploadWorldScreenshot,
-} from "../ui/api.js";
-import { blobToBase64, type WorldScreenshot } from "./screenshot.js";
+import { getPostcardStatus, retryAnimatedPostcard } from "../ui/api.js";
+import type { WorldScreenshot } from "./screenshot.js";
 
 export type PostcardViewState = "loading" | "none" | "submitting" | "pending" | "ready" | "failed";
+export const POSTCARD_UNAVAILABLE_MESSAGE = "Animated postcards are temporarily unavailable.";
 
 export interface PostcardController {
   state: PostcardViewState;
   job: GenerationJob | null;
   video: VideoAssetReference | null;
   error: string | null;
+  canCreate: boolean;
+  canRetry: boolean;
   create: () => Promise<void>;
   retry: () => Promise<void>;
 }
@@ -27,7 +25,7 @@ function stateFor(job: GenerationJob): PostcardViewState {
 
 export function usePostcard(
   levelId: string | null,
-  screenshot: WorldScreenshot | null = null,
+  _screenshot: WorldScreenshot | null = null,
   initialVideo: VideoAssetReference | null = null,
 ): PostcardController {
   const [state, setState] = useState<PostcardViewState>(initialVideo ? "ready" : levelId ? "loading" : "none");
@@ -105,24 +103,14 @@ export function usePostcard(
   }, [levelId, job?.id, job?.state, acceptJob]);
 
   const create = useCallback(async () => {
-    if (!levelId || !screenshot) {
-      setError("No world screenshot is available for this completed run.");
-      return;
-    }
-    setState("submitting");
-    setError(null);
-    try {
-      const image = await uploadWorldScreenshot(levelId, await blobToBase64(screenshot.blob));
-      const status = await createAnimatedPostcard(levelId, image.id);
-      if (status.state === "job") acceptJob(status.job);
-    } catch (cause) {
-      setState("failed");
-      setError(cause instanceof Error ? cause.message : "The animated postcard could not be started.");
-    }
-  }, [levelId, screenshot, acceptJob]);
+    setError(POSTCARD_UNAVAILABLE_MESSAGE);
+  }, []);
 
   const retry = useCallback(async () => {
-    if (!levelId) return;
+    if (!levelId || !job?.providerJobId || job.lastError?.retryable === false) {
+      setError(POSTCARD_UNAVAILABLE_MESSAGE);
+      return;
+    }
     setState("submitting");
     setError(null);
     try {
@@ -133,7 +121,16 @@ export function usePostcard(
       setState("failed");
       setError(cause instanceof Error ? cause.message : "The animated postcard retry failed.");
     }
-  }, [levelId, acceptJob]);
+  }, [levelId, job?.providerJobId, job?.lastError?.retryable, acceptJob]);
 
-  return { state, job, video, error, create, retry };
+  return {
+    state,
+    job,
+    video,
+    error,
+    canCreate: false,
+    canRetry: Boolean(job?.providerJobId) && job?.lastError?.retryable !== false,
+    create,
+    retry,
+  };
 }

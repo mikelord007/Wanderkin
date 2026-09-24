@@ -55,7 +55,7 @@ substitute for the dated run results above.
 | A2 | New schema round trips | Yes | Manifest, persistence, publication, audio, quest, and postcard references covered | Live provider N/A for serialization |
 | A3 | Migration compatibility | Yes | Legacy fixture import/migration covered | N/A; lossy/defaulted fields remain contract-defined |
 | A4 | Job deduplication per kind | Yes | Manager, audio orchestrator, preview, mesh, narration, and postcard dedupe tests; B6/B10/B18 contracts | Real rows must retain provenance; do not infer all-kind live proof |
-| A5 | Polling, errors, and resume | Yes | Job manager/store, live runner, B10, My Worlds, and zero-spend row-5 recovery | **Live:** rows 1–5 ready; rows 6–16 have no terminal success evidence yet |
+| A5 | Polling, errors, and resume | Yes | Job manager/store, live runner, B10, My Worlds, and zero-spend row-5 recovery | **Live:** rows 1–5 ready; row 6 rejected before dispatch; rows 7–15 unsubmitted; row 16 contract-blocked |
 | A6 | Partial asset failure | Yes | Optional quest/audio/postcard failure tests preserve playable core | Induced/mock failures are not provider incidents |
 | A7 | Budget rejection | Yes | Per-request, per-world, global, and rolling-day pre-submit checks in HTTP/unit coverage | No paid rejection required; actual provider billing remains unknown |
 | A8 | Preview approval/input selection | Yes | B5/B6 and provider-request-copy case passed | Real Kontext output exists; exact visual approval remains user-owned |
@@ -101,7 +101,7 @@ source/test contracts, and explicitly supplied observations.
 | L1 | Bounded representative-object matrix | **Partial.** Batch is capped below the user's $10 ceiling; rows 1–5 were submitted for one object only. A second object is not authorized yet. |
 | L2 | Judge appearance and usability, not HTTP success | **Open.** Rows 1–5 are ready, but the user has not accepted recognizability/course feel or quest quality. Provider success alone is insufficient. |
 | L3 | One current real photo-to-play path | **Open.** Cutout, two image edits, mesh, and validated quest are ready; no saved/playable/shared validation level exists. |
-| L4 | Evidence for every claimed AI capability | **Open.** Own execution exists for background removal, Kontext, GPT image edit, Rodin, and recovered Gemini quest text. Rows 6–16 are authorized/in flight, not successful evidence. |
+| L4 | Evidence for every claimed AI capability | **Open.** Own execution exists for background removal, Kontext, GPT image edit, Rodin, and recovered Gemini quest text. Row 6 failed before dispatch, rows 7–15 are paused/unsubmitted, and postcard row 16 is contract-blocked; none is successful evidence. |
 | L5 | Keep unverified optional features out of core acceptance | **Pass with caveat.** Audio/postcard failures are optional and fall back; optional companion work remains gated. Demo wording must label bundled versus generated media. |
 | L6 | Outage-ready bundled example | **Implemented/automated.** Lost Colors and bundled audio load without provider calls. User outage-path rehearsal remains open. |
 | L7 | Compare performance with baseline | Worker 11 recorded six 20-second Chrome samples and build size | Observational only; no universal FPS claim or hosted-origin measurement |
@@ -110,8 +110,9 @@ source/test contracts, and explicitly supplied observations.
 
 - [x] The narrow nested quest adapter fix and zero-spend force-poll recovery of
   `mjob_13e739e8d5af` are integrated; the four-field quest validates.
-- [ ] Record terminal results for the authorized/in-flight rows 6–16; actual
-  cost stays unknown wherever the provider returns no metered value.
+- [ ] After separate authorization, record terminal results for corrected
+  audio rows 6–15; keep postcard blocked until it has an enforceable maximum.
+  Actual cost stays unknown wherever the provider returns no metered value.
 - [ ] Save, repair if necessary, play, complete, publish, and reopen the current
   generated world without new generation requests.
 - [ ] User accepts or rejects preview/mesh identity, course usability, quest,

@@ -299,10 +299,10 @@ export function App() {
           postcardState={postcard.state}
           postcardVideo={postcard.video ?? existingPostcard}
           postcardError={postcard.error ?? screen.media.screenshotError}
-          {...(screen.publishable && screen.media.screenshot
+          {...(postcard.canCreate && screen.publishable && screen.media.screenshot
             ? { onCreateAnimatedPostcard: () => { void postcard.create(); } }
             : {})}
-          {...(postcard.state === "failed" ? { onRetryAnimatedPostcard: () => { void postcard.retry(); } } : {})}
+          {...(postcard.state === "failed" && postcard.canRetry ? { onRetryAnimatedPostcard: () => { void postcard.retry(); } } : {})}
           gameplayHighlight={screen.media.highlight}
           recordingSupported={screen.media.recordingSupported}
           recordingError={screen.media.recordingError}

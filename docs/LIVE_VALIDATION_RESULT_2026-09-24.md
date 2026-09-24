@@ -185,37 +185,43 @@ changed `$0.6932`→`$0.7247`. This is conservative ledger state, not evidence
 of a sixth paid provider job. Actual paid cost for the five completed provider
 jobs remains unknown; the rejected music call is explicitly uncharged.
 
-### Validated zero-call recovery plan
+### Superseding zero-call recovery plan
 
-No recovery call has been made. A contract-compatible plan is: 15-second
-loopable music (`$0.0315`), 15-second loopable ambience (`$0.1575`), seven
-3-second event cues (`$0.2205`), unchanged narration (`$0.0029` ceiling;
-`$0.0028` exact quote), and the unchanged 5-second postcard (`$0.3413`). The
-fresh conservative estimate is **$0.7537** and the exact current quotes sum to
-**$0.7536**. The postcard quote remains a provider-described lower bound
-because resolution is not pinned.
+No recovery call has been made. Independent contract review narrowed the next
+batch to audio only: 15-second music (`$0.0315`), 15-second ambience
+(`$0.1575`), seven 3-second event cues (`$0.2205`), and unchanged narration
+(`$0.0029` ceiling; `$0.0028` exact quote). The fresh conservative maximum is
+**$0.4124** and the exact quotes sum to **$0.4123**. `loop: true` remains
+ObjectQuest playback intent; the wrapper exposes no loop or ambience flag, so
+prompt wording is not evidence that upstream output is seamless.
+
+The postcard is now explicitly **SKIPPED/BLOCKED**, not successful or removed
+from the optional deliverable. The wrapper cannot pin resolution or audio, so
+the `$0.3413` `cap_price` lower bound is not an enforceable maximum. The next
+batch must make no postcard reservation, screenshot upload, or video request.
 
 The changed music request cannot reuse `oq-live-20260924-music`: its stored
 60-second body would conflict with a 15-second body. Its failed record has no
 provider job, and retry would target that obsolete request; therefore recovery
-requires a new versioned idempotency key. Rows 7–16 have no application or
-provider jobs, so their unused keys can be retained with the corrected request
-bodies. Successful rows 1–5 require no upload, reset, regeneration, or new
-provider call.
+requires new key `oq-live-20260924-music-v2`. Rows 7–15 have no application or
+provider jobs, so their unused keys are retained with corrected request bodies.
+Row 16 retains its unused identity only as blocked plan evidence. Successful
+rows 1–5 require no upload, reset, regeneration, or new provider call.
 
 Conservatively retaining the explicitly uncharged `$0.0315` reservation, the
-current batch ledger `$0.7247` plus the corrected future plan `$0.7537` would
-be **$1.4784**, below the `$3` batch guard. Including the earlier `$0.462`
-style spike gives **$1.9404** against the cumulative `$10` ceiling, leaving
-**$8.0596**. Before any corrected run, the current project total is `$1.1867`
+current batch ledger `$0.7247` plus the audio-only future plan `$0.4124` would
+be **$1.1371**, below the `$3` batch guard. Including the earlier `$0.462`
+style spike gives **$1.5991** against the cumulative `$10` ceiling, leaving
+**$8.4009**. Before any corrected run, the current project total is `$1.1867`
 and headroom is `$8.8133`. Provider-metered cost for completed calls remains
 unknown and must not be inferred from these estimates.
 
 The minimal repair belongs in `server/livepeer/adapter.ts` and
 `server/routes/jobs.ts` to enforce the observed 3–15-second wrapper contract
 before ledger reservation, plus `server/audio/prompts.ts` and
-`scripts/live-validation/plan.ts` to emit supported durations and a new music
-key. Focused regression coverage belongs in the existing adapter, audio
+`scripts/live-validation/plan.ts` and `run.ts` to emit supported durations, use
+a new music key, verify rows 1–5 read-only, and block postcard execution.
+Focused regression coverage belongs in the existing adapter, audio
 orchestrator, HTTP generation-validation, and live-runner tests. No broad
 recursive normalization, schema, dependency, or UI change is indicated.
 
@@ -351,8 +357,8 @@ entry, reservation, or provider submission.
 ## Evidence hashes
 
 - Runner and recovery evidence JSON: SHA-256
-  `8282eb0da0d9a2df5aefd68c0843725becbf880c27af3b6bd804f9280f5c5dc2`
-  (17,562 bytes).
+  `2826cde038acf1046403f6a0d9451dbff61ccb4b90bbd1866a650fe5ee56928d`
+  (18,578 bytes).
 - Recovered canonical quest JSON: SHA-256
   `47561633496011cc62324b3d7b8225b5600c1f9178e3a5a2e82bfb6fd1f5bb6e`
   (478 bytes).

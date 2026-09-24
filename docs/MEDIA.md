@@ -44,28 +44,19 @@ When the job becomes ready, its `VideoAssetReference` is appended to `manifest.m
 
 A pending or failed job does not modify playable assets. My Worlds polls the existing cache entry, shows independent progress/failure/retry state, and previews/downloads a ready postcard.
 
-## Exact bounded live request (requires separate authorization)
+## Animated postcard availability
 
-No paid request was made while implementing or testing this feature. The single request to authorize is the following gateway envelope, with placeholders resolved from the saved world and captured PNG:
+Fresh animated-postcard generation is temporarily unavailable. The current
+`pixverse-i2v` wrapper does not expose the resolution and audio controls needed
+to derive an enforceable maximum, and its quoted rate is a lower bound rather
+than a cap. The server therefore returns the nonretryable
+`cost_not_bounded` error before creating a job, reserving ledger spend,
+uploading to the provider, or submitting generation. The client does not
+capture or upload a new postcard screenshot while this guard is active.
 
-```json
-{
-  "request": {
-    "schemaVersion": 1,
-    "kind": "video",
-    "capability": "pixverse-i2v",
-    "idempotencyKey": "postcard_<sha256 authored-world fingerprint>",
-    "purpose": "animated-postcard",
-    "sourceImageAssetId": "<browser-world-capture generated asset id>",
-    "prompt": "Create a gentle five-second animated postcard of <world title>. Preserve the exact recognizable world, composition, and <selected style> art direction from the source image. Atmosphere: <saved atmosphere or calm miniature-world default>. Use a slow cinematic camera drift with subtle environmental motion. Do not add captions, interface elements, characters, scene cuts, or new objects.",
-    "durationSeconds": 5
-  },
-  "worldId": "<saved level id>",
-  "maxCostUsd": 0.34125
-}
-```
-
-The adapter maps this to `create_media`, action `animate`, with the uploaded screenshot `source_url`, the prompt, `duration: 5`, and `max_cost_usd: 0.34125`. The documented price is $0.06825 per generated second, so the five-second bound is exactly $0.34125 (displayed as $0.3413 when rounded to four decimals). The documented output is MP4 without audio. Real-provider evidence remains pending authorization.
+Existing saved postcard videos remain playable and downloadable. A job that
+already has a provider job ID may still be polled for its existing result; the
+guard never starts a replacement generation.
 
 ## Actual gameplay highlight
 

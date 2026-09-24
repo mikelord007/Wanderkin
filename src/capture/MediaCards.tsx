@@ -3,7 +3,7 @@ import type { SceneManifest, VideoAssetReference } from "@shared/index.js";
 import { Button } from "../ui/components/Button.js";
 import type { GameplayHighlight } from "./recorder.js";
 import type { PostcardViewState } from "./usePostcard.js";
-import { usePostcard } from "./usePostcard.js";
+import { POSTCARD_UNAVAILABLE_MESSAGE, usePostcard } from "./usePostcard.js";
 import "./media.css";
 
 export interface CompletionMediaCardsProps {
@@ -49,9 +49,9 @@ export function CompletionMediaCards(props: CompletionMediaCardsProps) {
             {props.postcardError ? <p className="oq-error-text" role="alert">{props.postcardError}</p> : null}
             {props.postcardState === "failed" && props.onRetryPostcard
               ? <Button variant="secondary" onClick={props.onRetryPostcard}>Retry animated postcard</Button>
-              : props.onCreatePostcard
+              : props.canCreatePostcard && props.onCreatePostcard
                 ? <Button variant="secondary" onClick={props.onCreatePostcard}>Create animated postcard</Button>
-                : <p className="oq-media-card__note">Save this world to create an animated postcard.</p>}
+                : <p className="oq-media-card__note">{POSTCARD_UNAVAILABLE_MESSAGE}</p>}
           </>
         )}
       </article>
@@ -96,7 +96,7 @@ export function WorldPostcardPanel({ manifest }: { manifest: SceneManifest }) {
     return <div className="oq-saved-postcard"><p className="oq-media-card__label">Generated animation · Animated postcard</p><p role="status">Animation in progress. Playing and editing remain available.</p></div>;
   }
   if (postcard.state === "failed") {
-    return <div className="oq-saved-postcard"><p className="oq-media-card__label">Animated postcard needs attention</p><p className="oq-kit-error" role="alert">{postcard.error ?? "The optional animation failed."}</p><Button variant="ghost" onClick={() => void postcard.retry()}>Retry postcard</Button></div>;
+    return <div className="oq-saved-postcard"><p className="oq-media-card__label">Animated postcard needs attention</p><p className="oq-kit-error" role="alert">{postcard.error ?? "The optional animation failed."}</p>{postcard.canRetry ? <Button variant="ghost" onClick={() => void postcard.retry()}>Retry postcard</Button> : <p>{POSTCARD_UNAVAILABLE_MESSAGE}</p>}</div>;
   }
   return null;
 }

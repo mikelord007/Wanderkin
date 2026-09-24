@@ -29,8 +29,9 @@ export function questPrompt(): string {
   ].join("\n");
 }
 
-function requestBase(id: string, kind: PlannedRequest["kind"], capability: string, purpose: string) {
-  return { schemaVersion: 1, kind, capability, idempotencyKey: `oq-live-20260924-${id}`, purpose };
+function requestBase(id: string, kind: PlannedRequest["kind"], capability: string, purpose: string, version?: string) {
+  const versionSuffix = version ? `-${version}` : "";
+  return { schemaVersion: 1, kind, capability, idempotencyKey: `oq-live-20260924-${id}${versionSuffix}`, purpose };
 }
 
 export function buildPlan(options: { includePostcard?: boolean; includeAlternateEdit?: boolean } = {}): PlannedRequest[] {
@@ -81,19 +82,19 @@ export function buildPlan(options: { includePostcard?: boolean; includeAlternate
     maxCharacters: 1200,
   });
   add("music", "music", "music", "audio:music", 0.0315, 1, {
-    ...requestBase("music", "music", "music", "audio:music"),
+    ...requestBase("music", "music", "music", "audio:music", "v2"),
     prompt: "Playful miniature exploration with warm plucked strings and soft toy percussion; Cartoon adventure; sofa, desk, and laptop room corner; clean game-ready sound, no speech, no copyrighted melody.",
-    durationSeconds: 60,
+    durationSeconds: 15,
     instrumental: true,
     loop: true,
   });
   const sfx = [
-    ["ambience", "audio:ambience", "gentle indoor breeze, distant soft room tone, tiny paper rustles", 20, true],
-    ["fragment-pickup", "audio:fragment-pickup", "short glassy sparkle and soft toy chime", 1, false],
-    ["portal-activate", "audio:portal-activate", "warm magical portal bloom with a gentle rising shimmer", 2, false],
-    ["checkpoint", "audio:checkpoint", "short bright checkpoint confirmation", 1, false],
-    ["fall-respawn", "audio:fall-respawn", "soft descending whoosh followed by a gentle return pop", 2, false],
-    ["race-start", "audio:race-start", "crisp playful three-count start flourish", 2, false],
+    ["ambience", "audio:ambience", "gentle indoor breeze, distant soft room tone, tiny paper rustles", 15, true],
+    ["fragment-pickup", "audio:fragment-pickup", "short glassy sparkle and soft toy chime", 3, false],
+    ["portal-activate", "audio:portal-activate", "warm magical portal bloom with a gentle rising shimmer", 3, false],
+    ["checkpoint", "audio:checkpoint", "short bright checkpoint confirmation", 3, false],
+    ["fall-respawn", "audio:fall-respawn", "soft descending whoosh followed by a gentle return pop", 3, false],
+    ["race-start", "audio:race-start", "crisp playful three-count start flourish", 3, false],
     ["race-finish", "audio:race-finish", "quick triumphant race finish fanfare", 3, false],
     ["completion", "audio:completion", "warm magical world completion flourish", 3, false],
   ] as const;

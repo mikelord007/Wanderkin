@@ -31,7 +31,9 @@ the quest with zero new submission or ledger delta.
 | 3 | `gpt-image-edit`, `mjob_4a0b2bde417b` | Ready, no fallback | PNG, 684,261 bytes, SHA-256 `93c3895a6dbf68121eb8f50487efd44a0e2601a4ee5bf6c2653c133aa1501106`; user visual approval pending |
 | 4 | `rodin-i3d`, `mjob_0001ef7f3201` | Ready, no fallback | GLB, 4,680,412 bytes, SHA-256 `f0855519fb1314e14703ef91a7778b6992f2f4c80b64910cfe4781e719b0e24c`; not yet loaded, prepared, or played by the user |
 | 5 | `gemini-text`, `mjob_13e739e8d5af` | **Recovered ready**, served model `fal-ai/any-llm`, no fallback, same app/provider IDs, zero new submission | Validated four-field quest, canonical SHA-256 `47561633496011cc62324b3d7b8225b5600c1f9178e3a5a2e82bfb6fd1f5bb6e`; in-world/user review pending |
-| 6–16 | Music, ambience, seven SFX cues, narration, postcard | Authorized/in flight; **no terminal success evidence at this snapshot** | Fresh estimate $0.7327; no media quality claim yet |
+| 6 | Music | Failed before provider dispatch; no provider ID and explicitly no charge | Obsolete 60-second request remains retained under `oq-live-20260924-music`; never retry it |
+| 7–15 | Ambience, seven SFX cues, narration | Unsubmitted; corrected audio-only resume remains paused | Fresh conservative maximum $0.4124; no media quality claim yet |
+| 16 | Postcard | **SKIPPED/BLOCKED** by contract/pricing review | Wrapper cannot pin resolution/audio and the quote is only a lower bound; no enforceable maximum or real video evidence |
 
 No validation level, share ID, or current generated-world gameplay evidence
 exists. Rows 1–5 therefore prove real execution and recovery, not a complete
@@ -40,15 +42,19 @@ gameplay acceptance.
 
 ### Spend boundary
 
-- Current batch ledger estimate/reservation: **$0.6932** across rows 1–5.
+- Current batch ledger estimate/reservation: **$0.7247** across rows 1–6,
+  including the retained `$0.0315` reservation for row 6 even though the
+  provider explicitly rejected it before dispatch and charged nothing.
 - Earlier style spike estimates: **$0.462**.
-- Combined recorded estimate: **$1.1552**.
-- Estimated fresh cost for rows 6–16: **$0.7327**; full batch estimate:
-  **$1.4259**; batch plus spike estimate: **$1.8879**.
+- Combined recorded estimate: **$1.1867**.
+- Corrected fresh audio-only maximum for rows 6–15: **$0.4124**. If separately
+  authorized, batch ledger plus that plan would be **$1.1371**, and the batch
+  plus spike would be **$1.5991**. Postcard is excluded as blocked, not priced
+  as a successful or bounded row.
 - All current provider-paid cost fields are `null`. Actual paid cost is
   **unknown**, not zero. Estimates are not provider billing.
-- The authorized ceiling is $10. Row-5 recovery added no call or estimate;
-  rows 6–16 were subsequently authorized and are in flight at this timestamp.
+- The authorized ceiling is $10. Row-5 recovery added no call or estimate.
+  Paid recovery is paused; rows 7–15 are unsubmitted and row 16 is blocked.
 
 ## Earlier dated ObjectQuest executions
 

@@ -10,6 +10,21 @@ export interface CapabilityContract {
   fallbackChain: readonly string[];
 }
 
+export const COST_NOT_BOUNDED_CODE = "cost_not_bounded";
+export const POSTCARD_UNAVAILABLE_MESSAGE = "Animated postcards are temporarily unavailable.";
+
+/** Raised when the provider contract exposes only a lower-bound price, so
+ * ObjectQuest cannot enforce its promised maximum before paid execution. */
+export class RequestCostNotBoundedError extends Error {
+  readonly code = COST_NOT_BOUNDED_CODE;
+  readonly retryable = false;
+
+  constructor() {
+    super(POSTCARD_UNAVAILABLE_MESSAGE);
+    this.name = "RequestCostNotBoundedError";
+  }
+}
+
 /** Live-discovered on 2026-09-24; see docs/LIVEPEER_CAPABILITIES.md. Price
  * estimators intentionally round up later, never down. */
 export const CAPABILITY_CONTRACTS: Readonly<Record<string, CapabilityContract>> = {
@@ -28,6 +43,17 @@ export const CAPABILITY_CONTRACTS: Readonly<Record<string, CapabilityContract>> 
 
 export function capabilityContract(capability: string): CapabilityContract | undefined {
   return CAPABILITY_CONTRACTS[capability];
+}
+
+/** The current pixverse-i2v wrapper accepts a cap_price but documents its
+ * rate as a lower bound and does not expose the output controls needed to
+ * derive an enforceable maximum. Fail closed until that contract changes. */
+export function isRequestCostBounded(request: GenerationRequest): boolean {
+  return !(request.kind === "video" && request.capability === "pixverse-i2v");
+}
+
+export function assertRequestCostBounded(request: GenerationRequest): void {
+  if (!isRequestCostBounded(request)) throw new RequestCostNotBoundedError();
 }
 
 export function estimateRequestCost(request: GenerationRequest): number | null {

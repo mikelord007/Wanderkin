@@ -8,6 +8,7 @@ import { AssetStore } from "../persistence/assetStore.js";
 import { GeneratedAssetStore } from "../persistence/generatedAssetStore.js";
 import { PhotoStore } from "../persistence/photoStore.js";
 import type { GenerationRequest } from "../../shared/generation.js";
+import type { GenerationJob } from "../../shared/job.js";
 import type { GenerationProviderAdapter, ProviderGenerationStatus } from "./types.js";
 import { SpendLedger } from "./spendLedger.js";
 import { JobStore } from "./store.js";
@@ -184,11 +185,57 @@ describe("JobManager", () => {
     { schemaVersion: 1, kind: "image-edit", capability: "bg-remove", idempotencyKey: "bg", purpose: "object-cutout", sourceImageAssetId: "p", instruction: "remove background", outputMimeType: "image/png" },
     { schemaVersion: 1, kind: "image-to-3d", capability: "rodin-i3d", idempotencyKey: "mesh", purpose: "world-mesh", photos: [{ photoId: "p", sourceIndex: 1 }] },
     { schemaVersion: 1, kind: "text", capability: "gemini-text", idempotencyKey: "text", purpose: "quest", prompt: "quest json", output: "quest-json", maxCharacters: 1200 },
-    { schemaVersion: 1, kind: "music", capability: "music", idempotencyKey: "music", purpose: "soundtrack", prompt: "instrumental", durationSeconds: 60, instrumental: true, loop: true },
-    { schemaVersion: 1, kind: "sfx", capability: "mirelo-sfx", idempotencyKey: "sfx", purpose: "pickup", prompt: "chime", durationSeconds: 2, loop: false },
+    { schemaVersion: 1, kind: "music", capability: "music", idempotencyKey: "music", purpose: "soundtrack", prompt: "instrumental", durationSeconds: 15, instrumental: true, loop: true },
+    { schemaVersion: 1, kind: "sfx", capability: "mirelo-sfx", idempotencyKey: "sfx", purpose: "pickup", prompt: "chime", durationSeconds: 3, loop: false },
     { schemaVersion: 1, kind: "tts", capability: "chatterbox-tts", idempotencyKey: "tts", purpose: "narration", text: "Welcome", language: "en" },
-    { schemaVersion: 1, kind: "video", capability: "pixverse-i2v", idempotencyKey: "video", purpose: "animated-postcard", sourceImageAssetId: "p", prompt: "orbit", durationSeconds: 5 },
   ];
+
+  const videoRequest: GenerationRequest = {
+    schemaVersion: 1,
+    kind: "video",
+    capability: "pixverse-i2v",
+    idempotencyKey: "video",
+    purpose: "animated-postcard",
+    sourceImageAssetId: "p",
+    prompt: "orbit",
+    durationSeconds: 5,
+  };
+
+  async function seedVideoJob(
+    store: JobStore,
+    options: { providerJobId: string | null; state?: GenerationJob["state"] } = { providerJobId: null },
+  ): Promise<GenerationJob> {
+    const now = new Date().toISOString();
+    const job: GenerationJob = {
+      schemaVersion: 1,
+      id: `job-${options.providerJobId ?? "unsubmitted"}`,
+      idempotencyKey: videoRequest.idempotencyKey,
+      providerId: "fake",
+      providerJobId: options.providerJobId,
+      capabilityRequested: videoRequest.capability,
+      capabilityUsed: options.providerJobId ? videoRequest.capability : null,
+      fallbackFired: null,
+      state: options.state ?? "failed",
+      photoOrder: [1],
+      createdAt: now,
+      updatedAt: now,
+      retryCount: 0,
+      maxRetries: 2,
+      uiMessage: "Something went wrong.",
+      kind: "video",
+      request: videoRequest,
+      lastError: { message: "transient failure", code: "fixture", retryable: true, occurredAt: now },
+    };
+    await store.put({
+      job,
+      internal: {
+        nextPollAt: 0,
+        backoffMs: 5_000,
+        originalRequest: { photos: [{ photoId: "p", sourceIndex: 1 }] },
+      },
+    });
+    return job;
+  }
 
   it("deduplicates every v2 generation kind (including the background-removal image-edit profile)", async () => {
     const adapter = fakeMultiAdapter();
@@ -201,6 +248,97 @@ describe("JobManager", () => {
       expect(second.job.id).toBe(first.job.id);
     }
     expect(adapter.submitGeneration).toHaveBeenCalledTimes(v2Requests.length);
+  });
+
+  it("blocks a new unbounded pixverse video before validation, job, ledger, or provider submission", async () => {
+    const adapter = fakeMultiAdapter();
+    const store = new JobStore(dir);
+    const ledger = new SpendLedger(dir);
+    const manager = new JobManager(store, adapter, new AssetStore(dir), new PhotoStore(dir), {
+      generatedAssets: new GeneratedAssetStore(dir),
+      spendLedger: ledger,
+      perRequestLimitUsd: 2,
+      perWorldLimitUsd: 8,
+      maxRetries: 2,
+      maxInFlight: 100,
+      globalLimitUsd: 100,
+      dailyLimitUsd: 20,
+    });
+
+    await expect(manager.submitGenerationOrReconcile(videoRequest, { worldId: "world-video" }))
+      .rejects.toMatchObject({
+        code: "cost_not_bounded",
+        retryable: false,
+        message: "Animated postcards are temporarily unavailable.",
+      });
+    expect(adapter.validateGenerationInput).not.toHaveBeenCalled();
+    expect(adapter.submitGeneration).not.toHaveBeenCalled();
+    expect(await store.all()).toHaveLength(0);
+    expect((await ledger.summaryForWorld("world-video")).entries).toBe(0);
+  });
+
+  it("reconciles a matching existing pixverse job without a fresh submission", async () => {
+    const adapter = fakeMultiAdapter();
+    const store = new JobStore(dir);
+    const existing = await seedVideoJob(store, { providerJobId: "provider-video", state: "generating" });
+    const manager = new JobManager(store, adapter, new AssetStore(dir), new PhotoStore(dir), {
+      generatedAssets: new GeneratedAssetStore(dir),
+      spendLedger: new SpendLedger(dir),
+      perRequestLimitUsd: 2,
+      perWorldLimitUsd: 8,
+      maxRetries: 2,
+      maxInFlight: 100,
+      globalLimitUsd: 100,
+      dailyLimitUsd: 20,
+    });
+
+    await expect(manager.submitGenerationOrReconcile(videoRequest)).resolves.toMatchObject({
+      status: "reconciled",
+      job: { id: existing.id },
+    });
+    expect(adapter.submitGeneration).not.toHaveBeenCalled();
+  });
+
+  it("blocks an unsubmitted pixverse retry without mutating its retry count or state", async () => {
+    const adapter = fakeMultiAdapter();
+    const store = new JobStore(dir);
+    const existing = await seedVideoJob(store, { providerJobId: null });
+    const manager = new JobManager(store, adapter, new AssetStore(dir), new PhotoStore(dir), {
+      generatedAssets: new GeneratedAssetStore(dir),
+      spendLedger: new SpendLedger(dir),
+      perRequestLimitUsd: 2,
+      perWorldLimitUsd: 8,
+      maxRetries: 2,
+      maxInFlight: 100,
+      globalLimitUsd: 100,
+      dailyLimitUsd: 20,
+    });
+
+    await expect(manager.retry(existing.id)).rejects.toMatchObject({ code: "cost_not_bounded", retryable: false });
+    expect(await store.get(existing.id)).toMatchObject({ job: { state: "failed", retryCount: 0 } });
+    expect(adapter.submitGeneration).not.toHaveBeenCalled();
+  });
+
+  it("polls an existing pixverse provider job without submitting another generation", async () => {
+    const adapter = fakeMultiAdapter({
+      getGenerationStatus: vi.fn(async (): Promise<ProviderGenerationStatus> => ({ state: "generating" })),
+    });
+    const store = new JobStore(dir);
+    const existing = await seedVideoJob(store, { providerJobId: "provider-video" });
+    const manager = new JobManager(store, adapter, new AssetStore(dir), new PhotoStore(dir), {
+      generatedAssets: new GeneratedAssetStore(dir),
+      spendLedger: new SpendLedger(dir),
+      perRequestLimitUsd: 2,
+      perWorldLimitUsd: 8,
+      maxRetries: 2,
+      maxInFlight: 100,
+      globalLimitUsd: 100,
+      dailyLimitUsd: 20,
+    });
+
+    await expect(manager.retry(existing.id)).resolves.toMatchObject({ state: "generating", providerJobId: "provider-video" });
+    expect(adapter.getGenerationStatus).toHaveBeenCalledWith("provider-video");
+    expect(adapter.submitGeneration).not.toHaveBeenCalled();
   });
 
   it("hard-rejects a request that exceeds the configured budget before provider submission", async () => {

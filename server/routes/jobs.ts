@@ -5,6 +5,7 @@ import type { GenerationRequest, ImageEditGenerationRequest } from "../../shared
 import { ProviderConcurrencyExceededError, type JobManager } from "../jobs/manager.js";
 import { BudgetExceededError, type SpendLedger } from "../jobs/spendLedger.js";
 import type { PreviewCacheStore } from "../jobs/previewCache.js";
+import { RequestCostNotBoundedError } from "../livepeer/capabilities.js";
 import { McpToolError } from "../livepeer/mcpClient.js";
 import type { GeneratedAssetStore } from "../persistence/generatedAssetStore.js";
 import type { PhotoStore } from "../persistence/photoStore.js";
@@ -29,6 +30,15 @@ const generationBase = {
   purpose: z.string().min(1).max(200),
 };
 
+const livepeerCreateMediaDurationSchema = z.number().superRefine((durationSeconds, context) => {
+  if (!Number.isInteger(durationSeconds) || durationSeconds < 3 || durationSeconds > 15) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "durationSeconds must be an integer from 3 through 15 for Livepeer create_media.",
+    });
+  }
+});
+
 const generationRequestSchema = z.discriminatedUnion("kind", [
   z.object({
     ...generationBase,
@@ -40,10 +50,10 @@ const generationRequestSchema = z.discriminatedUnion("kind", [
   }),
   z.object({ ...generationBase, kind: z.literal("image-edit"), sourceImageAssetId: z.string().min(1), instruction: z.string().min(1).max(4000), outputMimeType: z.enum(["image/png", "image/jpeg", "image/webp"]) }),
   z.object({ ...generationBase, kind: z.literal("text"), prompt: z.string().min(1).max(8000), output: z.enum(["quest-json", "plain-text"]), maxCharacters: z.number().int().min(1).max(8000) }),
-  z.object({ ...generationBase, kind: z.literal("music"), prompt: z.string().min(1).max(4000), durationSeconds: z.number().int().min(1).max(600), instrumental: z.literal(true), loop: z.boolean() }),
-  z.object({ ...generationBase, kind: z.literal("sfx"), prompt: z.string().min(1).max(2000), durationSeconds: z.number().int().min(1).max(60), loop: z.boolean() }),
+  z.object({ ...generationBase, kind: z.literal("music"), prompt: z.string().min(1).max(4000), durationSeconds: livepeerCreateMediaDurationSchema, instrumental: z.literal(true), loop: z.boolean() }),
+  z.object({ ...generationBase, kind: z.literal("sfx"), prompt: z.string().min(1).max(2000), durationSeconds: livepeerCreateMediaDurationSchema, loop: z.boolean() }),
   z.object({ ...generationBase, kind: z.literal("tts"), text: z.string().min(1).max(2000), voice: z.string().min(1).max(200).optional(), language: z.string().min(1).max(32) }),
-  z.object({ ...generationBase, kind: z.literal("video"), sourceImageAssetId: z.string().min(1), prompt: z.string().min(1).max(4000), durationSeconds: z.number().int().min(3).max(15), purpose: z.literal("animated-postcard") }),
+  z.object({ ...generationBase, kind: z.literal("video"), sourceImageAssetId: z.string().min(1), prompt: z.string().min(1).max(4000), durationSeconds: livepeerCreateMediaDurationSchema, purpose: z.literal("animated-postcard") }),
 ]).superRefine((request, context) => {
   if (request.kind !== "image-to-3d") return;
   const inputCount = (request.photos?.length ?? 0) + (request.sourceImageAssetIds?.length ?? 0);
@@ -78,6 +88,12 @@ export function createJobsRouter(
     if (!(err instanceof ProviderConcurrencyExceededError)) return false;
     res.setHeader("Retry-After", String(err.retryAfterSeconds));
     res.status(429).json({ message: err.message });
+    return true;
+  }
+
+  function sendCostNotBoundedError(err: unknown, res: Response): boolean {
+    if (!(err instanceof RequestCostNotBoundedError)) return false;
+    res.status(503).json({ message: err.message, code: err.code, retryable: err.retryable });
     return true;
   }
 
@@ -156,6 +172,7 @@ export function createJobsRouter(
       res.status(outcome.status === "reconciled" ? 200 : outcome.job.state === "failed" ? 502 : 201).json(outcome.job);
     } catch (err) {
       if (sendConcurrencyError(err, res)) return;
+      if (sendCostNotBoundedError(err, res)) return;
       if (err instanceof BudgetExceededError) { res.status(402).json({ message: err.message, code: err.code }); return; }
       if (err instanceof McpToolError) { res.status(400).json({ message: err.message }); return; }
       throw err;
@@ -349,6 +366,7 @@ export function createJobsRouter(
       job = await jobManager.retry(req.params.id as string);
     } catch (err) {
       if (sendConcurrencyError(err, res)) return;
+      if (sendCostNotBoundedError(err, res)) return;
       throw err;
     }
     if (!job) {
