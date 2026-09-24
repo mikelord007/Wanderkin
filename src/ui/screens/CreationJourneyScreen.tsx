@@ -103,7 +103,8 @@ export function CreationJourneyScreen({ onJobStarted, onBack }: CreationJourneyS
 
   async function buildWorld() {
     if (!canBuildWorld(record) || !record.photo) return; setBusy(true); setError(null);
-    const request: ImageTo3dGenerationRequest = { schemaVersion: 1, kind: "image-to-3d", capability: "rodin-i3d", idempotencyKey: newKey("shape"), purpose: "world-mesh", photos: [{ photoId: record.photo.id, sourceIndex: 1 }], sourceImageAssetIds: [record.preview.asset.id], styleReferenceAssetId: record.preview.asset.id, scenePrompt: `${STYLE_DEFINITIONS[record.selection.style].imagePrompts.geometryReference} ${record.selection.atmosphere}`.trim() };
+    const reviewedImageAssetId = record.reviewedImageAssetId ?? record.objectImage?.id ?? record.photo.id;
+    const request: ImageTo3dGenerationRequest = { schemaVersion: 1, kind: "image-to-3d", capability: "rodin-i3d", idempotencyKey: newKey("shape"), purpose: "world-mesh", photos: [{ photoId: record.photo.id, sourceIndex: 1 }], sourceImageAssetIds: [reviewedImageAssetId], styleReferenceAssetId: record.preview.asset.id, scenePrompt: `${STYLE_DEFINITIONS[record.selection.style].imagePrompts.geometryReference} ${record.selection.atmosphere}`.trim() };
     try { const job = await submitGeneration({ request, worldId: record.id }); const next = updateCreationJob(withCreationUpdate(record, { step: "building" }), "shape", job); persist(next); saveActiveSource({ kind: "job", jobId: job.id, photos: [record.photo] }); navigatedJob.current = job.id; onJobStarted(job.id); }
     catch (caught) { setError(describeApiError(caught)); } finally { setBusy(false); }
   }
