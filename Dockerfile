@@ -25,6 +25,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --from=build --chown=node:node /app/dist-server ./dist-server
+COPY --chown=node:node deploy/register-aliases.mjs deploy/alias-loader.mjs ./deploy/
 
 RUN mkdir -p /data/objectquest && chown node:node /data/objectquest
 USER node

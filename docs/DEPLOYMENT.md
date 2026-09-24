@@ -38,7 +38,8 @@ npm start
 
 `npm run build` writes the static client to `dist/` and compiled API to
 `dist-server/`. Both `npm start` and the explicit `npm run start:api` execute
-`node dist-server/server/index.js`; neither serves `dist/`. In production the
+the compiled Node API with the narrow `deploy/alias-loader.mjs` resolver needed
+for compiled `@shared/*` imports; neither serves `dist/`. In production the
 edge/static tier must serve `dist/` and proxy `/api/*` to this API process.
 
 ## Environment reference

@@ -7,7 +7,7 @@
     "dev": "concurrently -n client,server -c cyan,magenta \"vite\" \"tsx watch server/index.ts\"",
     "build": "npm run typecheck && vite build && tsc -p server/tsconfig.json",
     "start": "npm run start:api",
-    "start:api": "node dist-server/server/index.js",
+    "start:api": "node --import ./deploy/register-aliases.mjs dist-server/server/index.js",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p server/tsconfig.json --noEmit",
     "test": "vitest run",
