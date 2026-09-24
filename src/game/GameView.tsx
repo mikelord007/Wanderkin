@@ -29,6 +29,7 @@ import { resolveScenePresentation } from "../scene/style.js";
 import { Hud } from "./hud/Hud.js";
 import { GameStage as StageContents, type HudSignals } from "./render/GameStage.js";
 import { usePrefersReducedMotion } from "./render/useReducedMotion.js";
+import { ColorRestorationAdapter } from "./restorationAdapter.js";
 import type { GameLoadStage, GameSnapshot, GameViewProps } from "./types.js";
 
 interface Runtime {
@@ -78,17 +79,27 @@ export function GameView({
 }: GameViewProps) {
   const config = DEFAULT_MOVEMENT_CONFIG;
   const reducedMotion = usePrefersReducedMotion();
-  const {
-    style,
-    atmosphere: resolvedAtmosphere,
-    colorRestoration,
-  } = resolveScenePresentation(manifest, {
+  const manifestRef = useRef(manifest);
+  manifestRef.current = manifest;
+  const signature = useMemo(() => gameplaySignature(manifest), [manifest]);
+  const presentation = resolveScenePresentation(manifest, {
     ...(styleId === undefined ? {} : { styleId }),
     ...(atmosphere === undefined ? {} : { atmosphere }),
     ...(colorRestorationOverride === undefined
       ? {}
       : { colorRestoration: colorRestorationOverride }),
   });
+  const { style, atmosphere: resolvedAtmosphere } = presentation;
+  const initialColorRestoration = presentation.colorRestoration;
+  const [colorRestoration, setColorRestoration] = useState(initialColorRestoration);
+  const restorationAdapter = useMemo(
+    () => new ColorRestorationAdapter({ setColorRestoration }, initialColorRestoration),
+    [signature],
+  );
+
+  useEffect(() => {
+    restorationAdapter.reset(initialColorRestoration);
+  }, [initialColorRestoration, restorationAdapter]);
 
   const [stage, setStage] = useState<GameLoadStage>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -110,10 +121,6 @@ export function GameView({
   const objectiveDistanceRef = useRef<HTMLSpanElement>(null);
   const diagnosticsRef = useRef<GameDiagnostics | null>(null);
   const runningRef = useRef(false);
-
-  const manifestRef = useRef(manifest);
-  manifestRef.current = manifest;
-  const signature = useMemo(() => gameplaySignature(manifest), [manifest]);
 
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
