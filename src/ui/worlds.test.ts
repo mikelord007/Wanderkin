@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createEmptyManifest } from "@shared/index.js";
 import type { EditorDraft } from "../editor/draftStorage.js";
-import { missingAssetUrls, savedWorldItems } from "./worlds.js";
+import { missingAssetUrls, savedWorldItems, savedWorldOrigin } from "./worlds.js";
 
 function manifest(id: string) {
   return createEmptyManifest({ levelId: id, name: id, seed: id, movementConfigId: "default-v1" });
@@ -31,5 +31,15 @@ describe("My worlds list model", () => {
     await expect(missingAssetUrls(world, request as typeof fetch)).resolves.toEqual(["/assets/gone.glb"]);
     expect(request).toHaveBeenCalledTimes(2);
     expect(request.mock.calls.every((call) => call[1]?.method === "HEAD")).toBe(true);
+  });
+
+  it("distinguishes generated worlds, bundled sample copies, and imports", () => {
+    const generated = manifest("generated");
+    generated.photos = [{ id: "photo-1", url: "/photos/1.jpg", order: 1 }];
+    const sample = manifest("sample");
+    sample.assets = [{ id: "sample", url: "/samples/rodin.glb", sha256: "a".repeat(64), sizeBytes: 10 }];
+    expect(savedWorldOrigin(generated)).toBe("generated");
+    expect(savedWorldOrigin(sample)).toBe("sample-copy");
+    expect(savedWorldOrigin(manifest("imported"))).toBe("imported");
   });
 });
