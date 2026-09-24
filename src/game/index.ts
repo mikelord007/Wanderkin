@@ -10,6 +10,14 @@
 export { GameView } from "./GameView.js";
 export type { GameSnapshot, GameViewProps, GameLoadStage } from "./types.js";
 
+export { GameplayEventBus, gameplayEvents } from "./events.js";
+export type {
+  GameplayEvent,
+  GameplayEventListener,
+  GameplayEventMap,
+  GameplayEventType,
+} from "./events.js";
+
 // Diagnostics (development builds install these on window.__objectquest).
 export { DIAGNOSTICS_GLOBAL } from "./diagnostics.js";
 export type { GameDiagnostics, GameDiagnosticsApi } from "./diagnostics.js";
