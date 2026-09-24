@@ -1,9 +1,72 @@
 # ObjectQuest v2 live-validation result — 2026-09-24
 
-Status: **rows 1–8 remain ready; the one authorized row-9 replacement and row
-10 checkpoint are ready; recovery stopped without retry when row 11
-fall-respawn suffered a second provider `runner_abandoned` failure; rows 12–15
-remain unsubmitted and row 16 remains SKIPPED/BLOCKED**.
+Status: **the full reviewed audio set is generated and browser-decodes/plays;
+the original portal and fall failures remain preserved beside their successful
+versioned replacements; normal API attachment is blocked before save because
+the valid 8.52-second narration file was stored with `durationSeconds: 0`;
+row 16 remains SKIPPED/BLOCKED**.
+
+## Bounded completion pass and attachment blocker
+
+At MAIN/evidence revision
+`5c9ba7d2aa39a1c7d44cc3d4c9a7d2f1e7aaf9fd`, the completion harness first
+revalidated every ready row and both preserved `runner_abandoned` failures. Its
+no-dispatch plan contained exactly narration first, one byte-identical
+fall-respawn replacement whose only change was key
+`oq-live-20260924-fall-respawn-v2`, and the original unused race-start,
+race-finish, and completion requests. The plan ceiling was exactly `$0.1289`;
+it exposed no retry, upload, level-write, publish, or postcard path.
+
+All five first-and-only submissions completed READY with no fallback:
+
+| Cue | Application / provider job | Served capability / model | Stored artifact |
+| --- | --- | --- | --- |
+| narration | `job_1e84e844-ae2b-4de9-b332-ab4f5caee724` / `mjob_f9e710a255f2` | `chatterbox-tts` / `fal-ai/chatterbox/text-to-speech` | 422,062-byte RIFF/WAVE, SHA-256 `1f1b47a91512c0c6f7e8538969b1a5839a861a3120b2aca9a4444ea8ca155d01` |
+| fall-respawn-v2 | `job_dacec6c9-29a7-449e-a6f9-49bc10b3d0ca` / `mjob_f05c3d0d7207` | `mirelo-sfx` / `Mirelo-AI/sfx1.6/text-to-audio` | 266,318-byte RIFF/WAVE, SHA-256 `43485195fef9f72d8efbb69c7bc46fc73a74ae169bc4b556112fa8132ccb7fb1` |
+| race-start | `job_14627b5c-a07b-4974-abb8-153e8ca77cb3` / `mjob_2f42d61f38eb` | `mirelo-sfx` / `Mirelo-AI/sfx1.6/text-to-audio` | 266,318-byte RIFF/WAVE, SHA-256 `8bc9801c5706b852762db74d317b72ecb432e38498333fd8b96e8933c82cc7bb` |
+| race-finish | `job_2ed6d832-5280-4b3a-9fdb-321ddddc55c0` / `mjob_13760624b7fb` | `mirelo-sfx` / `Mirelo-AI/sfx1.6/text-to-audio` | 266,318-byte RIFF/WAVE, SHA-256 `879cd8f35ab627906d568115988874fd8f93bd0ce1d35f4313713f07d2f11004` |
+| completion | `job_ed9531f2-28dd-455a-ade3-9f24c704956b` / `mjob_0063a209e36e` | `mirelo-sfx` / `Mirelo-AI/sfx1.6/text-to-audio` | 266,318-byte RIFF/WAVE, SHA-256 `34a42647bc51e79764c1f189826536ef5f60bc0c80e44950518e15a165c05948` |
+
+The resulting ten-asset set is ordered music, ambience, fragment-pickup,
+portal-activate-v2, checkpoint, fall-respawn-v2, race-start, race-finish,
+completion, narration. Local bytes for every asset match the stored hash and
+size; music has ID3/MP3 magic and the remaining files have RIFF/WAVE magic. A
+real Electron/Chromium 150 browser fetched all ten with HTTP 200 and the
+declared MIME type, recomputed every SHA-256, decoded every asset at 48 kHz,
+and advanced a running Web Audio playback clock for each. Decoded durations
+were 17.600708 seconds for music, 15.000083 for ambience, 3.018583 for each
+SFX, and 8.52 for narration. This proves bounded browser decode/playback, not
+subjective quality or seamless looping.
+
+The guarded attachment dry-run verified that
+`live-validation-photo4-20260924-hands-on` was still the only saved level,
+named “The Cozy Corner Color Caper!”, with its original update timestamp, no
+audio/video, no publications, and preserved non-media manifest SHA-256
+`1950e31828c2a55a448b99b472d446aacf41ffef261421688cefb5fd5f60d6ed`.
+One normal `POST /api/audio` refresh supplied the exact ten cue-to-job
+mappings. It returned the generic HTTP 500 safe envelope; the isolated API
+log records the concrete pre-save failure:
+
+```text
+Invalid level: media.audio.9.durationSeconds: Number must be greater than 0
+```
+
+The narration job is READY and its WAV really decodes to 8.52 seconds, but
+its persisted asset metadata contains `durationSeconds: 0`. `LevelStore.save`
+validates the assembled manifest and rejected it before its atomic write.
+Fresh API reads confirmed the level remains at update timestamp
+`2026-09-24T13:53:08.014Z`, with zero audio/video and zero publications; the
+`levels.json` hash remains
+`dbe0dfd604d6677b86f8d6f892b9440e7ca527530b693a24a25cac0f9f86554b`.
+No PUT/manual metadata rewrite, partial attachment, shifted SFX mapping,
+second world, or publication was attempted.
+
+The final conservative ledger is `$1.2001` across 18 retained reservations;
+including the earlier `$0.4620` spike gives `$1.6621`, below the `$3` batch
+and `$10` project ceilings. All provider-reported costs remain `null`, so
+actual paid cost is unknown. The original failed portal and fall jobs remain
+terminal, unmodified, and unretried alongside the two successful versioned
+replacements.
 
 ## One-off portal recovery — stopped at the next provider failure
 

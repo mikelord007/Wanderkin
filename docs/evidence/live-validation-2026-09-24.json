@@ -861,6 +861,172 @@
         "browserDecodePlayback": "not run because the full required set did not complete",
         "attachment": "not attempted; no partial or shifted SFX mapping"
       }
+    },
+    {
+      "runId": "objectquest-live-audio-completion-20260924T144309Z",
+      "status": "audio-ready-browser-verified-attachment-blocked-pre-save",
+      "integratedRevision": "5c9ba7d2aa39a1c7d44cc3d4c9a7d2f1e7aaf9fd",
+      "completedAt": "2026-09-24T14:48:43.581Z",
+      "executionControl": {
+        "dryRunSubmissions": 5,
+        "sequential": true,
+        "narrationFirst": true,
+        "authorizedMaximumUsd": 0.1289,
+        "retryCalls": 0,
+        "replacementCalls": 1,
+        "uploads": 0,
+        "generationFailures": 0,
+        "levelAttachmentCalls": 1,
+        "levelWritesCompleted": 0,
+        "publishCalls": 0,
+        "postcardCalls": 0,
+        "automaticRetries": 0,
+        "perRequestMaximumUsd": 0.5,
+        "batchMaximumUsd": 3,
+        "projectMaximumUsd": 10
+      },
+      "completedRows": [
+        {
+          "step": "narration",
+          "applicationJobId": "job_1e84e844-ae2b-4de9-b332-ab4f5caee724",
+          "providerJobId": "mjob_f9e710a255f2",
+          "idempotencyKey": "oq-live-20260924-narration",
+          "servedCapability": "chatterbox-tts",
+          "servedModel": "fal-ai/chatterbox/text-to-speech",
+          "fallbackFired": null,
+          "reportedCost": null,
+          "timings": { "queueMilliseconds": 4977, "executionMilliseconds": 7854, "totalMilliseconds": 12831 },
+          "artifact": { "id": "77f57b35-5320-44f3-b9eb-c38f228d3163", "mimeType": "audio/wav", "sizeBytes": 422062, "storedDurationSeconds": 0, "decodedDurationSeconds": 8.52, "sha256": "1f1b47a91512c0c6f7e8538969b1a5839a861a3120b2aca9a4444ea8ca155d01" }
+        },
+        {
+          "step": "fall-respawn-v2",
+          "applicationJobId": "job_dacec6c9-29a7-449e-a6f9-49bc10b3d0ca",
+          "providerJobId": "mjob_f05c3d0d7207",
+          "idempotencyKey": "oq-live-20260924-fall-respawn-v2",
+          "servedCapability": "mirelo-sfx",
+          "servedModel": "Mirelo-AI/sfx1.6/text-to-audio",
+          "fallbackFired": null,
+          "reportedCost": null,
+          "timings": { "queueMilliseconds": 4613, "executionMilliseconds": 6952, "totalMilliseconds": 11565 },
+          "artifact": { "id": "50f5cdeb-d9da-45d9-9971-1be393ac5dfc", "mimeType": "audio/wav", "sizeBytes": 266318, "durationSeconds": 3, "sha256": "43485195fef9f72d8efbb69c7bc46fc73a74ae169bc4b556112fa8132ccb7fb1" }
+        },
+        {
+          "step": "race-start",
+          "applicationJobId": "job_14627b5c-a07b-4974-abb8-153e8ca77cb3",
+          "providerJobId": "mjob_2f42d61f38eb",
+          "idempotencyKey": "oq-live-20260924-race-start",
+          "servedCapability": "mirelo-sfx",
+          "servedModel": "Mirelo-AI/sfx1.6/text-to-audio",
+          "fallbackFired": null,
+          "reportedCost": null,
+          "timings": { "queueMilliseconds": 2654, "executionMilliseconds": 8533, "totalMilliseconds": 11187 },
+          "artifact": { "id": "aa9ff89a-b934-416c-afde-2c815e7aa94b", "mimeType": "audio/wav", "sizeBytes": 266318, "durationSeconds": 3, "sha256": "8bc9801c5706b852762db74d317b72ecb432e38498333fd8b96e8933c82cc7bb" }
+        },
+        {
+          "step": "race-finish",
+          "applicationJobId": "job_2ed6d832-5280-4b3a-9fdb-321ddddc55c0",
+          "providerJobId": "mjob_13760624b7fb",
+          "idempotencyKey": "oq-live-20260924-race-finish",
+          "servedCapability": "mirelo-sfx",
+          "servedModel": "Mirelo-AI/sfx1.6/text-to-audio",
+          "fallbackFired": null,
+          "reportedCost": null,
+          "timings": { "queueMilliseconds": 2575, "executionMilliseconds": 7962, "totalMilliseconds": 10537 },
+          "artifact": { "id": "9d7c1a66-a01d-4b8e-b13f-1617e2f81f89", "mimeType": "audio/wav", "sizeBytes": 266318, "durationSeconds": 3, "sha256": "879cd8f35ab627906d568115988874fd8f93bd0ce1d35f4313713f07d2f11004" }
+        },
+        {
+          "step": "completion",
+          "applicationJobId": "job_ed9531f2-28dd-455a-ade3-9f24c704956b",
+          "providerJobId": "mjob_0063a209e36e",
+          "idempotencyKey": "oq-live-20260924-completion",
+          "servedCapability": "mirelo-sfx",
+          "servedModel": "Mirelo-AI/sfx1.6/text-to-audio",
+          "fallbackFired": null,
+          "reportedCost": null,
+          "timings": { "queueMilliseconds": 2629, "executionMilliseconds": 7076, "totalMilliseconds": 9705 },
+          "artifact": { "id": "b509fee8-2b31-4ae6-a2a7-baf670607e91", "mimeType": "audio/wav", "sizeBytes": 266318, "durationSeconds": 3, "sha256": "34a42647bc51e79764c1f189826536ef5f60bc0c80e44950518e15a165c05948" }
+        }
+      ],
+      "preservedFailures": [
+        { "step": "portal-activate", "applicationJobId": "job_0ea8326f-b76f-46d6-aba1-5b2d03a02a14", "providerJobId": "mjob_f9db028110fb", "state": "failed", "retryCount": 0 },
+        { "step": "fall-respawn", "applicationJobId": "job_43353949-fb25-4589-93ea-e2b84b05cdaa", "providerJobId": "mjob_4a4a42d7fc56", "state": "failed", "retryCount": 0 }
+      ],
+      "fullAudioMapping": [
+        { "cue": "music", "applicationJobId": "job_ce2d246a-37d5-4d9e-92cd-576714355ecd", "assetId": "6bbf73bb-b471-41b7-87a6-e5359ba577d7" },
+        { "cue": "ambience", "applicationJobId": "job_70ab5853-fc2a-4ab5-9f4a-0e61fd97643c", "assetId": "b6ed4d5b-39ea-4a41-b6ed-734cf89fad1e" },
+        { "cue": "fragment-pickup", "applicationJobId": "job_1474ebee-fa65-4d4b-b411-0f8babbabb87", "assetId": "e8d567b4-7468-426f-9bff-f70e9860a522" },
+        { "cue": "portal-activate", "applicationJobId": "job_e6ca6d26-95e4-4a57-9957-ccb339f7b898", "assetId": "44281ef7-112f-45e5-b135-3739dc8f1154" },
+        { "cue": "checkpoint", "applicationJobId": "job_ad9d29da-c845-4942-a20e-73867b01e4dd", "assetId": "e57434dc-4764-471a-886d-0b3674d3d1b5" },
+        { "cue": "fall-respawn", "applicationJobId": "job_dacec6c9-29a7-449e-a6f9-49bc10b3d0ca", "assetId": "50f5cdeb-d9da-45d9-9971-1be393ac5dfc" },
+        { "cue": "race-start", "applicationJobId": "job_14627b5c-a07b-4974-abb8-153e8ca77cb3", "assetId": "aa9ff89a-b934-416c-afde-2c815e7aa94b" },
+        { "cue": "race-finish", "applicationJobId": "job_2ed6d832-5280-4b3a-9fdb-321ddddc55c0", "assetId": "9d7c1a66-a01d-4b8e-b13f-1617e2f81f89" },
+        { "cue": "completion", "applicationJobId": "job_ed9531f2-28dd-455a-ade3-9f24c704956b", "assetId": "b509fee8-2b31-4ae6-a2a7-baf670607e91" },
+        { "cue": "narration", "applicationJobId": "job_1e84e844-ae2b-4de9-b332-ab4f5caee724", "assetId": "77f57b35-5320-44f3-b9eb-c38f228d3163" }
+      ],
+      "browserVerification": {
+        "browser": "Electron 43.2.0 / Chromium 150.0.7871.129",
+        "http200Count": 10,
+        "declaredMimeMatchesCount": 10,
+        "sha256MatchesCount": 10,
+        "decodedCount": 10,
+        "playbackClockAdvancedCount": 10,
+        "sampleRateHz": 48000,
+        "decodedDurationsSeconds": { "music": 17.600708333333333, "ambience": 15.000083333333333, "fragment-pickup": 3.0185833333333334, "portal-activate": 3.0185833333333334, "checkpoint": 3.0185833333333334, "fall-respawn": 3.0185833333333334, "race-start": 3.0185833333333334, "race-finish": 3.0185833333333334, "completion": 3.0185833333333334, "narration": 8.52 },
+        "seamlessLoopQuality": "not established; loop metadata remains intent and subjective quality was not judged"
+      },
+      "attachment": {
+        "endpoint": "POST /api/audio",
+        "action": "refresh",
+        "attempts": 1,
+        "httpStatus": 500,
+        "safeError": "Something went wrong. Please try again.",
+        "serverError": "Invalid level: media.audio.9.durationSeconds: Number must be greater than 0",
+        "failureStage": "LevelStore schema validation before atomic save",
+        "rootCause": "The valid narration WAV decodes to 8.52 seconds, but the READY narration asset metadata stores durationSeconds as 0.",
+        "manualManifestRewriteAttempted": false,
+        "partialAttachmentAttempted": false,
+        "attached": false
+      },
+      "ledger": {
+        "worldId": "live-validation-photo4-20260924",
+        "entriesBefore": 13,
+        "entriesAfter": 18,
+        "estimatedUsdBefore": 1.0712,
+        "estimatedUsdAfter": 1.2001,
+        "freshReservedUsd": 0.1289,
+        "priorStyleSpikeUsd": 0.462,
+        "conservativeProjectTotalUsd": 1.6621,
+        "actualPaidCost": null
+      },
+      "level": {
+        "levelId": "live-validation-photo4-20260924-hands-on",
+        "name": "The Cozy Corner Color Caper!",
+        "updatedAtBefore": "2026-09-24T13:53:08.014Z",
+        "updatedAtAfter": "2026-09-24T13:53:08.014Z",
+        "preservedNonMediaManifestSha256": "1950e31828c2a55a448b99b472d446aacf41ffef261421688cefb5fd5f60d6ed",
+        "audioAssetsBefore": 0,
+        "audioAssetsAfter": 0,
+        "videoAssetsBefore": 0,
+        "videoAssetsAfter": 0,
+        "savedLevelCountAfter": 1,
+        "published": false,
+        "publicationsAfter": 0,
+        "levelsJsonSha256Before": "dbe0dfd604d6677b86f8d6f892b9440e7ca527530b693a24a25cac0f9f86554b",
+        "levelsJsonSha256After": "dbe0dfd604d6677b86f8d6f892b9440e7ca527530b693a24a25cac0f9f86554b"
+      },
+      "durableState": {
+        "jobsJsonSha256": "2b1e03e4745975726d0932228c021f89912d588f0b7da272950ed46985726f26",
+        "ledgerJsonSha256": "4815612b4a89e1950fdb862502a8333202b83eff70f0ad0768d60f414278c841",
+        "generatedAssetsJsonSha256": "3f204ee3cd6e5d8f7998b11754c89e19212176ae86949e37b892e4c03564fbe1"
+      },
+      "postcard": {
+        "status": "SKIPPED/BLOCKED",
+        "applicationJobId": null,
+        "providerJobId": null,
+        "reservedUsd": 0,
+        "screenshotUploaded": false,
+        "videoSubmitted": false
+      }
     }
   ]
 }
