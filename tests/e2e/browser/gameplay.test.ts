@@ -21,6 +21,15 @@ interface Diagnostics {
 type Point = readonly [number, number];
 type MovementKey = "w" | "a" | "s" | "d";
 
+test.beforeEach(async ({ page }) => {
+  // Gameplay only needs the bundled samples. The welcome screen also asks for
+  // the saved-world library, so keep that unrelated request from falling
+  // through Vite's development proxy to a shared API server on :8787.
+  await page.route("**/api/levels", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
+  );
+});
+
 async function readDiagnostics(page: Page): Promise<Diagnostics | null> {
   return page.evaluate(() => window.__objectquest?.get() ?? null);
 }

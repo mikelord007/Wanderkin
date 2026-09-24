@@ -3,6 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const candidateAppRoot = process.env.OBJECTQUEST_E2E_APP_ROOT;
+const appPort = process.env.OBJECTQUEST_E2E_PORT ?? "5174";
+const appUrl = `http://127.0.0.1:${appPort}`;
 
 export default defineConfig({
   testDir: ".",
@@ -13,7 +15,7 @@ export default defineConfig({
   timeout: 120_000,
   expect: { timeout: 15_000 },
   use: {
-    baseURL: "http://127.0.0.1:5174",
+    baseURL: appUrl,
     channel: "chrome",
     headless: true,
     viewport: { width: 1280, height: 720 },
@@ -22,15 +24,15 @@ export default defineConfig({
   },
   webServer: candidateAppRoot
     ? {
-        command: "npx vite --host 127.0.0.1 --port 5174 --strictPort",
+        command: `npx vite --host 127.0.0.1 --port ${appPort} --strictPort`,
         cwd: candidateAppRoot,
-        url: "http://127.0.0.1:5174",
+        url: appUrl,
         reuseExistingServer: false,
         timeout: 30_000,
       }
     : {
-        command: "npx vite ../../.. --host 127.0.0.1 --port 5174 --strictPort",
-        url: "http://127.0.0.1:5174",
+        command: `npx vite ../../.. --host 127.0.0.1 --port ${appPort} --strictPort`,
+        url: appUrl,
         reuseExistingServer: false,
         timeout: 30_000,
       },
