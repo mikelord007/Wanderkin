@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "levelId": "legacy-saved-level-v1",
+  "name": "Legacy Saved Room",
+  "createdAt": "2026-09-18T10:00:00.000Z",
+  "updatedAt": "2026-09-18T10:05:00.000Z",
+  "coordinateConvention": "y-up-right-handed-meters",
+  "calibration": { "assumedExtentMeters": 8 },
+  "assets": [
+    {
+      "id": "legacy-tripo-glb",
+      "url": "/samples/tripo.glb",
+      "sha256": "e473288cd9e4b999aaf01631e228510ab24e114a2707eb718d3e5381c240cb64",
+      "sizeBytes": 1993644
+    }
+  ],
+  "photos": [],
+  "entities": [
+    {
+      "id": "legacy-mesh",
+      "kind": "generated-mesh",
+      "assetId": "legacy-tripo-glb",
+      "transform": {
+        "position": [0, 1.45, 0],
+        "rotation": [0, 0.7071067811865475, 0, 0.7071067811865476],
+        "scale": [7.6995, 7.6995, 7.6995]
+      },
+      "collider": { "kind": "triangle-mesh" }
+    },
+    {
+      "id": "legacy-floor",
+      "kind": "floor",
+      "transform": {
+        "position": [0, -0.2, 0],
+        "rotation": [0, 0, 0, 1],
+        "scale": [1, 1, 1]
+      },
+      "dimensions": [12, 0.4, 8],
+      "collider": { "kind": "box", "halfExtents": [6, 0.2, 4] },
+      "addedBy": "game"
+    }
+  ],
+  "spawn": { "position": [-4, 0.37, -1], "headingRadians": 1.5707963267948966 },
+  "checkpoints": [
+    {
+      "id": "legacy-checkpoint-1",
+      "order": 0,
+      "position": [-2, 0.37, 0],
+      "triggerRadius": 0.4,
+      "safeRespawn": { "position": [-2, 0.37, 0], "headingRadians": 1.5707963267948966 }
+    }
+  ],
+  "seed": "legacy-saved-v1",
+  "movementConfigId": "default-v1",
+  "courseValidation": { "status": "manually-adjusted" }
+}
