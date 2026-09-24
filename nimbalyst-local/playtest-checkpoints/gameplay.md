@@ -150,7 +150,54 @@ Evidence:
   the cushion with the backrest towering over it.
   `run-inside-capsule.png` shows the body sitting inside its own collider.
 
-- Dirty/owned paths: all committed (see below).
+**Polish pass, after rendering through the real chase camera.** A point light's
+range and intensity are world-space and ignore the group's scale, so the
+lantern's range — fine at 0.70 m — was twelve times the character's height at
+0.35 m and blew the body out to white. Both are now expressed relative to the
+character's standing height (intensity as height squared, matching quadratic
+decay) and derived where the real height is known; the light is stood off behind
+its lens, the lantern moved to a shoulder blade where the scarf no longer hides
+it, and the near-white taken out of the mittens.
+
+## Commits (all on MAIN, baseline 1de4f28)
+
+- `1c5fb0d` feat: replace the primitive avatar with an authored character
+- `10e4cbb` fix: give the character a face you can actually read
+- `07d9d82` feat: shrink the character so the furniture feels enormous
+- `1a45bdb` fix: stop the lantern washing out the smaller character
+
+Nothing uncommitted. **No file outside my assigned ownership was edited** — in
+particular `shared/**`, `src/game/GameView.tsx`, `src/game/input/**`,
+`src/game/hud/**`, `src/game/bundledSamples*`, `src/App.tsx`, `src/ui/**`,
+`src/editor/**`, `src/scene/**` and `server/**` are all untouched by me. No other
+worker's dirty file was staged, nothing was reset or discarded.
+
+Final state: full repository suite **466/466 pass**; `tsc --noEmit` clean for
+every path I touched (the one remaining tree error, `src/ui/api.ts BRAND_NAME`,
+is the branding worker's in-flight file).
+
+## How to look at it
+
+Screenshots are in `nimbalyst-local/screenshots/character/` — every animation
+state, the body inside its collider wireframe, the 0.70 m vs 0.35 m sofa
+comparison, and the framing through the real game camera at both scales.
+
+To re-render or poke at it live:
+
+```
+npx vite --port 15911 --strictPort
+# then open, e.g.:
+#   /nimbalyst-local/character-preview.html?grid=1
+#   /nimbalyst-local/character-preview.html?state=run&spin=1
+#   /nimbalyst-local/character-preview.html?state=run&capsule=1
+#   /nimbalyst-local/character-preview.html?scene=sofa
+#   /nimbalyst-local/character-preview.html?scene=sofa&cam=game&height=0.35
+node nimbalyst-local/shoot-character.mjs 15911 nimbalyst-local/screenshots/character
+node nimbalyst-local/shoot-sofa.mjs      15911 nimbalyst-local/screenshots/character
+```
+
+A dev server was left running on port 15911 for this. It is mine and disposable;
+the protected services on 5173 / 8787 / 15173 / 18799 were never touched.
 
 ## Blockers / requests to coordinator
 
