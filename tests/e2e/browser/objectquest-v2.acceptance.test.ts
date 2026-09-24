@@ -372,7 +372,15 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
     // 3. Enable subtitles and observe timed narration/event copy.
     // 4. Emulate reduced motion before load; verify non-essential motion/effects
     //    reduce without hiding state or preventing completion.
+    const audioRequests: string[] = [];
+    page.on("request", (request) => {
+      const path = new URL(request.url()).pathname;
+      if (/^\/audio\/[^/]+\.wav$/.test(path)) audioRequests.push(path);
+    });
+
     await runB14(page);
+
+    expect(audioRequests).toContain("/audio/lost-colors-loop.wav");
   });
 
   test("B15 recovers from camera denial and gives useful invalid-input errors", async ({ page, context }) => {
