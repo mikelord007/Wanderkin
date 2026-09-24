@@ -1,0 +1,172 @@
+{
+  "schemaVersion": 1,
+  "levelId": "sample-lost-colors-rodin",
+  "name": "The Lost Colors of Teacup Island",
+  "createdAt": "2026-09-24T00:00:00.000Z",
+  "updatedAt": "2026-09-24T00:00:00.000Z",
+  "coordinateConvention": "y-up-right-handed-meters",
+  "calibration": { "assumedExtentMeters": 8 },
+  "assets": [
+    {
+      "id": "rodin-glb",
+      "url": "/samples/rodin.glb",
+      "sha256": "c750cb2c1fcd2197f8c373b791703bc90073075e11d08cafb0be4d84012d54b8",
+      "sizeBytes": 4979900,
+      "provenance": {
+        "providerId": "livepeer",
+        "capabilityUsed": "rodin-i3d",
+        "fallbackFired": null,
+        "providerJobId": "mjob_5c57ebc49690",
+        "registeredModel": "fal-ai/hyper3d/rodin/v2.5",
+        "sourcePhotoOrder": [4, 1, 2, 3, 5],
+        "generatedAt": "2026-09-17T00:00:00.000Z"
+      }
+    }
+  ],
+  "photos": [
+    { "id": "photo-1", "url": "/samples/photo-1.jpg", "order": 1, "label": "Source photo 1" },
+    { "id": "photo-2", "url": "/samples/photo-2.jpg", "order": 2, "label": "Source photo 2" },
+    { "id": "photo-3", "url": "/samples/photo-3.jpg", "order": 3, "label": "Source photo 3" },
+    { "id": "photo-4", "url": "/samples/photo-4.jpg", "order": 4, "label": "Source photo 4" },
+    { "id": "photo-5", "url": "/samples/photo-5.jpg", "order": 5, "label": "Source photo 5" }
+  ],
+  "entities": [
+    {
+      "id": "rodin-mesh",
+      "kind": "generated-mesh",
+      "assetId": "rodin-glb",
+      "transform": {
+        "position": [-0.0030815902530274553, 1.2904576176620481, 0.003392290225473271],
+        "rotation": [0, 0, 0, 1],
+        "scale": [4.220793966734851, 4.220793966734851, 4.220793966734851]
+      },
+      "collider": { "kind": "triangle-mesh" }
+    },
+    {
+      "id": "helper-floor",
+      "kind": "floor",
+      "transform": {
+        "position": [0, -0.2, 0.72],
+        "rotation": [0, 0, 0, 1],
+        "scale": [1, 1, 1]
+      },
+      "dimensions": [12, 0.4, 8.292672048065664],
+      "collider": { "kind": "box", "halfExtents": [6, 0.2, 4.146336024032832] },
+      "addedBy": "game"
+    }
+  ],
+  "spawn": {
+    "position": [-4.02, 0.37, -1.086],
+    "headingRadians": 1.5707963267948966
+  },
+  "checkpoints": [
+    {
+      "id": "checkpoint-1",
+      "order": 0,
+      "position": [-4.02, 0.37, 2.154],
+      "triggerRadius": 0.4,
+      "safeRespawn": { "position": [-4.02, 0.37, 2.154], "headingRadians": 0 }
+    },
+    {
+      "id": "checkpoint-2",
+      "order": 1,
+      "position": [2.46, 0.37, 3.594],
+      "triggerRadius": 0.4,
+      "safeRespawn": { "position": [2.46, 0.37, 3.594], "headingRadians": 3.141592653589793 }
+    },
+    {
+      "id": "checkpoint-3",
+      "order": 2,
+      "position": [-1.14, 0.37, -2.166],
+      "triggerRadius": 0.4,
+      "safeRespawn": { "position": [-1.14, 0.37, -2.166], "headingRadians": -1.5707963267948966 }
+    }
+  ],
+  "seed": "lost-colors-rodin-v1",
+  "movementConfigId": "default-v1",
+  "courseValidation": {
+    "status": "manually-adjusted",
+    "method": "derived from the authored Rodin sample route",
+    "checkedAt": "2026-09-24T00:00:00.000Z",
+    "evidence": "Fragment and portal anchors reuse standable positions from the bundled Rodin course.",
+    "uncertaintyNotes": "Lost Colors progression still requires Worker 5 browser completion evidence."
+  },
+  "experience": {
+    "schemaVersion": 1,
+    "style": {
+      "id": "cartoon",
+      "definitionVersion": 1,
+      "atmosphere": "A cheerful floating island above soft clouds."
+    },
+    "mode": {
+      "kind": "collect",
+      "requiredCollectibleIds": ["fragment-red", "fragment-yellow", "fragment-blue"],
+      "requiredCount": 3,
+      "finishPortalId": "finish-portal",
+      "restorationSteps": [0.3333333333, 0.6666666667, 1]
+    },
+    "quest": {
+      "schemaVersion": 1,
+      "title": "The Lost Colors of Teacup Island",
+      "intro": "Three colors have vanished from Teacup Island, leaving its tiny world pale and quiet.",
+      "objective": "Find all three color fragments, then enter the glowing portal.",
+      "narrationScript": "Welcome to Teacup Island. Find the three lost colors and carry them to the portal to bring this little world back to life."
+    },
+    "collectibles": [
+      {
+        "id": "fragment-red",
+        "kind": "color-fragment",
+        "transform": {
+          "position": [-4.02, 0.72, 2.154],
+          "rotation": [0, 0, 0, 1],
+          "scale": [0.22, 0.22, 0.22]
+        },
+        "triggerRadius": 0.45,
+        "color": "#FF4D6D",
+        "order": 0,
+        "restorationAmount": 0.3333333333
+      },
+      {
+        "id": "fragment-yellow",
+        "kind": "color-fragment",
+        "transform": {
+          "position": [2.46, 0.72, 3.594],
+          "rotation": [0, 0, 0, 1],
+          "scale": [0.22, 0.22, 0.22]
+        },
+        "triggerRadius": 0.45,
+        "color": "#FFD93D",
+        "order": 1,
+        "restorationAmount": 0.3333333333
+      },
+      {
+        "id": "fragment-blue",
+        "kind": "color-fragment",
+        "transform": {
+          "position": [0.3, 2.006, -0.006],
+          "rotation": [0, 0, 0, 1],
+          "scale": [0.22, 0.22, 0.22]
+        },
+        "triggerRadius": 0.45,
+        "color": "#4D96FF",
+        "order": 2,
+        "restorationAmount": 0.3333333334
+      }
+    ],
+    "finishPortal": {
+      "id": "finish-portal",
+      "kind": "finish-portal",
+      "transform": {
+        "position": [-1.14, 0.85, -2.166],
+        "rotation": [0, 0, 0, 1],
+        "scale": [0.8, 1.2, 0.25]
+      },
+      "triggerRadius": 0.75,
+      "activation": "all-required-collectibles",
+      "inactiveColor": "#6D6780",
+      "activeColor": "#9B5DE5"
+    },
+    "initialColorRestoration": 0
+  },
+  "media": { "audio": [], "video": [] }
+}
