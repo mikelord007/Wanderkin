@@ -1,5 +1,5 @@
 import { test } from "@playwright/test";
-import { runB5, runB6, runB10, runB11, runB15, runB19 } from "./objectquest-v2.creation-scenarios.js";
+import { runB5, runB6, runB10, runB11, runB14, runB15, runB19 } from "./objectquest-v2.creation-scenarios.js";
 
 /**
  * ObjectQuest v2 section-10 browser contracts.
@@ -140,15 +140,14 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
     throw new Error("Browser contract stub B13: connect version-bound Worker 5/7 challenges");
   });
 
-  test.skip("B14 supports mute, subtitles, keyboard focus, and reduced motion", async ({ page }) => {
+  test("B14 supports mute, subtitles, keyboard focus, and reduced motion", async ({ page }) => {
     // 1. Navigate creation, game HUD, pause, and results with keyboard only;
     //    focus remains visible, ordered, untrapped, and returns after dialogs.
     // 2. Toggle master/music/SFX/narration mute and verify channel behavior.
     // 3. Enable subtitles and observe timed narration/event copy.
     // 4. Emulate reduced motion before load; verify non-essential motion/effects
     //    reduce without hiding state or preventing completion.
-    void page;
-    throw new Error("Browser contract stub B14: connect Worker 6 and shared accessibility controls");
+    await runB14(page);
   });
 
   test("B15 recovers from camera denial and gives useful invalid-input errors", async ({ page, context }) => {

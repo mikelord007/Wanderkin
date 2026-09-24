@@ -1,11 +1,13 @@
 import type { AudioAssetReference, GenerationJob, GenerationRequest, SceneManifest } from "../../shared/index.js";
 import type { SubmitOutcome } from "../jobs/manager.js";
 import type { LevelStore } from "../levels.js";
+import type { JobManager } from "../jobs/manager.js";
 import { AUDIO_CUES, buildAudioRequests, type AudioCue, type AudioPromptInput } from "./prompts.js";
 
 export interface AudioGateway {
   submitGenerationOrReconcile(request: GenerationRequest, options?: { worldId?: string }): Promise<SubmitOutcome>;
   getPublic(jobId: string): Promise<GenerationJob | undefined>;
+  retry(jobId: string): Promise<GenerationJob | undefined>;
 }
 
 export interface AudioJobResult {
@@ -50,6 +52,11 @@ export class AudioOrchestrator {
     return summarize(jobs);
   }
 
+  async retry(cue: AudioCue, jobId: string): Promise<AudioGenerationResult> {
+    const job = await this.gateway.retry(jobId);
+    return summarize([job ? fromJob(cue, job) : { cue, state: "submission-failed", error: "Audio job was not found." }]);
+  }
+
   async persist(levelId: string, result: AudioGenerationResult): Promise<SceneManifest> {
     if (!this.levels) throw new Error("Level persistence is not configured.");
     const manifest = await this.levels.get(levelId);
@@ -64,6 +71,14 @@ export class AudioOrchestrator {
       },
     });
   }
+}
+
+export function audioGatewayFromManager(manager: JobManager): AudioGateway {
+  return {
+    submitGenerationOrReconcile: (request, options) => manager.submitGenerationOrReconcile(request, options),
+    getPublic: (jobId) => manager.getPublic(jobId),
+    retry: (jobId) => manager.retry(jobId),
+  };
 }
 
 function fromJob(cue: AudioCue, job: GenerationJob): AudioJobResult {

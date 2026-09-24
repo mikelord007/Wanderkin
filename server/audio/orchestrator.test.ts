@@ -19,6 +19,7 @@ class FixtureGateway implements AudioGateway {
     return { status: "created", job: job(request, request.purpose === "audio:ambience" ? "failed" : "generating") };
   }
   async getPublic(): Promise<GenerationJob | undefined> { return undefined; }
+  async retry(): Promise<GenerationJob | undefined> { return undefined; }
 }
 
 describe("audio orchestration", () => {

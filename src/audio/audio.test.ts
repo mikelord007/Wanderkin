@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { LevelMedia } from "@shared/index.js";
 import { BUNDLED_AUDIO_URLS, EFFECT_CUES, resolveAudioUrls } from "./assets.js";
 import { loadAudioSettings, saveAudioSettings } from "./settings.js";
+import { GameAudioEngine } from "./engine.js";
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>();
@@ -35,5 +36,32 @@ describe("client audio", () => {
     expect(urls["fragment-pickup"]).toBe("/generated/fragment-pickup.wav");
     expect(urls["portal-activate"]).toBe("/generated/portal-activate.wav");
     expect(urls.checkpoint).toBe(BUNDLED_AUDIO_URLS.checkpoint);
+  });
+
+  it("never repeats narration for the same world after respawn/restart events", async () => {
+    let starts = 0;
+    const samples = new Float32Array([.2, .1]);
+    const buffer = { length: 2, numberOfChannels: 1, sampleRate: 8000, duration: 1, getChannelData: () => samples } as unknown as AudioBuffer;
+    const context = {
+      state: "running",
+      destination: {},
+      resume: async () => undefined,
+      close: async () => undefined,
+      createGain: () => ({ gain: { value: 1 }, connect: () => undefined }),
+      createBufferSource: () => ({ connect: () => undefined, start: () => { starts += 1; }, stop: () => undefined, loop: false, loopStart: 0, loopEnd: 0, buffer: null }),
+      decodeAudioData: async () => buffer,
+      createBuffer: () => buffer,
+    } as unknown as AudioContext;
+    const engine = new GameAudioEngine(
+      { master: 80, music: 50, effects: 75, voice: 90, muted: false },
+      () => context,
+      async () => new Response(new Uint8Array([1])),
+    );
+    await engine.unlockAndStart();
+    const loopStarts = starts;
+    await engine.playNarrationOnce("world-1");
+    await engine.playNarrationOnce("world-1");
+    expect(starts - loopStarts).toBe(1);
+    engine.stop();
   });
 });

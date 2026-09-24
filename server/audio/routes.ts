@@ -17,7 +17,13 @@ const refreshSchema = z.object({
   jobIds: z.record(z.enum(AUDIO_CUES), z.string().min(1)),
   levelId: z.string().min(1).optional(),
 });
-const requestSchema = z.discriminatedUnion("action", [startSchema, refreshSchema]);
+const retrySchema = z.object({
+  action: z.literal("retry"),
+  cue: z.enum(AUDIO_CUES),
+  jobId: z.string().min(1),
+  levelId: z.string().min(1).optional(),
+});
+const requestSchema = z.discriminatedUnion("action", [startSchema, refreshSchema, retrySchema]);
 
 export function createAudioRouter(orchestrator: AudioOrchestrator): Router {
   const router = Router();
@@ -36,7 +42,9 @@ export function createAudioRouter(orchestrator: AudioOrchestrator): Router {
             narrationScript: parsed.data.narrationScript,
             ...(parsed.data.atmosphere !== undefined ? { atmosphere: parsed.data.atmosphere } : {}),
           })
-        : await orchestrator.refresh(parsed.data.jobIds as Partial<Record<AudioCue, string>>);
+        : parsed.data.action === "refresh"
+          ? await orchestrator.refresh(parsed.data.jobIds as Partial<Record<AudioCue, string>>)
+          : await orchestrator.retry(parsed.data.cue, parsed.data.jobId);
       const level = parsed.data.levelId && result.readyAssets.length
         ? await orchestrator.persist(parsed.data.levelId, result)
         : undefined;

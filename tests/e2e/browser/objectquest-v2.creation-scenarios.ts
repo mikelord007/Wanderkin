@@ -1,4 +1,5 @@
 import { expect, type BrowserContext, type Page } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
 
 type CapturedRequest = { path: string; body: any };
 const now = "2026-09-24T10:00:00.000Z";
@@ -75,6 +76,44 @@ export async function runB10(page: Page) {
 export async function runB11(page: Page) {
   await installCreationMock(page, { shapeState: "ready", failMusic: true }); await seed(page, seedCreation("building", { shape: { id: "shape-1", state: "ready", kind: "image-to-3d" }, music: { id: "music-1", state: "failed", kind: "music", retryable: true } }));
   await page.goto("/"); await expect(page.getByText("Your world is still safe.")).toBeVisible(); await expect(page.getByRole("button", { name: "Prepare my course" })).toBeEnabled(); await expect(page.getByRole("button", { name: "Retry music" })).toBeVisible();
+}
+
+export async function runB14(page: Page) {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.route("**/api/levels", route => route.fulfill({ json: [] }));
+  await page.goto("/");
+
+  const playSample = page.getByRole("button", { name: "Play a sample" }).first();
+  await expect(playSample).toBeEnabled();
+  await playSample.focus();
+  await expect(playSample).toBeFocused();
+  await page.keyboard.press("Enter");
+
+  const enterGame = page.locator(".oq-hud__overlay--invite button", { hasText: "Play" });
+  await expect(enterGame).toBeVisible({ timeout: 45_000 });
+  await enterGame.focus();
+  await page.keyboard.press("Enter");
+
+  await expect(page.getByText("Welcome to Teacup Island.")).toBeVisible();
+  const sound = page.getByRole("button", { name: "Sound" });
+  await sound.focus();
+  await expect(sound).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("group", { name: "Sound" })).toBeVisible();
+
+  const mute = page.getByRole("button", { name: "Mute sound" });
+  await mute.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("button", { name: "Unmute sound" })).toHaveAttribute("aria-pressed", "true");
+  for (const label of ["Master", "Music", "Effects", "Voice"]) await expect(page.getByLabel(label)).toBeVisible();
+  await page.getByLabel("Music").press("ArrowLeft");
+  await expect(page.getByLabel("Music")).toHaveValue("49");
+  const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem("objectquest:audio-settings:v1") ?? "null"));
+  expect(persisted).toMatchObject({ muted: true, music: 49 });
+  expect(await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches)).toBe(true);
+
+  await mkdir("test-results/objectquest-v2", { recursive: true });
+  await page.screenshot({ path: "test-results/objectquest-v2/B14-audio-accessibility.png", fullPage: true });
 }
 
 export async function runB15(page: Page, context: BrowserContext) {
