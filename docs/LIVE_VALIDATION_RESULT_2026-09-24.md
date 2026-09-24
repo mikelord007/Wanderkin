@@ -1,10 +1,70 @@
 # ObjectQuest v2 live-validation result — 2026-09-24
 
-Status: **the full reviewed audio set is generated and browser-decodes/plays;
-the original portal and fall failures remain preserved beside their successful
-versioned replacements; normal API attachment is blocked before save because
-the valid 8.52-second narration file was stored with `durationSeconds: 0`;
-row 16 remains SKIPPED/BLOCKED**.
+Status: **the full reviewed audio set is generated, browser-decodes/plays, and
+is attached in canonical order to the existing private hands-on level; the
+original portal and fall failures remain preserved beside their successful
+versioned replacements; row 16 remains SKIPPED/BLOCKED**.
+
+## Final zero-generation recovery and attachment
+
+Independent review approved duration-repair commit
+`824e00e30a90804ca7c2402d79f43adec6df889a` against parent
+`437d145a553c0513eb8260df2044028d7d356a87`. Before execution, all 18 jobs
+were terminal (15 ready, three failed), the narration job and asset still had
+duration zero, and the jobs/generated-assets/ledger/levels hashes were
+`2b1e03e4745975726d0932228c021f89912d588f0b7da272950ed46985726f26`,
+`3f204ee3cd6e5d8f7998b11754c89e19212176ae86949e37b892e4c03564fbe1`,
+`4815612b4a89e1950fdb862502a8333202b83eff70f0ad0768d60f414278c841`,
+and `dbe0dfd604d6677b86f8d6f892b9440e7ca527530b693a24a25cac0f9f86554b`.
+
+Only the isolated API on port 18799 was restarted, from PID 34496 to PID
+37008, with zero automatic retries and the preserved absolute storage. API
+boot changed neither jobs nor ledger. The client on 15173 retained PID 36188;
+the protected services on 5173 and 8787 retained PIDs 32220 and 20368.
+
+One `POST /api/audio` refresh contained only cue `narration`, application job
+`job_1e84e844-ae2b-4de9-b332-ab4f5caee724`, and no `levelId`. It returned the
+same ready asset `77f57b35-5320-44f3-b9eb-c38f228d3163` and no level. RIFF
+inspection derived exactly 8.52 seconds from the unchanged 422,062-byte WAV.
+The application/provider job IDs, asset ID, SHA-256
+`1f1b47a91512c0c6f7e8538969b1a5839a861a3120b2aca9a4444ea8ca155d01`,
+MIME, bytes, provenance, served model, state, and zero retry counters remained
+unchanged. A normalized comparison proved that only `durationSeconds` changed
+in `jobs.json` and `generated-assets.json`; the ledger and level stayed
+byte-identical. No provider poll, submission, retry, generation, upload, or
+spend occurred.
+
+The attachment guard then reread the latest level and verified its identity,
+name, original timestamp, empty media, zero publications, and preserved
+non-media manifest SHA-256
+`1950e31828c2a55a448b99b472d446aacf41ffef261421688cefb5fd5f60d6ed`.
+One normal `POST /api/audio` refresh attached all ten ready assets in exact
+order: music, ambience, fragment-pickup, portal-activate, checkpoint,
+fall-respawn, race-start, race-finish, completion, narration. The saved level
+kept every geometry, placement, quest, identity, photo, asset, workflow, and
+course-validation field; only media and `updatedAt` changed. It remains the
+only level, has no video, and `/publications` returns `[]`.
+
+The saved world loaded through `http://127.0.0.1:15173/#my-worlds` as
+`live-validation-photo4-20260924-hands-on`. In the same real Chromium page,
+the production `resolveAudioUrls` mapped all ten persisted entries to their
+attached URLs. `GameAudioEngine` fetched the attached music, ambience, and
+narration, reported an unlocked/running context, `playing: true`, and active
+music plus ambience loops. The prior ten-of-ten browser hash/decode/playback
+evidence remains authoritative for every individual cue. The headless 3D
+renderer fetched the saved mesh but did not advance past geometry preparation,
+so this bounded pass does not add a gameplay-traversal or first-frame claim;
+subjective audio quality and seamless-loop quality also remain user judgment.
+
+Final durable hashes are jobs
+`bde0c72297c64a2b3b5669996e953da111170dc904a141adc33fccc647e97b99`,
+generated assets
+`2056bf48b70dad05c6ba6cfc06a1d0581d72bc1861c8b2e45a1311f64c91bdc9`,
+ledger `4815612b4a89e1950fdb862502a8333202b83eff70f0ad0768d60f414278c841`,
+and levels
+`4e725902835722af5e91a01149385e2569ac6162f7c5a4551044f3b2eb8d2f52`.
+The conservative ledger remains `$1.2001` across 18 reservations and `$1.6621`
+including the earlier spike; actual paid cost remains unknown.
 
 ## Bounded completion pass and attachment blocker
 

@@ -1027,6 +1027,139 @@
         "screenshotUploaded": false,
         "videoSubmitted": false
       }
+    },
+    {
+      "runId": "objectquest-live-audio-final-recovery-20260924T150456Z",
+      "status": "complete-zero-generation-recovery-attached-private",
+      "integratedRevision": "824e00e30a90804ca7c2402d79f43adec6df889a",
+      "parentRevision": "437d145a553c0513eb8260df2044028d7d356a87",
+      "completedAt": "2026-09-24T15:04:56.446Z",
+      "executionControl": {
+        "providerSubmissions": 0,
+        "providerPolls": 0,
+        "generationCalls": 0,
+        "retryCalls": 0,
+        "uploads": 0,
+        "paidSpendAddedUsd": 0,
+        "narrationOnlyRefreshCalls": 1,
+        "levelAttachmentCalls": 1,
+        "levelWritesCompleted": 1,
+        "publishCalls": 0,
+        "postcardCalls": 0,
+        "automaticRetries": 0
+      },
+      "restart": {
+        "port": 18799,
+        "oldPid": 34496,
+        "newPid": 37008,
+        "health": "ok",
+        "head": "824e00e30a90804ca7c2402d79f43adec6df889a",
+        "jobsUnchangedOnBoot": true,
+        "ledgerUnchangedOnBoot": true,
+        "preservedProcesses": { "client15173": 36188, "main5173": 32220, "main8787": 20368 }
+      },
+      "baseline": {
+        "terminalJobs": 18,
+        "readyJobs": 15,
+        "failedJobs": 3,
+        "nonterminalJobs": 0,
+        "jobsJsonSha256": "2b1e03e4745975726d0932228c021f89912d588f0b7da272950ed46985726f26",
+        "generatedAssetsJsonSha256": "3f204ee3cd6e5d8f7998b11754c89e19212176ae86949e37b892e4c03564fbe1",
+        "ledgerJsonSha256": "4815612b4a89e1950fdb862502a8333202b83eff70f0ad0768d60f414278c841",
+        "levelsJsonSha256": "dbe0dfd604d6677b86f8d6f892b9440e7ca527530b693a24a25cac0f9f86554b"
+      },
+      "narrationRecovery": {
+        "request": {
+          "action": "refresh",
+          "jobIds": { "narration": "job_1e84e844-ae2b-4de9-b332-ab4f5caee724" },
+          "levelIdOmitted": true
+        },
+        "applicationJobId": "job_1e84e844-ae2b-4de9-b332-ab4f5caee724",
+        "providerJobId": "mjob_f9e710a255f2",
+        "assetId": "77f57b35-5320-44f3-b9eb-c38f228d3163",
+        "durationSecondsBefore": 0,
+        "durationSecondsAfter": 8.52,
+        "mimeType": "audio/wav",
+        "sizeBytes": 422062,
+        "sha256": "1f1b47a91512c0c6f7e8538969b1a5839a861a3120b2aca9a4444ea8ca155d01",
+        "servedCapability": "chatterbox-tts",
+        "servedModel": "fal-ai/chatterbox/text-to-speech",
+        "retryCount": 0,
+        "maxRetries": 0,
+        "levelReturned": false,
+        "wavBytesUnchanged": true,
+        "identifiersUnchanged": true,
+        "provenanceUnchanged": true,
+        "onlyDurationMetadataChanged": true,
+        "ledgerUnchanged": true,
+        "levelUnchanged": true,
+        "jobsJsonSha256After": "bde0c72297c64a2b3b5669996e953da111170dc904a141adc33fccc647e97b99",
+        "generatedAssetsJsonSha256After": "2056bf48b70dad05c6ba6cfc06a1d0581d72bc1861c8b2e45a1311f64c91bdc9"
+      },
+      "attachment": {
+        "levelId": "live-validation-photo4-20260924-hands-on",
+        "levelName": "The Cozy Corner Color Caper!",
+        "createdAt": "2026-09-24T13:51:13.585Z",
+        "updatedAtBefore": "2026-09-24T13:53:08.014Z",
+        "updatedAtAfter": "2026-09-24T15:01:34.988Z",
+        "preservedNonMediaManifestSha256": "1950e31828c2a55a448b99b472d446aacf41ffef261421688cefb5fd5f60d6ed",
+        "savedLevelCount": 1,
+        "audioAssetCount": 10,
+        "videoAssetCount": 0,
+        "publications": 0,
+        "private": true,
+        "cueOrder": ["music", "ambience", "fragment-pickup", "portal-activate", "checkpoint", "fall-respawn", "race-start", "race-finish", "completion", "narration"],
+        "assetIds": [
+          "6bbf73bb-b471-41b7-87a6-e5359ba577d7",
+          "b6ed4d5b-39ea-4a41-b6ed-734cf89fad1e",
+          "e8d567b4-7468-426f-9bff-f70e9860a522",
+          "44281ef7-112f-45e5-b135-3739dc8f1154",
+          "e57434dc-4764-471a-886d-0b3674d3d1b5",
+          "50f5cdeb-d9da-45d9-9971-1be393ac5dfc",
+          "aa9ff89a-b934-416c-afde-2c815e7aa94b",
+          "9d7c1a66-a01d-4b8e-b13f-1617e2f81f89",
+          "b509fee8-2b31-4ae6-a2a7-baf670607e91",
+          "77f57b35-5320-44f3-b9eb-c38f228d3163"
+        ],
+        "geometryPlacementsQuestIdentityPreserved": true,
+        "newWorldCreated": false,
+        "published": false
+      },
+      "playerVerification": {
+        "url": "http://127.0.0.1:15173/#my-worlds",
+        "loadedLevelId": "live-validation-photo4-20260924-hands-on",
+        "persistedManifestLoaded": true,
+        "resolvedAttachedUrlCount": 10,
+        "productionAudioEngine": {
+          "unlocked": true,
+          "contextState": "running",
+          "playing": true,
+          "activeLoops": ["ambience", "music"],
+          "attachedMusicFetched": true,
+          "attachedAmbienceFetched": true,
+          "attachedNarrationFetched": true
+        },
+        "priorAllCueBrowserDecodePlaybackCount": 10,
+        "headless3dFirstFrame": false,
+        "headless3dNote": "The saved level and mesh loaded, but the headless renderer remained at geometry preparation; no gameplay traversal or first-frame claim is added.",
+        "subjectiveQuality": "not judged",
+        "seamlessLoopQuality": "not established"
+      },
+      "ledger": {
+        "worldId": "live-validation-photo4-20260924",
+        "entries": 18,
+        "estimatedUsd": 1.2001,
+        "priorStyleSpikeUsd": 0.462,
+        "conservativeProjectTotalUsd": 1.6621,
+        "actualPaidCost": null,
+        "unchangedDuringRecoveryAndAttachment": true
+      },
+      "durableStateAfter": {
+        "jobsJsonSha256": "bde0c72297c64a2b3b5669996e953da111170dc904a141adc33fccc647e97b99",
+        "generatedAssetsJsonSha256": "2056bf48b70dad05c6ba6cfc06a1d0581d72bc1861c8b2e45a1311f64c91bdc9",
+        "ledgerJsonSha256": "4815612b4a89e1950fdb862502a8333202b83eff70f0ad0768d60f414278c841",
+        "levelsJsonSha256": "4e725902835722af5e91a01149385e2569ac6162f7c5a4551044f3b2eb8d2f52"
+      }
     }
   ]
 }
