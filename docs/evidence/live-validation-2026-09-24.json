@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "runs": [
+    {
+      "runId": "objectquest-live-1790251095973",
+      "status": "failed",
+      "failedStep": "style-preview",
+      "completedAt": "2026-09-24T11:58:15.973Z",
+      "maxUsd": 3,
+      "plannedMaximumUsd": 1.4259,
+      "reservedByRunnerUsd": 0.0431,
+      "ledger": {
+        "worldId": "live-validation-photo4-20260924",
+        "knownUsd": 0.0431,
+        "unknownEntries": 0,
+        "entries": 2
+      },
+      "jobs": [
+        {
+          "step": "cutout",
+          "capability": "bg-remove",
+          "applicationJobId": "job_737935e2-c54b-4c18-a6a6-782a7a4c69c8",
+          "providerJobId": "mjob_a2426904c928",
+          "servedCapability": "bg-remove",
+          "servedModel": "fal-ai/birefnet",
+          "fallbackFired": null,
+          "wallMilliseconds": 15792,
+          "providerTimings": {
+            "requestedAt": "2026-09-24T11:57:36.579Z",
+            "startedAt": "2026-09-24T11:57:39.408Z",
+            "completedAt": "2026-09-24T11:57:46.373Z",
+            "queueMilliseconds": 2829,
+            "executionMilliseconds": 6965,
+            "totalMilliseconds": 9794
+          },
+          "estimatedUsd": 0.0011,
+          "reportedCost": null,
+          "artifact": {
+            "id": "e4bd9b09-4912-44e8-9b71-6f2a6ff6f2c0",
+            "url": "/api/generated-assets/files/6d0b4d2c18d6dd58aa1a7754cebc710b7872094295457c538666205c0da404f9.png",
+            "sha256": "6d0b4d2c18d6dd58aa1a7754cebc710b7872094295457c538666205c0da404f9",
+            "sizeBytes": 193234,
+            "mimeType": "image/png"
+          }
+        },
+        {
+          "step": "style-preview",
+          "capability": "kontext-edit",
+          "applicationJobId": "job_ef2fde65-65e2-4d16-b8df-e75d53c93d85",
+          "providerJobId": "mjob_d3d1797a1657",
+          "servedCapability": "kontext-edit",
+          "servedModel": "fal-ai/flux-pro/kontext",
+          "fallbackFired": null,
+          "wallMilliseconds": 23701,
+          "providerTimings": {
+            "requestedAt": "2026-09-24T11:57:52.272Z",
+            "startedAt": "2026-09-24T11:57:55.427Z",
+            "completedAt": "2026-09-24T11:58:12.997Z",
+            "queueMilliseconds": 3155,
+            "executionMilliseconds": 17570,
+            "totalMilliseconds": 20725
+          },
+          "estimatedUsd": 0.042,
+          "reportedCost": null,
+          "artifact": null
+        }
+      ]
+    }
+  ]
+}
