@@ -41,6 +41,9 @@
   .oq-capture__actions .oq-kit-button, .oq-capture__confirm .oq-kit-button { width: 100%; }
   .oq-capture__tips { padding-inline: 4px; }
 }
+.oq-world-list__preview { overflow: hidden; aspect-ratio: 16/9; border-radius: 14px; background: var(--oq-inset); }
+.oq-world-list__preview img { width: 100%; height: 100%; object-fit: cover; }
+.oq-world-list__status { padding: 9px 11px; border-radius: 10px; color: var(--oq-accent-ink); background: var(--oq-wash); font-weight: 650; }
 .oq-style-preview { display: grid; gap: 24px; }
 .oq-style-preview__compare { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
 .oq-style-preview__compare .oq-kit-card { padding: 14px; }

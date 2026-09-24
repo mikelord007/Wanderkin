@@ -118,7 +118,7 @@ export interface PendingWorldItem {
   mode: GameModeId;
   status: PendingWorldStatus;
   statusText: string;
-  primaryAction: "resume" | "view-progress" | "retry";
+  primaryAction: "resume" | "view-progress" | "retry" | "review";
   attentionStage?: CreationAttentionStage;
   updatedAt: string;
   previewUrl?: string;
@@ -136,11 +136,12 @@ export function toPendingWorldItem(record: CreationRecord): PendingWorldItem | n
     ...(record.preview?.asset.url ? { previewUrl: record.preview.asset.url } : {}),
   };
   if (attentionStage) {
+    const retryable = record.jobs[attentionStage]?.retryable !== false;
     return {
       ...base,
       status: "needs-attention",
-      statusText: `${stageLabel(attentionStage)} needs attention`,
-      primaryAction: "retry",
+      statusText: retryable ? `${stageLabel(attentionStage)} needs attention` : `${stageLabel(attentionStage)} couldn’t finish — your choices are safe`,
+      primaryAction: retryable ? "retry" : "review",
       attentionStage,
     };
   }
@@ -180,4 +181,3 @@ function draftStatus(step: CreationStep): string {
     default: return "Continue creating";
   }
 }
-

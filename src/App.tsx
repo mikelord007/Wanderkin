@@ -81,12 +81,9 @@ export function App() {
   }, []);
 
   const handleJobCancelled = useCallback(() => {
-    // Deliberately abandoning this job (not a reload) — clear both so the
-    // next submission from Photos gets a fresh idempotency key instead of
-    // resuming this one.
-    clearActiveSource();
-    clearPendingSubmission();
-    setScreen({ name: "photos" });
+    // Leaving progress never cancels or forgets durable work. My worlds can
+    // reopen the same application job without another submission.
+    setScreen({ name: "start" });
   }, []);
 
   const handleSavePreparedLevel = useCallback(
