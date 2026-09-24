@@ -1,4 +1,5 @@
 import type { SceneManifest } from "@shared/index.js";
+import type { PlacementRepairIssue } from "../game/placementValidation.js";
 import type { PlacementMode } from "./Preview3D.js";
 
 export interface RepairGuidance {
@@ -11,40 +12,27 @@ export interface RepairGuidance {
  * The technical evidence remains available in the editor, but it is never the
  * first thing a player has to interpret.
  */
-export function repairGuidanceFor(manifest: SceneManifest): RepairGuidance | null {
+export function repairGuidanceFor(
+  manifest: SceneManifest,
+  issues: readonly PlacementRepairIssue[] = [],
+): RepairGuidance | null {
+  const issue = issues[0];
+  if (issue) {
+    const placementMode: PlacementMode =
+      issue.kind === "checkpoint"
+        ? { kind: "checkpoint", checkpointId: issue.entityId }
+        : issue.kind === "color-fragment"
+          ? { kind: "collectible", collectibleId: issue.entityId }
+          : issue.kind === "finish-portal"
+            ? "finish-portal"
+            : manifest.checkpoints.some((checkpoint) => checkpoint.id === issue.entityId)
+              ? { kind: "checkpoint", checkpointId: issue.entityId }
+              : "spawn";
+    return { message: issue.message, placementMode };
+  }
   if (manifest.courseValidation.status !== "failed") return null;
-
-  const details = `${manifest.courseValidation.uncertaintyNotes ?? ""} ${manifest.courseValidation.evidence ?? ""}`
-    .toLowerCase();
-  const checkpoints = [...manifest.checkpoints].sort((a, b) => a.order - b.order);
-  const checkpoint = checkpoints.at(-1);
-
-  if (checkpoint && /checkpoint|route|reach|jump|platform/.test(details)) {
-    return {
-      message: "Move this checkpoint closer to the previous platform.",
-      placementMode: { kind: "checkpoint", checkpointId: checkpoint.id },
-    };
-  }
-  if (/spawn|start/.test(details)) {
-    return {
-      message: "Move the starting point onto a safe, walkable surface.",
-      placementMode: "spawn",
-    };
-  }
-  if (manifest.experience?.finishPortal && /finish|portal|goal/.test(details)) {
-    return {
-      message: "Move the finish portal onto a reachable surface.",
-      placementMode: "finish-portal",
-    };
-  }
-  if (checkpoint) {
-    return {
-      message: "Move the highlighted checkpoint to reconnect the course.",
-      placementMode: { kind: "checkpoint", checkpointId: checkpoint.id },
-    };
-  }
   return {
-    message: "Move the starting point onto a safe, walkable surface.",
-    placementMode: "spawn",
+    message: "Reload the course check to identify the placement that needs attention.",
+    placementMode: null,
   };
 }

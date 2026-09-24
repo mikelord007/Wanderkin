@@ -27,23 +27,25 @@ describe("repairGuidanceFor", () => {
         safeRespawn: { position: [1, 1, 1], headingRadians: 0 },
       },
     ];
-    input.courseValidation = {
-      status: "failed",
-      uncertaintyNotes: "The route to checkpoint 1 is beyond the reachable jump distance.",
-    };
+    input.courseValidation = { status: "failed" };
 
-    expect(repairGuidanceFor(input)).toEqual({
+    expect(repairGuidanceFor(input, [{
+      entityId: "checkpoint-1",
+      kind: "checkpoint",
+      code: "unreachable",
+      message: "Move this checkpoint closer to the previous platform.",
+    }])).toEqual({
       message: "Move this checkpoint closer to the previous platform.",
       placementMode: { kind: "checkpoint", checkpointId: "checkpoint-1" },
     });
   });
 
-  it("falls back to a concrete spawn repair when no checkpoint exists", () => {
+  it("does not invent an entity focus when typed validator output is unavailable", () => {
     const input = manifest();
     input.courseValidation = { status: "failed", evidence: "No safe surface found." };
     expect(repairGuidanceFor(input)).toEqual({
-      message: "Move the starting point onto a safe, walkable surface.",
-      placementMode: "spawn",
+      message: "Reload the course check to identify the placement that needs attention.",
+      placementMode: null,
     });
   });
 });

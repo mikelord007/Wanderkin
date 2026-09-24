@@ -555,7 +555,10 @@ describe("createLevelsRouter (HTTP)", () => {
     const created = await fetch(`${baseUrl}/api/levels`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...lostColorsFixture, levelId: "publish-me" }),
+      body: JSON.stringify(baseManifest({
+        levelId: "publish-me",
+        photos: [{ id: "private-photo", url: "/samples/photo-1.jpg", order: 1 }],
+      })),
     });
     const privateLevel = (await created.json()) as SceneManifest;
 
@@ -579,6 +582,26 @@ describe("createLevelsRouter (HTTP)", () => {
     const shared = await fetch(`${baseUrl}/api/shares/${version.shareId}`);
     expect(shared.status).toBe(200);
     expect(await shared.json()).toEqual(version);
+  });
+
+  it("blocks publication when conservative experience placement validation reports a repair", async () => {
+    await fetch(`${baseUrl}/api/levels`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...lostColorsFixture, levelId: "needs-repair" }),
+    });
+
+    const response = await fetch(`${baseUrl}/api/levels/needs-repair/publish`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ challenge: { kind: "completion" } }),
+    });
+    expect(response.status).toBe(422);
+    const body = (await response.json()) as { message: string; issues: { entityId: string; message: string }[] };
+    expect(body.issues[0]).toMatchObject({
+      entityId: "fragment-blue",
+      message: "Move this color fragment onto a reachable platform.",
+    });
   });
 
   it("PUT rejects an unsafe :id before ever touching validation", async () => {

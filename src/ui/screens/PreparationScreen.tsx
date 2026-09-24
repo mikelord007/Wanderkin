@@ -5,6 +5,7 @@ import { LoadingScreen } from "../components/LoadingScreen.js";
 import { courseCandidateOptions, replaceSavedCandidate } from "../courseCandidates.js";
 import { attachProvenance, resolveAssetForManifest } from "../manifestProvenance.js";
 import { repairGuidanceFor, type RepairGuidance } from "../../editor/repairGuidance.js";
+import { validateExperiencePlacements } from "../../game/placementValidation.js";
 import "../../editor/editor.css";
 
 /**
@@ -42,6 +43,27 @@ const STAGE_TEXT: Record<"downloading" | "decoding" | "analyzing" | "validating"
   validating: "Validating the checkpoint route…",
 };
 
+async function validateForRepair(manifest: SceneManifest) {
+  const scene = await scenePreparationModule();
+  const geometry = new Map();
+  try {
+    const referenced = new Set(
+      manifest.entities.flatMap((entity) => entity.kind === "generated-mesh" ? [entity.assetId] : []),
+    );
+    for (const asset of manifest.assets) {
+      if (!referenced.has(asset.id)) continue;
+      const loaded = scene.getCachedAsset(asset.url) ?? await scene.loadAsset(asset.url);
+      geometry.set(asset.id, loaded.triangles);
+    }
+  } catch {
+    // The shared validator will convert missing geometry into a typed,
+    // display-ready repair issue instead of leaving a blank preview.
+  }
+  const result = validateExperiencePlacements(manifest, geometry);
+  const validated = { ...manifest, courseValidation: result.validation };
+  return { manifest: validated, guidance: repairGuidanceFor(validated, result.issues) };
+}
+
 export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onBack }: PreparationScreenProps) {
   const [primaryManifest, setPrimaryManifest] = useState<SceneManifest | null>(
     source.kind === "manifest" ? source.manifest : null,
@@ -57,8 +79,22 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
   const [saveError, setSaveError] = useState<string | null>(null);
   const [view, setView] = useState<"ready" | "editor">(source.kind === "manifest" ? "editor" : "ready");
   const [repairFocus, setRepairFocus] = useState<RepairGuidance | null>(
-    source.kind === "manifest" ? repairGuidanceFor(source.manifest) : null,
+    null,
   );
+
+  useEffect(() => {
+    if (source.kind !== "manifest") return;
+    let cancelled = false;
+    void validateForRepair(source.manifest).then((checked) => {
+      if (cancelled) return;
+      setPrimaryManifest(checked.manifest);
+      setManifest(checked.manifest);
+      setRepairFocus(checked.guidance);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [source]);
 
   useEffect(() => {
     if (source.kind === "manifest") return;
@@ -92,14 +128,19 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
         );
         if (cancelled) return;
 
-        const preparedPrimary = attachProvenance(result.manifest, cleanAsset, resolvedSourcePhotos);
-        const preparedCandidates = (result.courseCandidates ?? []).map((candidate: SceneManifest) =>
+        const primary = attachProvenance(result.manifest, cleanAsset, resolvedSourcePhotos);
+        const candidateManifests = (result.courseCandidates ?? []).map((candidate: SceneManifest) =>
           attachProvenance(candidate, cleanAsset, resolvedSourcePhotos),
         );
+        const checkedPrimary = await validateForRepair(primary);
+        const checkedCandidates = await Promise.all(candidateManifests.map(validateForRepair));
+        if (cancelled) return;
+        const preparedPrimary = checkedPrimary.manifest;
+        const preparedCandidates = checkedCandidates.map((checked) => checked.manifest);
         setPrimaryManifest(preparedPrimary);
         setManifest(preparedPrimary);
         setCandidates(preparedCandidates);
-        const guidance = repairGuidanceFor(preparedPrimary);
+        const guidance = checkedPrimary.guidance;
         setRepairFocus(guidance);
         setView(guidance ? "editor" : "ready");
       } catch (err) {
@@ -135,10 +176,11 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
   }
 
   function selectCandidate(candidate: SceneManifest) {
-    const guidance = repairGuidanceFor(candidate);
-    setManifest(candidate);
-    setRepairFocus(guidance);
-    setView(guidance ? "editor" : "ready");
+    void validateForRepair(candidate).then((checked) => {
+      setManifest(checked.manifest);
+      setRepairFocus(checked.guidance);
+      setView(checked.guidance ? "editor" : "ready");
+    });
   }
 
   if (error) {
