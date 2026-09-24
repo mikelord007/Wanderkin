@@ -23,6 +23,8 @@ export type {
   GameplaySessionSnapshot,
   RacePhase,
 } from "./modes/session.js";
+export { ColorRestorationAdapter } from "./restorationAdapter.js";
+export type { ColorRestorationSink } from "./restorationAdapter.js";
 
 // Diagnostics (development builds install these on window.__objectquest).
 export { DIAGNOSTICS_GLOBAL } from "./diagnostics.js";
