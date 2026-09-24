@@ -124,6 +124,17 @@ owned path. Full `npx vitest run`: 435/437 passing; the 2 failures are pre-exist
 the Opus character/animation worker (untracked/in-progress on this MAIN) — not touched or caused by this
 worker.
 
+## Peer coordination received mid-session
+- Gameplay worker f4268081-ebbc-45db-bbed-dfe12e5b8c8a owns 5 numeric defaults in `shared/movement.ts`; I
+  already import the central `DEFAULT_MOVEMENT_CONFIG` in `GameView.tsx` with no local fork — no action
+  needed, acknowledged.
+- Interface owner's brand contract (product renamed **Mousehold**, `src/brand.ts` / `src/ui/components/
+  Logo.tsx`): grepped `PlayScreen.tsx`/`FinishScreen.tsx`/`CaptureScreen.tsx` for hard-coded "ObjectQuest"
+  copy — none found, nothing to sweep. Delegated narrow edit done: `src/capture/recorder.ts`'s fallback
+  download-filename stem now reads `BRAND_SLUG` instead of a literal `"objectquest"` (commit
+  `722f9fa17064f46a4c680b0eb4b6e21986ccf3e4`). Left `api.ts` alone (their ownership) and didn't touch any
+  `.oq-*`/`src/styles.css` theming (their rethemes, my HUD classes untouched and unaffected).
+
 ## Next step
 Both owned items are complete. If resumed after a quota gap, verify nothing changed underneath (peer
 workers share MAIN): re-run `git log --oneline -5` for these two hashes, `npx vitest run` for a regression
