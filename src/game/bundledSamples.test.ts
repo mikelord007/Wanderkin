@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { BUNDLED_AUDIO_URLS } from "../audio/assets.js";
 import { EXPLORE_SAMPLE, LOST_COLORS_SAMPLE } from "./bundledSamples.js";
 
 describe("bundled Lost Colors sample", () => {
@@ -12,6 +13,8 @@ describe("bundled Lost Colors sample", () => {
     expect(LOST_COLORS_SAMPLE.media.audio.filter((asset) => asset.kind === "sfx")).toHaveLength(7);
     expect(LOST_COLORS_SAMPLE.media.audio.some((asset) => asset.kind === "music")).toBe(true);
     expect(LOST_COLORS_SAMPLE.media.audio.some((asset) => asset.kind === "narration")).toBe(true);
+    expect(LOST_COLORS_SAMPLE.media.audio).toHaveLength(10);
+    expect(LOST_COLORS_SAMPLE.media.audio.map((asset) => asset.url)).toEqual(Object.values(BUNDLED_AUDIO_URLS));
     expect(Math.max(...LOST_COLORS_SAMPLE.media.audio.map((asset) => asset.sizeBytes))).toBeLessThan(200_000);
   });
 

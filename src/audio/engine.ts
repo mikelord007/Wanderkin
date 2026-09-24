@@ -4,6 +4,13 @@ import type { LevelMedia } from "@shared/index.js";
 
 type Bus = "music" | "effects" | "voice";
 
+export interface GameAudioDiagnostics {
+  readonly unlocked: boolean;
+  readonly contextState: AudioContextState | "uninitialized";
+  readonly playing: boolean;
+  readonly activeLoops: readonly AudioCue[];
+}
+
 export class GameAudioEngine {
   private context: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -17,10 +24,20 @@ export class GameAudioEngine {
   constructor(
     private settings: AudioSettings,
     private readonly contextFactory: () => AudioContext = () => new AudioContext(),
-    private readonly fetcher: typeof fetch = fetch,
+    private readonly fetcher: typeof fetch = (...args) => fetch(...args),
   ) {}
 
   configure(media?: LevelMedia): void { this.urls = resolveAudioUrls(media); }
+
+  diagnostics(): GameAudioDiagnostics {
+    const contextState = this.context?.state ?? "uninitialized";
+    return {
+      unlocked: this.unlocked,
+      contextState,
+      playing: contextState === "running" && this.loops.size > 0,
+      activeLoops: [...this.loops.keys()],
+    };
+  }
 
   setSettings(settings: AudioSettings): void {
     this.settings = settings;

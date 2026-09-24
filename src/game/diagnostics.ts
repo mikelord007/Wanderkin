@@ -13,6 +13,7 @@
  */
 
 import type { MantleRejection } from "./core/mantle.js";
+import type { GameAudioDiagnostics } from "../audio/engine.js";
 
 export type Vec3Tuple = readonly [number, number, number];
 
@@ -49,6 +50,8 @@ export interface GameDiagnostics {
 export interface GameDiagnosticsApi {
   /** Current snapshot, or null before the first frame. */
   readonly get: () => GameDiagnostics | null;
+  /** Current read-only Web Audio state. */
+  readonly audio: () => GameAudioDiagnostics;
   readonly levelId: string;
   readonly movementConfigId: string;
 }
@@ -72,6 +75,10 @@ export function installDiagnostics(api: GameDiagnosticsApi): () => void {
     get: () => {
       const snapshot = api.get();
       return snapshot ? Object.freeze({ ...snapshot }) : null;
+    },
+    audio: () => {
+      const diagnostics = api.audio();
+      return Object.freeze({ ...diagnostics, activeLoops: Object.freeze([...diagnostics.activeLoops]) });
     },
     levelId: api.levelId,
     movementConfigId: api.movementConfigId,

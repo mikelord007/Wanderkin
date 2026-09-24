@@ -40,6 +40,8 @@ The current shared media schema has no explicit SFX cue field. Until an additive
 
 `src/audio/GameAudioEngine` creates Web Audio master, music, effects, and voice gain buses. The context and loops start only from the player's explicit **Play** gesture. Settings—including mute—persist in local storage; muting retains slider values. Decoded audio is trimmed around meaningful samples, normalized to 0.9 peak with conservative gain, and looped with small seam guards.
 
+Development builds expose the engine's read-only state at `window.__objectquest.audio()`: whether the Play gesture unlocked audio, the `AudioContext` state, whether a loop is playing, and the active loop cues. Browser QA uses this surface without controlling playback through it.
+
 The engine listens to the typed gameplay event bus. It plays the canonical cue for fragment, portal, checkpoint, respawn, race, and completion events. Narration is keyed by world ID and can play only once for that mounted world, so falling, respawning, and restarting never repeat it. `SubtitleBar` uses the validated narration text and remains useful when narration audio is absent or muted. Missing or undecodable optional media falls back to the bundled procedural asset without interrupting play.
 
 ## Bundled sample and license

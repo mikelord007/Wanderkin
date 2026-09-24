@@ -45,7 +45,8 @@ export function useGameAudio(options: {
   }), [engine, options.eventBus, options.narrationScript]);
 
   const unlock = useCallback(() => engine.unlockAndStart(), [engine]);
-  return { settings, setSettings, subtitle, unlock };
+  const getDiagnostics = useCallback(() => engine.diagnostics(), [engine]);
+  return { settings, setSettings, subtitle, unlock, getDiagnostics };
 }
 
 function handleEvent(engine: GameAudioEngine, event: GameplayEvent): void {
