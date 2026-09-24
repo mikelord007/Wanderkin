@@ -205,7 +205,7 @@ export function Hud(props: HudProps) {
         <>
           <ObjectivePanel props={props} />
 
-          <div className="oq-hud__top-actions">
+          <div className="oq-hud__top-actions" data-paused={paused && !completed}>
             <button
               type="button"
               onClick={() => {

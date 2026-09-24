@@ -4,8 +4,17 @@
  *
  * 1. `.oq-hud__top-actions` (Sound / Pause) had no stacking level and sat
  *    behind the pause overlay, so a mouse click on "Sound" while paused
- *    never reached the button. Fixed in `src/game/hud/hud.css` by giving
- *    the top-actions row `z-index: 4` (matching `.oq-hud__sound`).
+ *    never reached the button. `.oq-hud__overlay` is shared by five
+ *    different overlays (loading, error, completion, invite-to-play, and
+ *    pause), so the fix is intentionally scoped to the pause state only:
+ *    `Hud.tsx` sets `data-paused="true"` on `.oq-hud__top-actions` exactly
+ *    when the pause overlay is showing, and `hud.css` only raises the
+ *    z-index (to 4, matching `.oq-hud__sound`) for that attribute value.
+ *    The completion and invite overlays keep their original (unreachable)
+ *    stacking — that was not the reported defect and is intentionally
+ *    unchanged. Loading/error never coexist with these buttons at all
+ *    (`GameView.tsx` only shows them while `stage !== "running"`, which is
+ *    the same condition that hides `.oq-hud__top-actions`).
  * 2. `PlayScreen.tsx`'s capture state callback never left `captureState`
  *    at `"stopping"` after a recorder `"error"`, permanently killing the
  *    "Start gameplay capture" button/`C` key for the rest of the session.
@@ -108,6 +117,47 @@ test.describe("Finding 1 fix — Sound button reachable through the pause overla
     // Resume is the only thing that should relock — explicitly, not as a
     // side effect of interacting with the Sound panel.
     await page.getByRole("button", { name: "Resume" }).click();
+    await expect.poll(() => locked(page)).toBe(true);
+  });
+
+  test("the fix is scoped to pause: the invite ('Click to play') overlay still blocks Sound", async ({ page }) => {
+    await page.goto("/");
+    const card = page.getByRole("article").filter({ has: page.getByRole("heading", { name: SAMPLE }) });
+    await card.getByRole("button", { name: "Play now" }).click();
+
+    // Between the level finishing loading and the user's first click, the
+    // HUD is `ready` (top-actions render) but the pointer is not yet
+    // locked — `.oq-hud__overlay--invite` ("Click to play") is showing at
+    // the same time. This is the state the fix must NOT touch: the
+    // top-actions row has no `data-paused` elevation here, so the invite
+    // overlay (later in the DOM, same default stacking) must still win.
+    const playButton = page.getByRole("button", { name: /^Play$/ });
+    await playButton.waitFor();
+    expect(await locked(page)).toBe(false);
+
+    const topActionsPaused = await page.evaluate(
+      () => document.querySelector(".oq-hud__top-actions")?.getAttribute("data-paused") ?? null,
+    );
+    expect(topActionsPaused).toBe("false");
+
+    const soundButton = page.getByRole("button", { name: "Sound" });
+    const box = await soundButton.boundingBox();
+    if (!box) throw new Error("No bounding box for the Sound button");
+
+    // Confirm via the DOM's own paint order (no click yet) that the invite
+    // overlay — not the Sound button — is still topmost at that point.
+    const topmost = await page.evaluate(
+      ({ x, y }) => document.elementFromPoint(x, y)?.className ?? null,
+      { x: box.x + box.width / 2, y: box.y + box.height / 2 },
+    );
+    expect(String(topmost)).toContain("oq-hud__overlay");
+
+    // A real click at that spot falls through to the invite overlay behind
+    // it — whose own onClick starts the game — instead of ever reaching the
+    // Sound button. That is the *unfixed*, original behaviour, unaffected
+    // by scoping the pause fix to `data-paused="true"`.
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(page.getByRole("group", { name: "Sound" })).not.toBeVisible();
     await expect.poll(() => locked(page)).toBe(true);
   });
 });

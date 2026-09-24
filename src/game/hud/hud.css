@@ -95,12 +95,23 @@
 
 .oq-hud__top-actions {
   position: absolute;
-  z-index: 4;
   top: 1.1rem;
   right: 1.1rem;
   display: flex;
   gap: .5rem;
   pointer-events: auto;
+}
+
+/* `.oq-hud__overlay` is shared by five distinct overlays (loading, error,
+   completion, invite-to-play, and pause). Only the pause overlay is known
+   to coexist with these buttons in a state a mouse user needs to act on
+   (open Sound, or un-pause) — loading/error never render while these
+   buttons do, and completion/invite were not part of this fix and should
+   keep their original blocking behaviour. So the elevated stacking is
+   scoped to the paused state only, via this data attribute set in
+   `Hud.tsx`, rather than a blanket z-index. */
+.oq-hud__top-actions[data-paused="true"] {
+  z-index: 4;
 }
 
 .oq-hud__top-actions button {
