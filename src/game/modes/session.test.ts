@@ -3,7 +3,7 @@ import type { LevelExperience } from "@shared/index.js";
 import lostColorsManifest from "../../../shared/fixtures/lost-colors.json";
 import { GameplayEventBus } from "../events.js";
 import { GameplaySession } from "./session.js";
-import type { MonotonicClock, RaceBestTimeStore } from "./session.js";
+import type { MonotonicClock, RaceBestTimeStore, WorldIntroStore } from "./session.js";
 
 const experience = lostColorsManifest.experience as unknown as LevelExperience;
 
@@ -56,6 +56,31 @@ describe("GameplaySession collect mode", () => {
     expect(session.snapshot.restoration).toBe(0);
     expect(session.snapshot.portalActive).toBe(false);
     expect(session.snapshot.completed).toBe(false);
+  });
+
+  it("shows the movement intro once per world, including across restart and remount", () => {
+    const seen = new Set<string>();
+    const introStore: WorldIntroStore = {
+      hasSeen: (worldId) => seen.has(worldId),
+      markSeen: (worldId) => { seen.add(worldId); },
+    };
+    const bus = new GameplayEventBus();
+    const intro = vi.fn();
+    bus.on("introShown", intro);
+    const session = new GameplaySession({
+      experience,
+      worldId: "same-world",
+      introStore,
+      eventBus: bus,
+    });
+
+    expect(session.showIntroOnce()).toBe(true);
+    session.respawn("fell", null);
+    session.restart();
+    expect(session.showIntroOnce()).toBe(false);
+    const remounted = new GameplaySession({ experience, worldId: "same-world", introStore, eventBus: bus });
+    expect(remounted.showIntroOnce()).toBe(false);
+    expect(intro).toHaveBeenCalledOnce();
   });
 });
 

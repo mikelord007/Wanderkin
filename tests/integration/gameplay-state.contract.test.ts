@@ -3,7 +3,7 @@ import type { LevelExperience } from "../../shared/experience.js";
 import lostColorsManifest from "../../shared/fixtures/lost-colors.json";
 import { GameplayEventBus } from "../../src/game/events.js";
 import { GameplaySession } from "../../src/game/modes/session.js";
-import type { MonotonicClock, RaceBestTimeStore } from "../../src/game/modes/session.js";
+import type { MonotonicClock, RaceBestTimeStore, WorldIntroStore } from "../../src/game/modes/session.js";
 
 class FakeClock implements MonotonicClock {
   value = 10_000;
@@ -103,16 +103,51 @@ describe("ObjectQuest v2 gameplay state integration contracts", () => {
     expect(race.enterPortal("finish-portal")).toBe(false);
   });
 
-  it.skip("keeps restart and respawn state distinct and internally consistent", () => {
-    // Given collected rewards, a safe checkpoint, fired one-shot narration,
-    // and an active race clock, exercise manual respawn and out-of-bounds respawn.
+  it("keeps restart and respawn state distinct and internally consistent", () => {
+    const seenIntros = new Set<string>();
+    const introStore: WorldIntroStore = {
+      hasSeen: (worldId) => seenIntros.has(worldId),
+      markSeen: (worldId) => { seenIntros.add(worldId); },
+    };
+    const bus = new GameplayEventBus();
+    const events = vi.fn();
+    bus.on("*", events);
+    const collect = new GameplaySession({
+      experience: collectExperience,
+      worldId: "collect-respawn",
+      introStore,
+      eventBus: bus,
+    });
+    collect.showIntroOnce();
+    collect.collectFragment("fragment-red");
+    collect.respawn("manual", "checkpoint-1");
+    collect.respawn("fell", "checkpoint-1");
+    expect(collect.snapshot.collectedFragmentIds.has("fragment-red")).toBe(true);
+    expect(events.mock.calls.filter(([event]) => event.type === "fragmentCollected")).toHaveLength(1);
+    expect(events.mock.calls.filter(([event]) => event.type === "introShown")).toHaveLength(1);
+    expect(events.mock.calls.filter(([event]) => event.type === "respawned")).toHaveLength(2);
 
-    // Respawn restores position/velocity to the safe pose while preserving the
-    // mode's collected/checkpoint progress and never repeats rewards/narration.
+    collect.restart();
+    expect(collect.snapshot.collectedFragmentIds.size).toBe(0);
+    expect(collect.snapshot.completed).toBe(false);
+    expect(collect.showIntroOnce()).toBe(false);
 
-    // Restart applies the documented mode reset: start pose, clean timer/countdown,
-    // initial progress, no stale completion, and one new-run event sequence.
-    throw new Error("Contract stub: connect Worker 5 run/session state boundary");
+    const clock = new FakeClock();
+    const race = new GameplaySession({
+      experience: raceExperience(),
+      worldId: "race-restart",
+      clock,
+      bestTimeStore: new MemoryBestTimes(),
+    });
+    race.start();
+    clock.advance(2_000);
+    race.update();
+    clock.advance(500);
+    race.reachCheckpoint("checkpoint-1");
+    race.restart();
+    expect(race.snapshot.race.phase).toBe("countdown");
+    expect(race.snapshot.race.elapsedMilliseconds).toBe(0);
+    expect(race.snapshot.reachedCheckpointIds).toEqual([]);
   });
 
   it("uses deterministic race timing across countdown, pause, restart, completion, and comparison", () => {

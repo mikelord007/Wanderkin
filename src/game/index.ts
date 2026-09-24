@@ -24,8 +24,9 @@ export type {
   MonotonicClock,
   RaceBestTimeStore,
   RacePhase,
+  WorldIntroStore,
 } from "./modes/session.js";
-export { localRaceBestTimes } from "./modes/session.js";
+export { localRaceBestTimes, localWorldIntros } from "./modes/session.js";
 export { ColorRestorationAdapter } from "./restorationAdapter.js";
 export type { ColorRestorationSink } from "./restorationAdapter.js";
 

@@ -35,6 +35,7 @@ export interface GameplaySessionOptions {
   publishedVersionId?: PublishedLevelVersion["versionId"] | null;
   clock?: MonotonicClock;
   bestTimeStore?: RaceBestTimeStore;
+  introStore?: WorldIntroStore;
 }
 
 export interface MonotonicClock {
@@ -44,6 +45,11 @@ export interface MonotonicClock {
 export interface RaceBestTimeStore {
   read(key: string): number | null;
   write(key: string, milliseconds: number): void;
+}
+
+export interface WorldIntroStore {
+  hasSeen(worldId: string): boolean;
+  markSeen(worldId: string): void;
 }
 
 const SYSTEM_CLOCK: MonotonicClock = {
@@ -58,6 +64,15 @@ export const localRaceBestTimes: RaceBestTimeStore = {
   },
   write(key, milliseconds) {
     if (typeof localStorage !== "undefined") localStorage.setItem(key, String(milliseconds));
+  },
+};
+
+export const localWorldIntros: WorldIntroStore = {
+  hasSeen(worldId) {
+    return typeof localStorage !== "undefined" && localStorage.getItem(`objectquest:intro:${worldId}`) === "seen";
+  },
+  markSeen(worldId) {
+    if (typeof localStorage !== "undefined") localStorage.setItem(`objectquest:intro:${worldId}`, "seen");
   },
 };
 
@@ -77,6 +92,7 @@ export class GameplaySession {
   private readonly eventBus: GameplayEventBus;
   private readonly clock: MonotonicClock;
   private readonly bestTimeStore: RaceBestTimeStore;
+  private readonly introStore: WorldIntroStore;
   private readonly bestTimeKey: string;
   private readonly fragmentsById: ReadonlyMap<string, ColorFragmentEntity>;
   private collectedFragmentIds = new Set<string>();
@@ -101,6 +117,7 @@ export class GameplaySession {
     this.eventBus = options.eventBus ?? gameplayEvents;
     this.clock = options.clock ?? SYSTEM_CLOCK;
     this.bestTimeStore = options.bestTimeStore ?? localRaceBestTimes;
+    this.introStore = options.introStore ?? localWorldIntros;
     this.bestTimeKey = `objectquest:race-best:${this.publishedVersionId ?? `draft:${this.worldId}`}`;
     this.fragmentsById = new Map(
       options.experience.collectibles.map((fragment) => [fragment.id, fragment]),
@@ -193,6 +210,13 @@ export class GameplaySession {
       this.activatePortal();
     }
 
+    return true;
+  }
+
+  showIntroOnce(): boolean {
+    if (this.introStore.hasSeen(this.worldId)) return false;
+    this.introStore.markSeen(this.worldId);
+    this.eventBus.emit({ type: "introShown", worldId: this.worldId });
     return true;
   }
 
