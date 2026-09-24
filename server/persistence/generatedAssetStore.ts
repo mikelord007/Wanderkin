@@ -6,7 +6,8 @@ import type { AudioAssetReference, VideoAssetReference } from "../../shared/medi
 import type { GenerationProvenance } from "../../shared/provenance.js";
 import { MEDIA_ASSET_SCHEMA_VERSION } from "../../shared/schema-version.js";
 import { JsonFileStore } from "./jsonStore.js";
-import { InvalidFileError } from "./validate.js";
+import { inspectImageDimensions } from "../security/imageDimensions.js";
+import { detectPhotoType, InvalidFileError } from "./validate.js";
 
 export type GeneratedBinaryAsset = GeneratedImageReference | AudioAssetReference | VideoAssetReference;
 type GeneratedBinaryAssetDraft =
@@ -37,13 +38,14 @@ export class GeneratedAssetStore {
 
   async storeImage(
     buffer: Buffer,
-    expectedMimeType: GeneratedImageReference["mimeType"],
     provenance: GenerationProvenance,
   ): Promise<GeneratedImageReference> {
     assertSize(buffer, MAX_GENERATED_IMAGE_BYTES, "image");
     const detected = detectImage(buffer);
-    if (!detected || detected.mimeType !== expectedMimeType) {
-      throw new InvalidFileError(`Generated image bytes do not match expected ${expectedMimeType}.`);
+    if (!detected) {
+      throw new InvalidFileError(
+        "Generated image is not a recognized JPEG, PNG, or WebP image (magic bytes did not match).",
+      );
     }
     return this.store({
       id: randomUUID(),
@@ -167,37 +169,11 @@ function assertSize(buffer: Buffer, max: number, kind: string): void {
 }
 
 function detectImage(buffer: Buffer): { mimeType: GeneratedImageReference["mimeType"]; extension: string; width: number; height: number } | undefined {
-  if (buffer.length >= 24 && buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
-    return { mimeType: "image/png", extension: "png", width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
-  }
-  if (buffer.length >= 12 && buffer.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))) {
-    const dimensions = jpegDimensions(buffer);
-    if (dimensions) return { mimeType: "image/jpeg", extension: "jpg", ...dimensions };
-  }
-  if (buffer.length >= 30 && buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP") {
-    if (buffer.toString("ascii", 12, 16) === "VP8X") {
-      const width = 1 + buffer.readUIntLE(24, 3);
-      const height = 1 + buffer.readUIntLE(27, 3);
-      return { mimeType: "image/webp", extension: "webp", width, height };
-    }
-    return { mimeType: "image/webp", extension: "webp", width: 0, height: 0 };
-  }
-  return undefined;
-}
-
-function jpegDimensions(buffer: Buffer): { width: number; height: number } | undefined {
-  let offset = 2;
-  while (offset + 9 < buffer.length) {
-    if (buffer[offset] !== 0xff) { offset += 1; continue; }
-    const marker = buffer[offset + 1] ?? 0;
-    if (marker >= 0xc0 && marker <= 0xc3) {
-      return { height: buffer.readUInt16BE(offset + 5), width: buffer.readUInt16BE(offset + 7) };
-    }
-    const length = buffer.readUInt16BE(offset + 2);
-    if (length < 2) return undefined;
-    offset += 2 + length;
-  }
-  return undefined;
+  const mimeType = detectPhotoType(buffer);
+  if (!mimeType) return undefined;
+  const dimensions = inspectImageDimensions(buffer);
+  const extension = mimeType === "image/jpeg" ? "jpg" : mimeType === "image/png" ? "png" : "webp";
+  return { mimeType, extension, ...dimensions };
 }
 
 function detectAudio(buffer: Buffer): { mimeType: string; extension: string } | undefined {

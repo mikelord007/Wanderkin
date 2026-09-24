@@ -55,7 +55,7 @@ export function createPostcardsRouter(
     }
     const parsed = screenshotSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ message: "A bounded PNG screenshot is required." });
+      res.status(400).json({ message: "A bounded JPEG, PNG, or WebP screenshot is required." });
       return;
     }
     const buffer = Buffer.from(parsed.data.imageBase64, "base64");
@@ -66,7 +66,7 @@ export function createPostcardsRouter(
         releaseBudget = imagePolicy.budget.acquire(dimensions.width * dimensions.height * 4);
       }
       const owner = security?.issue(req, res);
-      const asset = await assets.storeImage(buffer, "image/png", localCaptureProvenance(buffer));
+      const asset = await assets.storeImage(buffer, localCaptureProvenance(buffer));
       if (owner) await security?.claim("generated-asset", asset.id, owner.ownerId);
       res.status(201).json(asset);
     } catch (error) {
@@ -79,7 +79,7 @@ export function createPostcardsRouter(
         res.status(429).json({ message: error.message });
         return;
       }
-      res.status(400).json({ message: "The screenshot was not a valid bounded PNG image." });
+      res.status(400).json({ message: "The screenshot was not a valid bounded JPEG, PNG, or WebP image." });
     } finally {
       releaseBudget?.();
     }

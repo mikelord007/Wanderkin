@@ -329,6 +329,32 @@ which has no provenance either.
 
 ## Known gaps / follow-ups
 
+### 2026-09-24 image-edit output-format diagnosis
+
+The first ObjectQuest v2 live `kontext-edit` preview requested PNG but the
+provider completed successfully with a JPEG result. The durable provider
+status for application job `job_ef2fde65-65e2-4d16-b8df-e75d53c93d85`
+(`mjob_d3d1797a1657`) reports `state: "ready"`, no fallback, and a result URL
+whose path ends in `.jpg`. Re-fetching that stored URL through
+`downloadBounded` returned `Content-Type: image/jpeg`, 129,740 bytes, SHA-256
+`adcd4f6a9c5ab0e6064d1e3656f906f5f5b9c4a22da704854b7c2c8fa0263c5e`, and
+the first 16 bytes `ff d8 ff e0 00 10 4a 46 49 46 00 01 01 00 00 01` (a JFIF
+JPEG header). The raw ready status reported `kontext-edit`, no fallback,
+`fal-ai/flux-pro/kontext`, and no declared MIME metadata. The earlier
+`style-spike-cartoon-reference.jpg` artifact has the same JFIF prefix, so this
+is repeatable provider behaviour rather than an error body or magic-byte
+misclassification.
+
+The application failure was local: `GeneratedAssetStore.storeImage` correctly
+sniffed the bytes as JPEG, then rejected them because the detected MIME did not
+equal the request's preferred `outputMimeType`. Generated image finalization
+now accepts JPEG, PNG, or WebP by magic bytes and persists the detected MIME,
+dimensions, and extension. The requested output format remains an application
+preference, but is neither sent as an unsupported Kontext field nor treated as
+a post-condition.
+Preview cache, generated 3D inputs, postcard screenshots, and browser image
+URLs all consume the detected asset metadata rather than assuming `.png`.
+
 - Worker 1's shared contracts intentionally have no separate
   `background-removal` kind; the exact server mapping is the `image-edit`
   profile documented above.

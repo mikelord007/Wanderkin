@@ -22,7 +22,7 @@ describe("GeneratedAssetStore", () => {
     png.writeUInt32BE(640, 16);
     png.writeUInt32BE(480, 20);
     const store = new GeneratedAssetStore(dir);
-    const asset = await store.storeImage(png, "image/png", provenance);
+    const asset = await store.storeImage(png, provenance);
     expect(asset).toMatchObject({ mimeType: "image/png", width: 640, height: 480, sizeBytes: 33, provenance });
     expect(asset.url).toMatch(/^\/api\/generated-assets\/files\/[a-f0-9]{64}\.png$/);
     expect((await store.get(asset.id))?.sha256).toBe(asset.sha256);
@@ -30,9 +30,9 @@ describe("GeneratedAssetStore", () => {
     expect((await store.getImageBytes(asset.id)).buffer).toEqual(png);
   });
 
-  it("rejects content that does not match the expected media type", async () => {
-    await expect(new GeneratedAssetStore(dir).storeImage(Buffer.from("not an image"), "image/png", provenance))
-      .rejects.toThrow(/do not match/);
+  it("rejects content that is not a supported image", async () => {
+    await expect(new GeneratedAssetStore(dir).storeImage(Buffer.from("not an image"), provenance))
+      .rejects.toThrow(/not a recognized JPEG, PNG, or WebP/);
   });
 
   it("stores independent audio and video assets with honest kinds", async () => {

@@ -73,6 +73,11 @@ async function pollJob(api: string, initial: Json): Promise<Json> {
   return job;
 }
 
+export function shouldReconcileStoredProviderJob(job: Json): boolean {
+  return job.state === "failed" && typeof job.providerJobId === "string" && job.providerJobId.length > 0
+    && job.lastError?.retryable !== false;
+}
+
 function evidenceFor(step: PlannedRequest, job: Json, startedAt: number): Json {
   const result = job.result;
   const asset = result?.asset;
@@ -197,7 +202,11 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     const startedAt = Date.now();
     const path = step.purpose === "style-preview" ? "/api/jobs/previews" : "/api/jobs/generate";
     const submitted = await postJson(args.api, path, { request, worldId: VALIDATION_WORLD_ID, maxCostUsd: step.estimatedUsd }, { "Idempotency-Key": request.idempotencyKey });
-    const job = await pollJob(args.api, submitted.job ?? submitted);
+    let submittedJob = submitted.job ?? submitted;
+    if (shouldReconcileStoredProviderJob(submittedJob)) {
+      submittedJob = await postJson(args.api, `/api/jobs/${encodeURIComponent(submittedJob.id)}/retry`, {});
+    }
+    const job = await pollJob(args.api, submittedJob);
     jobs.set(step.id, job);
     evidence.push(evidenceFor(step, job, startedAt));
     if (job.state !== "ready" || job.fallbackFired) {

@@ -216,6 +216,7 @@ describe("LivepeerAdapter multi-kind contracts", () => {
       max_cost_usd: 0.1,
       quality_gate: false,
     });
+    expect(mcp.calls[1]?.args).not.toHaveProperty("output_format");
   });
 });
 
