@@ -28,6 +28,7 @@ export type {
 } from "./modes/session.js";
 export { localRaceBestTimes, localWorldIntros } from "./modes/session.js";
 export { createRaceVariant } from "./modes/raceVariant.js";
+export { LOST_COLORS_SAMPLE } from "./bundledSamples.js";
 export { ColorRestorationAdapter } from "./restorationAdapter.js";
 export type { ColorRestorationSink } from "./restorationAdapter.js";
 
