@@ -1,9 +1,12 @@
+import { migrateSceneManifest } from "../../shared/manifest-migration.js";
+import lostColorsFixture from "../../shared/fixtures/lost-colors.json";
 import { STYLE_DEFINITIONS, type StyleId } from "../../shared/style.js";
 import { describe, expect, it } from "vitest";
 import {
   clampColorRestoration,
   getSceneStyle,
   resolveEnvironmentDressing,
+  resolveScenePresentation,
 } from "./style.js";
 
 const STYLE_IDS: readonly StyleId[] = ["cartoon", "hand-painted", "watercolor"];
@@ -28,6 +31,22 @@ describe("scene style runtime", () => {
     expect(clampColorRestoration(0.45)).toBe(0.45);
     expect(clampColorRestoration(2)).toBe(1);
     expect(clampColorRestoration(Number.NaN)).toBe(1);
+  });
+
+  it("starts the Rodin-backed Lost Colors fixture desaturated and accepts live progress", () => {
+    const manifest = migrateSceneManifest(lostColorsFixture);
+    const initial = resolveScenePresentation(manifest);
+    const secondRestorationStep = manifest.experience.mode.kind === "collect"
+      ? manifest.experience.mode.restorationSteps[1] ?? 0
+      : 0;
+    const collectedTwo = resolveScenePresentation(manifest, {
+      colorRestoration: secondRestorationStep,
+    });
+
+    expect(initial.style.id).toBe("cartoon");
+    expect(initial.atmosphere).toContain("floating island");
+    expect(initial.colorRestoration).toBe(0);
+    expect(collectedTwo.colorRestoration).toBeCloseTo(2 / 3, 8);
   });
 
   it("maps optional atmosphere text without mutating the shared definition", () => {
