@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "reviewedImageAssetId": "cutout-teacup",
+  "selectedReference": {
+    "photoIds": ["photo-4", "photo-1"],
+    "reviewedImageAssetId": "cutout-teacup",
+    "approvedPreviewAssetId": "preview-watercolor-teacup",
+    "style": "watercolor",
+    "mode": "collect",
+    "atmosphere": "A floating island above the clouds."
+  },
+  "jobs": [
+    {
+      "kind": "image-edit",
+      "jobId": "job-preview-1",
+      "status": "ready",
+      "providerJobId": "provider-preview-1",
+      "updatedAt": "2026-09-24T10:00:00.000Z",
+      "consumedByAssetId": "preview-watercolor-teacup"
+    },
+    {
+      "kind": "image-to-3d",
+      "jobId": "job-mesh-1",
+      "status": "generating",
+      "providerJobId": "provider-mesh-1",
+      "updatedAt": "2026-09-24T10:01:00.000Z"
+    }
+  ]
+}

@@ -2,7 +2,8 @@ import type { LevelExperience } from "./experience.js";
 import type { SceneManifest } from "./manifest.js";
 import { PUBLISHED_LEVEL_SCHEMA_VERSION } from "./schema-version.js";
 
-export type PublishedSceneManifest = SceneManifest & { experience: LevelExperience };
+/** Creation workflow/job metadata stays private even when photos are shared. */
+export type PublishedSceneManifest = Omit<SceneManifest, "workflow"> & { experience: LevelExperience };
 
 export type PublishedChallenge =
   | { kind: "completion" }

@@ -2,6 +2,8 @@ import type {
   AssetReference,
   GenerationJob,
   PhotoReference,
+  PublishedChallenge,
+  PublishedLevelVersion,
   ProviderCapabilityDescriptor,
   ProviderSubmitRequest,
   SceneManifest,
@@ -145,6 +147,22 @@ export function saveLevel(levelId: string, manifest: SceneManifest): Promise<Sce
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(manifest),
   });
+}
+
+export function publishLevel(
+  levelId: string,
+  challenge: PublishedChallenge,
+  includesSourcePhotos = false,
+): Promise<PublishedLevelVersion> {
+  return request<PublishedLevelVersion>(`/api/levels/${encodeURIComponent(levelId)}/publish`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ challenge, includesSourcePhotos }),
+  });
+}
+
+export function getSharedLevel(shareId: string): Promise<PublishedLevelVersion> {
+  return request<PublishedLevelVersion>(`/api/shares/${encodeURIComponent(shareId)}`);
 }
 
 export function exportLevelBundle(levelId: string): Promise<LevelBundle> {
