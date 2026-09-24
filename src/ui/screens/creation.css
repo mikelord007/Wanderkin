@@ -41,6 +41,26 @@
   .oq-capture__actions .oq-kit-button, .oq-capture__confirm .oq-kit-button { width: 100%; }
   .oq-capture__tips { padding-inline: 4px; }
 }
+.oq-style-preview { display: grid; gap: 24px; }
+.oq-style-preview__compare { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
+.oq-style-preview__compare .oq-kit-card { padding: 14px; }
+.oq-style-preview__compare figure { display: grid; gap: 10px; }
+.oq-style-preview__image { position: relative; overflow: hidden; aspect-ratio: 4/3; border-radius: 14px; background: var(--oq-inset); }
+.oq-style-preview__image img { width: 100%; height: 100%; object-fit: contain; image-orientation: from-image; }
+.oq-style-preview__placeholder { width: 100%; height: 100%; background: linear-gradient(110deg,var(--oq-inset) 25%,var(--oq-wash) 45%,var(--oq-inset) 65%); background-size: 220% 100%; animation: oq-preview-wait 1.5s ease-in-out infinite; }
+@keyframes oq-preview-wait { to { background-position: -220% 0; } }
+.oq-style-preview__loading { position: absolute; inset: auto 12px 12px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 14px; border-radius: 10px; color: white; background: var(--oq-ink); }
+.oq-style-preview__compare figcaption { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; color: var(--oq-muted); }
+.oq-style-preview__compare figcaption strong { color: var(--oq-success-ink); }
+.oq-style-preview__decision { max-width: 680px; margin-inline: auto; }
+.oq-style-preview__error { display: grid; gap: 4px; padding: 14px 16px; border-left: 4px solid var(--oq-error-ink); border-radius: 10px; background: #fbe5e7; }
+.oq-style-preview__actions { display: flex; flex-wrap: wrap; gap: 10px; }
+@media (max-width: 699px) {
+  .oq-style-preview__compare { grid-template-columns: 1fr; }
+  .oq-style-preview__actions { align-items: stretch; flex-direction: column; }
+  .oq-style-preview__actions .oq-kit-button { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .oq-style-preview__placeholder { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .oq-capture__drop { transition: none; } }
 .oq-review { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(280px,.8fr); gap: 24px; align-items: start; }
 .oq-review__visual { display: grid; gap: 16px; }
