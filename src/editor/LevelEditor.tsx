@@ -20,15 +20,21 @@ import {
 } from "./geometry.js";
 import {
   addCheckpoint,
+  addColorFragment,
+  addFinishPortal,
   addHelperEntity,
   removeCheckpoint,
+  removeColorFragment,
+  removeFinishPortal,
   removeHelperEntity,
   reorderCheckpoint,
   setSpawn,
   updateCalibration,
   updateCheckpoint,
+  updateColorFragment,
   updateEntityTransform,
   updateHelperDimensions,
+  updateFinishPortal,
 } from "./manifestEdits.js";
 import { clearDraft, resolveDraft, saveDraft, type EditorDraft } from "./draftStorage.js";
 import { saveThenExport } from "./exportFlow.js";
@@ -133,6 +139,21 @@ export function LevelEditor({
     const position: Vec3 = [point[0], capsuleY, point[2]];
     if (placementMode === "spawn") {
       setWorkingManifest((m) => setSpawn(m, { position, headingRadians: m.spawn.headingRadians }));
+    } else if (placementMode === "finish-portal") {
+      setWorkingManifest((m) => {
+        const portal = m.experience?.finishPortal;
+        return portal
+          ? updateFinishPortal(m, { transform: { ...portal.transform, position } })
+          : addFinishPortal(m, position);
+      });
+    } else if (placementMode.kind === "collectible") {
+      const collectibleId = placementMode.collectibleId;
+      setWorkingManifest((m) => {
+        const collectible = m.experience?.collectibles.find((item) => item.id === collectibleId);
+        return collectible
+          ? updateColorFragment(m, collectibleId, { transform: { ...collectible.transform, position } })
+          : m;
+      });
     } else {
       const checkpointId = placementMode.checkpointId;
       setWorkingManifest((m) =>
@@ -262,7 +283,13 @@ export function LevelEditor({
           {placementMode ? (
             <div className="oq-editor__placement-hint">
               Click a surface in the view to place{" "}
-              {placementMode === "spawn" ? "the spawn point" : "this checkpoint"}.
+              {placementMode === "spawn"
+                ? "the spawn point"
+                : placementMode === "finish-portal"
+                  ? "the finish portal"
+                  : placementMode.kind === "collectible"
+                    ? "this color fragment"
+                    : "this checkpoint"}.
               {placementError ? <span className="oq-error-text">{placementError}</span> : null}
               <button
                 type="button"
@@ -296,6 +323,16 @@ export function LevelEditor({
           />
 
           <SpawnCheckpointPanel
+            manifest={workingManifest}
+            placementMode={placementMode}
+            onSetPlacementMode={(mode) => {
+              setPlacementError(null);
+              setPlacementMode(mode);
+            }}
+            onChange={(next) => setWorkingManifest(next)}
+          />
+
+          <ExperienceEntitiesPanel
             manifest={workingManifest}
             placementMode={placementMode}
             onSetPlacementMode={(mode) => {
@@ -619,7 +656,9 @@ function SpawnCheckpointPanel({
       <ol className="oq-editor__checkpoint-list">
         {sortedCheckpoints.map((checkpoint, index) => {
           const active =
-            typeof placementMode === "object" && placementMode !== null && placementMode.checkpointId === checkpoint.id;
+            typeof placementMode === "object" &&
+            placementMode?.kind === "checkpoint" &&
+            placementMode.checkpointId === checkpoint.id;
           return (
             <li key={checkpoint.id} className="oq-editor__checkpoint-item">
               <div className="oq-editor__row">
@@ -627,7 +666,9 @@ function SpawnCheckpointPanel({
                 <button
                   type="button"
                   className={`oq-button oq-button--secondary${active ? " oq-button--active" : ""}`}
-                  onClick={() => onSetPlacementMode(active ? null : { checkpointId: checkpoint.id })}
+                  onClick={() =>
+                    onSetPlacementMode(active ? null : { kind: "checkpoint", checkpointId: checkpoint.id })
+                  }
                 >
                   {active ? "Click the view…" : "Place in view"}
                 </button>
@@ -686,6 +727,179 @@ function SpawnCheckpointPanel({
       >
         Add checkpoint
       </button>
+    </section>
+  );
+}
+
+function ExperienceEntitiesPanel({
+  manifest,
+  placementMode,
+  onSetPlacementMode,
+  onChange,
+}: {
+  manifest: SceneManifest;
+  placementMode: PlacementMode;
+  onSetPlacementMode: (mode: PlacementMode) => void;
+  onChange: (manifest: SceneManifest) => void;
+}) {
+  const experience = manifest.experience;
+  if (!experience) {
+    return (
+      <section className="oq-panel oq-editor-panel">
+        <h2>Adventure markers</h2>
+        <p className="oq-empty-hint">This legacy draft will receive adventure defaults when it is saved.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="oq-panel oq-editor-panel">
+      <h2>Collectibles &amp; finish</h2>
+      <p className="oq-editor__meta">
+        These markers use the same walkable-surface placement check as checkpoints.
+      </p>
+      <h3>Color fragments ({experience.collectibles.length})</h3>
+      {experience.collectibles.length === 0 ? (
+        <p className="oq-empty-hint">No color fragments in this adventure.</p>
+      ) : null}
+      <ol className="oq-editor__checkpoint-list">
+        {[...experience.collectibles]
+          .sort((a, b) => a.order - b.order)
+          .map((collectible) => {
+            const active =
+              typeof placementMode === "object" &&
+              placementMode?.kind === "collectible" &&
+              placementMode.collectibleId === collectible.id;
+            return (
+              <li key={collectible.id} className="oq-editor__checkpoint-item">
+                <div className="oq-editor__row">
+                  <span>Fragment #{collectible.order + 1}</span>
+                  <button
+                    type="button"
+                    className={`oq-button oq-button--secondary${active ? " oq-button--active" : ""}`}
+                    onClick={() =>
+                      onSetPlacementMode(
+                        active ? null : { kind: "collectible", collectibleId: collectible.id },
+                      )
+                    }
+                  >
+                    {active ? "Click the view…" : "Place in view"}
+                  </button>
+                  <button
+                    type="button"
+                    className="oq-button oq-button--ghost"
+                    onClick={() => onChange(removeColorFragment(manifest, collectible.id))}
+                  >
+                    Remove
+                  </button>
+                </div>
+                <PositionInputs
+                  position={collectible.transform.position}
+                  onChange={(position) =>
+                    onChange(
+                      updateColorFragment(manifest, collectible.id, {
+                        transform: { ...collectible.transform, position },
+                      }),
+                    )
+                  }
+                />
+                <div className="oq-editor__row">
+                  <label className="oq-editor__field">
+                    Color
+                    <input
+                      type="color"
+                      value={collectible.color}
+                      onChange={(event) =>
+                        onChange(updateColorFragment(manifest, collectible.id, { color: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <label className="oq-editor__field">
+                    Trigger radius (m)
+                    <input
+                      type="number"
+                      step={0.1}
+                      min={0.1}
+                      value={collectible.triggerRadius}
+                      onChange={(event) =>
+                        onChange(
+                          updateColorFragment(manifest, collectible.id, {
+                            triggerRadius: positiveInput(event.target.value, collectible.triggerRadius),
+                          }),
+                        )
+                      }
+                    />
+                  </label>
+                </div>
+              </li>
+            );
+          })}
+      </ol>
+      <button
+        type="button"
+        className="oq-button oq-button--secondary"
+        onClick={() => onChange(addColorFragment(manifest, manifest.spawn.position))}
+      >
+        Add color fragment
+      </button>
+
+      <h3>Finish portal</h3>
+      {experience.finishPortal ? (
+        <div className="oq-editor__checkpoint-item">
+          <div className="oq-editor__row">
+            <button
+              type="button"
+              className={`oq-button oq-button--secondary${placementMode === "finish-portal" ? " oq-button--active" : ""}`}
+              onClick={() => onSetPlacementMode(placementMode === "finish-portal" ? null : "finish-portal")}
+            >
+              {placementMode === "finish-portal" ? "Click the view…" : "Place in view"}
+            </button>
+            {experience.mode.kind !== "collect" ? (
+              <button
+                type="button"
+                className="oq-button oq-button--ghost"
+                onClick={() => onChange(removeFinishPortal(manifest))}
+              >
+                Remove
+              </button>
+            ) : null}
+          </div>
+          <PositionInputs
+            position={experience.finishPortal.transform.position}
+            onChange={(position) =>
+              onChange(
+                updateFinishPortal(manifest, {
+                  transform: { ...experience.finishPortal!.transform, position },
+                }),
+              )
+            }
+          />
+          <label className="oq-editor__field">
+            Trigger radius (m)
+            <input
+              type="number"
+              step={0.1}
+              min={0.1}
+              value={experience.finishPortal.triggerRadius}
+              onChange={(event) =>
+                onChange(
+                  updateFinishPortal(manifest, {
+                    triggerRadius: positiveInput(event.target.value, experience.finishPortal!.triggerRadius),
+                  }),
+                )
+              }
+            />
+          </label>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="oq-button oq-button--secondary"
+          onClick={() => onChange(addFinishPortal(manifest, manifest.spawn.position))}
+        >
+          Add finish portal
+        </button>
+      )}
     </section>
   );
 }

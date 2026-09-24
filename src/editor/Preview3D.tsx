@@ -3,7 +3,15 @@ import { Canvas, type ThreeEvent } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import type { Object3D } from "three";
 import { Box3, Matrix3 } from "three";
-import type { SceneManifest, SceneEntity, Checkpoint, SpawnPoint, Vec3 } from "@shared/index.js";
+import type {
+  Checkpoint,
+  ColorFragmentEntity,
+  FinishPortalEntity,
+  SceneEntity,
+  SceneManifest,
+  SpawnPoint,
+  Vec3,
+} from "@shared/index.js";
 import {
   createHelperGeometry,
   loadAsset,
@@ -13,7 +21,12 @@ import {
 import { isWalkableSurfaceNormalY } from "./geometry.js";
 
 /** What a click in the preview is currently placing, if anything. */
-export type PlacementMode = "spawn" | { checkpointId: string } | null;
+export type PlacementMode =
+  | "spawn"
+  | "finish-portal"
+  | { kind: "checkpoint"; checkpointId: string }
+  | { kind: "collectible"; collectibleId: string }
+  | null;
 
 /** World-space AABB of a loaded generated-mesh, reported once its object
  * finishes mounting/updating — used by LevelEditor's floor-align and
@@ -82,9 +95,27 @@ export function Preview3D({
         <CheckpointMarker
           key={checkpoint.id}
           checkpoint={checkpoint}
-          active={typeof placementMode === "object" && placementMode !== null && placementMode.checkpointId === checkpoint.id}
+          active={
+            typeof placementMode === "object" &&
+            placementMode?.kind === "checkpoint" &&
+            placementMode.checkpointId === checkpoint.id
+          }
         />
       ))}
+      {manifest.experience?.collectibles.map((collectible) => (
+        <CollectibleMarker
+          key={collectible.id}
+          collectible={collectible}
+          active={
+            typeof placementMode === "object" &&
+            placementMode?.kind === "collectible" &&
+            placementMode.collectibleId === collectible.id
+          }
+        />
+      ))}
+      {manifest.experience?.finishPortal ? (
+        <FinishPortalMarker portal={manifest.experience.finishPortal} active={placementMode === "finish-portal"} />
+      ) : null}
 
     </Canvas>
   );
@@ -306,5 +337,39 @@ function CheckpointMarker({ checkpoint, active }: { checkpoint: Checkpoint; acti
         <meshBasicMaterial color="#f5a623" wireframe transparent opacity={0.25} />
       </mesh>
     </mesh>
+  );
+}
+
+function CollectibleMarker({
+  collectible,
+  active,
+}: {
+  collectible: ColorFragmentEntity;
+  active: boolean;
+}) {
+  return (
+    <mesh position={collectible.transform.position}>
+      <octahedronGeometry args={[Math.max(0.12, collectible.triggerRadius * 0.35), 0]} />
+      <meshStandardMaterial
+        color={collectible.color}
+        emissive={active ? collectible.color : "#000000"}
+        emissiveIntensity={active ? 0.9 : 0.25}
+      />
+    </mesh>
+  );
+}
+
+function FinishPortalMarker({ portal, active }: { portal: FinishPortalEntity; active: boolean }) {
+  return (
+    <group position={portal.transform.position} quaternion={[...portal.transform.rotation]} scale={portal.transform.scale}>
+      <mesh>
+        <torusGeometry args={[0.7, 0.12, 12, 32]} />
+        <meshStandardMaterial
+          color={active ? portal.activeColor : portal.inactiveColor}
+          emissive={active ? portal.activeColor : portal.inactiveColor}
+          emissiveIntensity={0.55}
+        />
+      </mesh>
+    </group>
   );
 }

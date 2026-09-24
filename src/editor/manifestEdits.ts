@@ -1,6 +1,8 @@
 import type {
   CalibrationMetadata,
   Checkpoint,
+  ColorFragmentEntity,
+  FinishPortalEntity,
   HelperEntity,
   SceneManifest,
   SpawnPoint,
@@ -19,6 +21,11 @@ function newCheckpointId(): string {
     return `checkpoint-${crypto.randomUUID()}`;
   }
   return `checkpoint-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function newExperienceEntityId(prefix: "fragment" | "finish-portal"): string {
+  if ("randomUUID" in crypto) return `${prefix}-${crypto.randomUUID()}`;
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 /**
@@ -124,6 +131,153 @@ export function reorderCheckpoint(
   sorted[index] = { ...b, order: a.order };
   sorted[swapWith] = { ...a, order: b.order };
   return markManuallyAdjusted({ ...manifest, checkpoints: sorted });
+}
+
+function restorationSteps(count: number): number[] {
+  return Array.from({ length: count }, (_, index) => (index + 1) / count);
+}
+
+export function addColorFragment(
+  manifest: SceneManifest,
+  position: ColorFragmentEntity["transform"]["position"],
+): SceneManifest {
+  if (!manifest.experience) return manifest;
+  const collectible: ColorFragmentEntity = {
+    id: newExperienceEntityId("fragment"),
+    kind: "color-fragment",
+    transform: { position, rotation: [0, 0, 0, 1], scale: [0.22, 0.22, 0.22] },
+    triggerRadius: 0.45,
+    color: "#FFD93D",
+    order: manifest.experience.collectibles.length,
+    restorationAmount: 1,
+  };
+  const collectibles = [...manifest.experience.collectibles, collectible].map((item, index, all) => ({
+    ...item,
+    order: index,
+    restorationAmount: 1 / all.length,
+  }));
+  const mode = manifest.experience.mode;
+  const nextMode =
+    mode.kind === "collect"
+      ? {
+          ...mode,
+          requiredCollectibleIds: [...mode.requiredCollectibleIds, collectible.id],
+          requiredCount: mode.requiredCount + 1,
+          restorationSteps: restorationSteps(mode.requiredCount + 1),
+        }
+      : mode.kind === "explore"
+        ? { ...mode, optionalCollectibleIds: [...mode.optionalCollectibleIds, collectible.id] }
+        : mode;
+  return markManuallyAdjusted({
+    ...manifest,
+    experience: { ...manifest.experience, mode: nextMode, collectibles },
+  });
+}
+
+export function updateColorFragment(
+  manifest: SceneManifest,
+  collectibleId: string,
+  patch: Partial<Omit<ColorFragmentEntity, "id" | "kind" | "order">>,
+): SceneManifest {
+  if (!manifest.experience || !manifest.experience.collectibles.some((item) => item.id === collectibleId)) {
+    return manifest;
+  }
+  return markManuallyAdjusted({
+    ...manifest,
+    experience: {
+      ...manifest.experience,
+      collectibles: manifest.experience.collectibles.map((item) =>
+        item.id === collectibleId ? { ...item, ...patch } : item,
+      ),
+    },
+  });
+}
+
+export function removeColorFragment(manifest: SceneManifest, collectibleId: string): SceneManifest {
+  if (!manifest.experience || !manifest.experience.collectibles.some((item) => item.id === collectibleId)) {
+    return manifest;
+  }
+  const collectibles = manifest.experience.collectibles
+    .filter((item) => item.id !== collectibleId)
+    .map((item, index, all) => ({
+      ...item,
+      order: index,
+      restorationAmount: all.length === 0 ? item.restorationAmount : 1 / all.length,
+    }));
+  const mode = manifest.experience.mode;
+  const nextMode =
+    mode.kind === "collect"
+      ? (() => {
+          const requiredCollectibleIds = mode.requiredCollectibleIds.filter((id) => id !== collectibleId);
+          return {
+            ...mode,
+            requiredCollectibleIds,
+            requiredCount: requiredCollectibleIds.length,
+            restorationSteps: restorationSteps(requiredCollectibleIds.length),
+          };
+        })()
+      : mode.kind === "explore"
+        ? { ...mode, optionalCollectibleIds: mode.optionalCollectibleIds.filter((id) => id !== collectibleId) }
+        : mode;
+  return markManuallyAdjusted({
+    ...manifest,
+    experience: { ...manifest.experience, mode: nextMode, collectibles },
+  });
+}
+
+export function addFinishPortal(manifest: SceneManifest, position: FinishPortalEntity["transform"]["position"]): SceneManifest {
+  if (!manifest.experience || manifest.experience.finishPortal) return manifest;
+  const portal: FinishPortalEntity = {
+    id: newExperienceEntityId("finish-portal"),
+    kind: "finish-portal",
+    transform: { position, rotation: [0, 0, 0, 1], scale: [0.8, 1.2, 0.25] },
+    triggerRadius: 0.75,
+    activation:
+      manifest.experience.mode.kind === "collect"
+        ? "all-required-collectibles"
+        : manifest.experience.mode.kind === "race"
+          ? "all-race-checkpoints"
+          : "always",
+    inactiveColor: "#6D6780",
+    activeColor: "#9B5DE5",
+  };
+  const mode = manifest.experience.mode;
+  const nextMode =
+    mode.kind === "collect" || mode.kind === "race" ? { ...mode, finishPortalId: portal.id } : mode;
+  return markManuallyAdjusted({
+    ...manifest,
+    experience: { ...manifest.experience, mode: nextMode, finishPortal: portal },
+  });
+}
+
+export function updateFinishPortal(
+  manifest: SceneManifest,
+  patch: Partial<Omit<FinishPortalEntity, "id" | "kind">>,
+): SceneManifest {
+  if (!manifest.experience?.finishPortal) return manifest;
+  return markManuallyAdjusted({
+    ...manifest,
+    experience: {
+      ...manifest.experience,
+      finishPortal: { ...manifest.experience.finishPortal, ...patch },
+    },
+  });
+}
+
+export function removeFinishPortal(manifest: SceneManifest): SceneManifest {
+  if (!manifest.experience?.finishPortal || manifest.experience.mode.kind === "collect") return manifest;
+  const mode = manifest.experience.mode;
+  const nextMode =
+    mode.kind === "race"
+      ? (() => {
+          const { finishPortalId: _finishPortalId, ...withoutFinishPortal } = mode;
+          return withoutFinishPortal;
+        })()
+      : mode;
+  return markManuallyAdjusted({
+    ...manifest,
+    experience: { ...manifest.experience, mode: nextMode, finishPortal: null },
+  });
 }
 
 export function addHelperEntity(
