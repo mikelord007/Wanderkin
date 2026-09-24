@@ -175,6 +175,23 @@ otherwise the camera's forward direction.
 
 ## Checkpoints, respawn and completion
 
+V2 mode progress lives in `GameplaySession`, beside rather than inside the
+Rapier controller:
+
+- **Collect** credits each authored fragment once, applies monotonic authored
+  restoration steps, and unlocks the portal only after every required unique
+  fragment. Respawn preserves the set; restart clears it.
+- **Explore** points at authored destinations and optional collectibles. There
+  is no countdown or elapsed-time display, and visiting every destination (or
+  entering an authored always-active portal) completes the run.
+- **Race** freezes movement during its authored countdown, requires checkpoint
+  IDs in order, excludes paused time, freezes one final result, and stores a
+  personal best under the immutable published version ID. Draft runs use the
+  world ID as a clearly local fallback key.
+
+The older checkpoint-only course behavior below remains intact for legacy
+manifests and both original bundled samples.
+
 Checkpoints are collected **in manifest `order`**, not by proximity:
 walking through checkpoint 3 before checkpoint 2 does nothing. Without
 that, "next objective" would be meaningless and a course could be
@@ -343,7 +360,8 @@ Known limitations:
   decoding. Geometry and collision are unaffected; this does not occur in
   the browser.
 - **Mobile is not supported.** There is no touch input and pointer lock is
-  desktop-only.
+  desktop-only. Coarse-pointer layouts explicitly say that keyboard and mouse
+  are the supported controls instead of presenting inert touch controls.
 - **No audio.**
 - Mantle `insufficient-headroom` is unreachable with the default tuning
   (see above); it exists for tunings where required clearance exceeds the

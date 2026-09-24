@@ -50,7 +50,7 @@ export function StartScreen({
   useEffect(() => {
     Promise.all([import("../../scene/samples.js"), import("../../game/bundledSamples.js")])
       .then(([sceneSamples, gameSamples]) =>
-        setSampleLevels([gameSamples.LOST_COLORS_SAMPLE, ...sceneSamples.SAMPLE_LEVELS]),
+        setSampleLevels([gameSamples.LOST_COLORS_SAMPLE, gameSamples.EXPLORE_SAMPLE, ...sceneSamples.SAMPLE_LEVELS]),
       )
       .catch((error) =>
         setSampleError(error instanceof Error ? error.message : "Bundled samples are unavailable."),
@@ -155,9 +155,9 @@ export function StartScreen({
           {sampleError ? <p role="alert" className="oq-kit-error">The samples couldn’t load. Refresh to try again.</p>
             : !sampleLevels ? <p role="status" className="oq-kit-muted">Opening the sample collection…</p>
             : sampleLevels.length === 0 ? <EmptyState title="No samples available" description="You can still start a world from your own photo." action={<Button onClick={onCreateFromPhotos}>Create my world</Button>} />
-            : <div className="oq-kit-grid">{sampleLevels.map((manifest, index) => <Card key={manifest.levelId} className="oq-welcome__sample-card">
+            : <div className="oq-kit-grid">{sampleLevels.map((manifest) => <Card key={manifest.levelId} className="oq-welcome__sample-card">
               <img src={`/samples/photo-${manifest.assets[0]?.url.includes("rodin") ? 4 : 2}.jpg`} alt="Source photo for the bundled room sample" loading="lazy" />
-              <div><h3>{manifest.levelId === "sample-lost-colors-rodin" ? "The Lost Colors of Teacup Island" : index === 1 ? "The desk & sofa adventure" : "A different perspective"}</h3><p>{manifest.experience?.mode.kind === "collect" ? "3 color fragments · restore this miniature world" : `${manifest.checkpoints.length} checkpoints · a miniature room to explore`}</p>
+              <div><h3>{manifest.levelId === "sample-lost-colors-rodin" ? "The Lost Colors of Teacup Island" : manifest.levelId === "sample-explore-rodin" ? "Teacup Island Wander" : manifest.levelId === "sample-rodin-room-corner" ? "The desk & sofa adventure" : "A different perspective"}</h3><p>{manifest.experience?.mode.kind === "collect" ? "3 color fragments · restore this miniature world" : manifest.experience?.mode.kind === "explore" ? `${manifest.experience.mode.destinations.length} destinations · no timer` : `${manifest.checkpoints.length} checkpoints · a miniature room to explore`}</p>
                 <div className="oq-kit-row"><Button onClick={() => onPlaySample(manifest)}>Play now</Button><Button variant="ghost" onClick={() => onEditSample(manifest)}>Edit course</Button></div></div>
             </Card>)}</div>}
         </section>
