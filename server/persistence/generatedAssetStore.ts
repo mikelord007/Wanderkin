@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { GeneratedImageReference } from "../../shared/generation.js";
 import type { AudioAssetReference, VideoAssetReference } from "../../shared/media.js";
@@ -97,6 +97,16 @@ export class GeneratedAssetStore {
 
   async get(id: string): Promise<GeneratedBinaryAsset | undefined> {
     return (await this.index.read())[id];
+  }
+
+  async getImageBytes(id: string): Promise<{ buffer: Buffer; mimeType: string; filename: string }> {
+    const asset = await this.get(id);
+    if (!asset || "mediaType" in asset) {
+      throw new Error(`Unknown generated image asset id "${id}"`);
+    }
+    const filename = asset.url.split("/").pop();
+    if (!filename) throw new Error(`Generated image "${id}" has an invalid stored URL`);
+    return { buffer: await readFile(join(this.dir, filename)), mimeType: asset.mimeType, filename };
   }
 
   fileDir(): string {

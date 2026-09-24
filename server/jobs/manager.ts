@@ -744,10 +744,10 @@ export class JobManager {
           result = { kind: "image-edit", asset };
         } else if (request.kind === "video") {
           const asset = await this.generation.generatedAssets.storeVideo(buffer, {
-            durationSeconds: request.kind === "tts" ? 0 : request.durationSeconds,
+            durationSeconds: request.durationSeconds,
             provenance: record.job.provenance!,
           });
-          result = { kind: "video", asset };
+          result = { kind: "video", asset: { ...asset, kind: "animated-postcard" } };
         } else {
           const kind = request.kind === "music"
             ? "music"
@@ -756,7 +756,7 @@ export class JobManager {
               : request.purpose.toLowerCase().includes("ambience") ? "ambience" : "sfx";
           const asset = await this.generation.generatedAssets.storeAudio(buffer, {
             kind,
-            durationSeconds: request.durationSeconds,
+            durationSeconds: request.kind === "tts" ? 0 : request.durationSeconds,
             loop: request.kind === "tts" ? false : request.loop,
             defaultGain: request.kind === "music" ? 0.7 : request.kind === "tts" ? 1 : 0.85,
             ...(request.kind === "tts" ? { transcript: request.text } : {}),
@@ -772,7 +772,7 @@ export class JobManager {
       record.job.result = result;
       if ("asset" in result) record.job.resultAssetId = result.asset.id;
       record.job.state = "ready";
-      record.job.uiMessage = request.kind === "image-to-3d" ? friendlyMessage("ready") : "Generated asset is ready.";
+      record.job.uiMessage = "Generated asset is ready.";
       record.job.updatedAt = record.job.completedAt!;
     } catch (err) {
       record.job.state = "failed";

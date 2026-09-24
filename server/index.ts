@@ -6,12 +6,16 @@ import { mcpClient } from "./livepeer/mcpClient.js";
 import { LivepeerAdapter } from "./livepeer/adapter.js";
 import { PhotoStore } from "./persistence/photoStore.js";
 import { AssetStore } from "./persistence/assetStore.js";
+import { GeneratedAssetStore } from "./persistence/generatedAssetStore.js";
 import { JobStore, JobStoreUploadUrlCache } from "./jobs/store.js";
 import { JobManager } from "./jobs/manager.js";
+import { SpendLedger } from "./jobs/spendLedger.js";
+import { PreviewCacheStore } from "./jobs/previewCache.js";
 import { createCapabilitiesRouter } from "./routes/capabilities.js";
 import { createUploadsRouter } from "./routes/uploads.js";
 import { createPhotosRouter } from "./routes/photos.js";
 import { createAssetsRouter } from "./routes/assets.js";
+import { createGeneratedAssetsRouter } from "./routes/generatedAssets.js";
 import { createJobsRouter } from "./routes/jobs.js";
 import { createLevelsRouter, LevelStore } from "./levels.js";
 import { logServerError } from "./util/sanitize.js";
@@ -27,9 +31,25 @@ app.use(express.json({ limit: "10mb" }));
 
 const photoStore = new PhotoStore(env.storageDir);
 const assetStore = new AssetStore(env.storageDir);
+const generatedAssetStore = new GeneratedAssetStore(env.storageDir);
 const jobStore = new JobStore(env.storageDir);
-const adapter = new LivepeerAdapter(mcpClient, photoStore, new JobStoreUploadUrlCache(jobStore));
-const jobManager = new JobManager(jobStore, adapter, assetStore, photoStore);
+const spendLedger = new SpendLedger(env.storageDir);
+const previewCache = new PreviewCacheStore(env.storageDir);
+const sourceBytes = {
+  async getPhotoBytes(id: string) {
+    return (await photoStore.get(id))
+      ? photoStore.getPhotoBytes(id)
+      : generatedAssetStore.getImageBytes(id);
+  },
+};
+const adapter = new LivepeerAdapter(mcpClient, sourceBytes, new JobStoreUploadUrlCache(jobStore));
+const jobManager = new JobManager(jobStore, adapter, assetStore, photoStore, {
+  generatedAssets: generatedAssetStore,
+  spendLedger,
+  perRequestLimitUsd: env.livepeerMaxRequestUsd,
+  perWorldLimitUsd: env.livepeerMaxWorldUsd,
+  maxRetries: env.livepeerMaxAutomaticRetries,
+});
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
@@ -43,7 +63,8 @@ app.use(createCapabilitiesRouter(adapter));
 app.use(createUploadsRouter(photoStore));
 app.use(createPhotosRouter(photoStore));
 app.use(createAssetsRouter(assetStore));
-app.use(createJobsRouter(jobManager, adapter, photoStore));
+app.use(createGeneratedAssetsRouter(generatedAssetStore));
+app.use(createJobsRouter(jobManager, adapter, photoStore, generatedAssetStore, previewCache, spendLedger));
 app.use(createLevelsRouter(new LevelStore(env.storageDir, assetStore, photoStore)));
 
 const terminalErrorHandler: ErrorRequestHandler = (error, req, res, next) => {
