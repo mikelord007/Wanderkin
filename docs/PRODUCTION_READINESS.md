@@ -78,10 +78,14 @@ MiB ([`server/persistence/generatedAssetStore.ts`](../server/persistence/generat
 total timeout, redirect cap, URL safety checks, and byte cap
 ([`server/persistence/fetchSafe.ts`](../server/persistence/fetchSafe.ts)).
 
-**Gap.** Photo validation has no decoded dimension/pixel cap, so a small
-compressed decompression bomb can pass. Multer buffers each upload in memory;
-10 maximum-sized files can create substantial per-request memory pressure.
-There is no aggregate/user quota or reverse-proxy body policy.
+The creation client additionally decodes images with orientation handling and
+rejects dimensions outside 128–12,000 pixels per side
+([`src/ui/imageValidation.ts`](../src/ui/imageValidation.ts)).
+
+**Gap.** The decoded-dimension check is client-side only and can be bypassed by
+a direct API caller; the server has no decoded pixel cap. Multer buffers each
+upload in memory, so 10 maximum-sized files can create substantial per-request
+memory pressure. There is no aggregate/user quota or reverse-proxy body policy.
 
 **Action.** Decode with a bounded image library before persistence, enforce
 pixel/dimension and aggregate-request limits, stream large inputs to bounded
@@ -169,19 +173,20 @@ and a cache policy appropriate to private content.
 
 ### Mobile browser behavior
 
-**Today.** The creation flow uses a mobile-compatible image file picker and
-responsive UI styling. Gameplay explicitly states that keyboard and mouse are
-supported and touch controls are unavailable
-([`src/ui/screens/PhotosScreen.tsx`](../src/ui/screens/PhotosScreen.tsx),
-[`src/game/hud/Hud.tsx`](../src/game/hud/Hud.tsx)). The runtime relies on
+**Today.** The creation flow now provides drag-and-drop, a constrained image
+picker, and a dedicated camera action using the environment-facing camera when
+available, with a clear upload fallback on permission failure
+([`src/ui/screens/CaptureScreen.tsx`](../src/ui/screens/CaptureScreen.tsx)).
+Client decoding honors image orientation. Gameplay explicitly states that
+keyboard and mouse are supported and touch controls are unavailable
+([`src/game/hud/Hud.tsx`](../src/game/hud/Hud.tsx)). The runtime relies on
 pointer lock for mouse camera control
 ([`src/game/input/inputController.ts`](../src/game/input/inputController.ts)).
 
-**Gap.** There is no dedicated camera-capture action/`capture` hint, no touch
-gameplay, and no claim-backed mobile browser completion. Mobile memory limits
-may be stressed by large uploads and generated meshes; iOS media playback,
-orientation, background/resume, and WebGL recovery have not been production
-verified.
+**Gap.** There is no touch gameplay and no claim-backed mobile browser
+completion. Mobile memory limits may be stressed by large uploads and generated
+meshes; iOS camera lifecycle, media playback, background/resume, and WebGL
+recovery have not been production verified.
 
 **Action.** Keep the demo's playable path on a desktop browser and retain the
 honest touch notice. Run the mobile-layout/browser matrix, cap/resize images

@@ -29,9 +29,10 @@ select the authorized demo image. Confirm/use the image when prompted.
 with replace/retake available. Explain: “This is the source photograph; no 3D
 asset existed in ObjectQuest yet.”
 
-**Current release note:** The integrated baseline currently labels the action
-**Add photos** and proceeds to view selection; a distinct confirmation screen
-is a later integration dependency. Do not claim it exists if it is absent.
+**Integrated UI:** The creation journey now provides **Choose from photos**,
+**Take a photo**, drag-and-drop, a real preview, **Use this photo**, and
+**Retake or replace**. The complete journey still needs final browser validation
+on the release revision.
 
 ### 2. Review the object
 
@@ -42,15 +43,16 @@ the original image** or replace it.
 **Expected:** The intended object is complete and centered before any expensive
 3D work. The original remains available for comparison.
 
-**Fallback:** If background removal is unavailable or its screen is not in the
-release, state that this optional provider step has no real execution evidence
-and continue with the original image; never show a fabricated cutout.
+**Fallback:** If background removal is unavailable, click **Use original photo**
+and state that this provider step has no real execution evidence; never show a
+fabricated cutout.
 
 ### 3. Choose and approve the visual direction
 
 **Click:** Choose **Cartoon**, **Collect** (the default), optionally enter the
-prepared atmosphere, then deliberately request the preview. On **Like this
-direction?**, compare original and preview and click **Build my world**.
+prepared atmosphere, then click **Preview my world**. On **Like this
+direction?**, compare original and preview, click **Use this preview**, then
+click **Build my world**.
 
 **Expected:** The actual uploaded object appears as the approved style
 direction. Explain that the production mesh still comes from the original
@@ -65,9 +67,8 @@ the current visitor's result.
 ### 4. Show generation progress
 
 **Click:** After **Build my world**, remain on **Your world is taking shape**.
-If the demo uses the integrated baseline wording, the heading is **Building
-your level**. Refresh once to demonstrate that the same job resumes, then
-return through **My worlds** if that navigation is present.
+Refresh once to demonstrate that the same job resumes, then click **My worlds**
+and return to the pending world to show durable recovery.
 
 **Expected:** Real job-backed stages change without a fabricated percentage.
 Elapsed time is visible; refresh observes the existing job ID rather than
@@ -107,11 +108,13 @@ continues. Show subtitles with narration.
 **Expected:** Playback is user-initiated, channel controls work, and audio is
 tied to the saved world without restarting generation.
 
-**Current evidence boundary:** The bundled Lost Colors manifest currently has
-an empty audio array, and no real ObjectQuest execution exists yet for music,
-SFX, or TTS. If later integration has not supplied and validated those assets,
-say so and skip playback; do not substitute unrelated audio or claim generated
-sound evidence.
+**Current evidence boundary:** Worker 4's progress screen can submit story,
+music, and narration jobs and preview returned music/narration deliberately.
+Worker 6's complete quest/audio-to-saved-world integration has not landed, the
+bundled Lost Colors manifest has an empty audio array, and no real ObjectQuest
+execution exists yet for music, SFX, or TTS. Skip this step unless Worker 6
+supplies and validates those assets; do not substitute unrelated audio or
+claim generated sound evidence.
 
 ### 8. Save and share the challenge
 

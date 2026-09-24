@@ -60,10 +60,13 @@ unchecked until that work actually occurs.
   durable-volume deployment contract — [`package.json`](../package.json),
   [`Dockerfile`](../Dockerfile), [`deploy/Caddyfile`](../deploy/Caddyfile), and
   [`DEPLOYMENT.md`](DEPLOYMENT.md).
-- [ ] Complete screens 1–7 creation journey verified as one integrated flow;
-  object review and style approval depend on later integration work.
+- [x] Worker 4 creation screens 2–7, capture/upload, object review, explicit
+  style approval, resumable progress, and world-ready handoff are integrated.
+- [ ] Complete screens 1–7 creation journey verified in a real browser on the
+  final combined release; the implementation landing is not that evidence.
 - [ ] Generated quest/music/SFX/TTS integrated and used in a playable world;
-  gateway support is not evidence of end-user integration.
+  Worker 4 can submit and preview some optional jobs, but Worker 6's complete
+  saved-world/gameplay integration and real execution evidence are pending.
 - [ ] Optional generated postcard or gameplay-highlight flow integrated and
   independently failure-tolerant.
 
