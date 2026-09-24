@@ -24,6 +24,11 @@ world spend, and private levels require a matching token. Unauthorized and
 missing records both return 404 where practical. Private bytes use
 `Cache-Control: private, no-store`. Bundled files below `public/` remain public.
 
+Uploaded photos and screenshots are content-addressed by SHA-256 within that
+owner boundary. Re-uploading identical bytes with the same owner token returns
+the existing photo reference (HTTP 200) and does not create another file;
+identical bytes uploaded by a different owner create a separate private record.
+
 Publishing creates an immutable public snapshot. Workflow data is removed and
 source photos are omitted unless `includesSourcePhotos: true` is explicitly
 requested. Assets required to play a published version become public; source
@@ -38,6 +43,10 @@ owner-token support remain readable. New records are intentionally left
 unowned while this migration mode is active. The code default is `false` when
 `NODE_ENV=production` and `true` otherwise to preserve local fixtures and old
 development stores. Do not enable this on an internet-facing deployment.
+
+In legacy-open mode, content deduplication is limited to ownerless photos:
+identical ownerless bytes reuse the existing reference, while owned records are
+never folded into that open scope.
 
 Changing an existing open store to strict mode makes its unowned private
 records inaccessible; back up the complete storage directory and plan token

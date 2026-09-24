@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { readdir } from "node:fs/promises";
+import { join } from "node:path";
 import { startApiServer, type ApiServerHandle } from "./helpers/apiServer.js";
 import { startFakeMcpServer, type FakeMcpServer } from "./helpers/fakeMcpServer.js";
 import { defaultMcpHandlers } from "./helpers/mcpHandlers.js";
@@ -58,6 +60,26 @@ describe("POST /api/uploads + GET /api/photos/files/:name", () => {
     expect(downloaded.equals(original)).toBe(true);
   });
 
+  it("reuses identical ownerless photos in legacy-open mode", async () => {
+    const before = await readdir(join(api.storageDir, "photos"));
+    const bytes = readSamplePhoto(5);
+    const upload = async () => {
+      const form = new FormData();
+      form.append("photos", new Blob([new Uint8Array(bytes)], { type: "image/jpeg" }), "legacy.jpg");
+      return fetch(`${api.baseUrl}/api/uploads`, { method: "POST", body: form });
+    };
+
+    const first = await upload();
+    expect(first.status).toBe(201);
+    const [firstPhoto] = await first.json() as Array<{ id: string }>;
+    const repeated = await upload();
+    expect(repeated.status).toBe(200);
+    const [repeatedPhoto] = await repeated.json() as Array<{ id: string }>;
+
+    expect(repeatedPhoto!.id).toBe(firstPhoto!.id);
+    expect(await readdir(join(api.storageDir, "photos"))).toHaveLength(before.length + 1);
+  });
+
   it("rejects a file whose magic bytes aren't a recognized image, with 400 and stores nothing", async () => {
     const form = new FormData();
     form.append("photos", new Blob([new Uint8Array(notAnImageOrGlb())], { type: "image/jpeg" }), "fake.jpg");
@@ -113,7 +135,9 @@ describe("POST /api/uploads + GET /api/photos/files/:name", () => {
     const form = new FormData();
     form.append("screenshot", new Blob([new Uint8Array(readSamplePhoto(2))], { type: "image/jpeg" }), "world-shot.jpg");
     const response = await fetch(`${api.baseUrl}/api/screenshots`, { method: "POST", body: form });
-    expect(response.status).toBe(201);
+    // The same bytes were already uploaded above, so legacy-open dedupe also
+    // applies to the screenshot alias after all validations run.
+    expect(response.status).toBe(200);
     const [screenshot] = await response.json() as Array<{ id: string; url: string }>;
     expect(screenshot!.url).toMatch(/^\/api\/photos\/files\//);
   });

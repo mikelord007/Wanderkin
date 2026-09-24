@@ -180,6 +180,12 @@ generation happens server-side.
   without calling `submit` again. A repeat request with the same key but a
   **different** body returns HTTP 409 (`status: "conflict"`) rather than
   guessing which one was meant.
+- Photo uploads are content-addressed by SHA-256 per owner before job creation.
+  Re-uploading the same bytes under the same owner returns the existing photo
+  id (HTTP 200), so a refresh or resumed runner reconstructs the same generation
+  request body and can reconcile its idempotency key instead of conflicting.
+  Identical bytes from different owners remain separate; legacy-open mode only
+  deduplicates among ownerless photos.
 - The **same key** is also passed to Livepeer's own `run_capability`
   `idempotency_key`/`session_id` params. If our process crashes between
   submitting and persisting the response, a retry that lands via
@@ -253,10 +259,11 @@ generation happens server-side.
   (not reset per redirect, so a chain can't keep extending its own
   deadline), and the response body is cancelled and the read aborted
   mid-stream if it exceeds the byte cap rather than buffered unbounded.
-- Files are served back out at content-addressed URLs
-  (`/api/assets/files/{sha256}.glb`, `/api/photos/files/{uuid}.{ext}`) with
-  a strict filename pattern check, so a request can never escape the storage
-  directory.
+- Files are served back out at storage URLs (`/api/assets/files/{sha256}.glb`,
+  `/api/photos/files/{uuid}.{ext}`) with a strict filename pattern check, so a
+  request can never escape the storage directory. Photo content identity is
+  the owner-scoped SHA-256 recorded in the private index; the public URL keeps
+  the existing UUID form.
 
 ## Diagnostics stay private; client JSON is sanitized
 
