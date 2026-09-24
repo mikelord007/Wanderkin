@@ -9,6 +9,7 @@ import { migrateSceneManifest, sceneManifestReaderSchema } from "../../shared/ma
 import { LevelStore } from "../../server/levels.js";
 import { AssetStore } from "../../server/persistence/assetStore.js";
 import { PhotoStore } from "../../server/persistence/photoStore.js";
+import { PublicationStore } from "../../server/publications.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -79,17 +80,42 @@ describe("ObjectQuest v2 schema and publication integration contracts", () => {
     expect(reloaded?.workflow?.jobs.map((job) => job.jobId)).toEqual(["job-preview-1", "job-mesh-1"]);
   });
 
-  it.skip("keeps an existing published version stable after its private source is edited", () => {
+  it("keeps an existing published version stable after its private source is edited", async () => {
     // Given a Lost Colors draft published with a completion or race challenge,
     // capture its versionId, shareId, manifest bytes, challenge, and asset IDs.
-    void lostColorsManifest;
+    const { directory, store } = await createStore();
+    const source = await store.create(migrateSceneManifest(lostColorsManifest));
+    const publications = new PublicationStore(directory);
+    const first = await publications.publish(source, { challenge: { kind: "completion" } });
 
-    // When the creator edits style, entities, mission, media, and race target
-    // on the private source and saves or publishes a second version,
+    // When the creator edits style, entities, mission, and media on the
+    // private source and publishes a second version,
+    const edited = {
+      ...source,
+      name: "Private edited title",
+      experience: {
+        ...source.experience!,
+        style: { ...source.experience!.style, id: "watercolor" as const },
+        quest: { ...source.experience!.quest, objective: "A changed private objective." },
+      },
+      entities: source.entities.map((entity, index) =>
+        index === 0
+          ? { ...entity, transform: { ...entity.transform, position: [9, 9, 9] as const } }
+          : entity,
+      ),
+      media: { audio: [], video: [] },
+    };
+    const savedEdit = await store.save(source.levelId, edited);
+    const second = await publications.publish(savedEdit, { challenge: { kind: "completion" } });
 
     // then reopening the original shareId in an isolated reader returns the
     // original immutable manifest and challenge; the new publication has new
     // version/share identity and neither path submits generation work.
-    throw new Error("Contract stub: connect Worker 7 publish/read/edit adapters");
+    const isolatedRead = await new PublicationStore(directory).getByShareId(first.shareId);
+    expect(isolatedRead).toEqual(first);
+    expect(isolatedRead?.manifest.name).toBe(lostColorsManifest.name);
+    expect(isolatedRead?.manifest.photos).toEqual([]);
+    expect(second.versionId).not.toBe(first.versionId);
+    expect(second.shareId).not.toBe(first.shareId);
   });
 });

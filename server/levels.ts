@@ -11,6 +11,7 @@ import {
 import { AssetStore } from "./persistence/assetStore.js";
 import { PhotoStore } from "./persistence/photoStore.js";
 import { assertValidGlb, assertValidPhoto, InvalidFileError } from "./persistence/validate.js";
+import { PublicationStore } from "./publications.js";
 
 /**
  * Manifest persistence (owner: Level tools and persistence). Bundle imports
@@ -611,7 +612,22 @@ function wrapAsync(
   };
 }
 
-export function createLevelsRouter(store: LevelStore): Router {
+const publishRequestSchema = z.object({
+  challenge: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("completion") }),
+    z.object({
+      kind: z.literal("race"),
+      targetMilliseconds: z.number().finite().positive(),
+      verification: z.literal("personal-unverified"),
+    }),
+  ]),
+  includesSourcePhotos: z.boolean().optional().default(false),
+});
+
+export function createLevelsRouter(
+  store: LevelStore,
+  publications = new PublicationStore(store.storageDir),
+): Router {
   const router = Router();
 
   router.get(
@@ -665,6 +681,56 @@ export function createLevelsRouter(store: LevelStore): Router {
       }
       const saved = await store.save(id, parsed.data as SceneManifest);
       res.json(saved);
+    }),
+  );
+
+  router.post(
+    "/api/levels/:id/publish",
+    wrapAsync(async (req, res) => {
+      const level = await store.get(req.params.id as string);
+      if (!level) {
+        res.status(404).json({ message: "Level not found" });
+        return;
+      }
+      const parsed = publishRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ message: `Invalid publication: ${formatZodError(parsed.error)}` });
+        return;
+      }
+      try {
+        const publication = await publications.publish(level, parsed.data);
+        res.status(201).json(publication);
+      } catch (error) {
+        if (error instanceof Error && /challenge|race target/i.test(error.message)) {
+          res.status(400).json({ message: error.message });
+          return;
+        }
+        throw error;
+      }
+    }),
+  );
+
+  router.get(
+    "/api/levels/:id/publications",
+    wrapAsync(async (req, res) => {
+      const level = await store.get(req.params.id as string);
+      if (!level) {
+        res.status(404).json({ message: "Level not found" });
+        return;
+      }
+      res.json(await publications.listForSourceLevel(level.levelId));
+    }),
+  );
+
+  router.get(
+    "/api/shares/:shareId",
+    wrapAsync(async (req, res) => {
+      const publication = await publications.getByShareId(req.params.shareId as string);
+      if (!publication) {
+        res.status(404).json({ message: "Shared world not found" });
+        return;
+      }
+      res.json(publication);
     }),
   );
 

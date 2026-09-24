@@ -551,6 +551,36 @@ describe("createLevelsRouter (HTTP)", () => {
     expect((await updated.json()) as SceneManifest).toMatchObject({ name: "Updated name" });
   });
 
+  it("publishes an immutable share without source photos by default", async () => {
+    const created = await fetch(`${baseUrl}/api/levels`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...lostColorsFixture, levelId: "publish-me" }),
+    });
+    const privateLevel = (await created.json()) as SceneManifest;
+
+    const published = await fetch(`${baseUrl}/api/levels/publish-me/publish`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ challenge: { kind: "completion" } }),
+    });
+    expect(published.status).toBe(201);
+    const version = (await published.json()) as { shareId: string; manifest: SceneManifest; versionId: string };
+    expect(version.manifest.photos).toEqual([]);
+    expect(version.manifest).not.toHaveProperty("workflow");
+
+    const edited = await fetch(`${baseUrl}/api/levels/publish-me`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...privateLevel, name: "Edited private copy" }),
+    });
+    expect(edited.status).toBe(200);
+
+    const shared = await fetch(`${baseUrl}/api/shares/${version.shareId}`);
+    expect(shared.status).toBe(200);
+    expect(await shared.json()).toEqual(version);
+  });
+
   it("PUT rejects an unsafe :id before ever touching validation", async () => {
     const res = await fetch(`${baseUrl}/api/levels/${encodeURIComponent("../etc/passwd")}`, {
       method: "PUT",
