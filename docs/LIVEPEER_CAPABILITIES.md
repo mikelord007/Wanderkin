@@ -49,7 +49,7 @@ another.
 | `gpt-image-edit` | `create_media`; image `source_url` plus `prompt` shown by the example. Usage block is missing. | image; container not declared |
 | `rodin-i3d` | `create_media` action `generate`; image `source_url` and prompt shown by the example. The descriptor does not publish its full provider payload; the existing, previously verified Rodin adapter continues to send `image_urls`, GLB format, shaded material, 50K mesh, preview render, and a 0–65,535 deterministic seed. | 3D asset; ObjectQuest accepts only validated GLB |
 | `gemini-text` | `run_capability`; required capability plus prompt shown by the example. | text; ObjectQuest additionally parses and validates its constrained quest JSON |
-| `music` | `create_media`; `input_requirement=prompt_only`; prompt shown by example. The catalog does not confirm an instrumental-only flag. | audio; container not declared |
+| `music` | `create_media` action `music`; prompt required by the action. `tools/list` confirms `instrumental: true` forces no vocals and that instrumental is also the default when no lyrics are supplied. | audio; container not declared |
 | `mirelo-sfx` | `create_media`; prompt-only plus numeric `duration`; provider says 0.1–60 seconds, default 10 (and also labels duration as integer, so ObjectQuest restricts it to integer 1–60). | audio; container not declared |
 | `chatterbox-tts` | `create_media` action `tts`; required string key is exactly `text` (not `prompt`). Optional voice clone uses `audio_url`. | WAV audio |
 | `pixverse-i2v` | `create_media` action `animate`; required string `prompt`, required image `source_url`, optional integer `duration` 1–15 seconds (default 5). | MP4 video, no audio |
