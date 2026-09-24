@@ -87,3 +87,71 @@ describe("strict owner-token boundary", () => {
     expect((await shared.json() as PublishedLevelVersion).manifest.photos).toEqual([]);
   });
 });
+
+describe("HTTP abuse and spend controls", () => {
+  let api: ApiServerHandle | undefined;
+  let mcp: FakeMcpServer | undefined;
+
+  afterAll(async () => { await api?.stop(); await mcp?.close(); });
+
+  async function boot(env: Record<string, string>): Promise<void> {
+    await api?.stop();
+    await mcp?.close();
+    mcp = await startFakeMcpServer(defaultMcpHandlers());
+    api = await startApiServer({ mcpEndpoint: mcp.url, env });
+  }
+
+  function textRequest(idempotencyKey: string): unknown {
+    return {
+      request: {
+        schemaVersion: 1, kind: "text", capability: "gemini-text", idempotencyKey,
+        purpose: "security-test", prompt: "Return a short safe quest.", output: "plain-text", maxCharacters: 200,
+      },
+      worldId: `world-${idempotencyKey}`,
+    };
+  }
+
+  async function generate(idempotencyKey: string, body = textRequest(idempotencyKey)): Promise<Response> {
+    return fetch(`${api!.baseUrl}/api/jobs/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("returns 429 and Retry-After after a billable rate-limit breach", async () => {
+    await boot({ BILLABLE_RATE_LIMIT: "1", RATE_LIMIT_WINDOW_SECONDS: "60" });
+    expect((await generate("rate-first")).status).toBe(201);
+    const blocked = await generate("rate-second");
+    expect(blocked.status).toBe(429);
+    expect(Number(blocked.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(await blocked.json()).toEqual({ message: expect.stringMatching(/too many generation requests/i) });
+  });
+
+  it.each([
+    ["global", { LIVEPEER_MAX_GLOBAL_USD: "0.02", LIVEPEER_MAX_DAILY_USD: "20" }, /global limit/i],
+    ["daily", { LIVEPEER_MAX_GLOBAL_USD: "100", LIVEPEER_MAX_DAILY_USD: "0.02" }, /daily limit/i],
+  ])("rejects the %s spend cap before provider submission", async (_label, env, message) => {
+    await boot(env);
+    const key = `spend-${_label}`;
+    const response = await generate(key, {
+      request: {
+        schemaVersion: 1, kind: "music", capability: "music", idempotencyKey: key,
+        purpose: "security-test", prompt: "brief instrumental", durationSeconds: 10, instrumental: true, loop: false,
+      },
+      worldId: `world-${key}`,
+    });
+    expect(response.status).toBe(402);
+    expect(await response.json()).toMatchObject({ code: "budget_exceeded", message: expect.stringMatching(message) });
+    expect(mcp!.callsFor("run_capability")).toHaveLength(0);
+  });
+
+  it("keeps spend diagnostics absent unless configured and token-protected when enabled", async () => {
+    await boot({ DIAGNOSTICS_TOKEN: "diagnostics-secret" });
+    expect((await fetch(`${api!.baseUrl}/api/admin/spend`)).status).toBe(401);
+    const response = await fetch(`${api!.baseUrl}/api/admin/spend`, { headers: { "X-Admin-Token": "diagnostics-secret" } });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toMatchObject({ entries: 0, lifetimeUsd: 0, rollingDailyUsd: 0 });
+  });
+});
