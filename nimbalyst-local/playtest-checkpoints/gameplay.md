@@ -176,6 +176,72 @@ Final state: full repository suite **466/466 pass**; `tsc --noEmit` clean for
 every path I touched (the one remaining tree error, `src/ui/api.ts BRAND_NAME`,
 is the branding worker's in-flight file).
 
+## Final milestone: in-scene camera verification, then FROZEN
+
+Per the coordinator's superseding instruction, the five-value `shared/movement.ts`
+grant was **not actioned** — `shared/` remains untouched by me. The bounded
+in-scene camera-framing verification is now complete and I have stopped.
+
+**New: `src/game/render/cameraRig.test.ts` (4 tests).** Drives the real
+`CameraRig` against a real Rapier world, under a slab with 0.55 m of clearance
+(the underside of a sofa). Outcome — all four pass:
+
+- The miniature capsule stands and grounds in that 0.55 m gap; the authored
+  0.70 m capsule does not fit at all. This is the scale premise as a physics
+  fact rather than a screenshot.
+- Aiming the boom up into the slab, the camera reports occlusion, pulls in, ends
+  up **below** the slab (never inside furniture) and never closer than
+  `characterRadius * CAMERA_MIN_DISTANCE_RATIO` (never inside the character).
+- In the open it eases back out to the full 1.25 m boom.
+- Boom length, look-at lift and minimum boom, all measured **in character
+  heights**, are identical to the authored scale — so framing is unchanged and
+  it is the furniture that got bigger on screen, which is the point.
+
+Visual counterpart: `under-the-sofa-game-camera.png`. The character reads
+clearly in the shade under the furniture; the contour hull and the value
+contrast in the palette are doing that work.
+
+**No defect found in this verification.** Nothing further changed as a result.
+
+## Test failures reported by the navigation owner — settled
+
+They observed 2 failures in `characterAnimator.test.ts` during their 435/437 run.
+Not reproducible:
+
+- `characterAnimator.test.ts` is **byte-identical from its first commit
+  (`1c5fb0d`) to HEAD** — `git diff 1c5fb0d HEAD` touches only the
+  implementation file.
+- At HEAD it passes **16/16 on three consecutive runs**; the tests are
+  deterministic (fixed inputs, no clock, no randomness).
+- 38/38 was verified immediately before each of my commits.
+
+Cause: we share one working tree on MAIN, and I was actively editing
+`characterAnimator.ts` in the window before `10e4cbb` landed at 22:33:58. A peer
+running vitest during that window reads a half-applied edit. Nothing to fix; the
+lesson is that a shared-tree test run is only meaningful at a commit boundary.
+
+## Model provenance — asked for explicitly
+
+`claude-opus-5` / "Opus 5" comes from the **environment block the harness places
+in my system context** ("You are powered by the model named Opus 5. The exact
+model ID is claude-opus-5"). That is runtime-supplied metadata, **not** an
+inference from the requested `claude-code:opus` alias and **not** something I
+obtained by querying the CLI or an API — I ran no command to confirm it
+independently, and I am not aware of a free way to read the serving model ID
+from inside the session. So: runtime metadata, but self-reported by the harness
+rather than externally verified. If the coordinator needs a stronger source, the
+launcher's own record of what it resolved the alias to is the authority, not me.
+
+## Brand harmonisation (Mousehold) — noted, not actioned
+
+"Pip" is already a tiny friendly household explorer, which fits *Mousehold* and
+its tagline directly; item 12 is literally "everything is enormous when you're
+this small". The design is data (a palette and a handful of ring tables in
+`characterDesign.ts`), so adding mouse cues — ears on the cap, a tail in place
+of or alongside the scarf — is a contained change. **Not done**, per the freeze
+and per the instruction not to discard a coherent implemented character to
+duplicate logo geometry. Available on request.
+
 ## How to look at it
 
 Screenshots are in `nimbalyst-local/screenshots/character/` — every animation

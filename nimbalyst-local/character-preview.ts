@@ -140,18 +140,35 @@ if (params.get("scene") === "sofa") {
   for (const subject of subjects) scene.remove(subject.holder);
   subjects.length = 0;
 
+  // ?under=1 raises the sofa on legs and puts the character in the gap
+  // underneath, which is the space the miniature scale exists to open up.
+  const under = params.get("under") === "1";
+  const lift = under ? 0.55 : 0;
   const upholstery = new THREE.MeshStandardMaterial({ color: "#8a6f5c", roughness: 0.9 });
   const seat = new THREE.Mesh(
     new THREE.BoxGeometry(SOFA.length, SOFA.seat, SOFA.depth - SOFA.backThickness),
     upholstery,
   );
-  seat.position.set(0, SOFA.seat / 2, (SOFA.backThickness) / 2);
+  seat.position.set(0, lift + SOFA.seat / 2, (SOFA.backThickness) / 2);
   const back = new THREE.Mesh(
     new THREE.BoxGeometry(SOFA.length, SOFA.height, SOFA.backThickness),
     upholstery,
   );
-  back.position.set(0, SOFA.height / 2, -(SOFA.depth - SOFA.backThickness) / 2);
-  for (const part of [seat, back]) {
+  back.position.set(0, lift + SOFA.height / 2, -(SOFA.depth - SOFA.backThickness) / 2);
+  const legs: THREE.Mesh[] = [];
+  if (under) {
+    const legMaterial = new THREE.MeshStandardMaterial({ color: "#4e3b2f", roughness: 0.8 });
+    for (const [lx, lz] of [[-3.6, 1.2], [3.6, 1.2], [-3.6, -1.2], [3.6, -1.2]] as const) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.4, lift, 0.4), legMaterial);
+      leg.position.set(lx, lift / 2, lz);
+      leg.castShadow = true;
+      leg.receiveShadow = true;
+      scene.add(leg);
+      legs.push(leg);
+    }
+  }
+
+  for (const part of [seat, back, ...legs]) {
     part.castShadow = true;
     part.receiveShadow = true;
     scene.add(part);
@@ -165,7 +182,11 @@ if (params.get("scene") === "sofa") {
     const tilt = new THREE.Group();
     tilt.add(model.group);
     holder.add(tilt);
-    holder.position.set(-2 + index * 4, SOFA.seat + height / 2, 1.1);
+    holder.position.set(
+      under ? -1.2 + index * 2.4 : -2 + index * 4,
+      under ? height / 2 : lift + SOFA.seat + height / 2,
+      under ? 0.4 : 1.1,
+    );
     scene.add(holder);
     applyLanternScale(model, height);
     sofaSubjects.push({ holder, model, animator, tilt, height });

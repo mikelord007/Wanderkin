@@ -13,6 +13,8 @@ const SHOTS = [
   { name: "scale-vs-sofa", query: "scene=sofa" },
   { name: "game-camera-old-070m", query: "scene=sofa&cam=game&height=0.7" },
   { name: "game-camera-new-035m", query: "scene=sofa&cam=game&height=0.35" },
+  { name: "under-the-sofa", query: "scene=sofa&under=1" },
+  { name: "under-the-sofa-game-camera", query: "scene=sofa&under=1&cam=game&height=0.35" },
 ];
 
 await mkdir(outDir, { recursive: true });
