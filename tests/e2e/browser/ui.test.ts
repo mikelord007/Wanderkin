@@ -27,15 +27,16 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function openEditorForSample(page: Page, sampleName: string): Promise<void> {
-  const sampleSection = page.getByRole("heading", { name: "Play a sample" }).locator("..");
-  const card = sampleSection.locator("article").filter({ hasText: sampleName });
-  await card.getByRole("button", { name: "Edit" }).click();
+  const card = page.getByRole("article").filter({
+    has: page.getByRole("heading", { name: sampleName }),
+  });
+  await card.getByRole("button", { name: "Edit course" }).click();
   await page.getByRole("heading", { name: "Model orientation" }).waitFor();
 }
 
 test("photo lightbox follows real left/right/Escape keyboard input", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "From photos" }).click();
+  await page.getByRole("button", { name: "Create my world" }).first().click();
   await page.getByRole("heading", { name: "Add your photos" }).waitFor();
 
   await page.locator('input[type="file"]').setInputFiles([
@@ -68,7 +69,7 @@ test("photo lightbox follows real left/right/Escape keyboard input", async ({ pa
 
 test("editor scale, spawn, checkpoint, and helper edits survive save and reload", async ({ page }) => {
   await page.goto("/");
-  await openEditorForSample(page, "Room corner — Rodin");
+  await openEditorForSample(page, "The desk & sofa adventure");
 
   const orientation = page.getByRole("heading", { name: "Model orientation" }).locator("..");
   await orientation.getByLabel("Uniform scale").fill("4.5");
@@ -88,8 +89,7 @@ test("editor scale, spawn, checkpoint, and helper edits survive save and reload"
   await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
   await page.reload();
 
-  const savedSection = page.getByRole("heading", { name: "Your saved levels" }).locator("..");
-  const savedCard = savedSection.locator("article").filter({ hasText: "Room corner — Rodin" });
+  const savedCard = page.getByRole("article").filter({ hasText: "Room corner — Rodin" });
   await savedCard.getByRole("button", { name: "Edit" }).click();
   await page.getByRole("heading", { name: "Model orientation" }).waitFor();
 
@@ -110,7 +110,7 @@ test("editor scale, spawn, checkpoint, and helper edits survive save and reload"
 
 test("portable level export downloads and imports through the browser", async ({ page }) => {
   await page.goto("/");
-  await openEditorForSample(page, "Room corner — Tripo");
+  await openEditorForSample(page, "A different perspective");
 
   const orientation = page.getByRole("heading", { name: "Model orientation" }).locator("..");
   await orientation.getByLabel("Uniform scale").fill("6.75");
@@ -125,8 +125,8 @@ test("portable level export downloads and imports through the browser", async ({
   expect(bundlePath).not.toBeNull();
 
   await page.getByRole("button", { name: "Back", exact: true }).click();
-  await page.getByRole("heading", { name: "Create a new level" }).waitFor();
-  await page.getByLabel("Import level bundle").setInputFiles(bundlePath!);
+  await page.getByRole("heading", { name: "Your everyday objects. Extraordinary little worlds." }).waitFor();
+  await page.getByLabel("Choose a world bundle").setInputFiles(bundlePath!);
 
   await page.getByRole("heading", { name: "Model orientation" }).waitFor();
   await expect(
@@ -136,8 +136,7 @@ test("portable level export downloads and imports through the browser", async ({
   // A full reload must rediscover both the original saved level and the
   // newly imported copy from the isolated server's durable level index.
   await page.reload();
-  const savedSection = page.getByRole("heading", { name: "Your saved levels" }).locator("..");
-  await expect(savedSection.locator("article").filter({ hasText: "Room corner — Tripo" })).toHaveCount(2);
+  await expect(page.getByRole("article").filter({ hasText: "Room corner — Tripo" })).toHaveCount(2);
 
   expect(mcp.callsFor("run_capability")).toHaveLength(0);
 });
@@ -147,7 +146,7 @@ test("a real generated GLB prepares, switches candidates, and saves through the 
   test.skip(!generatedGlbPath, "Set OBJECTQUEST_GENERATED_GLB_PATH to a previously generated local GLB artifact.");
 
   await page.goto("/");
-  await page.getByLabel("Import a GLB file").setInputFiles(generatedGlbPath!);
+  await page.getByLabel("Choose a 3D object").setInputFiles(generatedGlbPath!);
 
   const candidates = page.getByRole("radiogroup", { name: "Course candidate" });
   await expect(candidates).toBeVisible({ timeout: 60_000 });
@@ -178,8 +177,7 @@ test("a real generated GLB prepares, switches candidates, and saves through the 
   await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
 
   await page.reload();
-  const savedSection = page.getByRole("heading", { name: "Your saved levels" }).locator("..");
-  const savedCard = savedSection.locator("article").filter({ hasText: "Imported level" });
+  const savedCard = page.getByRole("article").filter({ hasText: "Imported level" });
   await expect(savedCard).toHaveCount(1);
   await savedCard.getByRole("button", { name: "Edit" }).click();
   await expect(page.getByRole("heading", { name: "Model orientation" }).locator("..").getByLabel("Uniform scale"))
