@@ -42,7 +42,7 @@ function audio(
 /** Canonical order: music, ambience, seven EFFECT_CUES, narration. */
 export const LOST_COLORS_BUNDLED_MEDIA: LevelMedia = {
   audio: [
-    audio("bundled-music", "music", "lost-colors-loop.wav", "fd0c3b2ce79fbc57643c41d5ea5f3104b7def3a89f98cb267a04c0e2b44f2dce", 96044, 6, true),
+    audio("bundled-music", "music", "lost-colors-loop.wav", "90167b3cad7474b77ad2f3c9b691e37e4bdff70abd0a3faf23a8693d4edb7051", 176444, 4, true),
     audio("bundled-ambience", "ambience", "gentle-breeze.wav", "0c69d03d214a3bcec1a294d24e0bc88793582a0c3cf96b81ab4f061922c3b217", 64044, 4, true),
     audio("bundled-fragment-pickup", "sfx", "fragment-pickup.wav", "7a959727eddea2167dd56a1130c84cb17db43ae4a9d91dbaa5cb257cd97a6812", 7244, .45, false),
     audio("bundled-portal-activate", "sfx", "portal-activate.wav", "6a77a2b91078fe0e49e7fff42b90cefcde780f42af8fcf944368aa28b82f66e1", 19244, 1.2, false),
