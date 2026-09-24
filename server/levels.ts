@@ -3,8 +3,11 @@ import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import express, { Router } from "express";
 import { z } from "zod";
-import { SCENE_MANIFEST_SCHEMA_VERSION } from "../shared/schema-version.js";
 import type { SceneManifest } from "../shared/manifest.js";
+import {
+  migrateSceneManifest,
+  sceneManifestReaderSchema,
+} from "../shared/manifest-migration.js";
 import { AssetStore } from "./persistence/assetStore.js";
 import { PhotoStore } from "./persistence/photoStore.js";
 import { assertValidGlb, assertValidPhoto, InvalidFileError } from "./persistence/validate.js";
@@ -57,8 +60,18 @@ class AtomicLevelIndex {
     if (this.cache) return this.cache;
     try {
       const text = await readFile(this.filePath, "utf-8");
-      const raw = JSON.parse(text) as Record<string, SceneManifest>;
-      this.cache = new Map(Object.entries(raw));
+      const raw = JSON.parse(text) as unknown;
+      if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+        throw new Error("Invalid levels index: expected an object keyed by level id");
+      }
+      const migrated = Object.entries(raw).map(([id, value]) => {
+        const manifest = requireValidManifest(value);
+        if (manifest.levelId !== id) {
+          throw new Error(`Invalid levels index: key \"${id}\" does not match manifest levelId`);
+        }
+        return [id, manifest] as const;
+      });
+      this.cache = new Map(migrated);
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
         this.cache = new Map();
@@ -179,140 +192,32 @@ export class LevelStore {
 }
 
 // ---------------------------------------------------------------------
-// Strict runtime validation (zod) — mirrors shared/manifest.ts exactly so
-// a malformed or corrupt manifest is rejected before it's ever persisted.
+// Runtime validation starts with the shared compatible reader so additive
+// v2 blocks are parsed and retained instead of being stripped by a local
+// legacy-only zod object. The extra checks below preserve the editor's
+// conservative geometry and id guarantees.
 // ---------------------------------------------------------------------
 
-const finiteNumberSchema = z.number().finite();
-const referenceIdSchema = z
-  .string()
-  .min(1)
-  .max(128)
-  .regex(/^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/, "must be a bounded reference id without whitespace or path separators");
-const vec3Schema = z.tuple([finiteNumberSchema, finiteNumberSchema, finiteNumberSchema]);
-const positiveVec3Schema = vec3Schema.refine((value) => value.every((component) => component > 0), {
-  message: "components must all be positive",
-});
-const nonZeroScaleSchema = vec3Schema.refine(
-  (value) => value.every((component) => Math.abs(component) > Number.EPSILON),
-  { message: "scale components must all be non-zero" },
-);
-const quatSchema = z
-  .tuple([finiteNumberSchema, finiteNumberSchema, finiteNumberSchema, finiteNumberSchema])
-  .refine((value) => {
-    const length = Math.hypot(value[0], value[1], value[2], value[3]);
-    return length > Number.EPSILON && Math.abs(length - 1) <= 1e-3;
-  }, { message: "must be a normalized, non-zero quaternion" });
-const transformSchema = z.object({ position: vec3Schema, rotation: quatSchema, scale: nonZeroScaleSchema });
+const REFERENCE_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/;
 
-const colliderSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("triangle-mesh") }),
-  z.object({ kind: z.literal("box"), halfExtents: positiveVec3Schema }),
-  z.object({ kind: z.literal("capsule"), radius: finiteNumberSchema.positive(), halfHeight: finiteNumberSchema.positive() }),
-]);
-
-const generatedMeshEntitySchema = z.object({
-  id: referenceIdSchema,
-  kind: z.literal("generated-mesh"),
-  assetId: referenceIdSchema,
-  transform: transformSchema,
-  collider: colliderSchema,
-});
-
-const helperEntitySchema = z.object({
-  id: referenceIdSchema,
-  kind: z.enum(["floor", "box", "ramp"]),
-  transform: transformSchema,
-  dimensions: positiveVec3Schema,
-  collider: colliderSchema,
-  addedBy: z.literal("game"),
-});
-
-const sceneEntitySchema = z.union([generatedMeshEntitySchema, helperEntitySchema]);
-
-const spawnPointSchema = z.object({ position: vec3Schema, headingRadians: finiteNumberSchema });
-
-const checkpointSchema = z.object({
-  id: referenceIdSchema,
-  order: z.number().int().nonnegative(),
-  position: vec3Schema,
-  triggerRadius: finiteNumberSchema.positive(),
-  safeRespawn: spawnPointSchema,
-});
-
-const assetProvenanceSchema = z.object({
-  providerId: z.string().min(1),
-  capabilityUsed: z.string().min(1),
-  fallbackFired: z.string().nullable(),
-  providerJobId: z.string().min(1),
-  registeredModel: z.string().min(1),
-  sourcePhotoOrder: z.array(z.number().int().positive()),
-  generatedAt: z.string().min(1),
-});
-
-const assetReferenceSchema = z.object({
-  id: referenceIdSchema,
-  url: z.string().min(1),
-  sha256: z.string().regex(/^[a-f0-9]{64}$/, "must be a lowercase sha256 digest"),
-  sizeBytes: finiteNumberSchema.int().positive(),
-  provenance: assetProvenanceSchema.optional(),
-});
-
-const photoReferenceSchema = z.object({
-  id: referenceIdSchema,
-  url: z.string().min(1),
-  order: z.number().int().positive(),
-  label: z.string().optional(),
-});
-
-const calibrationSchema = z.object({
-  assumedExtentMeters: finiteNumberSchema.positive(),
-  measuredDimension: z.object({ description: z.string().min(1), meters: finiteNumberSchema.positive() }).optional(),
-});
-
-const courseValidationSchema = z.object({
-  status: z.enum(["unvalidated", "validated", "failed", "manually-adjusted"]),
-  method: z.string().optional(),
-  checkedAt: z.string().optional(),
-  evidence: z.string().optional(),
-  uncertaintyNotes: z.string().optional(),
-});
-
-export const sceneManifestSchema = z
-  .object({
-    schemaVersion: z.literal(SCENE_MANIFEST_SCHEMA_VERSION),
-    // Not `.min(1)`: POST /api/levels accepts an empty/placeholder levelId
-    // and mints a real one server-side (LevelStore.create) — PUT
-    // /api/levels/:id separately requires the body's levelId to equal a
-    // validated, non-empty :id, so that path stays strict.
-    levelId: z.string().max(128),
-    name: z.string().min(1).max(200),
-    createdAt: z.string().min(1),
-    updatedAt: z.string().min(1),
-    coordinateConvention: z.literal("y-up-right-handed-meters"),
-    calibration: calibrationSchema,
-    assets: z.array(assetReferenceSchema),
-    photos: z.array(photoReferenceSchema),
-    entities: z.array(sceneEntitySchema),
-    spawn: spawnPointSchema,
-    checkpoints: z.array(checkpointSchema),
-    seed: z.string().min(1),
-    movementConfigId: z.string().min(1),
-    courseValidation: courseValidationSchema,
-  })
+export const sceneManifestSchema = sceneManifestReaderSchema
   .superRefine((manifest, context) => {
-    const orders = manifest.checkpoints.map((checkpoint) => checkpoint.order).sort((a, b) => a - b);
-    if (!orders.every((order, index) => order === index)) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["checkpoints"],
-        message: "orders must be unique and ascending starting at 0",
-      });
+    if (manifest.levelId.length > 128) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["levelId"], message: "must be at most 128 characters" });
     }
-
+    if (manifest.name.length > 200) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["name"], message: "must be at most 200 characters" });
+    }
     const assertUniqueIds = (values: readonly { id: string }[], path: string): void => {
       const seen = new Set<string>();
       values.forEach((value, index) => {
+        if (value.id.length > 128 || !REFERENCE_ID_PATTERN.test(value.id)) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [path, index, "id"],
+            message: "must be a bounded reference id without whitespace or path separators",
+          });
+        }
         if (seen.has(value.id)) {
           context.addIssue({
             code: z.ZodIssueCode.custom,
@@ -330,6 +235,18 @@ export const sceneManifestSchema = z
 
     const assetIds = new Set(manifest.assets.map((asset) => asset.id));
     manifest.entities.forEach((entity, index) => {
+      const quaternionLength = Math.hypot(...entity.transform.rotation);
+      if (
+        entity.transform.scale.some((component) => Math.abs(component) <= Number.EPSILON) ||
+        quaternionLength <= Number.EPSILON ||
+        Math.abs(quaternionLength - 1) > 1e-3
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["entities", index, "transform"],
+          message: "requires non-zero scale and a normalized, non-zero quaternion",
+        });
+      }
       if (entity.kind === "generated-mesh" && !assetIds.has(entity.assetId)) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
@@ -337,7 +254,13 @@ export const sceneManifestSchema = z
           message: `unknown asset reference \"${entity.assetId}\"`,
         });
       }
-      if (entity.kind === "ramp" && entity.collider.kind !== "triangle-mesh") {
+      if (entity.kind !== "generated-mesh" && entity.dimensions.some((dimension) => dimension <= 0)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["entities", index, "dimensions"],
+          message: "components must all be positive",
+        });
+      } else if (entity.kind === "ramp" && entity.collider.kind !== "triangle-mesh") {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["entities", index, "collider"],
@@ -365,10 +288,10 @@ function formatZodError(error: z.ZodError): string {
   return error.issues.map((issue) => `${issue.path.join(".") || "body"}: ${issue.message}`).join("; ");
 }
 
-function requireValidManifest(manifest: SceneManifest): SceneManifest {
+function requireValidManifest(manifest: unknown): SceneManifest {
   const parsed = sceneManifestSchema.safeParse(manifest);
   if (!parsed.success) throw new Error(`Invalid level: ${formatZodError(parsed.error)}`);
-  return parsed.data as SceneManifest;
+  return migrateSceneManifest(parsed.data);
 }
 
 // ---------------------------------------------------------------------

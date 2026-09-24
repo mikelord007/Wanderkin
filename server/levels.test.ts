@@ -7,6 +7,7 @@ import express from "express";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createEmptyManifest } from "../shared/manifest.js";
 import type { SceneManifest } from "../shared/manifest.js";
+import lostColorsFixture from "../shared/fixtures/lost-colors.json";
 import { AssetStore } from "./persistence/assetStore.js";
 import { PhotoStore } from "./persistence/photoStore.js";
 import { createAssetsRouter } from "./routes/assets.js";
@@ -491,6 +492,23 @@ describe("createLevelsRouter (HTTP)", () => {
     const fetched = await fetch(`${baseUrl}/api/levels/${createdBody.levelId}`);
     expect(fetched.status).toBe(200);
     expect(await fetched.json()).toEqual(createdBody);
+  });
+
+  it("POST then GET round-trips every v2 experience and media block", async () => {
+    const created = await fetch(`${baseUrl}/api/levels`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(lostColorsFixture),
+    });
+    expect(created.status).toBe(201);
+    const createdBody = (await created.json()) as SceneManifest;
+
+    const fetched = await fetch(`${baseUrl}/api/levels/${createdBody.levelId}`);
+    expect(fetched.status).toBe(200);
+    expect(await fetched.json()).toEqual(createdBody);
+    expect(createdBody.experience).toEqual(lostColorsFixture.experience);
+    expect(createdBody.media).toEqual(lostColorsFixture.media);
+    expect(createdBody.assets).toEqual(lostColorsFixture.assets);
   });
 
   it("POST rejects a structurally invalid manifest with 400", async () => {
