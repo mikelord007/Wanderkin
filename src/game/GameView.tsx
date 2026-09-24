@@ -318,10 +318,11 @@ export function GameView({
     if (!runtime) return undefined;
     return installDiagnostics({
       get: () => diagnosticsRef.current,
+      audio: audio.getDiagnostics,
       levelId: manifestRef.current.levelId,
       movementConfigId: config.id,
     });
-  }, [runtime, config.id]);
+  }, [runtime, config.id, audio.getDiagnostics]);
 
   // ---- Running state --------------------------------------------------
 

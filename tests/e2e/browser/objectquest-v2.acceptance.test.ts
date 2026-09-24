@@ -380,7 +380,29 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
 
     await runB14(page);
 
+    const narration = page.getByText(/Welcome to Teacup Island\. Find the three lost colors/);
+    await expect(narration).toHaveCount(1);
+    await expect.poll(() => page.evaluate(() => window.__objectquest?.audio() ?? null)).toMatchObject({
+      unlocked: true,
+      contextState: "running",
+      playing: true,
+      activeLoops: expect.arrayContaining(["music", "ambience"]),
+    });
     expect(audioRequests).toContain("/audio/lost-colors-loop.wav");
+
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.keyboard.press("r");
+    await expect.poll(() => audioRequests).toContain("/audio/fall-respawn.wav");
+    expect(audioRequests.filter((path) => path === "/audio/narration-intro.wav")).toHaveLength(1);
+
+    await expect(narration).toBeHidden({ timeout: 12_000 });
+    await page.getByRole("button", { name: "Pause game" }).focus();
+    await page.keyboard.press("Enter");
+    await page.getByRole("button", { name: "Restart course" }).focus();
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(500);
+    await expect(narration).toBeHidden();
+    expect(audioRequests.filter((path) => path === "/audio/narration-intro.wav")).toHaveLength(1);
   });
 
   test("B15 recovers from camera denial and gives useful invalid-input errors", async ({ page, context }) => {
