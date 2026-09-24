@@ -82,7 +82,10 @@ generated input must be a size-bounded image produced by `bg-remove`,
 `kontext-edit`, or `gpt-image-edit`. `styleReferenceAssetId` identifies the
 approved visual direction for refresh/provenance consistency and is never
 uploaded or sent in the provider payload. The route also rejects a style
-reference that is repeated in `sourceImageAssetIds`.
+reference that is repeated in `sourceImageAssetIds`, verifies its persisted
+preview-cache approval, and prevents any approved preview from being used as a
+3D provider input even if a caller places it directly in
+`sourceImageAssetIds`.
 
 The complete normalized request is stored on `GenerationJob`; generated input
 ids and the style-reference id are also copied into `GenerationProvenance`.

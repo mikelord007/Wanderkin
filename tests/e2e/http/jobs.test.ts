@@ -2,6 +2,7 @@ import { rmSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { GenerationJob } from "../../../shared/job.js";
 import type { GenerationProvenance } from "../../../shared/provenance.js";
+import { PreviewCacheStore } from "../../../server/jobs/previewCache.js";
 import { GeneratedAssetStore } from "../../../server/persistence/generatedAssetStore.js";
 import { startApiServer, type ApiServerHandle } from "./helpers/apiServer.js";
 import { startFakeMcpServer, type FakeMcpServer } from "./helpers/fakeMcpServer.js";
@@ -291,6 +292,10 @@ describe("POST /api/jobs, status, retry, and restart reconciliation", () => {
       "image/jpeg",
       provenance("kontext-edit", "job-style-preview"),
     );
+    const previewCache = new PreviewCacheStore(api!.storageDir);
+    const previewKey = "a".repeat(64);
+    await previewCache.put(previewKey, "job-style-preview");
+    await previewCache.approve(previewKey, "job-style-preview", styleReference.id);
     const key = uniqueIdempotencyKey("v2-generated-cutout");
     const request = {
       schemaVersion: 1,

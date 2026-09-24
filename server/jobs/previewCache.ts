@@ -6,6 +6,9 @@ import { JsonFileStore } from "../persistence/jsonStore.js";
 export interface PreviewCacheRecord {
   key: string;
   jobId: string;
+  /** Set on approval so later mesh requests can verify the referenced output
+   * without trusting a caller-supplied asset id. */
+  assetId?: string;
   approved: boolean;
   createdAt: string;
   updatedAt: string;
@@ -43,13 +46,18 @@ export class PreviewCacheStore {
     });
   }
 
-  async approve(key: string, jobId: string): Promise<PreviewCacheRecord | undefined> {
+  async approve(key: string, jobId: string, assetId?: string): Promise<PreviewCacheRecord | undefined> {
     return this.file.update((current) => {
       const existing = current[key];
       if (!existing || existing.jobId !== jobId) return undefined;
       existing.approved = true;
+      if (assetId !== undefined) existing.assetId = assetId;
       existing.updatedAt = new Date().toISOString();
       return existing;
     });
+  }
+
+  async findApprovedByAssetId(assetId: string): Promise<PreviewCacheRecord | undefined> {
+    return Object.values(await this.file.read()).find((record) => record.approved && record.assetId === assetId);
   }
 }

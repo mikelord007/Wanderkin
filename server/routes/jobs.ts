@@ -84,9 +84,17 @@ export function createJobsRouter(
         if (!(await generatedAssets?.getProviderImage(id))) {
           return `Unknown or ineligible generated sourceImageAssetId "${id}"`;
         }
+        if (await previewCache?.findApprovedByAssetId(id)) {
+          return `Approved style preview "${id}" cannot be used as a 3D provider input`;
+        }
       }
-      if (request.styleReferenceAssetId && !(await generatedAssets?.getProviderImage(request.styleReferenceAssetId))) {
-        return `Unknown or ineligible styleReferenceAssetId "${request.styleReferenceAssetId}"`;
+      if (request.styleReferenceAssetId) {
+        if (!(await generatedAssets?.getProviderImage(request.styleReferenceAssetId))) {
+          return `Unknown or ineligible styleReferenceAssetId "${request.styleReferenceAssetId}"`;
+        }
+        if (!(await previewCache?.findApprovedByAssetId(request.styleReferenceAssetId))) {
+          return `styleReferenceAssetId "${request.styleReferenceAssetId}" is not an approved preview`;
+        }
       }
     } else if ((request.kind === "image-edit" || request.kind === "video") && !(await sourceImageExists(request.sourceImageAssetId))) {
       return `Unknown sourceImageAssetId "${request.sourceImageAssetId}"`;
@@ -250,7 +258,8 @@ export function createJobsRouter(
       res.status(409).json({ message: "Only a ready style preview can be approved" });
       return;
     }
-    const record = await previewCache.approve(req.params.key as string, job.id);
+    const assetId = job.result?.kind === "image-edit" ? job.result.asset.id : undefined;
+    const record = await previewCache.approve(req.params.key as string, job.id, assetId);
     if (!record) { res.status(404).json({ message: "Preview not found for this job" }); return; }
     res.json({ ...record, job });
   });
