@@ -19,6 +19,10 @@
 .oq-capture__card { display: grid; gap: 20px; }
 .oq-capture__drop { min-height: 380px; display: grid; place-items: center; align-content: center; gap: 12px; padding: 32px; text-align: center; border: 2px dashed var(--oq-control-line); border-radius: 18px; background: var(--oq-inset); transition: border-color var(--oq-duration) var(--oq-ease), background var(--oq-duration) var(--oq-ease); }
 .oq-capture__drop--active { border-color: var(--oq-action); background: var(--oq-wash); }
+/* The drop zone's own heading answers the page heading; sizing it like a
+   second h1 made the two argue for the same attention. */
+.oq-capture__drop :is(h2, h3) { font-size: clamp(1.3rem, 1.15rem + .6vw, 1.6rem); }
+.oq-capture__drop p { color: var(--oq-muted); max-inline-size: 40ch; }
 .oq-capture__icon { display: grid; place-items: center; width: 68px; height: 68px; color: var(--oq-accent-ink); background: var(--oq-wash); border-radius: 50%; }
 .oq-capture__icon svg { width: 30px; height: 30px; }
 .oq-capture__actions, .oq-capture__confirm { justify-content: center; }

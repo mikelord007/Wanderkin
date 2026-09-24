@@ -45,7 +45,9 @@
 
   /* --- Ink --- */
   --oq-ink: #23312a;
-  --oq-muted: #5f6a5f;
+  /* Dark enough to clear 4.5:1 on `--oq-inset`, not just on `--oq-paper` —
+     secondary text lands on the inset inside drop zones and empty states. */
+  --oq-muted: #5a6459;
   --oq-on-shade: #eef2ea;
   --oq-on-shade-muted: #aebdae;
 

@@ -61,7 +61,33 @@ body stays system-ui.
 - [x] Editor visual consistency (item 7), verified at 1440 / 820 / 390
 - [x] `src/ui/api.ts` brand copy + bundle filename (granted by coordinator)
 - [x] Contrast pass over the legacy Play/Finish/Capture overlays
-- [ ] Residual brand-reference sweep to report to the coordinator  ← next
+- [x] Residual brand-reference sweep, reported to the coordinator
+- [x] Accessibility floor: WCAG AA contrast and keyboard focus, both automated
+
+### Accessibility verification
+
+`nimbalyst-local/tmp-interface/contrast.mjs` (throwaway, not committed) samples
+every rendered text node's computed colour against its nearest opaque
+background and checks the WCAG AA ratio for its size and weight:
+
+```
+/                                  54 nodes, 0 below AA
+/create                            23 nodes, 0 below AA
+/edit/sample-rodin-room-corner     67 nodes, 0 below AA
+Look step (step 2)                 29 nodes, 0 below AA
+/design-kit/                      235 nodes, 0 below AA
+```
+
+It caught one real failure: `--oq-muted` was 4.4:1 on `--oq-inset` (fine on
+`--oq-paper`, but secondary text lands on the inset inside drop zones and empty
+states). `--oq-muted` moved from `#5f6a5f` to `#5a6459`.
+
+Text that floats over live 3D or a photograph is excluded from that sweep by
+design — it has no solid background to measure. Those were checked by eye on
+`/play/sample-rodin-room-corner` and kept on their own dark ground.
+
+Keyboard focus: tabbing the landing gives every control a 3px solid marigold
+`#e8a33d` ring, on both the pine band and the plaster page.
 
 ### Item 7 notes
 
