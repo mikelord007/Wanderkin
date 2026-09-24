@@ -34,36 +34,17 @@ async function openEditorForSample(page: Page, sampleName: string): Promise<void
   await page.getByRole("heading", { name: "Model orientation" }).waitFor();
 }
 
-test("photo lightbox follows real left/right/Escape keyboard input", async ({ page }) => {
+test("creation entry opens the v2 capture screen", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Create my world" }).first().click();
-  await page.getByRole("heading", { name: "Add your photos" }).waitFor();
+  await expect(page.getByRole("heading", { name: "What will your world be made of?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Choose one clear photo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Choose from photos" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Take a photo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Back" })).toBeVisible();
 
-  await page.locator('input[type="file"]').setInputFiles([
-    "public/samples/photo-1.jpg",
-    "public/samples/photo-2.jpg",
-  ]);
-  const firstPhoto = page.getByRole("button", { name: "Enlarge photo 1" });
-  try {
-    await firstPhoto.waitFor({ state: "visible", timeout: 15_000 });
-  } catch {
-    throw new Error(`Photo upload UI did not become ready:\n${await page.locator("body").innerText()}`);
-  }
-  await firstPhoto.click();
-
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toHaveAttribute("aria-label", /Photo 1/);
-  await expect(dialog).toContainText("1 of 2");
-  await page.keyboard.press("ArrowRight");
-  await expect(dialog).toHaveAttribute("aria-label", /Photo 2/);
-  await expect(dialog).toContainText("2 of 2");
-  await page.keyboard.press("ArrowLeft");
-  await expect(dialog).toContainText("1 of 2");
-  await page.keyboard.press("Escape");
-  await expect(dialog).toBeHidden();
-
-  // Uploading photos is local-only in this test; no generation tool call is
-  // allowed merely by exercising the selection/lightbox UI.
+  // Entering creation is local-only; no provider call is allowed before the
+  // player explicitly chooses and approves a photo.
   expect(mcp.callsFor("run_capability")).toHaveLength(0);
 });
 
