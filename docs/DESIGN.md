@@ -86,3 +86,40 @@ Heading “My worlds”; filter tabs All / Ready / In progress / Needs attention
 ## Integration and QA
 
 Kit exports live in `src/ui/components/index.ts`. Keep business logic, paid requests, audio playback, persistence, and game events in owning screens/modules. Kit components are controlled and callback-driven. WorldStyleScope can nest for a three-style QA gallery. Preview entry `/design-kit/` is a standalone Vite development page, intentionally outside the production navigation. Test all three styles, native radio arrow navigation, visible focus, modal Tab/Escape/focus restoration, sliders, 375px layout, 200% zoom, reduced motion, loading/disabled/error states, and offline preview fallback. Use real sample assets; no runtime external font/icon services.
+
+### Component integration reference
+
+```tsx
+import { WorldStyleScope, Button, ChoiceTiles, TextField,
+  ProgressPanel, Sheet, AudioControls, PlayFrame, HUDChip,
+  SubtitleBar } from "../components/index.js";
+
+// Wrap each migrated screen; kit CSS imports its own scoped theme.
+<WorldStyleScope worldStyle={selectedStyle}>
+  <ChoiceTiles legend="Adventure" value={mode} options={options}
+    onChange={setMode} />
+  <TextField label="Atmosphere (optional)" value={atmosphere}
+    onChange={event => setAtmosphere(event.target.value)}
+    helperText="A few words are enough." />
+  <Button loading={submitting} loadingLabel="Creating your preview…"
+    onClick={submitPreview}>Preview my world</Button>
+</WorldStyleScope>
+```
+
+- `ChoiceOption`: value, label, description, optional image ReactNode and disabled. Images supplied by the screen; use meaningful alt for actual references, empty alt for redundant decoration. LookChoiceTiles / AdventureChoiceTiles aliases use the same generic API. Keep three choices in each labeled fieldset.
+- `ProgressStage`: id, label, status (`pending | active | complete | error`), optional detail. `ProgressPanel` takes title, detail, stages, optional percent only with a known total, and action slot. `Stepper` can stand alone. Derive statuses from the shared job contract in the screen adapter.
+- `AudioSettings`: master/music/effects/voice percentages 0–100 plus muted boolean. `AudioControls` takes value/onChange. Convert percentages in the owning audio engine; mute retains slider values. DEFAULT_AUDIO_SETTINGS is an initial suggestion, not persisted state.
+- `Modal` / `Sheet`: controlled open/onClose, title, children. Native dialog plus explicit boundary wrapping contains keyboard focus and restores the opener. Put error explanations inside the dialog; don't dismiss on failed saves.
+- `Toast`: message, onDismiss, optional tone success/error/info. Keep it in a mounted live region when possible; no automatic expiry. `HUDChip`: children, optional label and announce; use announce for infrequent collected-count changes, not continuously ticking timers.
+- `PlayFrame`: scene, hud, actions, subtitles and controls slots; viewport-filling by default, embedded only for previews. Apply world scope outside the frame. `SubtitleBar`: text, optional speaker and visible. Canvas/controls remain the game worker's responsibility.
+- `SampleWorldPreview` is a welcome-only lazy static view of the actual bundled asset, with demand rendering and zero-duration camera fitting. It is not a second game runtime. Its fallback never blocks Create or the sample buttons.
+
+### Verification evidence (2026-09-24)
+
+With Vite running on port 5191, run `node src/ui/theme/verify-design-kit.mjs` and `node src/ui/theme/verify-welcome.mjs`. Set OQ_DESIGN_URL to use another local origin. Chrome is required. Screenshots land in ignored `test-results/design/`: kit-cartoon.png, kit-hand-painted.png, kit-watercolor.png, kit-mobile.png, start-desktop.png, start-mobile.png. No screenshot or generated build artifact is committed.
+
+The kit check covers native radio arrow keys, slider/mute interaction, modal/sheet focus containment, Escape and focus restoration in all three styles; visible focus; 375px overflow; reduced-motion spinner behavior; no page errors; calculated text contrast. Tested ratios: ink/paper 13.57:1, muted/paper 5.79:1, white/action 6.95:1 Cartoon, 6.13:1 Hand-painted, 6.15:1 Watercolor. Accent ink/wash ranges 6.79–8.48:1.
+
+The welcome check loads the actual GLB, reaches gameplay entry through both sample cards, checks Create/Back navigation, My worlds focus, import controls, full-height paper background at 375px, and independent library/preview failure fallbacks. Library API responses are stubbed empty/unavailable; this is not persistence or live-provider acceptance. Screenshots show the empty-library fixture. Both sample assets and their game loading paths are real. Legacy in-game titles and screens 2–10 remain owned by their implementation workers.
+
+The standalone preview uses `design-kit/index.html`, served by Vite at `/design-kit/`. It is deliberately dev-only: production inclusion would need an additional Rollup HTML input owned by the integration worker. No changes to App, main, root index.html, Vite config, runtime, server, shared contracts, package manifests, or dependencies are needed for this kit. The original boot screen and non-migrated screens retain their baseline theme until their owners adopt it.
