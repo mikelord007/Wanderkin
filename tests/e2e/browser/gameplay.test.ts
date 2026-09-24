@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
 
 interface Diagnostics {
   playerPosition: readonly [number, number, number];
@@ -108,7 +108,7 @@ async function driveToPoint(
     while (Date.now() < timeoutAt) {
       const diagnostics = await readDiagnostics(page);
       if (!diagnostics) {
-        if (await page.getByText("Course complete", { exact: true }).isVisible()) {
+        if (await page.getByRole("button", { name: "Play again" }).isVisible()) {
           return { mantleObserved, maxY };
         }
         throw new Error("Game diagnostics disappeared before the target was reached");
@@ -167,7 +167,7 @@ async function collectNextCheckpoint(
     .poll(async () => {
       const current = await readDiagnostics(page);
       if (current) return current.checkpointsCollected;
-      return (await page.getByText("Course complete", { exact: true }).isVisible()) ? expectedCount : -1;
+      return (await page.getByRole("button", { name: "Play again" }).isVisible()) ? expectedCount : -1;
     })
     .toBe(expectedCount);
   return result;
@@ -240,8 +240,9 @@ async function verifyFallRespawn(page: Page, outwardTarget: Point, expectedCount
   throw new Error(`Did not observe fall + automatic respawn; diagnostics: ${JSON.stringify(await readDiagnostics(page))}`);
 }
 
-async function finishAndReplay(page: Page): Promise<void> {
-  await expect(page.getByText("Course complete", { exact: true })).toBeVisible();
+async function finishAndReplay(page: Page, testInfo: TestInfo): Promise<void> {
+  await expect(page.getByRole("button", { name: "Play again" })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("completion.png"), fullPage: true });
   await page.getByRole("button", { name: "Play again" }).click();
   await page.getByRole("button", { name: /^Play$/ }).waitFor();
   await page.getByRole("button", { name: /^Play$/ }).click();
@@ -250,7 +251,7 @@ async function finishAndReplay(page: Page): Promise<void> {
 }
 
 test.describe("real browser gameplay input", () => {
-  test("completes and replays the Rodin sample with keyboard and mouse", async ({ page }) => {
+  test("completes and replays the Rodin sample with keyboard and mouse", async ({ page }, testInfo) => {
     const initial = await openSample(page, "The desk & sofa adventure");
     const yawBefore = initial.cameraYaw;
     await page.mouse.move(640, 360);
@@ -269,10 +270,10 @@ test.describe("real browser gameplay input", () => {
     expect(elevated.maxY).toBeGreaterThan(1.4);
     await collectNextCheckpoint(page, 4, { timeoutMs: 15_000 });
     await collectNextCheckpoint(page, 5, { timeoutMs: 20_000 });
-    await finishAndReplay(page);
+    await finishAndReplay(page, testInfo);
   });
 
-  test("completes and replays the Tripo sample with the same controls", async ({ page }) => {
+  test("completes and replays the Tripo sample with the same controls", async ({ page }, testInfo) => {
     await openSample(page, "A different perspective");
     await collectNextCheckpoint(page, 1, { timeoutMs: 20_000 });
     await verifyPauseAndResume(page);
@@ -285,6 +286,6 @@ test.describe("real browser gameplay input", () => {
     expect(elevated.maxY).toBeGreaterThan(1.6);
     await collectNextCheckpoint(page, 4, { timeoutMs: 20_000 });
     await collectNextCheckpoint(page, 5, { timeoutMs: 25_000 });
-    await finishAndReplay(page);
+    await finishAndReplay(page, testInfo);
   });
 });

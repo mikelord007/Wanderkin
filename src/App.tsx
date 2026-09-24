@@ -14,6 +14,8 @@ import {
   saveActiveSource,
 } from "./ui/jobStorage.js";
 import { createLevel, downloadLevelBundle, saveLevel } from "./ui/api.js";
+import { createRaceVariant } from "./game/modes/raceVariant.js";
+import type { GameCompletionResult } from "./game/types.js";
 
 type Screen =
   | { name: "start" }
@@ -21,7 +23,7 @@ type Screen =
   | { name: "generation"; jobId: string }
   | { name: "preparation"; source: PreparationSource; isNew: boolean }
   | { name: "play"; manifest: SceneManifest }
-  | { name: "finish"; manifest: SceneManifest };
+  | { name: "finish"; manifest: SceneManifest; result: GameCompletionResult };
 
 function initialScreen(): Screen {
   const resume = resolveResumeState();
@@ -161,7 +163,7 @@ export function App() {
         <PlayScreen
           manifest={screen.manifest}
           onExit={goStart}
-          onComplete={() => setScreen({ name: "finish", manifest: screen.manifest })}
+          onComplete={(result) => setScreen({ name: "finish", manifest: screen.manifest, result })}
         />
       );
 
@@ -169,15 +171,10 @@ export function App() {
       return (
         <FinishScreen
           manifest={screen.manifest}
+          result={screen.result}
           onReplay={() => setScreen({ name: "play", manifest: screen.manifest })}
-          onBackToLevel={() =>
-            setScreen({
-              name: "preparation",
-              source: { kind: "manifest", manifest: screen.manifest },
-              isNew: false,
-            })
-          }
-          onBackToStart={goStart}
+          onTryRace={() => setScreen({ name: "play", manifest: createRaceVariant(screen.manifest) })}
+          onCreateAnother={() => setScreen({ name: "photos" })}
         />
       );
 
