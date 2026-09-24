@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import type { QuestOrchestrator } from "./orchestrator.js";
+import type { OwnerSecurity } from "../security/owner.js";
 
 const questInputSchema = z.object({
   worldId: z.string().min(1).max(200),
@@ -13,7 +14,7 @@ const questInputSchema = z.object({
   levelId: z.string().min(1).optional(),
 });
 
-export function createQuestRouter(orchestrator: QuestOrchestrator): Router {
+export function createQuestRouter(orchestrator: QuestOrchestrator, security?: OwnerSecurity): Router {
   const router = Router();
   router.post("/api/quests", async (req, res, next) => {
     const parsed = questInputSchema.safeParse(req.body);
@@ -22,6 +23,16 @@ export function createQuestRouter(orchestrator: QuestOrchestrator): Router {
       return;
     }
     const { jobId, attempt = 0, levelId } = parsed.data;
+    const owner = security?.issue(req, res);
+    if (security && jobId && !(await security.canAccess("job", jobId, req))) {
+      res.status(404).json({ message: "Quest generation job was not found." }); return;
+    }
+    if (security && levelId && !(await security.canAccess("level", levelId, req))) {
+      res.status(404).json({ message: "Level was not found." }); return;
+    }
+    if (security && !jobId && !(await security.isUnowned("world", parsed.data.worldId)) && !(await security.canAccess("world", parsed.data.worldId, req))) {
+      res.status(404).json({ message: "World was not found." }); return;
+    }
     const input = {
       worldId: parsed.data.worldId,
       style: parsed.data.style,
@@ -31,8 +42,8 @@ export function createQuestRouter(orchestrator: QuestOrchestrator): Router {
     };
     try {
       const result = jobId
-        ? await orchestrator.continue(input, jobId, attempt)
-        : await orchestrator.start(input);
+        ? await orchestrator.continue(input, jobId, attempt, owner?.ownerId)
+        : await orchestrator.start(input, owner?.ownerId);
       const level = result.state === "ready" && levelId
         ? await orchestrator.persist(levelId, result.quest)
         : undefined;

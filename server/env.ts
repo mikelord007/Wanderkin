@@ -17,6 +17,18 @@ function boundedInteger(value: string | undefined, fallback: number, min: number
   return Number.isInteger(parsed) && parsed >= min && parsed <= max ? parsed : fallback;
 }
 
+function nonNegativeInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function booleanValue(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  if (/^(?:1|true|yes)$/i.test(value)) return true;
+  if (/^(?:0|false|no)$/i.test(value)) return false;
+  return fallback;
+}
+
 /** Server-only environment access. Never import this module from src/. */
 export const env = {
   port: Number(process.env.PORT ?? 8787),
@@ -27,5 +39,22 @@ export const env = {
   livepeerApiKey: process.env.LIVEPEER_API_KEY ?? "",
   livepeerMaxRequestUsd: positiveNumber(process.env.LIVEPEER_MAX_REQUEST_USD, 2),
   livepeerMaxWorldUsd: positiveNumber(process.env.LIVEPEER_MAX_WORLD_USD, 8),
+  livepeerMaxGlobalUsd: positiveNumber(process.env.LIVEPEER_MAX_GLOBAL_USD, 100),
+  livepeerMaxDailyUsd: positiveNumber(process.env.LIVEPEER_MAX_DAILY_USD, 20),
   livepeerMaxAutomaticRetries: boundedInteger(process.env.LIVEPEER_MAX_AUTOMATIC_RETRIES, 3, 0, 5),
+  providerMaxInFlight: boundedInteger(process.env.PROVIDER_MAX_IN_FLIGHT, 4, 1, 100),
+  providerConcurrencyRetrySeconds: boundedInteger(process.env.PROVIDER_CONCURRENCY_RETRY_SECONDS, 15, 1, 3_600),
+  billableRateLimit: boundedInteger(process.env.BILLABLE_RATE_LIMIT, 10, 1, 10_000),
+  uploadRateLimit: boundedInteger(process.env.UPLOAD_RATE_LIMIT, 30, 1, 10_000),
+  rateLimitWindowSeconds: boundedInteger(process.env.RATE_LIMIT_WINDOW_SECONDS, 60, 1, 86_400),
+  // Trusting forwarding headers is an explicit deployment choice. Keep it
+  // disabled unless a trusted reverse proxy overwrites X-Forwarded-For.
+  trustProxyHops: nonNegativeInteger(process.env.TRUST_PROXY_HOPS, 0),
+  diagnosticsToken: process.env.DIAGNOSTICS_TOKEN ?? "",
+  legacyOpen: booleanValue(process.env.OBJECTQUEST_LEGACY_OPEN, process.env.NODE_ENV !== "production"),
+  secureOwnerCookie: booleanValue(process.env.OBJECTQUEST_SECURE_COOKIE, process.env.NODE_ENV === "production"),
+  uploadMaxImageWidth: boundedInteger(process.env.UPLOAD_MAX_IMAGE_WIDTH, 12_000, 128, 100_000),
+  uploadMaxImageHeight: boundedInteger(process.env.UPLOAD_MAX_IMAGE_HEIGHT, 12_000, 128, 100_000),
+  uploadMaxImagePixels: boundedInteger(process.env.UPLOAD_MAX_IMAGE_PIXELS, 40_000_000, 16_384, 1_000_000_000),
+  uploadDecodeBudgetBytes: boundedInteger(process.env.UPLOAD_DECODE_BUDGET_BYTES, 256 * 1024 * 1024, 1024 * 1024, 2_147_483_647),
 };

@@ -48,6 +48,7 @@ export async function startApiServer(opts: {
   removeStorageOnStop?: boolean;
   /** Pass STORAGE_DIR relatively to exercise production path resolution. */
   useRelativeStoragePath?: boolean;
+  env?: Record<string, string>;
 }): Promise<ApiServerHandle> {
   const port = await getFreePort();
   const storageDir = opts.storageDir ?? mkdtempSync(join(tmpdir(), "objectquest-e2e-"));
@@ -63,6 +64,7 @@ export async function startApiServer(opts: {
         : storageDir,
       LIVEPEER_MCP_ENDPOINT: opts.mcpEndpoint,
       LIVEPEER_API_KEY: "",
+      ...opts.env,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

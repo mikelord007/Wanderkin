@@ -12,8 +12,9 @@ import { GeneratedAssetStore } from "../persistence/generatedAssetStore.js";
 import { downloadBounded, UnsafeUrlError, DownloadTooLargeError } from "../persistence/fetchSafe.js";
 import { MAX_GLB_BYTES } from "../persistence/validate.js";
 import type { PhotoStore } from "../persistence/photoStore.js";
+import type { OwnerSecurity } from "../security/owner.js";
 import { sanitizeMessage } from "../util/sanitize.js";
-import { estimateRequestCost } from "../livepeer/capabilities.js";
+import { capabilityContract, estimateRequestCost } from "../livepeer/capabilities.js";
 import type { GenerationProviderAdapter, ProviderGenerationStatus } from "./types.js";
 import { BudgetExceededError, SpendLedger } from "./spendLedger.js";
 import {
@@ -37,6 +38,16 @@ export type SubmitOutcome =
   /** Same idempotency key reused with a materially different request body —
    * refuses to guess which one the caller meant. */
   | { status: "conflict"; job: GenerationJob };
+
+export class ProviderConcurrencyExceededError extends Error {
+  readonly code = "provider_concurrency_exceeded";
+  readonly retryable = true;
+
+  constructor(readonly retryAfterSeconds: number) {
+    super("The generation service is at capacity. Please retry shortly.");
+    this.name = "ProviderConcurrencyExceededError";
+  }
+}
 
 const MAX_RETRIES = 3;
 const PROVIDER_ID = "livepeer-agent-mcp";
@@ -233,8 +244,24 @@ export class JobManager {
       perRequestLimitUsd: number;
       perWorldLimitUsd: number;
       maxRetries?: number;
+      maxInFlight?: number;
+      concurrencyRetrySeconds?: number;
+      globalLimitUsd: number;
+      dailyLimitUsd: number;
+      ownerSecurity?: OwnerSecurity;
     },
   ) {}
+
+  private async assertProviderCapacity(excludeJobId?: string): Promise<void> {
+    const limit = this.generation?.maxInFlight ?? 4;
+    const records = await this.store.all();
+    const inFlight = records.filter(
+      (record) => record.job.id !== excludeJobId && !isTerminalJobState(record.job.state),
+    ).length;
+    if (inFlight >= limit) {
+      throw new ProviderConcurrencyExceededError(this.generation?.concurrencyRetrySeconds ?? 15);
+    }
+  }
 
   /** Marks a job whose submit outcome is permanently ambiguous (no
    * `providerJobId`, and past the provider's confirmed idempotency
@@ -360,7 +387,7 @@ export class JobManager {
    * Holds a per-idempotency-key lock across the "does a job for this key
    * already exist" check and the create, so two concurrent POSTs with the
    * same key can never both create a job. */
-  async submitOrReconcile(request: CreateJobRequest, idempotencyKey: string): Promise<SubmitOutcome> {
+  async submitOrReconcile(request: CreateJobRequest, idempotencyKey: string, ownerId?: string): Promise<SubmitOutcome> {
     return this.runExclusive(`idem:${idempotencyKey}`, async () => {
       const existing = await this.store.findByIdempotencyKey(idempotencyKey);
       if (existing) {
@@ -371,7 +398,28 @@ export class JobManager {
       }
 
       const record = this.buildRecord(request, idempotencyKey);
-      await this.store.put(record);
+      await this.runExclusive("provider-capacity", async () => {
+        await this.assertProviderCapacity();
+        if (this.generation) {
+          const listPriceUsd = capabilityContract(request.capability)?.priceUsd ?? null;
+          await this.generation.spendLedger.reserve({
+            jobId: record.job.id,
+            worldId: null,
+            capability: request.capability,
+            kind: "image-to-3d",
+            estimateUsd: listPriceUsd,
+            listPriceUsd,
+            perRequestLimitUsd: this.generation.perRequestLimitUsd,
+            perWorldLimitUsd: this.generation.perWorldLimitUsd,
+            globalLimitUsd: this.generation.globalLimitUsd,
+            dailyLimitUsd: this.generation.dailyLimitUsd,
+          });
+        }
+        if (ownerId && this.generation?.ownerSecurity) {
+          await this.generation.ownerSecurity.claim("job", record.job.id, ownerId);
+        }
+        await this.store.put(record);
+      });
       const submitted = await this.submitToProvider(record, request);
       return { status: "created", job: toPublicJob(submitted) };
     });
@@ -382,7 +430,7 @@ export class JobManager {
    * request's idempotency key. */
   async submitGenerationOrReconcile(
     request: GenerationRequest,
-    options: { requestLimitOverrideUsd?: number; worldId?: string } = {},
+    options: { requestLimitOverrideUsd?: number; worldId?: string; ownerId?: string } = {},
   ): Promise<SubmitOutcome> {
     if (!this.generation || !this.adapter.validateGenerationInput || !this.adapter.submitGeneration) {
       throw new Error("Multi-kind generation services are not configured");
@@ -406,16 +454,26 @@ export class JobManager {
         this.generation!.perRequestLimitUsd,
         options.requestLimitOverrideUsd ?? this.generation!.perRequestLimitUsd,
       );
-      await this.generation!.spendLedger.reserve({
-        jobId: record.job.id,
-        worldId: options.worldId ?? null,
-        capability: request.capability,
-        kind: request.kind,
+      await this.runExclusive("provider-capacity", async () => {
+        await this.assertProviderCapacity();
+        await this.generation!.spendLedger.reserve({
+          jobId: record.job.id,
+          worldId: options.worldId ?? null,
+          capability: request.capability,
+          kind: request.kind,
         estimateUsd,
+        listPriceUsd: capabilityContract(request.capability)?.priceUsd ?? null,
         perRequestLimitUsd: effectiveRequestLimit,
         perWorldLimitUsd: this.generation!.perWorldLimitUsd,
+        globalLimitUsd: this.generation!.globalLimitUsd,
+        dailyLimitUsd: this.generation!.dailyLimitUsd,
+        });
+        if (options.ownerId && this.generation?.ownerSecurity) {
+          await this.generation.ownerSecurity.claim("job", record.job.id, options.ownerId);
+          if (options.worldId) await this.generation.ownerSecurity.claim("world", options.worldId, options.ownerId);
+        }
+        await this.store.put(record);
       });
-      await this.store.put(record);
       const submitted = await this.submitGenerationToProvider(record, request, effectiveRequestLimit);
       return { status: "created", job: toPublicJob(submitted) };
     });
@@ -746,12 +804,14 @@ export class JobManager {
         const { buffer } = await downloadBounded(output.url, maxBytes);
         if (request.kind === "image-edit") {
           const asset = await this.generation.generatedAssets.storeImage(buffer, request.outputMimeType, record.job.provenance!);
+          await this.generation.ownerSecurity?.inherit("generated-asset", asset.id, "job", record.job.id);
           result = { kind: "image-edit", asset };
         } else if (request.kind === "video") {
           const asset = await this.generation.generatedAssets.storeVideo(buffer, {
             durationSeconds: request.durationSeconds,
             provenance: record.job.provenance!,
           });
+          await this.generation.ownerSecurity?.inherit("generated-asset", asset.id, "job", record.job.id);
           result = { kind: "video", asset: { ...asset, kind: "animated-postcard" } };
         } else {
           const kind = request.kind === "music"
@@ -767,6 +827,7 @@ export class JobManager {
             ...(request.kind === "tts" ? { transcript: request.text } : {}),
             provenance: record.job.provenance!,
           });
+          await this.generation.ownerSecurity?.inherit("generated-asset", asset.id, "job", record.job.id);
           result = request.kind === "music"
             ? { kind: "music", asset: { ...asset, kind: "music" } }
             : request.kind === "tts"
@@ -810,6 +871,7 @@ export class JobManager {
         },
         orderedPhotos,
       );
+      await this.generation?.ownerSecurity?.inherit("asset", asset.id, "job", record.job.id);
       record.job.resultAssetId = asset.id;
       if (record.job.request?.kind === "image-to-3d") {
         record.job.result = { kind: "image-to-3d", asset };
@@ -895,10 +957,13 @@ export class JobManager {
         return this.markIdempotencyRetentionExpired(record);
       }
 
-      record.job.retryCount += 1;
-      record.job.state = "queued";
-      delete record.job.lastError;
-      await this.store.put(record);
+      await this.runExclusive("provider-capacity", async () => {
+        await this.assertProviderCapacity(record.job.id);
+        record.job.retryCount += 1;
+        record.job.state = "queued";
+        delete record.job.lastError;
+        await this.store.put(record);
+      });
 
       const updated = record.job.request
         ? await this.submitGenerationToProvider(

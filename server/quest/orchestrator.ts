@@ -6,7 +6,7 @@ import { buildQuestPrompt, fallbackQuest, type QuestPromptInput } from "./templa
 import { validateQuestOutput } from "./validation.js";
 
 export interface QuestGateway {
-  submitGenerationOrReconcile(request: GenerationRequest, options?: { worldId?: string }): Promise<SubmitOutcome>;
+  submitGenerationOrReconcile(request: GenerationRequest, options?: { worldId?: string; ownerId?: string }): Promise<SubmitOutcome>;
   getPublic(jobId: string): Promise<GenerationJob | undefined>;
 }
 
@@ -24,15 +24,15 @@ export class QuestOrchestrator {
     private readonly levels?: Pick<LevelStore, "get" | "save">,
   ) {}
 
-  async start(input: QuestGenerationInput): Promise<QuestGenerationState> {
-    const job = await this.submit(input, 0);
-    return this.resolve(input, job, 0);
+  async start(input: QuestGenerationInput, ownerId?: string): Promise<QuestGenerationState> {
+    const job = await this.submit(input, 0, ownerId);
+    return this.resolve(input, job, 0, ownerId);
   }
 
-  async continue(input: QuestGenerationInput, jobId: string, attempt: 0 | 1): Promise<QuestGenerationState> {
+  async continue(input: QuestGenerationInput, jobId: string, attempt: 0 | 1, ownerId?: string): Promise<QuestGenerationState> {
     const job = await this.gateway.getPublic(jobId);
     if (!job) throw new Error("Quest generation job was not found.");
-    return this.resolve(input, job, attempt);
+    return this.resolve(input, job, attempt, ownerId);
   }
 
   async persist(levelId: string, quest: QuestTextBlock): Promise<SceneManifest> {
@@ -47,7 +47,7 @@ export class QuestOrchestrator {
     });
   }
 
-  private async submit(input: QuestGenerationInput, attempt: 0 | 1): Promise<GenerationJob> {
+  private async submit(input: QuestGenerationInput, attempt: 0 | 1, ownerId?: string): Promise<GenerationJob> {
     const request: GenerationRequest = {
       schemaVersion: 1,
       kind: "text",
@@ -58,12 +58,15 @@ export class QuestOrchestrator {
       output: "quest-json",
       maxCharacters: 1200,
     };
-    const outcome = await this.gateway.submitGenerationOrReconcile(request, { worldId: input.worldId });
+    const outcome = await this.gateway.submitGenerationOrReconcile(request, {
+      worldId: input.worldId,
+      ...(ownerId ? { ownerId } : {}),
+    });
     if (outcome.status === "conflict") throw new Error("Quest generation idempotency conflict.");
     return outcome.job;
   }
 
-  private async resolve(input: QuestGenerationInput, job: GenerationJob, attempt: 0 | 1): Promise<QuestGenerationState> {
+  private async resolve(input: QuestGenerationInput, job: GenerationJob, attempt: 0 | 1, ownerId?: string): Promise<QuestGenerationState> {
     if (job.state !== "ready" && job.state !== "failed") return { state: "pending", job, attempt };
     if (job.state === "ready" && job.result?.kind === "text") {
       const result = validateQuestOutput(job.result.output.structured ?? job.result.output.text);
@@ -71,8 +74,8 @@ export class QuestOrchestrator {
         return { state: "ready", job, quest: result.value, attempt, fallback: false, validationErrors: [] };
       }
       if (attempt === 0) {
-        const retry = await this.submit(input, 1);
-        return this.resolve(input, retry, 1);
+        const retry = await this.submit(input, 1, ownerId);
+        return this.resolve(input, retry, 1, ownerId);
       }
       return {
         state: "ready",

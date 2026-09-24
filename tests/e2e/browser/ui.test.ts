@@ -34,17 +34,25 @@ async function openEditorForSample(page: Page, sampleName: string): Promise<void
   await page.getByRole("heading", { name: "Model orientation" }).waitFor();
 }
 
-test("creation entry opens the v2 capture screen", async ({ page }) => {
+test("capture preview supports a real upload and replacement", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Create my world" }).first().click();
-  await expect(page.getByRole("heading", { name: "What will your world be made of?" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Choose one clear photo" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Choose from photos" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Take a photo" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Back" })).toBeVisible();
+  await page.getByRole("heading", { name: "What will your world be made of?" }).waitFor();
 
-  // Entering creation is local-only; no provider call is allowed before the
-  // player explicitly chooses and approves a photo.
+  const input = page.locator('input[type="file"][aria-label="Choose an object photo"]');
+  await input.setInputFiles("public/samples/photo-1.jpg");
+  const preview = page.getByRole("img", { name: "Your selected object" });
+  await expect(preview).toBeVisible();
+  await expect(page.getByText("Ready to review", { exact: true })).toBeVisible();
+  const firstSource = await preview.getAttribute("src");
+
+  await page.getByRole("button", { name: "Retake or replace" }).click();
+  await input.setInputFiles("public/samples/photo-2.jpg");
+  await expect.poll(() => preview.getAttribute("src")).not.toBe(firstSource);
+  await expect(page.getByRole("button", { name: "Use this photo" })).toBeEnabled();
+
+  // Choosing/replacing is local-only; no generation call is allowed merely
+  // by exercising the capture preview.
   expect(mcp.callsFor("run_capability")).toHaveLength(0);
 });
 

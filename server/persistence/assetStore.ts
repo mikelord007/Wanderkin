@@ -54,6 +54,10 @@ export class AssetStore {
     return current[id];
   }
 
+  async findByFilename(filename: string): Promise<StoredAssetRecord | undefined> {
+    return Object.values(await this.index.read()).find((asset) => asset.url.endsWith(`/${filename}`));
+  }
+
   /** Repairs only placeholder model provenance on an existing generated
    * asset. Both identifiers must match the stored record, and a concrete
    * model can never be overwritten with a different value. */

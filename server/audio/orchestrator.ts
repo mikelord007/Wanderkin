@@ -5,7 +5,7 @@ import type { JobManager } from "../jobs/manager.js";
 import { AUDIO_CUES, buildAudioRequests, type AudioCue, type AudioPromptInput } from "./prompts.js";
 
 export interface AudioGateway {
-  submitGenerationOrReconcile(request: GenerationRequest, options?: { worldId?: string }): Promise<SubmitOutcome>;
+  submitGenerationOrReconcile(request: GenerationRequest, options?: { worldId?: string; ownerId?: string }): Promise<SubmitOutcome>;
   getPublic(jobId: string): Promise<GenerationJob | undefined>;
   retry(jobId: string): Promise<GenerationJob | undefined>;
 }
@@ -32,12 +32,16 @@ export class AudioOrchestrator {
     private readonly levels?: Pick<LevelStore, "get" | "save">,
   ) {}
 
-  async start(input: AudioPromptInput): Promise<AudioGenerationResult> {
+  async start(input: AudioPromptInput, ownerId?: string): Promise<AudioGenerationResult> {
     const settled = await Promise.allSettled(buildAudioRequests(input).map(async ({ cue, request }) => {
-      const outcome = await this.gateway.submitGenerationOrReconcile(request, { worldId: input.worldId });
+      const outcome = await this.gateway.submitGenerationOrReconcile(request, {
+        worldId: input.worldId,
+        ...(ownerId ? { ownerId } : {}),
+      });
       if (outcome.status === "conflict") throw new Error(`Audio idempotency conflict for ${cue}.`);
       return fromJob(cue, outcome.job);
     }));
+    if (settled.every((result) => result.status === "rejected")) throw settled[0]!.reason;
     const jobs = settled.map((result, index): AudioJobResult => result.status === "fulfilled"
       ? result.value
       : { cue: AUDIO_CUES[index]!, state: "submission-failed", error: safeError(result.reason) });

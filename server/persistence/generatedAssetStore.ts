@@ -107,6 +107,10 @@ export class GeneratedAssetStore {
     return (await this.index.read())[id];
   }
 
+  async findByFilename(filename: string): Promise<GeneratedBinaryAsset | undefined> {
+    return Object.values(await this.index.read()).find((asset) => asset.url.endsWith(`/${filename}`));
+  }
+
   async getImageBytes(id: string): Promise<{ buffer: Buffer; mimeType: string; filename: string }> {
     const asset = await this.getProviderImage(id);
     if (!asset) throw new Error(`Unknown or ineligible generated image asset id "${id}"`);

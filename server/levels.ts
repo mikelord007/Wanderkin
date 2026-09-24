@@ -12,6 +12,7 @@ import { AssetStore } from "./persistence/assetStore.js";
 import { PhotoStore } from "./persistence/photoStore.js";
 import { assertValidGlb, assertValidPhoto, InvalidFileError } from "./persistence/validate.js";
 import { PublicationStore } from "./publications.js";
+import type { OwnerSecurity } from "./security/owner.js";
 import { extractGlbTriangles } from "../src/scene/glb.js";
 import {
   assertPlayableExperience,
@@ -647,13 +648,44 @@ const publishRequestSchema = z.object({
 export function createLevelsRouter(
   store: LevelStore,
   publications = new PublicationStore(store.storageDir),
+  security?: OwnerSecurity,
 ): Router {
   const router = Router();
 
+  async function canAccessManifestResources(req: express.Request, manifest: SceneManifest): Promise<boolean> {
+    if (!security) return true;
+    for (const photo of manifest.photos) {
+      if (photo.url.startsWith("/api/") && !(await security.canAccess("photo", photo.id, req))) return false;
+    }
+    for (const asset of manifest.assets) {
+      if (asset.url.startsWith("/api/") && !(await security.canAccess("asset", asset.id, req))) return false;
+    }
+    for (const asset of [...(manifest.media?.audio ?? []), ...(manifest.media?.video ?? [])]) {
+      if (asset.url.startsWith("/api/") && !(await security.canAccess("generated-asset", asset.id, req))) return false;
+    }
+    return true;
+  }
+
+  async function exposePublishedResources(publication: Awaited<ReturnType<PublicationStore["getByShareId"]>>): Promise<void> {
+    if (!security || !publication) return;
+    for (const asset of publication.manifest.assets) await security.makePublic("asset", asset.id);
+    for (const asset of [...(publication.manifest.media?.audio ?? []), ...(publication.manifest.media?.video ?? [])]) {
+      await security.makePublic("generated-asset", asset.id);
+    }
+    if (publication.includesSourcePhotos) {
+      for (const photo of publication.manifest.photos) await security.makePublic("photo", photo.id);
+    }
+  }
+
   router.get(
     "/api/levels",
-    wrapAsync(async (_req, res) => {
-      res.json(await store.list());
+    wrapAsync(async (req, res) => {
+      const levels = await store.list();
+      if (!security) { res.json(levels); return; }
+      const visible = (await Promise.all(levels.map(async (level) => (
+        await security.canAccess("level", level.levelId, req) ? level : undefined
+      )))).filter((level): level is SceneManifest => level !== undefined);
+      res.json(visible);
     }),
   );
 
@@ -665,7 +697,12 @@ export function createLevelsRouter(
         res.status(400).json({ message: `Invalid level: ${formatZodError(parsed.error)}` });
         return;
       }
+      const owner = security?.issue(req, res);
+      if (!(await canAccessManifestResources(req, parsed.data as SceneManifest))) {
+        res.status(400).json({ message: "Level references an unavailable private asset" }); return;
+      }
       const created = await store.create(parsed.data as SceneManifest);
+      if (owner) await security?.claim("level", created.levelId, owner.ownerId);
       res.status(201).json(created);
     }),
   );
@@ -673,6 +710,9 @@ export function createLevelsRouter(
   router.get(
     "/api/levels/:id",
     wrapAsync(async (req, res) => {
+      if (security && !(await security.canAccess("level", req.params.id as string, req))) {
+        res.status(404).json({ message: "Level not found" }); return;
+      }
       const level = await store.get(req.params.id as string);
       if (!level) {
         res.status(404).json({ message: "Level not found" });
@@ -699,7 +739,16 @@ export function createLevelsRouter(
         res.status(400).json({ message: "Body levelId does not match the URL id" });
         return;
       }
+      const owner = security?.issue(req, res);
+      const existing = await store.get(id);
+      if (existing && security && !(await security.canAccess("level", id, req))) {
+        res.status(404).json({ message: "Level not found" }); return;
+      }
+      if (!(await canAccessManifestResources(req, parsed.data as SceneManifest))) {
+        res.status(400).json({ message: "Level references an unavailable private asset" }); return;
+      }
       const saved = await store.save(id, parsed.data as SceneManifest);
+      if (owner) await security?.claim("level", saved.levelId, owner.ownerId);
       res.json(saved);
     }),
   );
@@ -707,6 +756,10 @@ export function createLevelsRouter(
   router.post(
     "/api/levels/:id/publish",
     wrapAsync(async (req, res) => {
+      security?.issue(req, res);
+      if (security && !(await security.canAccess("level", req.params.id as string, req))) {
+        res.status(404).json({ message: "Level not found" }); return;
+      }
       const level = await store.get(req.params.id as string);
       if (!level) {
         res.status(404).json({ message: "Level not found" });
@@ -720,6 +773,7 @@ export function createLevelsRouter(
       try {
         await assertLevelPublishable(store, level);
         const publication = await publications.publish(level, parsed.data);
+        await exposePublishedResources(publication);
         res.status(201).json(publication);
       } catch (error) {
         if (error instanceof PlacementValidationError) {
@@ -738,6 +792,9 @@ export function createLevelsRouter(
   router.get(
     "/api/levels/:id/publications",
     wrapAsync(async (req, res) => {
+      if (security && !(await security.canAccess("level", req.params.id as string, req))) {
+        res.status(404).json({ message: "Level not found" }); return;
+      }
       const level = await store.get(req.params.id as string);
       if (!level) {
         res.status(404).json({ message: "Level not found" });
@@ -755,6 +812,7 @@ export function createLevelsRouter(
         res.status(404).json({ message: "Shared world not found" });
         return;
       }
+      await exposePublishedResources(publication);
       res.json(publication);
     }),
   );
@@ -762,6 +820,9 @@ export function createLevelsRouter(
   router.get(
     "/api/levels/:id/export",
     wrapAsync(async (req, res) => {
+      if (security && !(await security.canAccess("level", req.params.id as string, req))) {
+        res.status(404).json({ message: "Level not found" }); return;
+      }
       const level = await store.get(req.params.id as string);
       if (!level) {
         res.status(404).json({ message: "Level not found" });
@@ -800,7 +861,13 @@ export function createLevelsRouter(
         return;
       }
       try {
+        const owner = security?.issue(req, res);
         const imported = await importLevelBundle(store, rawBundle);
+        if (owner && security) {
+          await security.claim("level", imported.levelId, owner.ownerId);
+          for (const photo of imported.photos) if (photo.url.startsWith("/api/")) await security.claim("photo", photo.id, owner.ownerId);
+          for (const asset of imported.assets) if (asset.url.startsWith("/api/")) await security.claim("asset", asset.id, owner.ownerId);
+        }
         res.status(201).json(imported);
       } catch (err) {
         if (err instanceof InvalidBundleError) {

@@ -8,8 +8,8 @@ import { PhotoStore } from "./persistence/photoStore.js";
 import { AssetStore } from "./persistence/assetStore.js";
 import { GeneratedAssetStore } from "./persistence/generatedAssetStore.js";
 import { JobStore, JobStoreUploadUrlCache } from "./jobs/store.js";
-import { JobManager } from "./jobs/manager.js";
-import { SpendLedger } from "./jobs/spendLedger.js";
+import { JobManager, ProviderConcurrencyExceededError } from "./jobs/manager.js";
+import { BudgetExceededError, SpendLedger } from "./jobs/spendLedger.js";
 import { PreviewCacheStore } from "./jobs/previewCache.js";
 import { createCapabilitiesRouter } from "./routes/capabilities.js";
 import { createUploadsRouter } from "./routes/uploads.js";
@@ -25,6 +25,10 @@ import { createAudioRouter } from "./audio/routes.js";
 import { createPostcardsRouter } from "./postcards/routes.js";
 import { PostcardCacheStore } from "./postcards/store.js";
 import { logServerError } from "./util/sanitize.js";
+import { createRateLimiter, isBillableRoute, isUploadRoute } from "./security/rateLimit.js";
+import { createDiagnosticsRouter } from "./security/diagnostics.js";
+import { OwnerSecurity } from "./security/owner.js";
+import { ImageDecodeBudget } from "./security/imageDimensions.js";
 
 /**
  * Foundation API shell plus the Livepeer provider/job/asset routes (owned by
@@ -33,7 +37,21 @@ import { logServerError } from "./util/sanitize.js";
  * registered from their `server/levels.ts`.
  */
 const app = express();
+app.set("trust proxy", env.trustProxyHops);
 app.use(express.json({ limit: "10mb" }));
+
+const billableRateLimiter = createRateLimiter({
+  limit: env.billableRateLimit,
+  windowMs: env.rateLimitWindowSeconds * 1_000,
+  message: "Too many generation requests. Please wait before trying again.",
+});
+const uploadRateLimiter = createRateLimiter({
+  limit: env.uploadRateLimit,
+  windowMs: env.rateLimitWindowSeconds * 1_000,
+  message: "Too many uploads. Please wait before trying again.",
+});
+app.use((req, res, next) => isBillableRoute(req) ? billableRateLimiter(req, res, next) : next());
+app.use((req, res, next) => isUploadRoute(req) ? uploadRateLimiter(req, res, next) : next());
 
 const photoStore = new PhotoStore(env.storageDir);
 const assetStore = new AssetStore(env.storageDir);
@@ -41,6 +59,8 @@ const generatedAssetStore = new GeneratedAssetStore(env.storageDir);
 const jobStore = new JobStore(env.storageDir);
 const spendLedger = new SpendLedger(env.storageDir);
 const previewCache = new PreviewCacheStore(env.storageDir);
+const ownerSecurity = new OwnerSecurity(env.storageDir, env.legacyOpen, env.secureOwnerCookie);
+const imageDecodeBudget = new ImageDecodeBudget(env.uploadDecodeBudgetBytes);
 const levelStore = new LevelStore(env.storageDir, assetStore, photoStore);
 const postcardCache = new PostcardCacheStore(env.storageDir);
 const sourceBytes = {
@@ -57,6 +77,11 @@ const jobManager = new JobManager(jobStore, adapter, assetStore, photoStore, {
   perRequestLimitUsd: env.livepeerMaxRequestUsd,
   perWorldLimitUsd: env.livepeerMaxWorldUsd,
   maxRetries: env.livepeerMaxAutomaticRetries,
+  maxInFlight: env.providerMaxInFlight,
+  concurrencyRetrySeconds: env.providerConcurrencyRetrySeconds,
+  globalLimitUsd: env.livepeerMaxGlobalUsd,
+  dailyLimitUsd: env.livepeerMaxDailyUsd,
+  ownerSecurity,
 });
 const questOrchestrator = new QuestOrchestrator(questGatewayFromManager(jobManager), levelStore);
 const audioOrchestrator = new AudioOrchestrator(audioGatewayFromManager(jobManager), levelStore);
@@ -70,15 +95,30 @@ app.get("/api/movement-config", (_req, res) => {
 });
 
 app.use(createCapabilitiesRouter(adapter));
-app.use(createUploadsRouter(photoStore));
-app.use(createPhotosRouter(photoStore));
-app.use(createAssetsRouter(assetStore));
-app.use(createGeneratedAssetsRouter(generatedAssetStore));
-app.use(createPostcardsRouter(levelStore, generatedAssetStore, jobManager, postcardCache));
-app.use(createJobsRouter(jobManager, adapter, photoStore, generatedAssetStore, previewCache, spendLedger));
-app.use(createQuestRouter(questOrchestrator));
-app.use(createAudioRouter(audioOrchestrator));
-app.use(createLevelsRouter(levelStore));
+app.use(createDiagnosticsRouter(spendLedger, env.diagnosticsToken));
+app.use(createUploadsRouter(photoStore, ownerSecurity, {
+  limits: {
+    maxWidth: env.uploadMaxImageWidth,
+    maxHeight: env.uploadMaxImageHeight,
+    maxPixels: env.uploadMaxImagePixels,
+  },
+  budget: imageDecodeBudget,
+}));
+app.use(createPhotosRouter(photoStore, ownerSecurity));
+app.use(createAssetsRouter(assetStore, ownerSecurity));
+app.use(createGeneratedAssetsRouter(generatedAssetStore, ownerSecurity));
+app.use(createJobsRouter(jobManager, adapter, photoStore, generatedAssetStore, previewCache, spendLedger, ownerSecurity));
+app.use(createQuestRouter(questOrchestrator, ownerSecurity));
+app.use(createAudioRouter(audioOrchestrator, ownerSecurity));
+app.use(createPostcardsRouter(levelStore, generatedAssetStore, jobManager, postcardCache, ownerSecurity, {
+  limits: {
+    maxWidth: env.uploadMaxImageWidth,
+    maxHeight: env.uploadMaxImageHeight,
+    maxPixels: env.uploadMaxImagePixels,
+  },
+  budget: imageDecodeBudget,
+}));
+app.use(createLevelsRouter(levelStore, undefined, ownerSecurity));
 
 const terminalErrorHandler: ErrorRequestHandler = (error, req, res, next) => {
   if (res.headersSent) {
@@ -92,6 +132,16 @@ const terminalErrorHandler: ErrorRequestHandler = (error, req, res, next) => {
       return;
     }
     res.status(400).json({ message: "The multipart upload is invalid or exceeds an upload limit." });
+    return;
+  }
+
+  if (error instanceof ProviderConcurrencyExceededError) {
+    res.setHeader("Retry-After", String(error.retryAfterSeconds));
+    res.status(429).json({ message: error.message });
+    return;
+  }
+  if (error instanceof BudgetExceededError) {
+    res.status(402).json({ message: error.message, code: error.code });
     return;
   }
 

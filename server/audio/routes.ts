@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { AUDIO_CUES, type AudioCue } from "./prompts.js";
 import type { AudioOrchestrator } from "./orchestrator.js";
+import type { OwnerSecurity } from "../security/owner.js";
 
 const startSchema = z.object({
   action: z.literal("start"),
@@ -25,13 +26,30 @@ const retrySchema = z.object({
 });
 const requestSchema = z.discriminatedUnion("action", [startSchema, refreshSchema, retrySchema]);
 
-export function createAudioRouter(orchestrator: AudioOrchestrator): Router {
+export function createAudioRouter(orchestrator: AudioOrchestrator, security?: OwnerSecurity): Router {
   const router = Router();
   router.post("/api/audio", async (req, res, next) => {
     const parsed = requestSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ message: "Invalid audio generation request.", issues: parsed.error.issues });
       return;
+    }
+    const owner = security?.issue(req, res);
+    if (security && parsed.data.levelId && !(await security.canAccess("level", parsed.data.levelId, req))) {
+      res.status(404).json({ message: "Level was not found." }); return;
+    }
+    if (security && parsed.data.action === "start" && !(await security.isUnowned("world", parsed.data.worldId)) && !(await security.canAccess("world", parsed.data.worldId, req))) {
+      res.status(404).json({ message: "World was not found." }); return;
+    }
+    const jobIds = parsed.data.action === "refresh"
+      ? Object.values(parsed.data.jobIds)
+      : parsed.data.action === "retry" ? [parsed.data.jobId] : [];
+    if (security) {
+      for (const jobId of jobIds) {
+        if (!(await security.canAccess("job", jobId, req))) {
+          res.status(404).json({ message: "Audio job was not found." }); return;
+        }
+      }
     }
     try {
       const result = parsed.data.action === "start"
@@ -41,7 +59,7 @@ export function createAudioRouter(orchestrator: AudioOrchestrator): Router {
             objectDescription: parsed.data.objectDescription,
             narrationScript: parsed.data.narrationScript,
             ...(parsed.data.atmosphere !== undefined ? { atmosphere: parsed.data.atmosphere } : {}),
-          })
+          }, owner?.ownerId)
         : parsed.data.action === "refresh"
           ? await orchestrator.refresh(parsed.data.jobIds as Partial<Record<AudioCue, string>>)
           : await orchestrator.retry(parsed.data.cue, parsed.data.jobId);

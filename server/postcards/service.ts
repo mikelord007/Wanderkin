@@ -93,7 +93,7 @@ export class PostcardService {
     return { state: "job", cacheHit: true, job };
   }
 
-  async create(levelId: string, screenshotAssetId: string): Promise<PostcardStatus> {
+  async create(levelId: string, screenshotAssetId: string, ownerId?: string): Promise<PostcardStatus> {
     const manifest = await this.levels.get(levelId);
     if (!manifest) throw new Error("WORLD_NOT_FOUND");
     const fingerprint = fingerprintWorld(manifest);
@@ -112,7 +112,7 @@ export class PostcardService {
     }
     const outcome: SubmitOutcome = await this.jobs.submitGenerationOrReconcile(
       requestFor(manifest, fingerprint, screenshotAssetId),
-      { worldId: levelId, requestLimitOverrideUsd: POSTCARD_MAX_COST_USD },
+      { worldId: levelId, requestLimitOverrideUsd: POSTCARD_MAX_COST_USD, ...(ownerId ? { ownerId } : {}) },
     );
     if (outcome.status === "conflict") throw new Error("POSTCARD_CONFLICT");
     const record: PostcardCacheRecord = {
