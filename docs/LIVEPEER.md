@@ -329,6 +329,25 @@ which has no provenance either.
 
 ## Known gaps / follow-ups
 
+### 2026-09-24 image-edit output-format diagnosis
+
+The first ObjectQuest v2 live `kontext-edit` preview requested PNG but the
+provider completed successfully with a JPEG result. The durable provider
+status for application job `job_ef2fde65-65e2-4d16-b8df-e75d53c93d85`
+(`mjob_d3d1797a1657`) reports `state: "ready"`, no fallback, and a result URL
+whose path ends in `.jpg`. Re-fetching that stored URL through
+`downloadBounded` returned `Content-Type: image/jpeg`, 129,740 bytes, and the
+first 16 bytes `ff d8 ff e0 00 10 4a 46 49 46 00 01 01 00 00 01` (a JFIF
+JPEG header). This rules out an error body and confirms the provider treated
+`output_format: png` as a preference rather than a guaranteed post-condition.
+
+The application failure was local: `GeneratedAssetStore.storeImage` correctly
+sniffed the bytes as JPEG, then rejected them because the detected MIME did not
+equal the request's preferred `outputMimeType`. Generated image finalization
+must therefore accept JPEG, PNG, or WebP by magic bytes and persist the detected
+MIME and extension while retaining the requested format only in the provider
+request.
+
 - Worker 1's shared contracts intentionally have no separate
   `background-removal` kind; the exact server mapping is the `image-edit`
   profile documented above.
