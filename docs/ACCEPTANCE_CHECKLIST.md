@@ -1,6 +1,6 @@
 # ObjectQuest v2 independent acceptance checklist
 
-Snapshot: **2026-09-24**, integrated revision `764d1dd`. This checklist is an
+Snapshot: **2026-09-24**, integrated revision `e269fa9`. This checklist is an
 evidence map, not a single release checkbox. **Implemented** means the code path
 exists. **Automated/browser** means a named local check passed. **Live** means
 ObjectQuest itself submitted or recovered a real provider job. **Hands-on** is
@@ -9,15 +9,17 @@ not required for the acceptance item; it does not mean “unverified.”
 
 ## Verification baseline
 
-- [x] `npm run typecheck` passed at `764d1dd`.
+- [x] `npm run typecheck`, 69 focused adapter/job-manager/quest tests, 377 unit
+  tests, 44 HTTP tests, and the 7/7 live-runner suite passed after the integrated
+  row-5 parser repair.
 - [x] The live-runner suite passed 7/7 and the focused provider-neutral saved-
   world copy case passed 1/1 in Chrome at `764d1dd`.
 - [x] The full browser suite passed **37**, skipped **6**, and failed **0** of
   43 cases on isolated port 55210 at `764d1dd`. The run also observed three WAV
   requests and zero runtime errors for B14. The temporary servers were stopped.
-- [x] The preceding broad revision passed **371 unit tests and 44 HTTP tests**.
-  They were intentionally not rerun for the later runner/docs/evidence/test-only
-  delta, so this is dated prior-revision evidence, not a fresh `764d1dd` run.
+- [x] The latest broad integrated result is **377 unit tests and 44 HTTP tests**.
+  The browser suite was not rerun for the server parser-only repair, so its
+  37/6/0 result remains correctly tied to `764d1dd`.
 - [x] An earlier production build passed after quest/audio integration; it was
   not rerun for the later runner/docs/evidence/test-only delta.
 - [ ] No hosted-origin, backup/restore, or final user hands-on run exists.
@@ -53,7 +55,7 @@ substitute for the dated run results above.
 | A2 | New schema round trips | Yes | Manifest, persistence, publication, audio, quest, and postcard references covered | Live provider N/A for serialization |
 | A3 | Migration compatibility | Yes | Legacy fixture import/migration covered | N/A; lossy/defaulted fields remain contract-defined |
 | A4 | Job deduplication per kind | Yes | Manager, audio orchestrator, preview, mesh, narration, and postcard dedupe tests; B6/B10/B18 contracts | Real rows must retain provenance; do not infer all-kind live proof |
-| A5 | Polling, errors, and resume | Yes | Job manager/store, live runner, B10, and My Worlds paths | **Partial live:** rows 1–4 ready; row 5 provider-complete but app recovery pending |
+| A5 | Polling, errors, and resume | Yes | Job manager/store, live runner, B10, My Worlds, and zero-spend row-5 recovery | **Live:** rows 1–5 ready; rows 6–16 have no terminal success evidence yet |
 | A6 | Partial asset failure | Yes | Optional quest/audio/postcard failure tests preserve playable core | Induced/mock failures are not provider incidents |
 | A7 | Budget rejection | Yes | Per-request, per-world, global, and rolling-day pre-submit checks in HTTP/unit coverage | No paid rejection required; actual provider billing remains unknown |
 | A8 | Preview approval/input selection | Yes | B5/B6 and provider-request-copy case passed | Real Kontext output exists; exact visual approval remains user-owned |
@@ -76,7 +78,7 @@ substitute for the dated run results above.
 | B7 | Restart/respawn cleanly | Mechanics covered by tests/integrated suite; exact skipped-case mapping was not supplied | User hands-on confirmation remains open |
 | B8 | Adjust/save course entities | Real local API save/reload editor case passed | Generated course repair still awaits live world |
 | B9 | Reload style, mission, audio | Persistence/reference tests and saved-world browser coverage exist | No saved current live-validation world |
-| B10 | Resume pending generation | Seeded same-job resume/My Worlds and live-runner reconciliation covered | Row-5 force-poll recovery still pending |
+| B10 | Resume pending generation | Seeded resume plus one force-poll of row 5 recovered the same app/provider IDs with no new submission | Complete for row 5; remaining media rows still need outcomes |
 | B11 | Optional media failure preserves world | Unit/HTTP/browser contracts cover independent failure | No real provider failure claimed |
 | B12 | Open share separately | Isolated browser context opened and played publication | No deployed direct `/share/:id` refresh |
 | B13 | Compare same published race | Isolated context retained immutable version/target after private edit | Client-reported timing limitation applies |
@@ -97,19 +99,19 @@ source/test contracts, and explicitly supplied observations.
 | ID | Gate | Status at this snapshot |
 | --- | --- | --- |
 | L1 | Bounded representative-object matrix | **Partial.** Batch is capped below the user's $10 ceiling; rows 1–5 were submitted for one object only. A second object is not authorized yet. |
-| L2 | Judge appearance and usability, not HTTP success | **Open.** Rows 1–4 produced artifacts, but the user has not accepted recognizability/course feel. Provider success alone is insufficient. |
-| L3 | One current real photo-to-play path | **Open.** Background removal, two image edits, and mesh are ready. Quest row 5 needs zero-spend recovery; no saved/playable/shared validation level exists. |
-| L4 | Evidence for every claimed AI capability | **Open.** Own execution exists for background removal, Kontext, GPT image edit, Rodin, and provider-side quest text. Music, ambience, SFX, TTS, and image-to-video have no real execution. |
+| L2 | Judge appearance and usability, not HTTP success | **Open.** Rows 1–5 are ready, but the user has not accepted recognizability/course feel or quest quality. Provider success alone is insufficient. |
+| L3 | One current real photo-to-play path | **Open.** Cutout, two image edits, mesh, and validated quest are ready; no saved/playable/shared validation level exists. |
+| L4 | Evidence for every claimed AI capability | **Open.** Own execution exists for background removal, Kontext, GPT image edit, Rodin, and recovered Gemini quest text. Rows 6–16 are authorized/in flight, not successful evidence. |
 | L5 | Keep unverified optional features out of core acceptance | **Pass with caveat.** Audio/postcard failures are optional and fall back; optional companion work remains gated. Demo wording must label bundled versus generated media. |
 | L6 | Outage-ready bundled example | **Implemented/automated.** Lost Colors and bundled audio load without provider calls. User outage-path rehearsal remains open. |
 | L7 | Compare performance with baseline | Worker 11 recorded six 20-second Chrome samples and build size | Observational only; no universal FPS claim or hosted-origin measurement |
 
 ## Outstanding acceptance decisions
 
-- [ ] Land and verify the narrow nested quest-response adapter fix, then
-  force-poll provider job `mjob_13e739e8d5af` without resubmitting it.
-- [ ] Submit authorized rows 6–16 only after that recovery; record actual cost
-  as unknown wherever the provider returns no metered value.
+- [x] The narrow nested quest adapter fix and zero-spend force-poll recovery of
+  `mjob_13e739e8d5af` are integrated; the four-field quest validates.
+- [ ] Record terminal results for the authorized/in-flight rows 6–16; actual
+  cost stays unknown wherever the provider returns no metered value.
 - [ ] Save, repair if necessary, play, complete, publish, and reopen the current
   generated world without new generation requests.
 - [ ] User accepts or rejects preview/mesh identity, course usability, quest,

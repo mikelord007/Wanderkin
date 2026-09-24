@@ -1,6 +1,6 @@
 # Manual play-test handoff
 
-Snapshot: **2026-09-24**, integrated revision `764d1dd`. This is the
+Snapshot: **2026-09-24**, integrated revision `e269fa9`. This is the
 **no-provider** hands-on path: it must not submit a preview, mesh, quest, audio,
 or postcard job.
 

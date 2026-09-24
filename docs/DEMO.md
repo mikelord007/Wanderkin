@@ -1,6 +1,6 @@
 # ObjectQuest hackathon demo
 
-Snapshot: **2026-09-24**, integrated revision `764d1dd`. This is the canonical
+Snapshot: **2026-09-24**, integrated revision `e269fa9`. This is the canonical
 ten-step sequence from the product brief. Use a current
 desktop Chromium browser with keyboard and mouse. Do not improvise a paid run:
 refresh capability/price/allowance immediately before the demo and use a new
@@ -162,11 +162,13 @@ logo alone.
 **Expected:** Start with current ready rows: `mjob_a2426904c928` (cutout),
 `mjob_d3d1797a1657` (Kontext), `mjob_4a0b2bde417b` (GPT image edit), and
 `mjob_0001ef7f3201` (Rodin). Explain that quest job
-`mjob_13e739e8d5af` completed at the provider with nested valid text, but the
-application adapter/recovery is pending; rows 6–16 were not submitted. Then
+`mjob_13e739e8d5af` was recovered ready from its existing provider result at
+zero new spend, with four validated fields and model `fal-ai/any-llm`. Rows
+6–16 are authorized/in flight but have no successful evidence yet. Then
 show the $0.042 Kontext and $0.420 Rodin style spike and the 2026-09-18 Rodin
 success. The current batch estimate is $0.6932 and the combined batch-plus-
-spike estimate is $1.1552; provider-metered costs are unknown, not zero.
+spike estimate is $1.1552 before any rows 6–16 results; provider-metered costs
+are unknown, not zero.
 
 ## Provider-down fallback path
 

@@ -1,7 +1,7 @@
 # ObjectQuest v2 delivery checklist
 
 Snapshot: **2026-09-24**, integrated `main` revision
-`764d1dd0ff73bb5a5d2d7c4eb49de986b3225753`. This checklist separates
+`e269fa95a3ee9cd4a7620cdbf7b19e4f4c692197`. This checklist separates
 implementation, automated/local evidence, live-provider evidence, user
 hands-on acceptance, and deployment. A checked implementation box is not a
 claim that the corresponding live output or gameplay feel has been accepted.
@@ -47,17 +47,18 @@ claim that the corresponding live output or gameplay feel has been accepted.
 
 ## Verification ledger
 
-- [x] `npm run typecheck`: pass at `764d1dd`.
-- [x] Live-runner focused suite: 7/7 pass at `764d1dd`.
+- [x] `npm run typecheck`: pass after the integrated row-5 adapter repair.
+- [x] Focused adapter/job-manager/quest suite: 69/69 pass; live-runner suite:
+  7/7 pass.
 - [x] Provider-neutral saved-world copy case: 1/1 Chrome pass at `764d1dd`.
 - [x] Full browser suite: **37 passed, 6 skipped, 0 failed (43 total)** on the
   isolated port 55210 at `764d1dd`. The temporary 55209/55210 services were
   stopped afterward.
 - [x] B14 audio browser evidence: three WAV requests and zero runtime errors.
-- [x] Prior broad suite: **371 unit tests and 44 HTTP tests passed** after the
-  audio/security/photo-dedupe integration. These were intentionally not rerun
-  for the later runner/docs/evidence/test-only delta, so they remain dated
-  prior-revision evidence rather than a `764d1dd` claim.
+- [x] Integrated broad suite: **377 unit tests and 44 HTTP tests passed** after
+  the parser-only row-5 repair. The browser suite was appropriately not rerun
+  for that server change, so 37/6/0 at `764d1dd` remains the latest browser
+  evidence.
 - [x] Earlier production build passed after quest/audio integration. It was not
   rerun for the latest runner/docs/evidence/test-only delta.
 - [ ] Docker image build: Docker was not installed on the delivery worker's
@@ -65,17 +66,18 @@ claim that the corresponding live output or gameplay feel has been accepted.
 
 ## Live-provider and hands-on gates
 
-- [x] Current batch rows 1–4 have real ready outputs: background removal,
-  Kontext preview, GPT image-edit alternate, and Rodin mesh. See
+- [x] Current batch rows 1–5 are ready: background removal, Kontext preview,
+  GPT image-edit alternate, Rodin mesh, and validated four-field quest. See
   [`EVIDENCE.md`](EVIDENCE.md).
-- [ ] Row 5 quest recovery: provider job `mjob_13e739e8d5af` completed with
-  valid nested text, but the application discarded that shape. The adapter fix
-  and force-poll-only recovery are pending; no new paid call is warranted.
-- [ ] Rows 6–16: music, ambience, seven SFX cues, narration, and postcard have
-  not been submitted in the live batch.
+- [x] Row 5 reused provider job `mjob_13e739e8d5af`: one force-poll recovered
+  the same app job, served model `fal-ai/any-llm`, no fallback, validated four
+  fields, null actual cost, and no ledger/estimate increase.
+- [ ] Rows 6–16: music, ambience, seven SFX cues, narration, and postcard are
+  authorized/in flight under the existing budget but have no success evidence
+  at this timestamp. Fresh estimate: $0.7327.
 - [ ] One current generated world is saved, repaired if necessary, completed,
   published, and opened in a fresh context. No level/share exists yet because
-  the live runner stopped at row 5.
+  rows 6–16 and the save/play step have not completed.
 - [ ] User hands-on acceptance covers preview/mesh identity, course feel and
   repair, real quest text, generated audio/subtitles, postcard labeling and
   playback, persistence, and the photo-free share.

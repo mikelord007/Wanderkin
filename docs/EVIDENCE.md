@@ -1,6 +1,6 @@
 # Real Livepeer evidence index
 
-Snapshot: **2026-09-24**, application revision `764d1dd`. This index keeps five
+Snapshot: **2026-09-24**, application revision `e269fa9`. This index keeps five
 different claims separate:
 
 1. **Catalog availability**: discovery said the capability could be routed.
@@ -19,11 +19,10 @@ The canonical committed runner record is
 [`LIVE_VALIDATION_RESULT_2026-09-24.md`](LIVE_VALIDATION_RESULT_2026-09-24.md)
 with redacted structured data in
 [`live-validation-2026-09-24.json`](evidence/live-validation-2026-09-24.json).
-That result file records the runner's stop-time interpretation. A later
-inspection found that row 5's provider response contains valid quest text at
-`run_output.result.text`; the current application adapter does not normalize
-that nested shape. The scoped adapter fix and **force-poll-only** recovery are
-pending. No replacement paid quest request should be submitted.
+That result preserves both the original stop and the later recovery. The scoped
+adapter fix recognizes the observed `run_output.result.text` envelope. One
+authorized force-poll reused the same application/provider job and recovered
+the quest with zero new submission or ledger delta.
 
 | Row | Capability and job | Result at this snapshot | Artifact / boundary |
 | ---: | --- | --- | --- |
@@ -31,12 +30,12 @@ pending. No replacement paid quest request should be submitted.
 | 2 | `kontext-edit`, `mjob_d3d1797a1657` | Ready after zero-spend reconciliation of the same provider job | JPEG, 129,740 bytes, SHA-256 `adcd4f6a9c5ab0e6064d1e3656f906f5f5b9c4a22da704854b7c2c8fa0263c5e`; user visual approval pending |
 | 3 | `gpt-image-edit`, `mjob_4a0b2bde417b` | Ready, no fallback | PNG, 684,261 bytes, SHA-256 `93c3895a6dbf68121eb8f50487efd44a0e2601a4ee5bf6c2653c133aa1501106`; user visual approval pending |
 | 4 | `rodin-i3d`, `mjob_0001ef7f3201` | Ready, no fallback | GLB, 4,680,412 bytes, SHA-256 `f0855519fb1314e14703ef91a7778b6992f2f4c80b64910cfe4781e719b0e24c`; not yet loaded, prepared, or played by the user |
-| 5 | `gemini-text`, `mjob_13e739e8d5af` | Provider completed with valid nested text; application job failed normalization | No consumed quest artifact yet; adapter repair/recovery pending |
-| 6–16 | Music, ambience, seven SFX cues, narration, postcard | **Not submitted** after the row-5 stop | No real media or quality evidence |
+| 5 | `gemini-text`, `mjob_13e739e8d5af` | **Recovered ready**, served model `fal-ai/any-llm`, no fallback, same app/provider IDs, zero new submission | Validated four-field quest, canonical SHA-256 `47561633496011cc62324b3d7b8225b5600c1f9178e3a5a2e82bfb6fd1f5bb6e`; in-world/user review pending |
+| 6–16 | Music, ambience, seven SFX cues, narration, postcard | Authorized/in flight; **no terminal success evidence at this snapshot** | Fresh estimate $0.7327; no media quality claim yet |
 
 No validation level, share ID, or current generated-world gameplay evidence
-exists. Rows 1–4 therefore prove real execution and stored artifacts, not a
-complete photo-to-play journey. The user owns hands-on appearance, audio, and
+exists. Rows 1–5 therefore prove real execution and recovery, not a complete
+photo-to-play journey. The user owns hands-on appearance, quest, audio, and
 gameplay acceptance.
 
 ### Spend boundary
@@ -44,11 +43,12 @@ gameplay acceptance.
 - Current batch ledger estimate/reservation: **$0.6932** across rows 1–5.
 - Earlier style spike estimates: **$0.462**.
 - Combined recorded estimate: **$1.1552**.
-- Estimated unsubmitted rows 6–16: **$0.7327**; full batch estimate:
+- Estimated fresh cost for rows 6–16: **$0.7327**; full batch estimate:
   **$1.4259**; batch plus spike estimate: **$1.8879**.
 - All current provider-paid cost fields are `null`. Actual paid cost is
   **unknown**, not zero. Estimates are not provider billing.
-- The authorized ceiling is $10. No new paid calls followed the row-5 stop.
+- The authorized ceiling is $10. Row-5 recovery added no call or estimate;
+  rows 6–16 were subsequently authorized and are in flight at this timestamp.
 
 ## Earlier dated ObjectQuest executions
 
@@ -86,7 +86,7 @@ Catalog and historical-health counts are the dated discovery snapshot in
 | `gpt-image-edit` | Available in authorized batch | **Yes:** `mjob_4a0b2bde417b` | Output exists; user review pending |
 | `rodin-i3d` | Available; 2/3 in snapshot | **Yes:** current, dated, and bundled jobs | Bundled authored course playable; current GLB gameplay unverified |
 | `tripo-mv3d` | Available alternative | Bundled provenance only | Bundled authored course playable; no current automatic-course claim |
-| `gemini-text` | Available; 278/281 in snapshot | **Provider yes, app consumption no:** `mjob_13e739e8d5af` | Nested valid text awaits adapter recovery; no in-world quest review |
+| `gemini-text` | Available; 278/281 in snapshot | **Yes:** recovered `mjob_13e739e8d5af` through the same app job | Validated four-field quest; no in-world/user review |
 | `music` | Available; 171/173 in snapshot | **No** | Bundled audio works, but it is not generated-music evidence |
 | `mirelo-sfx` | Available; 22/22 in snapshot | **No** | No generated ambience/SFX listening evidence |
 | `chatterbox-tts` | Available; 60/60; `READY` | **No** | No generated narration/subtitle synchronization evidence |
@@ -94,9 +94,8 @@ Catalog and historical-health counts are the dated discovery snapshot in
 
 ## Evidence still required
 
-- Recover and validate the existing quest job without a new provider request.
-- Execute and preserve authorized music, ambience, SFX, TTS, and postcard jobs,
-  or remove those real-generation claims from the demo.
+- Preserve terminal evidence for the authorized/in-flight music, ambience, SFX,
+  TTS, and postcard jobs, or omit those real-generation claims from the demo.
 - Save the current world, load the GLB, inspect/repair its course, complete it,
   publish it, and open the photo-free share in a fresh context.
 - Record the user's visual, audio, labeling, and gameplay decisions.

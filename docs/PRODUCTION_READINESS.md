@@ -1,6 +1,6 @@
 # Production readiness review
 
-Snapshot: **2026-09-24**, integrated revision `764d1dd`. This is a code and
+Snapshot: **2026-09-24**, integrated revision `e269fa9`. This is a code and
 evidence review, not hosted-production proof. Mocked tests, bundled media,
 catalog availability, real provider execution, human quality review, and
 gameplay usability are kept distinct.
@@ -113,14 +113,14 @@ existing provider IDs without a new paid call.
 
 **Remaining gap.** Recovery is bound to the same browser owner token and local
 storage; cleared storage or a different device has no account-level discovery.
-The current quest row demonstrates an adapter-normalization failure after the
-provider completed successfully. Its fix and force-poll-only recovery are
-pending, and no saved live-validation level exists yet.
+The quest row historically exposed an adapter-normalization failure after the
+provider completed successfully. The scoped repair is now integrated and one
+force-poll recovered the same job at zero new spend. No saved live-validation
+level exists yet.
 
-**Production action.** Complete the scoped normalization repair, force-poll the
-existing row-5 provider job without resubmission, then validate process restart,
-refresh, My Worlds recovery, save, and share. Add account-level discovery before
-multi-device claims.
+**Production action.** Preserve the verified no-resubmission recovery semantics,
+then validate process restart, refresh, My Worlds recovery, save, and share on
+the completed batch. Add account-level discovery before multi-device claims.
 
 ## Rate, concurrency, and spend controls
 
@@ -157,15 +157,15 @@ preview/download flows are implemented ([`src/capture`](../src/capture),
 cover these paths without claiming provider quality.
 
 **Remaining gap.** The current live batch has not executed music, ambience,
-SFX, TTS, or image-to-video. The quest provider completed row 5, but the
-application failed to normalize its nested text; repair is pending. Gameplay
-recording support varies by browser, and generated postcard media has no real
+SFX, TTS, or image-to-video at this timestamp. The recovered row-5 quest is
+schema-valid, but has not been reviewed in a playable world. Gameplay recording
+support varies by browser, and generated postcard media has no real
 quality/playback evidence yet.
 
-**Production action.** Resume only after the row-5 repair, reuse existing rows,
-run the authorized remaining live rows with zero automatic retries, and hand
-the saved world to the user for listening, visual, gameplay, persistence, and
-labeling acceptance.
+**Production action.** Reuse rows 1–5, apply the contract/price/dry-run guards
+to the authorized rows 6–16, and treat them as unverified until terminal
+artifacts are recorded. Then hand the saved world to the user for listening,
+visual, gameplay, persistence, and labeling acceptance.
 
 ## Mobile browsers
 
@@ -186,6 +186,6 @@ advertise mobile play until touch controls and a target-device matrix pass.
 The code is suitable for a controlled, single-instance local/hackathon demo
 with bundled fallbacks. It is not production-deployed, the current real
 photo-to-play batch is incomplete, and user hands-on acceptance remains open.
-The highest remaining gates are the row-5 normalization recovery, live rows
-6–16, generated-world save/play/share, user quality/gameplay review, tested
+The highest remaining gates are terminal evidence for live rows 6–16,
+generated-world save/play/share, user quality/gameplay review, tested
 backup/restore, and an authorized dedicated deployment origin.
