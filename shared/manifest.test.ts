@@ -3,6 +3,8 @@ import { createEmptyManifest } from "./manifest.js";
 import { SCENE_MANIFEST_SCHEMA_VERSION } from "./schema-version.js";
 import { COORDINATE_CONVENTION } from "./geometry.js";
 import { isTerminalJobState } from "./job.js";
+import legacyFixture from "./fixtures/legacy-scene-manifest-v1.json";
+import { migrateSceneManifest, sceneManifestReaderSchema } from "./manifest-migration.js";
 
 describe("createEmptyManifest", () => {
   it("produces a schema-versioned manifest with the shared coordinate convention", () => {
@@ -26,5 +28,17 @@ describe("isTerminalJobState", () => {
     expect(isTerminalJobState("failed")).toBe(true);
     expect(isTerminalJobState("generating")).toBe(false);
     expect(isTerminalJobState("queued")).toBe(false);
+  });
+});
+
+describe("legacy manifest compatibility", () => {
+  it("loads the pre-v2 saved-level fixture without changing its envelope version", () => {
+    expect(sceneManifestReaderSchema.parse(legacyFixture).schemaVersion).toBe(1);
+
+    const migrated = migrateSceneManifest(legacyFixture);
+    expect(migrated.schemaVersion).toBe(1);
+    expect(migrated.experience.mode.kind).toBe("explore");
+    expect(migrated.experience.quest.title).toBe(legacyFixture.name);
+    expect(migrated.experience.collectibles).toEqual([]);
   });
 });
