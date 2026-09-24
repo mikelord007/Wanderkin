@@ -31,6 +31,7 @@ export function PlayScreen({ manifest, onExit, onComplete, publishedVersionId }:
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const recorderRef = useRef<GameplayRecorder | null>(null);
   const highlightRef = useRef<GameplayHighlight | null>(null);
+  const recordingErrorRef = useRef<string | null>(null);
 
   useEffect(() => () => recorderRef.current?.dispose(), []);
 
@@ -45,9 +46,14 @@ export function PlayScreen({ manifest, onExit, onComplete, publishedVersionId }:
       return;
     }
     setCaptureError(null);
+    recordingErrorRef.current = null;
     const recorder = new GameplayRecorder(canvas, manifest.name, (state) => {
       if (state === "recording" || state === "stopping" || state === "ready") setCaptureState(state);
-      if (state === "error") setCaptureError(recorder.error?.message ?? "Gameplay recording stopped unexpectedly.");
+      if (state === "error") {
+        const message = recorder.error?.message ?? "Gameplay recording stopped unexpectedly.";
+        recordingErrorRef.current = message;
+        setCaptureError(message);
+      }
     });
     recorderRef.current = recorder;
     recorder.start();
@@ -62,6 +68,7 @@ export function PlayScreen({ manifest, onExit, onComplete, publishedVersionId }:
       return highlight;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Gameplay recording could not be finished.";
+      recordingErrorRef.current = message;
       setCaptureError(message);
       return null;
     }
@@ -85,7 +92,7 @@ export function PlayScreen({ manifest, onExit, onComplete, publishedVersionId }:
       screenshot,
       highlight,
       screenshotError,
-      recordingError: captureError,
+      recordingError: recordingErrorRef.current,
       recordingSupported,
     });
   }
