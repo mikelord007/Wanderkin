@@ -1,7 +1,12 @@
-import { Component, lazy, Suspense, useState, type ReactNode } from "react";
+import { Component, lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import type { PublishedLevelVersion, SceneManifest } from "@shared/index.js";
 import type { GameCompletionResult } from "../../game/types.js";
 import { LoadingScreen } from "../components/LoadingScreen.js";
+import { Button } from "../components/Button.js";
+import { GameplayRecorder, supportsGameplayRecording, type GameplayHighlight } from "../../capture/recorder.js";
+import { captureWorldScreenshot } from "../../capture/screenshot.js";
+import type { CompletedRunMedia } from "../../capture/types.js";
+import "../../capture/media.css";
 
 const GameView = lazy(() =>
   import("../../game/GameView.js").then((mod) => ({ default: mod.GameView })),
@@ -10,7 +15,7 @@ const GameView = lazy(() =>
 interface PlayScreenProps {
   manifest: SceneManifest;
   onExit: () => void;
-  onComplete: (result: GameCompletionResult) => void;
+  onComplete: (result: GameCompletionResult, media: CompletedRunMedia) => void;
   publishedVersionId?: PublishedLevelVersion["versionId"];
 }
 
@@ -20,6 +25,77 @@ interface PlayScreenProps {
 export function PlayScreen({ manifest, onExit, onComplete, publishedVersionId }: PlayScreenProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryAttempt, setRetryAttempt] = useState(0);
+  const [captureState, setCaptureState] = useState<"idle" | "recording" | "stopping" | "ready">("idle");
+  const [captureError, setCaptureError] = useState<string | null>(null);
+  const [recordingSupported] = useState(() => supportsGameplayRecording());
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const recorderRef = useRef<GameplayRecorder | null>(null);
+  const highlightRef = useRef<GameplayHighlight | null>(null);
+  const recordingErrorRef = useRef<string | null>(null);
+
+  useEffect(() => () => recorderRef.current?.dispose(), []);
+
+  function renderedCanvas(): HTMLCanvasElement | null {
+    return wrapperRef.current?.querySelector("canvas") ?? null;
+  }
+
+  function startCapture() {
+    const canvas = renderedCanvas();
+    if (!canvas) {
+      setCaptureError("Wait for the world to finish loading, then try again.");
+      return;
+    }
+    setCaptureError(null);
+    recordingErrorRef.current = null;
+    const recorder = new GameplayRecorder(canvas, manifest.name, (state) => {
+      if (state === "recording" || state === "stopping" || state === "ready") setCaptureState(state);
+      if (state === "error") {
+        const message = recorder.error?.message ?? "Gameplay recording stopped unexpectedly.";
+        recordingErrorRef.current = message;
+        setCaptureError(message);
+      }
+    });
+    recorderRef.current = recorder;
+    recorder.start();
+  }
+
+  async function stopCapture(): Promise<GameplayHighlight | null> {
+    const recorder = recorderRef.current;
+    if (!recorder || recorder.state !== "recording") return highlightRef.current;
+    try {
+      const highlight = await recorder.stop();
+      highlightRef.current = highlight;
+      return highlight;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Gameplay recording could not be finished.";
+      recordingErrorRef.current = message;
+      setCaptureError(message);
+      return null;
+    }
+  }
+
+  async function handleComplete(result: GameCompletionResult) {
+    const canvas = renderedCanvas();
+    let screenshot = null;
+    let screenshotError: string | null = null;
+    if (canvas) {
+      try {
+        screenshot = await captureWorldScreenshot(canvas, manifest);
+      } catch (error) {
+        screenshotError = error instanceof Error ? error.message : "The world screenshot could not be captured.";
+      }
+    } else {
+      screenshotError = "The rendered world was unavailable for a screenshot.";
+    }
+    const highlight = await stopCapture();
+    onComplete(result, {
+      screenshot,
+      highlight,
+      screenshotError,
+      recordingError: recordingErrorRef.current,
+      recordingSupported,
+    });
+  }
 
   if (loadError) {
     return (
@@ -49,17 +125,25 @@ export function PlayScreen({ manifest, onExit, onComplete, publishedVersionId }:
   }
 
   return (
-    <div className="oq-screen oq-screen--play oq-screen--full-bleed">
+    <div ref={wrapperRef} className="oq-screen oq-screen--play oq-screen--full-bleed">
       <ErrorBoundary key={retryAttempt} onError={setLoadError}>
         <Suspense fallback={<LoadingScreen stage="Loading the game…" />}>
           <GameView
             manifest={manifest}
             onExit={onExit}
-            onComplete={onComplete}
+            onComplete={handleComplete}
             {...(publishedVersionId === undefined ? {} : { publishedVersionId })}
           />
         </Suspense>
       </ErrorBoundary>
+      <div className="oq-capture-controls" data-recording={captureState === "recording"} aria-label="Gameplay highlight controls">
+        {!recordingSupported ? <p>Gameplay recording isn’t supported by this browser.</p>
+          : captureState === "idle" ? <Button variant="secondary" onClick={startCapture}>Start gameplay capture</Button>
+          : captureState === "recording" ? <Button variant="secondary" onClick={() => void stopCapture()}>Stop gameplay capture</Button>
+          : captureState === "stopping" ? <p role="status">Finishing gameplay highlight…</p>
+          : <p role="status">Gameplay highlight ready</p>}
+        {captureError ? <p role="alert">{captureError}</p> : null}
+      </div>
     </div>
   );
 }

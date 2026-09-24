@@ -1,9 +1,12 @@
 import { useState } from "react";
-import type { PublishedLevelVersion, SceneManifest } from "@shared/index.js";
+import type { PublishedLevelVersion, SceneManifest, VideoAssetReference } from "@shared/index.js";
 import { Button } from "../components/Button.js";
 import { Icon } from "../components/Icon.js";
 import type { GameCompletionResult } from "../../game/types.js";
 import { sharePath } from "../shareRouting.js";
+import { CompletionMediaCards } from "../../capture/MediaCards.js";
+import type { GameplayHighlight } from "../../capture/recorder.js";
+import type { PostcardViewState } from "../../capture/usePostcard.js";
 import "./finish-screen.css";
 
 interface FinishScreenProps {
@@ -13,6 +16,15 @@ interface FinishScreenProps {
   onTryRace?: () => void;
   onShare?: () => Promise<PublishedLevelVersion>;
   onCreateAnother: () => void;
+  postcardState?: PostcardViewState;
+  postcardVideo?: VideoAssetReference | null;
+  postcardError?: string | null;
+  onCreateAnimatedPostcard?: () => void;
+  onRetryAnimatedPostcard?: () => void;
+  gameplayHighlight?: GameplayHighlight | null;
+  recordingSupported?: boolean;
+  recordingError?: string | null;
+  onDownloadGameplayHighlight?: () => void;
 }
 
 function formatTime(milliseconds: number): string {
@@ -22,7 +34,13 @@ function formatTime(milliseconds: number): string {
   return `${minutes}:${String(seconds).padStart(2, "0")}.${tenths}`;
 }
 
-export function FinishScreen({ manifest, result, onReplay, onTryRace, onShare, onCreateAnother }: FinishScreenProps) {
+export function FinishScreen({
+  manifest, result, onReplay, onTryRace, onShare, onCreateAnother,
+  postcardState = "none", postcardVideo = null, postcardError = null,
+  onCreateAnimatedPostcard, onRetryAnimatedPostcard,
+  gameplayHighlight = null, recordingSupported = false, recordingError = null,
+  onDownloadGameplayHighlight,
+}: FinishScreenProps) {
   const isCollect = manifest.experience?.mode.kind === "collect";
   const isRace = result.mode === "race";
   const [sharing, setSharing] = useState(false);
@@ -93,6 +111,18 @@ export function FinishScreen({ manifest, result, onReplay, onTryRace, onShare, o
         {shareError ? <p className="oq-error-text" role="alert">{shareError}</p> : null}
         {!onShare ? <p className="oq-finish__note">Publish this world to unlock a playable sharing link.</p> : null}
         <p className="oq-finish__note">Replay and Race reuse this world’s existing assets — no new generation is started.</p>
+        <CompletionMediaCards
+          postcardState={postcardState}
+          postcardVideo={postcardVideo}
+          postcardError={postcardError}
+          canCreatePostcard={Boolean(onCreateAnimatedPostcard)}
+          {...(onCreateAnimatedPostcard ? { onCreatePostcard: onCreateAnimatedPostcard } : {})}
+          {...(onRetryAnimatedPostcard ? { onRetryPostcard: onRetryAnimatedPostcard } : {})}
+          highlight={gameplayHighlight}
+          recordingSupported={recordingSupported}
+          recordingError={recordingError}
+          {...(onDownloadGameplayHighlight ? { onDownloadHighlight: onDownloadGameplayHighlight } : {})}
+        />
       </section>
     </main>
   );

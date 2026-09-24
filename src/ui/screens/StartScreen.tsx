@@ -16,6 +16,7 @@ import {
   importLevelBundle,
   listLevels,
 } from "../api.js";
+import { WorldPostcardPanel } from "../../capture/MediaCards.js";
 
 const SampleWorldPreview = lazy(() => import("../components/SampleWorldPreview.js"));
 
@@ -242,6 +243,7 @@ export function StartScreen({
                   {!draft ? <Button variant="secondary" onClick={() => onEditSavedLevel(manifest)}>Edit</Button> : null}
                   <Button variant="ghost" onClick={() => handleExport(manifest)} disabled={exportingLevelId !== null} loading={exportingLevelId === manifest.levelId} loadingLabel="Exporting…">Export</Button>
                 </div>
+                <WorldPostcardPanel manifest={manifest} />
               </Card>;
             })}</div>}
           {exportError && <p className="oq-kit-error" role="alert">We couldn’t export this world. Try Export again.</p>}

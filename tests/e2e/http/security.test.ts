@@ -21,6 +21,15 @@ function playableWorld(levelId: string): SceneManifest {
   return migrateSceneManifest(manifest);
 }
 
+function pngHeader(width: number, height: number): Buffer {
+  const buffer = Buffer.alloc(24);
+  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(buffer);
+  buffer.write("IHDR", 12, "ascii");
+  buffer.writeUInt32BE(width, 16);
+  buffer.writeUInt32BE(height, 20);
+  return buffer;
+}
+
 describe("strict owner-token boundary", () => {
   let api: ApiServerHandle;
   let mcp: FakeMcpServer;
@@ -85,6 +94,34 @@ describe("strict owner-token boundary", () => {
     const shared = await fetch(`${api.baseUrl}/api/shares/${version.shareId}`);
     expect(shared.status).toBe(200);
     expect((await shared.json() as PublishedLevelVersion).manifest.photos).toEqual([]);
+  });
+
+  it("keeps captured postcard screenshots owner-private and rejects oversized dimensions", async () => {
+    const created = await fetch(`${api.baseUrl}/api/levels`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(playableWorld("postcard-private")),
+    });
+    expect(created.status).toBe(201);
+    const token = created.headers.get("x-objectquest-owner")!;
+
+    const oversized = await fetch(`${api.baseUrl}/api/postcards/postcard-private/screenshot`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-ObjectQuest-Owner": token },
+      body: JSON.stringify({ imageBase64: pngHeader(20_000, 20_000).toString("base64") }),
+    });
+    expect(oversized.status).toBe(413);
+    expect(await oversized.json()).toEqual({ message: expect.stringMatching(/decoded-pixel limit/i) });
+
+    const captured = await fetch(`${api.baseUrl}/api/postcards/postcard-private/screenshot`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-ObjectQuest-Owner": token },
+      body: JSON.stringify({ imageBase64: pngHeader(2, 2).toString("base64") }),
+    });
+    expect(captured.status).toBe(201);
+    const asset = await captured.json() as { id: string };
+    expect((await fetch(`${api.baseUrl}/api/generated-assets/${asset.id}`)).status).toBe(404);
+    expect((await fetch(`${api.baseUrl}/api/generated-assets/${asset.id}`, {
+      headers: { "X-ObjectQuest-Owner": token },
+    })).status).toBe(200);
   });
 });
 

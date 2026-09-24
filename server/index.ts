@@ -22,6 +22,8 @@ import { QuestOrchestrator, questGatewayFromManager } from "./quest/orchestrator
 import { createQuestRouter } from "./quest/routes.js";
 import { AudioOrchestrator, audioGatewayFromManager } from "./audio/orchestrator.js";
 import { createAudioRouter } from "./audio/routes.js";
+import { createPostcardsRouter } from "./postcards/routes.js";
+import { PostcardCacheStore } from "./postcards/store.js";
 import { logServerError } from "./util/sanitize.js";
 import { createRateLimiter, isBillableRoute, isUploadRoute } from "./security/rateLimit.js";
 import { createDiagnosticsRouter } from "./security/diagnostics.js";
@@ -59,6 +61,8 @@ const spendLedger = new SpendLedger(env.storageDir);
 const previewCache = new PreviewCacheStore(env.storageDir);
 const ownerSecurity = new OwnerSecurity(env.storageDir, env.legacyOpen, env.secureOwnerCookie);
 const imageDecodeBudget = new ImageDecodeBudget(env.uploadDecodeBudgetBytes);
+const levelStore = new LevelStore(env.storageDir, assetStore, photoStore);
+const postcardCache = new PostcardCacheStore(env.storageDir);
 const sourceBytes = {
   async getPhotoBytes(id: string) {
     return (await photoStore.get(id))
@@ -79,7 +83,6 @@ const jobManager = new JobManager(jobStore, adapter, assetStore, photoStore, {
   dailyLimitUsd: env.livepeerMaxDailyUsd,
   ownerSecurity,
 });
-const levelStore = new LevelStore(env.storageDir, assetStore, photoStore);
 const questOrchestrator = new QuestOrchestrator(questGatewayFromManager(jobManager), levelStore);
 const audioOrchestrator = new AudioOrchestrator(audioGatewayFromManager(jobManager), levelStore);
 
@@ -107,6 +110,14 @@ app.use(createGeneratedAssetsRouter(generatedAssetStore, ownerSecurity));
 app.use(createJobsRouter(jobManager, adapter, photoStore, generatedAssetStore, previewCache, spendLedger, ownerSecurity));
 app.use(createQuestRouter(questOrchestrator, ownerSecurity));
 app.use(createAudioRouter(audioOrchestrator, ownerSecurity));
+app.use(createPostcardsRouter(levelStore, generatedAssetStore, jobManager, postcardCache, ownerSecurity, {
+  limits: {
+    maxWidth: env.uploadMaxImageWidth,
+    maxHeight: env.uploadMaxImageHeight,
+    maxPixels: env.uploadMaxImagePixels,
+  },
+  budget: imageDecodeBudget,
+}));
 app.use(createLevelsRouter(levelStore, undefined, ownerSecurity));
 
 const terminalErrorHandler: ErrorRequestHandler = (error, req, res, next) => {

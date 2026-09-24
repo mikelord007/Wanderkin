@@ -28,6 +28,9 @@ import {
   loadCreationWorldItems,
   setActiveCreationId,
 } from "./ui/creationStorage.js";
+import type { CompletedRunMedia } from "./capture/types.js";
+import { usePostcard } from "./capture/usePostcard.js";
+import { downloadGameplayHighlight } from "./capture/recorder.js";
 
 type Screen =
   | { name: "start" }
@@ -40,6 +43,7 @@ type Screen =
       name: "finish";
       manifest: SceneManifest;
       result: GameCompletionResult;
+      media: CompletedRunMedia;
       publishable: boolean;
       publication?: PublishedLevelVersion;
     };
@@ -77,6 +81,15 @@ function challengeFor(result: GameCompletionResult): PublishedChallenge {
  */
 export function App() {
   const [screen, setScreen] = useState<Screen>(initialScreen);
+  const postcardLevelId = screen.name === "finish" && screen.publishable ? screen.manifest.levelId : null;
+  const existingPostcard = screen.name === "finish"
+    ? screen.manifest.media?.video.find((asset) => asset.kind === "animated-postcard") ?? null
+    : null;
+  const postcard = usePostcard(
+    postcardLevelId,
+    screen.name === "finish" ? screen.media.screenshot : null,
+    existingPostcard,
+  );
 
   const goStart = useCallback(() => setScreen({ name: "start" }), []);
 
@@ -226,13 +239,14 @@ export function App() {
               ? setScreen({ name: "friend", shareId: screen.publication.shareId })
               : goStart()
           }
-          onComplete={(result) =>
+          onComplete={(result, media) =>
             setScreen(
               screen.publication
                 ? {
                     name: "finish",
                     manifest: screen.manifest,
                     result,
+                    media,
                     publishable: false,
                     publication: screen.publication,
                   }
@@ -240,6 +254,7 @@ export function App() {
                     name: "finish",
                     manifest: screen.manifest,
                     result,
+                    media,
                     publishable: screen.publishable,
                   },
             )
@@ -281,6 +296,19 @@ export function App() {
               }
             : {})}
           onCreateAnother={screen.publication ? goStart : () => setScreen({ name: "photos" })}
+          postcardState={postcard.state}
+          postcardVideo={postcard.video ?? existingPostcard}
+          postcardError={postcard.error ?? screen.media.screenshotError}
+          {...(screen.publishable && screen.media.screenshot
+            ? { onCreateAnimatedPostcard: () => { void postcard.create(); } }
+            : {})}
+          {...(postcard.state === "failed" ? { onRetryAnimatedPostcard: () => { void postcard.retry(); } } : {})}
+          gameplayHighlight={screen.media.highlight}
+          recordingSupported={screen.media.recordingSupported}
+          recordingError={screen.media.recordingError}
+          {...(screen.media.highlight
+            ? { onDownloadGameplayHighlight: () => downloadGameplayHighlight(screen.media.highlight!, screen.manifest.name) }
+            : {})}
         />
       );
 
