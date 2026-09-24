@@ -1,4 +1,5 @@
 import type { SceneManifest, StyleId } from "@shared/index.js";
+import { BRAND_NAME } from "../brand.js";
 
 export const WORLD_CAPTURE_WIDTH = 1280;
 export const WORLD_CAPTURE_HEIGHT = 720;
@@ -98,7 +99,7 @@ export async function captureWorldScreenshot(
   context.fillStyle = "#ffffff";
   context.font = "800 17px system-ui, sans-serif";
   context.textAlign = "center";
-  context.fillText("OBJECTQUEST", 1111, 611);
+  context.fillText(BRAND_NAME.toUpperCase(), 1111, 611);
 
   return {
     blob: await canvasToBlob(output),

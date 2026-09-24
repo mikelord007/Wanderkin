@@ -36,6 +36,58 @@ Scope discipline: did not touch the disclosed-but-nonblocking `GameStageProps.co
 finding (QA's finding #1, gameplay-owned file, explicitly flagged as non-blocking pending the gameplay
 freeze) — out of scope for this reopened item per the coordinator's instruction.
 
+## Final: item 1 branding miss in src/capture/screenshot.ts (fixed)
+
+Coordinator reported final QA (`39fd875`, combined typecheck/build/474-unit/46-HTTP, independently
+re-verified `fb2500d`'s navigation fix) also caught a branding miss inside this worker's `src/capture`
+ownership: `captureWorldScreenshot`'s corner badge hard-coded `"OBJECTQUEST"` (line 101) onto every exported
+world screenshot, instead of reading the renamed product identity from `src/brand.ts`.
+
+Fix: `screenshot.ts` now imports `BRAND_NAME` from `../brand.js` and draws `BRAND_NAME.toUpperCase()`
+("MOUSEHOLD") in the same badge, same font/geometry, same pill — no sizing/geometry/storage changes needed.
+
+Static sizing evidence (real `canvas.measureText`, exact font used in the code — `"800 17px system-ui,
+sans-serif"` — against the 162px pill): old `"OBJECTQUEST"` measured 119.9px wide (21.1px margin each side);
+new `"MOUSEHOLD"` measures 110.2px wide (25.9px margin each side) — shorter than the old text, strictly more
+margin, no clipping risk, so no badge-sizing adjustment was made (would have been unjustified for a text that
+got shorter). Visual confirmation: rendered the actual badge pill + text with the exact same draw calls at
+`nimbalyst-local/screenshots/brand-badge-check.png` — clean, centered, no clipping.
+
+No test added (no `screenshot.test.ts` existed before this, and a test that only re-asserts the same string
+BRAND_NAME already encodes would be pure duplication, matching the "reuse, don't add a string-mirroring
+test" instruction). Ran the existing capture-scoped tests instead: `npx vitest run src/capture` — 7/7
+passing (`recorder.test.ts`, `usePostcard.test.ts`, `MediaCards.test.ts`) — no full 474-suite re-run, per
+instruction, since peers are still moving. `tsc --noEmit` clean (exit 0).
+
+No paid/provider calls, no live-world writes, no service changes — this only touches how a screenshot is
+composited client-side.
+
+## Watermark: this worker's scope is now closed
+
+Items 6 and 13 done and committed (`398c7eb`, `c15ddaa`), item 6's reopened race fixed and committed
+(`fb2500d`), the brand-contract integration done and committed (`722f9fa`), and this final item 1 branding
+miss fixed (commit hash recorded below once landed). `git status` confirms no other uncommitted changes in
+any path this worker owns. Freezing here — no further self-directed work on this task; any new instruction
+would need to come from the coordinator.
+
+### Pointer-lock (item 13) interactive-verification gap — attempted again, still honestly open
+
+Per the coordinator's optional-bounded-verification ask: made one fresh, bounded attempt (no service/product
+changes, existing headless browser-session tool only) to see whether the 3D scene would load fast enough
+this time to interactively exercise click-to-play -> pointer-lock-engage -> HUD-button-unreachable-by-click
+-> `M`/`C` keyboard fix. Loaded `/play/sample-rodin-room-corner` (the lighter bundled sample) and polled the
+loading-stage text twice, 15s apart (30s total). Actual observation: still stuck at "Rendering first frame"
+after the full 30s, same as every earlier attempt this session and the independent QA worker's own attempt
+in `verification.md`. Did not retry further or extend the wait — matches the "bounded, not unbounded" ask.
+
+**Honest final status: the click-to-play -> pointer-lock-engage -> HUD-interaction flow remains
+interactively unverified in this environment.** The fix itself (keyboard `M`/`C` shortcuts, explicit
+release-before-click on Sound/capture, no accidental `requestPointerLock()` call sites) is source-verified
+and independently re-confirmed by two separate reviews (this worker's own grep, and the QA worker's
+independent grep in `verification.md`), but "source-verified" is not "interactively confirmed" — that
+remains owed to the user's own manual playtest, consistent with the plan's own stance that automated
+evidence should not substitute for it.
+
 Session: NEW Claude-only overnight worker, coordinator 30e37344-f303-4b8a-80c8-ee9f8fd5f3d6.
 Model: Sonnet 5 (model id `claude-sonnet-5`, per this runtime's own system context — not inferred from a requested alias).
 Owns: items 6 (real URL routes) and 13 (pointer-lock/HUD usability) from OVERNIGHT_PLAYTEST_PLAN.md.
