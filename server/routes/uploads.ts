@@ -3,13 +3,14 @@ import multer from "multer";
 import type { PhotoStore } from "../persistence/photoStore.js";
 import { InvalidFileError, MAX_PHOTO_BYTES } from "../persistence/validate.js";
 import { logServerError } from "../util/sanitize.js";
+import type { OwnerSecurity } from "../security/owner.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_PHOTO_BYTES, files: 10 },
 });
 
-export function createUploadsRouter(photos: PhotoStore): Router {
+export function createUploadsRouter(photos: PhotoStore, security?: OwnerSecurity): Router {
   const router = Router();
 
   router.post("/api/uploads", upload.array("photos", 10), async (req, res) => {
@@ -19,8 +20,13 @@ export function createUploadsRouter(photos: PhotoStore): Router {
       return;
     }
     try {
+      const owner = security?.issue(req, res);
       const references = await Promise.all(
-        files.map((file, index) => photos.store(file.buffer, index + 1, file.originalname)),
+        files.map(async (file, index) => {
+          const photo = await photos.store(file.buffer, index + 1, file.originalname);
+          if (owner) await security?.claim("photo", photo.id, owner.ownerId);
+          return photo;
+        }),
       );
       res.status(201).json(references);
     } catch (err) {

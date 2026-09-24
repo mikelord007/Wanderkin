@@ -12,6 +12,7 @@ import { GeneratedAssetStore } from "../persistence/generatedAssetStore.js";
 import { downloadBounded, UnsafeUrlError, DownloadTooLargeError } from "../persistence/fetchSafe.js";
 import { MAX_GLB_BYTES } from "../persistence/validate.js";
 import type { PhotoStore } from "../persistence/photoStore.js";
+import type { OwnerSecurity } from "../security/owner.js";
 import { sanitizeMessage } from "../util/sanitize.js";
 import { capabilityContract, estimateRequestCost } from "../livepeer/capabilities.js";
 import type { GenerationProviderAdapter, ProviderGenerationStatus } from "./types.js";
@@ -247,6 +248,7 @@ export class JobManager {
       concurrencyRetrySeconds?: number;
       globalLimitUsd: number;
       dailyLimitUsd: number;
+      ownerSecurity?: OwnerSecurity;
     },
   ) {}
 
@@ -385,7 +387,7 @@ export class JobManager {
    * Holds a per-idempotency-key lock across the "does a job for this key
    * already exist" check and the create, so two concurrent POSTs with the
    * same key can never both create a job. */
-  async submitOrReconcile(request: CreateJobRequest, idempotencyKey: string): Promise<SubmitOutcome> {
+  async submitOrReconcile(request: CreateJobRequest, idempotencyKey: string, ownerId?: string): Promise<SubmitOutcome> {
     return this.runExclusive(`idem:${idempotencyKey}`, async () => {
       const existing = await this.store.findByIdempotencyKey(idempotencyKey);
       if (existing) {
@@ -413,6 +415,9 @@ export class JobManager {
             dailyLimitUsd: this.generation.dailyLimitUsd,
           });
         }
+        if (ownerId && this.generation?.ownerSecurity) {
+          await this.generation.ownerSecurity.claim("job", record.job.id, ownerId);
+        }
         await this.store.put(record);
       });
       const submitted = await this.submitToProvider(record, request);
@@ -425,7 +430,7 @@ export class JobManager {
    * request's idempotency key. */
   async submitGenerationOrReconcile(
     request: GenerationRequest,
-    options: { requestLimitOverrideUsd?: number; worldId?: string } = {},
+    options: { requestLimitOverrideUsd?: number; worldId?: string; ownerId?: string } = {},
   ): Promise<SubmitOutcome> {
     if (!this.generation || !this.adapter.validateGenerationInput || !this.adapter.submitGeneration) {
       throw new Error("Multi-kind generation services are not configured");
@@ -463,6 +468,10 @@ export class JobManager {
         globalLimitUsd: this.generation!.globalLimitUsd,
         dailyLimitUsd: this.generation!.dailyLimitUsd,
         });
+        if (options.ownerId && this.generation?.ownerSecurity) {
+          await this.generation.ownerSecurity.claim("job", record.job.id, options.ownerId);
+          if (options.worldId) await this.generation.ownerSecurity.claim("world", options.worldId, options.ownerId);
+        }
         await this.store.put(record);
       });
       const submitted = await this.submitGenerationToProvider(record, request, effectiveRequestLimit);
@@ -795,12 +804,14 @@ export class JobManager {
         const { buffer } = await downloadBounded(output.url, maxBytes);
         if (request.kind === "image-edit") {
           const asset = await this.generation.generatedAssets.storeImage(buffer, request.outputMimeType, record.job.provenance!);
+          await this.generation.ownerSecurity?.inherit("generated-asset", asset.id, "job", record.job.id);
           result = { kind: "image-edit", asset };
         } else if (request.kind === "video") {
           const asset = await this.generation.generatedAssets.storeVideo(buffer, {
             durationSeconds: request.durationSeconds,
             provenance: record.job.provenance!,
           });
+          await this.generation.ownerSecurity?.inherit("generated-asset", asset.id, "job", record.job.id);
           result = { kind: "video", asset: { ...asset, kind: "animated-postcard" } };
         } else {
           const kind = request.kind === "music"
@@ -816,6 +827,7 @@ export class JobManager {
             ...(request.kind === "tts" ? { transcript: request.text } : {}),
             provenance: record.job.provenance!,
           });
+          await this.generation.ownerSecurity?.inherit("generated-asset", asset.id, "job", record.job.id);
           result = request.kind === "music"
             ? { kind: "music", asset: { ...asset, kind: "music" } }
             : request.kind === "tts"
@@ -859,6 +871,7 @@ export class JobManager {
         },
         orderedPhotos,
       );
+      await this.generation?.ownerSecurity?.inherit("asset", asset.id, "job", record.job.id);
       record.job.resultAssetId = asset.id;
       if (record.job.request?.kind === "image-to-3d") {
         record.job.result = { kind: "image-to-3d", asset };

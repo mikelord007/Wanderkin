@@ -8,6 +8,7 @@ import type { PreviewCacheStore } from "../jobs/previewCache.js";
 import { McpToolError } from "../livepeer/mcpClient.js";
 import type { GeneratedAssetStore } from "../persistence/generatedAssetStore.js";
 import type { PhotoStore } from "../persistence/photoStore.js";
+import type { OwnerSecurity } from "../security/owner.js";
 
 const photoSchema = z.object({
   photoId: z.string().min(1),
@@ -69,6 +70,7 @@ export function createJobsRouter(
   generatedAssets?: GeneratedAssetStore,
   previewCache?: PreviewCacheStore,
   spendLedger?: SpendLedger,
+  security?: OwnerSecurity,
 ): Router {
   const router = Router();
 
@@ -79,9 +81,12 @@ export function createJobsRouter(
     return true;
   }
 
-  async function sourceImageExists(id: string): Promise<boolean> {
-    if (await photos.get(id)) return true;
-    return Boolean(await generatedAssets?.getProviderImage(id));
+  async function sourceImageExists(id: string, req: Request): Promise<boolean> {
+    if (await photos.get(id)) return !security || security.canAccess("photo", id, req);
+    if (await generatedAssets?.getProviderImage(id)) {
+      return !security || security.canAccess("generated-asset", id, req);
+    }
+    return false;
   }
 
   async function isApprovedPreviewAsset(id: string): Promise<boolean> {
@@ -93,11 +98,11 @@ export function createJobsRouter(
     );
   }
 
-  async function validateGenerationSources(request: GenerationRequest): Promise<string | undefined> {
+  async function validateGenerationSources(request: GenerationRequest, req: Request): Promise<string | undefined> {
     if (request.kind === "image-to-3d") {
-      for (const photo of request.photos ?? []) if (!(await photos.get(photo.photoId))) return `Unknown photoId "${photo.photoId}"`;
+      for (const photo of request.photos ?? []) if (!(await sourceImageExists(photo.photoId, req))) return `Unknown photoId "${photo.photoId}"`;
       for (const id of request.sourceImageAssetIds ?? []) {
-        if (!(await generatedAssets?.getProviderImage(id))) {
+        if (!(await generatedAssets?.getProviderImage(id)) || (security && !(await security.canAccess("generated-asset", id, req)))) {
           return `Unknown or ineligible generated sourceImageAssetId "${id}"`;
         }
         if (await isApprovedPreviewAsset(id)) {
@@ -105,14 +110,14 @@ export function createJobsRouter(
         }
       }
       if (request.styleReferenceAssetId) {
-        if (!(await generatedAssets?.getProviderImage(request.styleReferenceAssetId))) {
+        if (!(await generatedAssets?.getProviderImage(request.styleReferenceAssetId)) || (security && !(await security.canAccess("generated-asset", request.styleReferenceAssetId, req)))) {
           return `Unknown or ineligible styleReferenceAssetId "${request.styleReferenceAssetId}"`;
         }
         if (!(await isApprovedPreviewAsset(request.styleReferenceAssetId))) {
           return `styleReferenceAssetId "${request.styleReferenceAssetId}" is not an approved preview`;
         }
       }
-    } else if ((request.kind === "image-edit" || request.kind === "video") && !(await sourceImageExists(request.sourceImageAssetId))) {
+    } else if ((request.kind === "image-edit" || request.kind === "video") && !(await sourceImageExists(request.sourceImageAssetId, req))) {
       return `Unknown sourceImageAssetId "${request.sourceImageAssetId}"`;
     }
     return undefined;
@@ -131,15 +136,21 @@ export function createJobsRouter(
       return;
     }
     const request = parsed.data.request as GenerationRequest;
-    const sourceError = await validateGenerationSources(request);
+    const owner = security?.issue(req, res);
+    const sourceError = await validateGenerationSources(request, req);
     if (sourceError) { res.status(400).json({ message: sourceError }); return; }
     try {
       const outcome = await jobManager.submitGenerationOrReconcile(request, {
         ...(parsed.data.worldId !== undefined ? { worldId: parsed.data.worldId } : {}),
         ...(parsed.data.maxCostUsd !== undefined ? { requestLimitOverrideUsd: parsed.data.maxCostUsd } : {}),
+        ...(owner ? { ownerId: owner.ownerId } : {}),
       });
       if (outcome.status === "conflict") {
         res.status(409).json({ message: "This Idempotency-Key was already used for a different generation request." });
+        return;
+      }
+      if (security && !(await security.canAccess("job", outcome.job.id, req))) {
+        res.status(404).json({ message: "Job not found" });
         return;
       }
       res.status(outcome.status === "reconciled" ? 200 : outcome.job.state === "failed" ? 502 : 201).json(outcome.job);
@@ -168,6 +179,7 @@ export function createJobsRouter(
     }
 
     const { capability, scenePrompt } = parsed.data;
+    const owner = security?.issue(req, res);
     // exactOptionalPropertyTypes: zod's `.optional()` yields `viewSlot?: T |
     // undefined`, which ProviderInputPhoto's `viewSlot?: PhotoViewSlot`
     // rejects — rebuild each photo so an absent slot is an omitted key, not
@@ -180,7 +192,7 @@ export function createJobsRouter(
 
     for (const photo of requestPhotos) {
       const stored = await photos.get(photo.photoId);
-      if (!stored) {
+      if (!stored || (security && !(await security.canAccess("photo", photo.photoId, req)))) {
         res.status(400).json({ message: `Unknown photoId "${photo.photoId}"` });
         return;
       }
@@ -200,10 +212,15 @@ export function createJobsRouter(
       outcome = await jobManager.submitOrReconcile(
         { capability, photos: requestPhotos, ...(scenePrompt !== undefined ? { scenePrompt } : {}) },
         idempotencyKey,
+        owner?.ownerId,
       );
     } catch (err) {
       if (sendConcurrencyError(err, res)) return;
       throw err;
+    }
+    if (security && !(await security.canAccess("job", outcome.job.id, req))) {
+      res.status(404).json({ message: "Job not found" });
+      return;
     }
 
     if (outcome.status === "conflict") {
@@ -233,13 +250,18 @@ export function createJobsRouter(
       res.status(400).json({ message: "Idempotency-Key header must match request.idempotencyKey" });
       return;
     }
-    if (!(await sourceImageExists(request.sourceImageAssetId))) {
+    const owner = security?.issue(req, res);
+    if (!(await sourceImageExists(request.sourceImageAssetId, req))) {
       res.status(400).json({ message: `Unknown sourceImageAssetId "${request.sourceImageAssetId}"` });
       return;
     }
     const cacheKey = previewCache.keyFor(request);
     const cached = await previewCache.get(cacheKey);
     if (cached) {
+      if (security && !(await security.canAccess("preview-cache", cacheKey, req))) {
+        res.status(404).json({ message: "Preview not found" });
+        return;
+      }
       const job = await jobManager.getPublic(cached.jobId);
       if (job && job.state !== "failed") {
         res.status(200).json({ cacheHit: true, approved: cached.approved, cacheKey, job });
@@ -250,12 +272,14 @@ export function createJobsRouter(
       const outcome = await jobManager.submitGenerationOrReconcile(request, {
         ...(parsed.data.worldId !== undefined ? { worldId: parsed.data.worldId } : {}),
         ...(parsed.data.maxCostUsd !== undefined ? { requestLimitOverrideUsd: parsed.data.maxCostUsd } : {}),
+        ...(owner ? { ownerId: owner.ownerId } : {}),
       });
       if (outcome.status === "conflict") {
         res.status(409).json({ message: "This Idempotency-Key was already used for a different generation request." });
         return;
       }
       const record = await previewCache.put(cacheKey, outcome.job.id);
+      if (owner && security) await security.claim("preview-cache", cacheKey, owner.ownerId);
       res.status(outcome.status === "reconciled" ? 200 : 201).json({ cacheHit: false, approved: record.approved, cacheKey, job: outcome.job });
     } catch (err) {
       if (sendConcurrencyError(err, res)) return;
@@ -269,6 +293,9 @@ export function createJobsRouter(
     if (!previewCache || !/^[a-f0-9]{64}$/.test(req.params.key as string)) { res.status(404).json({ message: "Preview not found" }); return; }
     const record = await previewCache.get(req.params.key as string);
     if (!record) { res.status(404).json({ message: "Preview not found" }); return; }
+    if (security && !(await security.canAccess("preview-cache", req.params.key as string, req))) {
+      res.status(404).json({ message: "Preview not found" }); return;
+    }
     const job = await jobManager.getPublic(record.jobId);
     res.json({ ...record, job: job ?? null });
   });
@@ -277,6 +304,10 @@ export function createJobsRouter(
     if (!previewCache || !/^[a-f0-9]{64}$/.test(req.params.key as string)) { res.status(404).json({ message: "Preview not found" }); return; }
     const parsed = z.object({ jobId: z.string().min(1) }).safeParse(req.body);
     if (!parsed.success) { res.status(400).json({ message: "A matching jobId is required" }); return; }
+    security?.issue(req, res);
+    if (security && !(await security.canAccess("preview-cache", req.params.key as string, req))) {
+      res.status(404).json({ message: "Preview not found" }); return;
+    }
     const job = await jobManager.getPublic(parsed.data.jobId);
     if (!job || job.state !== "ready" || job.kind !== "image-edit" || job.request?.purpose !== "style-preview") {
       res.status(409).json({ message: "Only a ready style preview can be approved" });
@@ -290,10 +321,16 @@ export function createJobsRouter(
 
   router.get("/api/jobs/spend/:worldId", async (req, res) => {
     if (!spendLedger) { res.status(503).json({ message: "Spend ledger is not configured" }); return; }
+    if (security && !(await security.canAccess("world", req.params.worldId as string, req))) {
+      res.status(404).json({ message: "Spend summary not found" }); return;
+    }
     res.json(await spendLedger.summaryForWorld(req.params.worldId as string));
   });
 
   router.get("/api/jobs/:id", async (req, res) => {
+    if (security && !(await security.canAccess("job", req.params.id as string, req))) {
+      res.status(404).json({ message: "Job not found" }); return;
+    }
     const job = await jobManager.getPublic(req.params.id as string);
     if (!job) {
       res.status(404).json({ message: "Job not found" });
@@ -303,6 +340,10 @@ export function createJobsRouter(
   });
 
   router.post("/api/jobs/:id/retry", async (req, res) => {
+    security?.issue(req, res);
+    if (security && !(await security.canAccess("job", req.params.id as string, req))) {
+      res.status(404).json({ message: "Job not found" }); return;
+    }
     let job;
     try {
       job = await jobManager.retry(req.params.id as string);

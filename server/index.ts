@@ -21,6 +21,7 @@ import { createLevelsRouter, LevelStore } from "./levels.js";
 import { logServerError } from "./util/sanitize.js";
 import { createRateLimiter, isBillableRoute, isUploadRoute } from "./security/rateLimit.js";
 import { createDiagnosticsRouter } from "./security/diagnostics.js";
+import { OwnerSecurity } from "./security/owner.js";
 
 /**
  * Foundation API shell plus the Livepeer provider/job/asset routes (owned by
@@ -51,6 +52,7 @@ const generatedAssetStore = new GeneratedAssetStore(env.storageDir);
 const jobStore = new JobStore(env.storageDir);
 const spendLedger = new SpendLedger(env.storageDir);
 const previewCache = new PreviewCacheStore(env.storageDir);
+const ownerSecurity = new OwnerSecurity(env.storageDir, env.legacyOpen, env.secureOwnerCookie);
 const sourceBytes = {
   async getPhotoBytes(id: string) {
     return (await photoStore.get(id))
@@ -69,6 +71,7 @@ const jobManager = new JobManager(jobStore, adapter, assetStore, photoStore, {
   concurrencyRetrySeconds: env.providerConcurrencyRetrySeconds,
   globalLimitUsd: env.livepeerMaxGlobalUsd,
   dailyLimitUsd: env.livepeerMaxDailyUsd,
+  ownerSecurity,
 });
 
 app.get("/api/health", (_req, res) => {
@@ -81,12 +84,12 @@ app.get("/api/movement-config", (_req, res) => {
 
 app.use(createCapabilitiesRouter(adapter));
 app.use(createDiagnosticsRouter(spendLedger, env.diagnosticsToken));
-app.use(createUploadsRouter(photoStore));
-app.use(createPhotosRouter(photoStore));
-app.use(createAssetsRouter(assetStore));
-app.use(createGeneratedAssetsRouter(generatedAssetStore));
-app.use(createJobsRouter(jobManager, adapter, photoStore, generatedAssetStore, previewCache, spendLedger));
-app.use(createLevelsRouter(new LevelStore(env.storageDir, assetStore, photoStore)));
+app.use(createUploadsRouter(photoStore, ownerSecurity));
+app.use(createPhotosRouter(photoStore, ownerSecurity));
+app.use(createAssetsRouter(assetStore, ownerSecurity));
+app.use(createGeneratedAssetsRouter(generatedAssetStore, ownerSecurity));
+app.use(createJobsRouter(jobManager, adapter, photoStore, generatedAssetStore, previewCache, spendLedger, ownerSecurity));
+app.use(createLevelsRouter(new LevelStore(env.storageDir, assetStore, photoStore), undefined, ownerSecurity));
 
 const terminalErrorHandler: ErrorRequestHandler = (error, req, res, next) => {
   if (res.headersSent) {

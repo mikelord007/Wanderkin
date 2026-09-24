@@ -45,6 +45,10 @@ export class PhotoStore implements PhotoBytesProvider {
     return current[id];
   }
 
+  async findByFilename(filename: string): Promise<PhotoReference | undefined> {
+    return Object.values(await this.index.read()).find((photo) => photo.url.endsWith(`/${filename}`));
+  }
+
   async getPhotoBytes(photoId: string): Promise<{ buffer: Buffer; mimeType: string; filename: string }> {
     const reference = await this.get(photoId);
     if (!reference) {

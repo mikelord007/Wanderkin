@@ -1,6 +1,7 @@
 import { basename, extname, join } from "node:path";
 import { Router } from "express";
 import type { PhotoStore } from "../persistence/photoStore.js";
+import type { OwnerSecurity } from "../security/owner.js";
 
 const CONTENT_TYPE_BY_EXT: Record<string, string> = {
   ".jpg": "image/jpeg",
@@ -8,10 +9,10 @@ const CONTENT_TYPE_BY_EXT: Record<string, string> = {
   ".webp": "image/webp",
 };
 
-export function createPhotosRouter(photos: PhotoStore): Router {
+export function createPhotosRouter(photos: PhotoStore, security?: OwnerSecurity): Router {
   const router = Router();
 
-  router.get("/api/photos/files/:name", (req, res) => {
+  router.get("/api/photos/files/:name", async (req, res) => {
     const safeName = basename(req.params.name as string);
     const ext = extname(safeName).toLowerCase();
     const contentType = CONTENT_TYPE_BY_EXT[ext];
@@ -19,8 +20,13 @@ export function createPhotosRouter(photos: PhotoStore): Router {
       res.status(404).end();
       return;
     }
+    const photo = await photos.findByFilename(safeName);
+    if (!photo || (security && !(await security.canAccess("photo", photo.id, req)))) {
+      res.status(404).end();
+      return;
+    }
     res.setHeader("Content-Type", contentType);
-    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.setHeader("Cache-Control", "private, no-store");
     res.sendFile(join(photos.fileDir(), safeName), (err) => {
       if (err) res.status(404).end();
     });

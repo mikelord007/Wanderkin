@@ -22,6 +22,13 @@ function nonNegativeInteger(value: string | undefined, fallback: number): number
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
+function booleanValue(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  if (/^(?:1|true|yes)$/i.test(value)) return true;
+  if (/^(?:0|false|no)$/i.test(value)) return false;
+  return fallback;
+}
+
 /** Server-only environment access. Never import this module from src/. */
 export const env = {
   port: Number(process.env.PORT ?? 8787),
@@ -44,4 +51,6 @@ export const env = {
   // disabled unless a trusted reverse proxy overwrites X-Forwarded-For.
   trustProxyHops: nonNegativeInteger(process.env.TRUST_PROXY_HOPS, 0),
   diagnosticsToken: process.env.DIAGNOSTICS_TOKEN ?? "",
+  legacyOpen: booleanValue(process.env.OBJECTQUEST_LEGACY_OPEN, process.env.NODE_ENV !== "production"),
+  secureOwnerCookie: booleanValue(process.env.OBJECTQUEST_SECURE_COOKIE, process.env.NODE_ENV === "production"),
 };
