@@ -1,6 +1,6 @@
 # ObjectQuest v2 live-validation result — 2026-09-24
 
-Status: **stopped safely after row 2 failed; partial evidence only**.
+Status: **resumed after the image-format fix; stopped safely at row 5 when the quest provider returned no output**.
 
 ## Dry-run checkpoint
 
@@ -15,7 +15,7 @@ Status: **stopped safely after row 2 failed; partial evidence only**.
 
 No billable request was submitted during this checkpoint.
 
-## Paid-run outcome
+## Initial paid-run outcome
 
 The one authorized batch was started with:
 
@@ -37,7 +37,66 @@ that same provider job rather than submitting another generation. It failed
 again with the same PNG magic-byte validation error. `retryCount` remained 0,
 the provider job ID did not change, and no further retry was attempted.
 
-## Per-row execution record
+## Resumed-run outcome
+
+After `main` reached `ab80fae`, the validation runner gained an explicit
+resume mode that reuses the stored source photo and reviewed cutout instead
+of uploading again. The focused runner suite passed 7/7 and the full
+client/server typecheck passed. Resume dry-run output classified rows 1–2 as
+`RECONCILE/REUSE` at zero new spend and rows 3–16 as the only payable rows,
+with a planned new-spend maximum of **$1.3828**.
+
+The resumed command was:
+
+```text
+npx tsx scripts/live-validation/run.ts --api http://127.0.0.1:18799 --max-usd 3 --reuse-photo-id 632f0492-579a-46ff-8436-b7649035fd98 --reuse-cutout-asset-id e4bd9b09-4912-44e8-9b71-6f2a6ff6f2c0
+```
+
+Rows 1–2 reconciled without a new provider submission or ledger entry. The
+previous Kontext provider output downloaded successfully as a real JPEG and
+was stored using its detected media type. Rows 3 and 4 completed without
+fallback. Row 5 reached provider state `done`, but the provider result
+contained no normalized text/output value. The runner stopped immediately;
+rows 6–16 were not submitted and no retry was attempted.
+
+The resumed runner's complete console output was:
+
+```text
+Validation stopped at quest: Provider reported "done" but returned no output. Partial evidence: C:\Users\manuj\code_barely_runs\Objectquest_worktrees\sudden-stone\docs\evidence\live-validation-2026-09-24.json
+```
+
+### Resumed per-row execution record
+
+| # | Row | Application / provider job | Served capability / model | Status | Artifact |
+| ---: | --- | --- | --- | --- | --- |
+| 1 | Cutout | `job_737935e2-c54b-4c18-a6a6-782a7a4c69c8` / `mjob_a2426904c928` | `bg-remove` / `fal-ai/birefnet` | **Reconciled ready**, no fallback, zero new spend | PNG, 193,234 bytes, SHA-256 `6d0b4d2c18d6dd58aa1a7754cebc710b7872094295457c538666205c0da404f9` |
+| 2 | Cartoon style preview | `job_ef2fde65-65e2-4d16-b8df-e75d53c93d85` / `mjob_d3d1797a1657` | `kontext-edit` / `fal-ai/flux-pro/kontext` | **Reconciled ready**, no fallback, zero new spend | JPEG, 129,740 bytes, SHA-256 `adcd4f6a9c5ab0e6064d1e3656f906f5f5b9c4a22da704854b7c2c8fa0263c5e` |
+| 3 | GPT image-edit alternate | `job_f9bcf342-6254-4b38-9fa0-d32c797cb89f` / `mjob_4a0b2bde417b` | `gpt-image-edit` / `openai/gpt-image-2/edit` | **Ready**, no fallback; provider total 77,457 ms | PNG, 684,261 bytes, SHA-256 `93c3895a6dbf68121eb8f50487efd44a0e2601a4ee5bf6c2653c133aa1501106` |
+| 4 | Rodin mesh | `job_662f0c8a-52f1-4e33-adad-fcff355e014d` / `mjob_0001ef7f3201` | `rodin-i3d` / `fal-ai/hyper3d/rodin/v2.5` | **Ready**, no fallback; provider total 138,789 ms | GLB, 4,680,412 bytes, SHA-256 `f0855519fb1314e14703ef91a7778b6992f2f4c80b64910cfe4781e719b0e24c` |
+| 5 | Quest | `job_8df572b8-0ded-4e8b-b524-c3361698a1ca` / `mjob_13e739e8d5af` | `gemini-text` / model not reported | **Failed**, no fallback: provider reported `done` without output; provider total 10,478 ms | None |
+| 6 | Music | — | — | Not submitted after runner stop | — |
+| 7 | Ambience | — | — | Not submitted after runner stop | — |
+| 8 | Fragment-pickup SFX | — | — | Not submitted after runner stop | — |
+| 9 | Portal-activate SFX | — | — | Not submitted after runner stop | — |
+| 10 | Checkpoint SFX | — | — | Not submitted after runner stop | — |
+| 11 | Fall/respawn SFX | — | — | Not submitted after runner stop | — |
+| 12 | Race-start SFX | — | — | Not submitted after runner stop | — |
+| 13 | Race-finish SFX | — | — | Not submitted after runner stop | — |
+| 14 | Completion SFX | — | — | Not submitted after runner stop | — |
+| 15 | Narration | — | — | Not submitted after runner stop | — |
+| 16 | Animated postcard | — | — | Not submitted after runner stop | — |
+
+### Current cumulative spend
+
+- Ledger estimate/reservation: **$0.6932** across five entries: the original
+  cutout and preview plus the GPT alternate, Rodin mesh, and quest.
+- New runner reservation during the resumed attempt: **$0.6501**.
+- All five provider-reported costs are `null`; the provider-reported total is
+  **unknown**, not zero.
+- Neither reconciliation added a ledger entry or incurred new estimated
+  spend.
+
+## Initial per-row execution record
 
 | # | Row | Application job | Provider job | Served capability / model | Status and timing | Reported cost | Artifact |
 | ---: | --- | --- | --- | --- | --- | --- | --- |
@@ -60,7 +119,7 @@ the provider job ID did not change, and no further retry was attempted.
 
 No fallback fired on either submitted job.
 
-## Spend
+## Initial spend
 
 - Ledger estimate: **$0.0431** across two entries (`$0.0011` cutout +
   `$0.0420` style preview).
@@ -82,25 +141,26 @@ desk, but the primary object group is preserved.
 - Screenshot size: 36,575 bytes
 - Screenshot SHA-256: `4d4073f495391e5796cd64f88b69576895b490053fdc5480bd309ab57920f614`
 
-The style preview could not be displayed because the app rejected the
-provider result before storing an artifact. With no approved preview, the
-runner correctly did not submit the mesh or any downstream quest/audio/video
-jobs and did not save a level. `GET /api/levels` returned an empty list.
+The resumed run stored the JPEG style preview and the generated mesh, but the
+quest failure occurred before the runner's save step. No validation level was
+created, no publish attempt was possible, and `GET /api/levels` still returned
+an empty list. Per the revised handoff scope, no course traversal, repair, or
+extended browser screenshot session was performed.
 
 Consequently these requested checks were **not verified**:
 
-- Cartoon styling quality and identity preservation;
-- generated mesh recognizability/loading;
+- Cartoon styling quality and identity preservation by the user;
+- generated mesh recognizability/loading in gameplay;
 - quest title, intro, and objective;
 - music, ambience, SFX, narration, audio diagnostics, and subtitles;
 - generated-animation postcard labeling or MP4 playback;
 - course traversal, guided repair, validation, or publication;
 - a fresh-context `/share/<id>` run without generation or source photos.
 
-The course was neither found completable nor repaired: no generated world
-existed to traverse. No share ID or share link was created.
+The course was neither found completable nor repaired because no generated
+world was saved. No level URL, share ID, or share link was created.
 
-## Defect
+## Resolved image-format defect
 
 **Reproduction:** submit the authorized `kontext-edit` style-preview request
 for the successful cutout, requesting `outputMimeType: image/png`, through
@@ -117,6 +177,24 @@ retained served capability `kontext-edit`, served model
 `fal-ai/flux-pro/kontext`, provider ID `mjob_d3d1797a1657`, no fallback, and
 `reportedCost: null`; no preview artifact was stored.
 
+**Resolution evidence:** after the server began treating requested MIME as a
+preference and retained magic-byte validation, the same provider job and URL
+stored a valid JPEG artifact without another paid Kontext submission.
+
+## Blocking quest-output defect
+
+**Reproduction:** submit the authorized `gemini-text` request with idempotency
+key `oq-live-20260924-quest` through `POST /api/jobs/generate` and poll
+application job `job_8df572b8-0ded-4e8b-b524-c3361698a1ca`.
+
+**Expected:** provider state `done` includes text or structured quest JSON for
+the four required fields.
+
+**Actual:** provider job `mjob_13e739e8d5af` reported `done`, served
+`gemini-text`, and fired no fallback, but the normalized result contained no
+output. The application job failed with `Provider reported "done" but returned
+no output`; reported cost and served model were both absent.
+
 ## Five-layer distinction
 
 1. **Catalog availability:** the 2026-09-24 plan snapshot listed all requested
@@ -125,46 +203,59 @@ retained served capability `kontext-edit`, served model
    endpoint exposes only the 3D descriptors.
 2. **Historical health:** the plan's seven-day provider history remains
    contextual evidence only; it is not this ObjectQuest run.
-3. **Our execution:** ObjectQuest executed `bg-remove` successfully and
-   executed `kontext-edit` to a terminal app-side media-validation failure.
-   Rows 3–16 were not executed. Neither submitted row used a fallback.
+3. **Our execution:** ObjectQuest has ready, no-fallback jobs for `bg-remove`,
+   `kontext-edit`, `gpt-image-edit`, and `rodin-i3d`. The `gemini-text` job
+   reached provider state `done` but failed because no output was returned.
+   Rows 6–16 were not executed.
 4. **Visual quality:** human inspection in real Chrome supports only the
-   cutout-preservation finding above. There is no preview, mesh, audio, or
-   video quality evidence from this run.
+   cutout-preservation finding above. Preview and mesh artifacts exist but
+   were intentionally left for the user's hands-on review. There is no audio
+   or video quality evidence from this run.
 5. **Gameplay usability:** not established. No level was saved, traversed,
    repaired, published, or opened through a share link.
 
 ## Evidence hashes
 
 - Runner evidence JSON: SHA-256
-  `ddcf2a7521c3260949d10b2c3b688d71c225eb07c1f5f8661547f53c7cb79ff7`
-  (2,425 bytes).
+  `c3ceab02717b78f2a95700b02ae22aeadb9286203136048292a3c39023c16a96`
+  (8,250 bytes).
 - Full runner console log: SHA-256
   `af9a316e22346f08b671ff97c8017bdc80862fd8bd71f258110d418c2292db6a`
   (225 bytes; local ignored path `test-results/live-validation/paid-run.log`).
 - Successful cutout artifact: SHA-256
   `6d0b4d2c18d6dd58aa1a7754cebc710b7872094295457c538666205c0da404f9`
   (193,234 bytes; retained only in ignored validation storage).
+- Reconciled style preview: SHA-256
+  `adcd4f6a9c5ab0e6064d1e3656f906f5f5b9c4a22da704854b7c2c8fa0263c5e`
+  (129,740-byte JPEG; retained only in ignored validation storage).
+- GPT alternate: SHA-256
+  `93c3895a6dbf68121eb8f50487efd44a0e2601a4ee5bf6c2653c133aa1501106`
+  (684,261-byte PNG; retained only in ignored validation storage).
+- Rodin mesh: SHA-256
+  `f0855519fb1314e14703ef91a7778b6992f2f4c80b64910cfe4781e719b0e24c`
+  (4,680,412-byte GLB; retained only in ignored validation storage).
+- Resumed runner console log: SHA-256
+  `bca4a287856d4197b99035b6f87dc8d8496d0126ad52f9c3b57a277047810459`
+  (210 bytes; local ignored path `test-results/live-validation/resumed-run.log`).
 - Chrome screenshot: SHA-256
   `4d4073f495391e5796cd64f88b69576895b490053fdc5480bd309ab57920f614`
   (36,575 bytes).
 
 ## Cleanup and local-state integrity
 
-- Final spend endpoint: `knownUsd: 0.0431`, `unknownEntries: 0`,
-  `entries: 2`.
+- Final spend endpoint: `knownUsd: 0.6932`, `unknownEntries: 0`,
+  `entries: 5`, `reservedUsd: 0.6932`.
 - Final saved-level count: 0.
 - Ignored spend ledger SHA-256:
-  `3390d5ad288bdadbc173306436504f83119c9744c8c711a5341683b680ecb8e8`.
+  `475df491edf3b679795c338dba26c5688760c68e5ea46a02f13a09d81dfdbcc0`.
 - Ignored durable jobs index SHA-256:
-  `2184d6f6978b429ae528e90e28b7cfec6dca1c2c959a680078e6edf1fd8cae18`.
-- The generated PNG, storage directory, durable jobs/ledger, and runner log
-  remain uncommitted under ignored paths.
-- No Vite client was started because the runner stopped before it created a
-  level; the successful cutout was checked directly from the isolated API in
-  real Chrome.
-- The Chrome validation tab was closed, the isolated API was stopped, and
-  port 18799 was confirmed no longer listening.
+  `39ebbcd5465199323eaea320f5ce453d31ecd7f9b598c8847344279db0a7423d`.
+- Generated media, storage, durable jobs/ledger, runtime Vite configuration,
+  and runner logs remain uncommitted under ignored paths.
+- The isolated API remains running at `http://127.0.0.1:18799` and the client
+  remains running at `http://127.0.0.1:15173/` with `/api` proxied to that API.
+- My Worlds is the client root above. There is no validation-level URL or
+  share URL because the runner stopped before save/publish.
 
 Checkpoint commits before this final document update:
 
@@ -172,3 +263,4 @@ Checkpoint commits before this final document update:
 - `a2142c36bb2b01495390b3ac109523696c054e1f` — runner evidence JSON.
 - `1bed190a0545b88f817b9a6e996d8fdfd1790302` — browser findings and
   screenshot.
+- `86f2b4005eb4c60704550fedc0a9dbfd546bf2e8` — resume-mode runner tooling.

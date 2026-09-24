@@ -65,6 +65,153 @@
           "artifact": null
         }
       ]
+    },
+    {
+      "runId": "objectquest-live-1790253298056",
+      "status": "failed",
+      "failedStep": "quest",
+      "completedAt": "2026-09-24T12:34:58.056Z",
+      "maxUsd": 3,
+      "plannedMaximumUsd": 1.3828,
+      "reservedByRunnerUsd": 0.6501,
+      "ledger": {
+        "worldId": "live-validation-photo4-20260924",
+        "knownUsd": 0.6932,
+        "unknownEntries": 0,
+        "entries": 5,
+        "reservedUsd": 0.6932
+      },
+      "jobs": [
+        {
+          "step": "cutout",
+          "capability": "bg-remove",
+          "applicationJobId": "job_737935e2-c54b-4c18-a6a6-782a7a4c69c8",
+          "providerJobId": "mjob_a2426904c928",
+          "servedCapability": "bg-remove",
+          "servedModel": "fal-ai/birefnet",
+          "fallbackFired": null,
+          "wallMilliseconds": 21,
+          "providerTimings": {
+            "requestedAt": "2026-09-24T11:57:36.579Z",
+            "startedAt": "2026-09-24T11:57:39.408Z",
+            "completedAt": "2026-09-24T11:57:46.373Z",
+            "queueMilliseconds": 2829,
+            "executionMilliseconds": 6965,
+            "totalMilliseconds": 9794
+          },
+          "estimatedUsd": 0.0011,
+          "reportedCost": null,
+          "artifact": {
+            "id": "e4bd9b09-4912-44e8-9b71-6f2a6ff6f2c0",
+            "url": "/api/generated-assets/files/6d0b4d2c18d6dd58aa1a7754cebc710b7872094295457c538666205c0da404f9.png",
+            "sha256": "6d0b4d2c18d6dd58aa1a7754cebc710b7872094295457c538666205c0da404f9",
+            "sizeBytes": 193234,
+            "mimeType": "image/png"
+          }
+        },
+        {
+          "step": "style-preview",
+          "capability": "kontext-edit",
+          "applicationJobId": "job_ef2fde65-65e2-4d16-b8df-e75d53c93d85",
+          "providerJobId": "mjob_d3d1797a1657",
+          "servedCapability": "kontext-edit",
+          "servedModel": "fal-ai/flux-pro/kontext",
+          "fallbackFired": null,
+          "wallMilliseconds": 5765,
+          "providerTimings": {
+            "requestedAt": "2026-09-24T11:57:52.272Z",
+            "startedAt": "2026-09-24T11:57:55.427Z",
+            "completedAt": "2026-09-24T12:30:53.706Z",
+            "queueMilliseconds": 3155,
+            "executionMilliseconds": 1978279,
+            "totalMilliseconds": 1981434
+          },
+          "estimatedUsd": 0.042,
+          "reportedCost": null,
+          "artifact": {
+            "id": "4372d056-ec44-49a9-a374-31cfec00f2c7",
+            "url": "/api/generated-assets/files/adcd4f6a9c5ab0e6064d1e3656f906f5f5b9c4a22da704854b7c2c8fa0263c5e.jpg",
+            "sha256": "adcd4f6a9c5ab0e6064d1e3656f906f5f5b9c4a22da704854b7c2c8fa0263c5e",
+            "sizeBytes": 129740,
+            "mimeType": "image/jpeg"
+          }
+        },
+        {
+          "step": "alternate-edit",
+          "capability": "gpt-image-edit",
+          "applicationJobId": "job_f9bcf342-6254-4b38-9fa0-d32c797cb89f",
+          "providerJobId": "mjob_4a0b2bde417b",
+          "servedCapability": "gpt-image-edit",
+          "servedModel": "openai/gpt-image-2/edit",
+          "fallbackFired": null,
+          "wallMilliseconds": 80130,
+          "providerTimings": {
+            "requestedAt": "2026-09-24T12:30:57.531Z",
+            "startedAt": "2026-09-24T12:31:02.926Z",
+            "completedAt": "2026-09-24T12:32:14.988Z",
+            "queueMilliseconds": 5395,
+            "executionMilliseconds": 72062,
+            "totalMilliseconds": 77457
+          },
+          "estimatedUsd": 0.23,
+          "reportedCost": null,
+          "artifact": {
+            "id": "12b090df-d46d-4e28-a2e5-da1648c81f67",
+            "url": "/api/generated-assets/files/93c3895a6dbf68121eb8f50487efd44a0e2601a4ee5bf6c2653c133aa1501106.png",
+            "sha256": "93c3895a6dbf68121eb8f50487efd44a0e2601a4ee5bf6c2653c133aa1501106",
+            "sizeBytes": 684261,
+            "mimeType": "image/png"
+          }
+        },
+        {
+          "step": "mesh",
+          "capability": "rodin-i3d",
+          "applicationJobId": "job_662f0c8a-52f1-4e33-adad-fcff355e014d",
+          "providerJobId": "mjob_0001ef7f3201",
+          "servedCapability": "rodin-i3d",
+          "servedModel": "fal-ai/hyper3d/rodin/v2.5",
+          "fallbackFired": null,
+          "wallMilliseconds": 149913,
+          "providerTimings": {
+            "requestedAt": "2026-09-24T12:32:17.662Z",
+            "startedAt": "2026-09-24T12:32:22.986Z",
+            "completedAt": "2026-09-24T12:34:36.451Z",
+            "queueMilliseconds": 5324,
+            "executionMilliseconds": 133465,
+            "totalMilliseconds": 138789
+          },
+          "estimatedUsd": 0.42,
+          "reportedCost": null,
+          "artifact": {
+            "id": "4c7a5b8a-234a-4fad-bc14-4b8674f08f4d",
+            "url": "/api/assets/files/f0855519fb1314e14703ef91a7778b6992f2f4c80b64910cfe4781e719b0e24c.glb",
+            "sha256": "f0855519fb1314e14703ef91a7778b6992f2f4c80b64910cfe4781e719b0e24c",
+            "sizeBytes": 4680412,
+            "mimeType": "model/gltf-binary"
+          }
+        },
+        {
+          "step": "quest",
+          "capability": "gemini-text",
+          "applicationJobId": "job_8df572b8-0ded-4e8b-b524-c3361698a1ca",
+          "providerJobId": "mjob_13e739e8d5af",
+          "servedCapability": "gemini-text",
+          "servedModel": null,
+          "fallbackFired": null,
+          "wallMilliseconds": 10483,
+          "providerTimings": {
+            "requestedAt": "2026-09-24T12:34:47.576Z",
+            "startedAt": "2026-09-24T12:34:49.304Z",
+            "completedAt": "2026-09-24T12:34:58.054Z",
+            "queueMilliseconds": 1728,
+            "executionMilliseconds": 8750,
+            "totalMilliseconds": 10478
+          },
+          "estimatedUsd": 0.0001,
+          "reportedCost": null,
+          "artifact": null
+        }
+      ]
     }
   ]
 }
