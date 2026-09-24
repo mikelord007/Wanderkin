@@ -14,6 +14,11 @@ npx playwright test tests/e2e/browser/qa/performance.qa.test.ts --project=chromi
 
 Result: 6 passed in 2.5 minutes.
 
+An earlier aggregate version attempted all six 20-second samples in one test.
+That run stalled and was terminated manually; its partial timings were
+discarded and are not mixed into the table below. After splitting the work into
+six independently bounded cases, no final case stalled and all six completed.
+
 | Bundled sample | Style | First play invitation (ms) | Frames / 20 s | Mean frame (ms) | p95 frame (ms) | Mean FPS |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | Rodin | Cartoon | 2,497.7 | 1,200 | 16.6665 | 16.8 | 60.001 |

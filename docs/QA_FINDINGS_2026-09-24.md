@@ -121,3 +121,45 @@ chunk are largest. See [performance evidence](qa/evidence/worker11-performance-2
   oversize/dimension rejection, and mobile completion need direct evidence.
 - The optional generated-GLB UI test skipped because
   `OBJECTQUEST_GENERATED_GLB_PATH` was not supplied.
+
+## Hand-off to manual testing
+
+Use the already-running local build at `http://127.0.0.1:5173/` with its API at
+`http://127.0.0.1:8787`. If those processes are unavailable, start equivalent
+local services on free high ports and substitute the app origin below.
+
+1. At `http://127.0.0.1:5173/`, play **The desk & sofa adventure** and
+   **A different perspective** to completion, then replay. Judge movement,
+   camera, collision, mantle/jump feel, and whether the authored route is
+   understandable without test diagnostics.
+2. From the same page, open **The Lost Colors of Teacup Island**. Click Play,
+   confirm music/ambience/narration are actually audible, collect all three
+   fragments, watch each colour-restoration step, enter the activated portal,
+   and replay. Specifically check whether QA-11-01 still produces silence.
+3. Play **Teacup Island Wander** and confirm exploration feels complete without
+   a timer. From Lost Colors completion choose Race: judge the countdown/timer,
+   restart during a run, finish twice, and confirm the best time persists and
+   does not use stale time from the restarted attempt.
+4. Edit one saved world into Cartoon, Hand-painted, and Watercolor variants and
+   play each from the same starting view. Judge whether geometry remains
+   readable and the differences are attractive rather than merely detectable.
+5. Choose **Create my world**. Try camera denial, a valid upload, a corrupt
+   image, an oversized image, and an excessive-dimension image. Continue the
+   valid image through review/crop, customize, preview approval, progress, and
+   world-ready; check error usefulness and whether prior safe state survives.
+6. Save and fully reload the created world. Verify style, mission, and audible
+   media; edit an entity and reload again. Finish/replay while watching Network
+   for unexpected generation POSTs. Publish and open the resulting
+   `http://127.0.0.1:5173/share/<share-id>` in an Incognito window; confirm it
+   opens the same immutable version without upload/generation.
+7. Repeat welcome, creation, gameplay HUD/pause, completion, My worlds, and the
+   share URL at 1280×800 and 375×812. Look for clipping, overlaps, unreadable
+   HUD text, or hidden primary actions. On touch hardware, confirm the explicit
+   keyboard/mouse support notice appears rather than implying touch gameplay.
+8. Keyboard-only: traverse creation, enter/pause/complete play, toggle
+   subtitles/mute, and adjust every audio slider with arrow keys. Confirm focus
+   rings remain visible, slider arrows never move the player, narration does
+   not repeat after death, and OS reduced-motion mode removes avoidable motion.
+9. Only after Worker 8 lands, manually inspect B16 gameplay capture and B17
+   postcard preview/download. Confirm overlays, downloads, resume behavior,
+   and that generated postcards are not mislabeled gameplay recordings.
