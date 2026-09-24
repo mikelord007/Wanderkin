@@ -100,6 +100,20 @@ change. It is deterministic after asset load, incurs no extra 3D generation per
 style, and lets reduced-motion and device-performance choices be handled at
 render time.
 
+The implemented renderer was also captured on both bundled meshes. These are
+the production `GameView`, not concept images:
+
+| Style | Rodin | Tripo |
+| --- | --- | --- |
+| Cartoon | [capture](evidence/style-cartoon-rodin.png) | [capture](evidence/style-cartoon-tripo.png) |
+| Hand-painted | [capture](evidence/style-hand-painted-rodin.png) | [capture](evidence/style-hand-painted-tripo.png) |
+| Watercolor | [capture](evidence/style-watercolor-rodin.png) | [capture](evidence/style-watercolor-tripo.png) |
+
+The progressive hook has matching [zero-colour](evidence/style-restoration-0.png)
+and [full-colour](evidence/style-restoration-1.png) captures. Frame-time
+observations and their headless-environment limitation are documented in
+`docs/SCENE.md`.
+
 ## Limitations and guardrails
 
 - This is a one-scene spike. The styled mesh used one input photo while the

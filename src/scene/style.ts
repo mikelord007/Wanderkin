@@ -4,6 +4,7 @@ import {
   type StyleDefinition,
   type StyleId,
 } from "../../shared/style.js";
+import type { SceneManifest } from "../../shared/manifest.js";
 
 export type EnvironmentMotif = "cloud" | "tree" | "rock" | "reed";
 
@@ -14,6 +15,18 @@ export interface ResolvedEnvironmentDressing {
   atmosphere: string | null;
 }
 
+export interface ScenePresentationOverrides {
+  styleId?: StyleId;
+  atmosphere?: string;
+  colorRestoration?: number;
+}
+
+export interface ResolvedScenePresentation {
+  style: StyleDefinition;
+  atmosphere: string | undefined;
+  colorRestoration: number;
+}
+
 export function getSceneStyle(id: StyleId = "cartoon"): StyleDefinition {
   return STYLE_DEFINITIONS[id];
 }
@@ -21,6 +34,24 @@ export function getSceneStyle(id: StyleId = "cartoon"): StyleDefinition {
 export function clampColorRestoration(value: number): number {
   if (!Number.isFinite(value)) return 1;
   return Math.min(1, Math.max(0, value));
+}
+
+/**
+ * Resolves saved v2 presentation state while keeping the public preview props
+ * authoritative. Legacy v1 manifests intentionally retain the colourful
+ * Cartoon default.
+ */
+export function resolveScenePresentation(
+  manifest: SceneManifest,
+  overrides: ScenePresentationOverrides = {},
+): ResolvedScenePresentation {
+  return {
+    style: getSceneStyle(overrides.styleId ?? manifest.experience?.style.id ?? "cartoon"),
+    atmosphere: overrides.atmosphere ?? manifest.experience?.style.atmosphere,
+    colorRestoration: clampColorRestoration(
+      overrides.colorRestoration ?? manifest.experience?.initialColorRestoration ?? 1,
+    ),
+  };
 }
 
 /**

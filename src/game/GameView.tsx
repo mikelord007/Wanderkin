@@ -25,7 +25,7 @@ import { GameSimulation, type SimulationEvent } from "./core/simulation.js";
 import type { TriangleSoup } from "./core/soup.js";
 import { InputController } from "./input/inputController.js";
 import { installDiagnostics, type GameDiagnostics } from "./diagnostics.js";
-import { clampColorRestoration, getSceneStyle } from "../scene/style.js";
+import { resolveScenePresentation } from "../scene/style.js";
 import { Hud } from "./hud/Hud.js";
 import { GameStage as StageContents, type HudSignals } from "./render/GameStage.js";
 import { usePrefersReducedMotion } from "./render/useReducedMotion.js";
@@ -101,11 +101,17 @@ export function GameView({
       : null,
     [signature, resolvedEventBus, publishedVersionId],
   );
-  const style = getSceneStyle(styleId ?? manifest.experience?.style.id ?? "cartoon");
-  const resolvedAtmosphere = atmosphere ?? manifest.experience?.style.atmosphere;
-  const initialColorRestoration = clampColorRestoration(
-    colorRestorationOverride ?? manifest.experience?.initialColorRestoration ?? 1,
-  );
+  const {
+    style,
+    atmosphere: resolvedAtmosphere,
+    colorRestoration: initialColorRestoration,
+  } = resolveScenePresentation(manifest, {
+    ...(styleId === undefined ? {} : { styleId }),
+    ...(atmosphere === undefined ? {} : { atmosphere }),
+    ...(colorRestorationOverride === undefined
+      ? {}
+      : { colorRestoration: colorRestorationOverride }),
+  });
   const [colorRestoration, setColorRestoration] = useState(initialColorRestoration);
   const restorationAdapter = useMemo(
     () => new ColorRestorationAdapter({ setColorRestoration }, initialColorRestoration),
