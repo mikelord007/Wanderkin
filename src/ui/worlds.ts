@@ -20,12 +20,16 @@ export type WorldListItem =
       id: string;
       title: string;
       job: GenerationJob;
+      statusText?: string;
+      actionLabel?: "Resume" | "View progress";
     }
   | {
       kind: "failed";
       id: string;
       title: string;
       job: GenerationJob;
+      statusText?: string;
+      actionLabel?: "Retry" | "Review choices";
     };
 
 export function savedWorldItems(

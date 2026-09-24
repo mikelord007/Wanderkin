@@ -215,14 +215,14 @@ export function StartScreen({
             : <div className="oq-kit-grid">{worldItems.map(item => {
               if (item.kind === "pending") return <Card key={`pending-${item.id}`} className="oq-kit-stack">
                 <p className="oq-kit-eyebrow">In progress</p><h3>{item.title || "Untitled world"}</h3>
-                <p className="oq-kit-muted">Generation is {item.job.state}. Leaving this page does not cancel it.</p>
-                {onResumePendingWorld ? <Button onClick={() => onResumePendingWorld(item.job.id)}>Resume</Button> : null}
+                <p className="oq-kit-muted">{item.statusText ?? `Generation is ${item.job.state}. Leaving this page does not cancel it.`}</p>
+                {onResumePendingWorld ? <Button onClick={() => onResumePendingWorld(item.job.id)}>{item.actionLabel ?? "Resume"}</Button> : null}
               </Card>;
               if (item.kind === "failed") return <Card key={`failed-${item.id}`} className="oq-kit-stack">
                 <p className="oq-kit-eyebrow">Needs attention</p><h3>{item.title || "Untitled world"}</h3>
-                <p className="oq-kit-error">{item.job.uiMessage || "This generation stage needs another try."}</p>
-                {item.job.lastError?.retryable && onRetryFailedWorld
-                  ? <Button onClick={() => onRetryFailedWorld(item.job.id)}>Retry</Button>
+                <p className="oq-kit-error">{item.statusText ?? item.job.uiMessage ?? "This generation stage needs another try."}</p>
+                {onRetryFailedWorld && (item.job.lastError?.retryable || item.actionLabel === "Review choices")
+                  ? <Button onClick={() => onRetryFailedWorld(item.job.id)}>{item.actionLabel ?? "Retry"}</Button>
                   : <p className="oq-kit-muted">This stage can’t be retried automatically.</p>}
               </Card>;
               if (item.kind === "draft") return <Card key={`draft-${item.id}`} className="oq-kit-stack">
