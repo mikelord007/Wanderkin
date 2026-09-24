@@ -6,9 +6,11 @@
  * brand because at mouse scale a houseplant is a forest; the warm accent is the
  * light you are heading towards.
  *
- * Scoped to `.oq-theme` / `[data-world-style]` so a screen opts in, and so a
- * world's chosen look can retint the action colour without touching anything
- * structural.
+ * The values live on `:root` so that screens still on the older markup — the
+ * world editor, play, finish, capture — can use the same palette without first
+ * being wrapped in a theme scope. `.oq-theme` decides how a region *paints*
+ * itself; this file only decides what the colours are. A world's chosen look
+ * retints the action colour further down, per subtree.
  */
 
 /* Fraunces: the display face. Self-hosted (see public/brand/README.md) so the
@@ -26,7 +28,7 @@
     U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-.oq-theme, [data-world-style] {
+:root {
   /* --- Brand constants. Same five values as the logo, so the mark never sits
      on a background it was not drawn for. --- */
   --mh-pine: #1d3a2e;

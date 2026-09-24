@@ -6,7 +6,9 @@ import {
   getSharedLevel,
   importLevelBundle,
   publishLevel,
+  safeBundleFilename,
 } from "./api.js";
+import { BRAND_SLUG } from "../brand.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -34,6 +36,31 @@ describe("publication API", () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/shares/share-1", undefined);
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/api/jobs"))).toBe(false);
+  });
+});
+
+describe("safeBundleFilename", () => {
+  it("names the download after the brand, and still ends in .json", () => {
+    // The extension is cosmetic — the import route reads the body, never the
+    // name — but a bundle that does not end in .json would fall outside the
+    // file picker's accept list and look unopenable to the person who saved it.
+    const name = safeBundleFilename("Room corner — Rodin");
+    expect(name.startsWith("Room-corner-")).toBe(true);
+    expect(name.endsWith(`.${BRAND_SLUG}.json`)).toBe(true);
+  });
+
+  it("falls back to a usable name when the level has none", () => {
+    expect(safeBundleFilename("   ")).toBe(`${BRAND_SLUG}-level.${BRAND_SLUG}.json`);
+  });
+
+  it("strips path separators so a level name cannot steer where the file lands", () => {
+    // Dots survive by design — they are legal in a filename, and without a
+    // separator a run of them cannot traverse anywhere. It is the slashes and
+    // backslashes that would let a level name choose a directory.
+    const name = safeBundleFilename("../../etc/passwd");
+    expect(name).not.toContain("/");
+    expect(name).not.toContain("\\");
+    expect(name.endsWith(`.${BRAND_SLUG}.json`)).toBe(true);
   });
 });
 

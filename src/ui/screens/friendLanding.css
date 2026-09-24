@@ -1,10 +1,10 @@
 .oq-friend { max-width: 1100px; }
-.oq-friend__brand { font-weight: 800; letter-spacing: -.03em; font-size: 1.2rem; }
+.oq-friend__brand { display: flex; }
 .oq-friend__card { display: grid; grid-template-columns: minmax(280px,.82fr) minmax(0,1.18fr); gap: 28px; align-items: center; }
 .oq-friend__copy { display: flex; flex-direction: column; align-items: flex-start; gap: 18px; }
 .oq-friend__copy h1, .oq-friend__copy p { margin: 0; }
 .oq-friend__copy h1 { font-size: clamp(2.2rem,4vw,3.6rem); line-height: 1; }
-.oq-friend__eyebrow { color: var(--oq-accent); font-weight: 750; text-transform: uppercase; letter-spacing: .08em; font-size: .76rem; }
+.oq-friend__eyebrow { color: var(--oq-accent-ink); font-weight: 700; font-size: .8125rem; }
 .oq-friend__details { width: 100%; display: grid; gap: 10px; margin: 0; }
 .oq-friend__details div { display: flex; justify-content: space-between; gap: 16px; padding-block: 10px; border-bottom: 1px solid var(--oq-border); }
 .oq-friend__details dt { color: var(--oq-text-dim); }

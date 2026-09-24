@@ -2,6 +2,8 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import type { PublishedLevelVersion } from "@shared/index.js";
 import { describeApiError, getSharedLevel } from "../api.js";
 import { LoadingScreen } from "../components/LoadingScreen.js";
+import { Logo } from "../components/Logo.js";
+import { BRAND_NAME } from "../../brand.js";
 import "./friendLanding.css";
 
 const Preview3D = lazy(() =>
@@ -40,7 +42,7 @@ export function FriendLandingScreen({ shareId, onPlay, onHome }: FriendLandingSc
         <section className="oq-panel oq-panel--error">
           <h1>This shared world isn’t available</h1>
           <p>{error}</p>
-          <button type="button" className="oq-button oq-button--secondary" onClick={onHome}>Visit ObjectQuest</button>
+          <button type="button" className="oq-button oq-button--secondary" onClick={onHome}>Visit {BRAND_NAME}</button>
         </section>
       </main>
     );
@@ -57,7 +59,7 @@ export function FriendLandingScreen({ shareId, onPlay, onHome }: FriendLandingSc
 
   return (
     <main className="oq-screen oq-friend">
-      <header className="oq-friend__brand">ObjectQuest</header>
+      <header className="oq-friend__brand"><Logo size={30} /></header>
       <section className="oq-panel oq-friend__card">
         <div className="oq-friend__copy">
           <p className="oq-friend__eyebrow">A friend shared a little world</p>

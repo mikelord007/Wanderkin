@@ -355,45 +355,59 @@ export function LevelEditor({
           />
 
           <HelperGeometryPanel manifest={workingManifest} onChange={(next) => setWorkingManifest(next)} />
+        </div>
+      </div>
 
+      {/* Save and Play used to live at the bottom of the scrolling panel
+          column, so on a short window they were below the fold of a column
+          you had to find before you could scroll it. They are the editor's
+          two most-used controls; they belong on a bar that stays put. */}
+      <div className="oq-editor__actionbar">
+        <div className="oq-editor__actionbar-notes" role="status">
           {saveError ? <p className="oq-error-text">{saveError}</p> : null}
           {savedNotice ? <p className="oq-editor__saved-notice">Saved.</p> : null}
           {exportNotice ? <p className="oq-editor__saved-notice">{exportNotice}</p> : null}
-          {onExport && hasUnsavedChanges ? (
-            <p className="oq-editor__meta">Export will save these changes first so the bundle is complete.</p>
+          {!saveError && !savedNotice && !exportNotice ? (
+            <p className="oq-editor__meta">
+              {hasUnsavedChanges
+                ? onExport
+                  ? "Unsaved changes. Export saves them first so the bundle is complete."
+                  : "Unsaved changes."
+                : "All changes saved."}
+            </p>
           ) : null}
+        </div>
 
-          <div className="oq-actions">
-            <button type="button" className="oq-button oq-button--ghost" onClick={onBack}>
-              Back
-            </button>
+        <div className="oq-actions">
+          <button type="button" className="oq-button oq-button--ghost" onClick={onBack}>
+            Back
+          </button>
+          {onExport ? (
             <button
               type="button"
               className="oq-button oq-button--secondary"
-              onClick={handleSave}
+              onClick={handleExport}
               disabled={saving || exporting}
             >
-              {saving ? "Saving…" : "Save"}
+              {exporting ? "Exporting…" : hasUnsavedChanges ? "Save & export" : "Export"}
             </button>
-            {onExport ? (
-              <button
-                type="button"
-                className="oq-button oq-button--secondary"
-                onClick={handleExport}
-                disabled={saving || exporting}
-              >
-                {exporting ? "Exporting…" : hasUnsavedChanges ? "Save & export" : "Export"}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="oq-button oq-button--primary"
-              onClick={() => onPlay(workingManifest)}
-              disabled={saving || exporting}
-            >
-              Play
-            </button>
-          </div>
+          ) : null}
+          <button
+            type="button"
+            className="oq-button oq-button--secondary"
+            onClick={handleSave}
+            disabled={saving || exporting}
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+          <button
+            type="button"
+            className="oq-button oq-button--primary"
+            onClick={() => onPlay(workingManifest)}
+            disabled={saving || exporting}
+          >
+            Play
+          </button>
         </div>
       </div>
     </div>

@@ -1,67 +1,84 @@
+/*
+ * World editor.
+ *
+ * The editor used to be the one room in the app with its own decor: dark
+ * violet panels, amber outlines, a different type scale. It now shares the
+ * Mousehold tokens with everything else, so moving from "Edit" into the editor
+ * no longer feels like leaving the product.
+ *
+ * Two things deliberately stay dark: the 3D stage and the notes that float on
+ * top of it. Those sit over a rendered scene, not over the page.
+ */
+
 .oq-editor {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--oq-space-4);
 }
 
+/* --- Banners --------------------------------------------------------- */
+
 .oq-editor__banner {
-  background: #241d3c;
-  border: 1px solid #382f54;
-  border-radius: 12px;
-  padding: 0.9rem 1.1rem;
+  background: var(--oq-surface);
+  border: 1px solid var(--oq-line);
+  border-left: 4px solid var(--oq-control-line);
+  border-radius: var(--oq-round-md);
+  padding: var(--oq-space-4) var(--oq-space-5);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: var(--oq-space-3);
 }
 
 .oq-editor__banner p {
   margin: 0;
-  color: #f3eefc;
 }
 
 .oq-editor__banner--warning {
-  border-color: #ffcb6b;
+  border-left-color: var(--oq-warning-ink);
+  background: var(--oq-warning-wash);
   flex-direction: column;
   align-items: flex-start;
 }
 
 .oq-editor__banner--repair {
-  border-color: #f5a623;
-  background: #30233a;
+  border-left-color: var(--oq-warning-ink);
+  background: var(--oq-warning-wash);
   align-items: flex-start;
 }
 
 .oq-editor__banner--repair strong {
   display: block;
-  color: #fff4dc;
-  margin-bottom: 0.25rem;
+  margin-bottom: 2px;
 }
 
 .oq-editor__banner--repair > span {
-  color: #d8d0e9;
-  font-size: 0.8rem;
+  color: var(--oq-muted);
+  font-size: .875rem;
 }
 
 .oq-editor__banner-actions {
   display: flex;
-  gap: 0.6rem;
+  gap: var(--oq-space-2);
   flex-wrap: wrap;
 }
 
+/* --- Stage and panels ------------------------------------------------ */
+
 .oq-editor__layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr);
+  gap: var(--oq-space-4);
   align-items: start;
 }
 
 .oq-editor__preview {
   position: relative;
-  border-radius: 14px;
+  border-radius: var(--oq-round-lg);
   overflow: hidden;
-  border: 1px solid #382f54;
+  border: 1px solid var(--oq-line);
+  background: var(--oq-inset);
   height: clamp(420px, 60vh, 640px);
   min-height: 420px;
 }
@@ -78,143 +95,174 @@
   cursor: crosshair;
 }
 
+/* Floating over the live scene, so these two keep their own dark ground. */
 .oq-editor__placement-hint {
   position: absolute;
-  bottom: 0.75rem;
-  left: 0.75rem;
-  right: 0.75rem;
-  background: rgba(15, 11, 26, 0.88);
-  border: 1px solid #f5a623;
-  border-radius: 10px;
-  padding: 0.6rem 0.9rem;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  background: #16241fe6;
+  border: 1px solid var(--mh-marigold);
+  border-radius: var(--oq-round-sm);
+  padding: 10px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  color: #f3eefc;
-  font-size: 0.85rem;
+  gap: var(--oq-space-3);
+  color: #eef2ea;
+  font-size: .875rem;
+}
+
+.oq-editor__placement-hint .oq-button--ghost {
+  color: var(--mh-marigold);
+}
+
+.oq-editor__placement-hint .oq-button--ghost:not(:disabled):hover {
+  background: #ffffff1f;
+}
+
+.oq-editor__placement-hint .oq-error-text {
+  color: #f6b3a8;
 }
 
 .oq-editor__preview-note {
   position: absolute;
-  top: 0.6rem;
-  left: 0.6rem;
-  right: 0.6rem;
+  top: 10px;
+  left: 10px;
+  right: 10px;
   margin: 0;
-  background: rgba(15, 11, 26, 0.78);
-  border-radius: 8px;
-  padding: 0.4rem 0.7rem;
-  font-size: 0.78rem;
-  color: #ffcb6b;
+  background: #16241fcc;
+  border-radius: var(--oq-round-sm);
+  padding: 7px 12px;
+  font-size: .8125rem;
+  color: #f4d9a4;
 }
 
 .oq-editor__panels {
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
-  max-height: 640px;
+  gap: var(--oq-space-3);
+  max-height: clamp(420px, 60vh, 640px);
   overflow-y: auto;
-  padding-right: 0.25rem;
+  padding-right: var(--oq-space-1);
+}
+
+/* Compounded with `.oq-panel` on purpose: these override the shared panel's
+   padding and gap, and equal specificity would leave the winner up to
+   whichever stylesheet the bundler happened to emit last. */
+.oq-panel.oq-editor-panel {
+  padding: var(--oq-space-4);
+  gap: var(--oq-space-3);
 }
 
 .oq-editor-panel h2 {
-  margin: 0 0 0.25rem;
-  font-size: 1rem;
+  margin: 0;
+  font-size: 1.125rem;
 }
 
+/* A quiet sub-heading, sentence case. The old uppercase tracked labels made
+   every group inside a panel shout at the same volume as the panel itself. */
 .oq-editor-panel h3 {
-  margin: 0.5rem 0 0.25rem;
-  font-size: 0.85rem;
-  color: #b9aed6;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  margin: var(--oq-space-2) 0 0;
+  font-size: .9375rem;
+  font-weight: 700;
+  color: var(--oq-accent-ink);
 }
+
+/* --- Status --------------------------------------------------------- */
 
 .oq-editor__status-badge {
   display: inline-block;
   width: fit-content;
-  padding: 0.25rem 0.7rem;
+  padding: 4px 11px;
   border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: .8125rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
   margin: 0;
 }
 
 .oq-editor__status-badge--validated {
-  background: #1f4d3d;
-  color: #6fe3b4;
+  background: var(--oq-success-wash);
+  color: var(--oq-success-ink);
 }
 
 .oq-editor__status-badge--failed {
-  background: #4d1f24;
-  color: #ff8686;
+  background: var(--oq-error-wash);
+  color: var(--oq-error-ink);
 }
 
 .oq-editor__status-badge--manually-adjusted {
-  background: #4d3a1f;
-  color: #ffcb6b;
+  background: var(--oq-warning-wash);
+  color: var(--oq-warning-ink);
 }
 
 .oq-editor__status-badge--unvalidated {
-  background: #362f4d;
-  color: #b9aed6;
+  background: var(--oq-inset);
+  color: var(--oq-muted);
 }
 
 .oq-editor__meta {
   margin: 0;
-  font-size: 0.78rem;
-  color: #b9aed6;
+  font-size: .8125rem;
+  color: var(--oq-muted);
 }
 
 .oq-editor__validation-summary {
-  margin: 0.55rem 0 0;
-  color: #d8d0e9;
-  line-height: 1.45;
+  margin: 0;
+  max-inline-size: 60ch;
 }
 
 .oq-editor__technical {
-  margin-top: 0.65rem;
-  color: #b9aed6;
-  font-size: 0.78rem;
+  color: var(--oq-muted);
+  font-size: .8125rem;
 }
 
 .oq-editor__technical summary {
   cursor: pointer;
-  color: #c8bcdf;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  color: var(--oq-accent-ink);
   font-weight: 650;
 }
 
 .oq-editor__technical-content {
   max-height: 10rem;
   overflow: auto;
-  margin-top: 0.45rem;
-  padding-right: 0.3rem;
+  margin-top: var(--oq-space-2);
+  padding-right: var(--oq-space-1);
   overflow-wrap: anywhere;
 }
 
 .oq-editor__technical-content p {
-  margin: 0.35rem 0 0;
+  margin: 6px 0 0;
 }
+
+/* --- Fields --------------------------------------------------------- */
 
 .oq-editor__field {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.8rem;
-  color: #b9aed6;
-  margin-bottom: 0.5rem;
+  gap: var(--oq-space-1);
+  font-size: .8125rem;
+  color: var(--oq-muted);
+  margin-bottom: var(--oq-space-2);
 }
 
 .oq-editor__field input,
 .oq-editor__field select {
-  background: #201a33;
-  border: 1px solid #382f54;
-  border-radius: 8px;
-  color: #f3eefc;
-  padding: 0.4rem 0.55rem;
-  font-size: 0.9rem;
+  background: var(--oq-surface);
+  border: 1px solid var(--oq-control-line);
+  border-radius: var(--oq-round-sm);
+  color: var(--oq-ink);
+  min-height: 38px;
+  padding: 6px 10px;
+  font-size: .9375rem;
+}
+
+.oq-editor__field input:focus,
+.oq-editor__field select:focus {
+  border-color: var(--oq-action);
 }
 
 .oq-editor__field--compact {
@@ -224,16 +272,18 @@
 .oq-editor__vec3 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
+  gap: var(--oq-space-2);
 }
 
 .oq-editor__row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--oq-space-2);
   flex-wrap: wrap;
-  margin-bottom: 0.4rem;
+  margin-bottom: var(--oq-space-2);
 }
+
+/* --- Lists ---------------------------------------------------------- */
 
 .oq-editor__checkpoint-list {
   list-style: none;
@@ -241,59 +291,121 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: var(--oq-space-2);
 }
 
 .oq-editor__checkpoint-item {
-  background: #201a33;
-  border: 1px solid #382f54;
-  border-radius: 10px;
-  padding: 0.6rem;
+  background: var(--oq-paper);
+  border: 1px solid var(--oq-line);
+  border-radius: var(--oq-round-sm);
+  padding: var(--oq-space-3);
 }
 
 .oq-editor__helper-list {
   list-style: none;
-  margin: 0 0 0.6rem;
+  margin: 0 0 var(--oq-space-3);
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: var(--oq-space-2);
 }
 
-.oq-editor__add-helper {
-  border-top: 1px solid #382f54;
-  padding-top: 0.6rem;
-}
-
+.oq-editor__add-helper,
 .oq-editor__calibrate {
-  border-top: 1px solid #382f54;
-  padding-top: 0.6rem;
-  margin-top: 0.4rem;
+  border-top: 1px solid var(--oq-line);
+  padding-top: var(--oq-space-3);
+  margin-top: var(--oq-space-1);
 }
 
 .oq-editor__saved-notice {
-  color: #6fe3b4;
+  color: var(--oq-success-ink);
   margin: 0;
-  font-size: 0.85rem;
+  font-size: .875rem;
+  font-weight: 650;
 }
 
+/* The toggled-on state of a mode button — placing a spawn, editing a
+   checkpoint. It is a pressed control, so it reads as one. */
 .oq-button--active {
-  outline: 2px solid #f5a623;
+  background: var(--oq-wash);
+  border-color: var(--oq-action);
+  outline: 1px solid var(--oq-action);
+  outline-offset: -2px;
+  color: var(--oq-accent-ink);
 }
+
+/* --- Action bar ----------------------------------------------------- */
+
+.oq-editor__actionbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--oq-space-3);
+  padding: var(--oq-space-3) var(--oq-space-4);
+  padding-bottom: max(var(--oq-space-3), env(safe-area-inset-bottom));
+  border: 1px solid var(--oq-line);
+  border-radius: var(--oq-round-md);
+  /* Opaque rather than translucent: the 3D stage can scroll underneath it,
+     and a blurred pane over a moving scene is hard to read. */
+  background: var(--oq-surface);
+  box-shadow: var(--oq-elevation-lift);
+}
+
+.oq-editor__actionbar-notes {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.oq-editor__actionbar .oq-actions {
+  margin-left: auto;
+}
+
+@media (max-width: 620px) {
+  /* The bar follows a very long form down the page here, so it earns its
+     height back: one compact status line, then full-width actions. */
+  .oq-editor__actionbar {
+    padding: var(--oq-space-2) var(--oq-space-3);
+    gap: var(--oq-space-2);
+  }
+
+  .oq-editor__actionbar-notes {
+    width: 100%;
+    font-size: .8125rem;
+  }
+
+  .oq-editor__actionbar .oq-actions {
+    margin-left: 0;
+    width: 100%;
+    gap: var(--oq-space-2);
+  }
+
+  .oq-editor__actionbar .oq-button {
+    flex: 1 1 auto;
+    padding-inline: var(--oq-space-3);
+  }
+}
+
+/* --- Ready panel ---------------------------------------------------- */
 
 .oq-world-ready {
   display: grid;
-  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
-  gap: 1.25rem;
+  grid-template-columns: minmax(260px, .8fr) minmax(0, 1.2fr);
+  gap: var(--oq-space-5);
   align-items: center;
-  padding: 1.25rem;
+  padding: var(--oq-space-5);
 }
 
 .oq-world-ready__copy {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.8rem;
+  gap: var(--oq-space-3);
 }
 
 .oq-world-ready__copy h2,
@@ -302,19 +414,20 @@
 }
 
 .oq-world-ready__objective {
-  color: #d8d0e9;
+  color: var(--oq-muted);
   font-weight: 650;
 }
 
 .oq-world-ready__preview {
   height: clamp(360px, 55vh, 580px);
   min-height: 360px;
-  border: 1px solid #382f54;
-  border-radius: 14px;
+  border: 1px solid var(--oq-line);
+  border-radius: var(--oq-round-lg);
   overflow: hidden;
+  background: var(--oq-inset);
 }
 
-@media (max-width: 860px) {
+@media (max-width: 960px) {
   .oq-editor__layout {
     grid-template-columns: 1fr;
   }
@@ -322,9 +435,25 @@
   .oq-editor__panels {
     max-height: none;
     overflow-y: visible;
+    padding-right: 0;
   }
 
   .oq-world-ready {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .oq-editor__preview {
+    height: clamp(320px, 48vh, 420px);
+    min-height: 320px;
+  }
+
+  .oq-editor-canvas {
+    min-height: 320px;
+  }
+
+  .oq-editor__vec3 {
+    grid-template-columns: 1fr 1fr;
   }
 }

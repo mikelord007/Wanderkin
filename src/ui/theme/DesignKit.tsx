@@ -1,8 +1,8 @@
 import { useState } from "react";
 import {
   AudioControls, Button, Card, ChoiceTiles, DEFAULT_AUDIO_SETTINGS, EmptyState, HUDChip, Icon,
-  Modal, PlayFrame, ProgressPanel, Sheet, Stepper, SubtitleBar, TextField, Toast, WORLD_STYLES,
-  WorldStyleScope, type ProgressStage, type WorldStyle,
+  Logo, Modal, PlayFrame, ProgressPanel, Sheet, Stepper, STYLE_EXAMPLES, SubtitleBar, TextField,
+  Toast, WORLD_STYLES, WorldStyleScope, type ProgressStage, type WorldStyle,
 } from "../components/index.js";
 import "./design-kit.css";
 
@@ -34,7 +34,12 @@ function StyleGallery({ style, label }: { style: WorldStyle; label: string }) {
       </Card>
       <Card className="oq-kit-stack"><h3>02 · Choices & fields</h3>
         <ChoiceTiles legend="Look" value={look} onChange={setLook} hint="Illustrative color swatches — not generated previews."
-          options={WORLD_STYLES.map(s => ({ value: s.value, label: s.label, description: s.value === "cartoon" ? "Bold shapes. Bright discoveries." : s.value === "hand-painted" ? "Warm light. A handmade feeling." : "Soft washes. A quiet escape.", image: <WorldStyleScope worldStyle={s.value} className="oq-kit-style-swatch"><Icon name="spark" /></WorldStyleScope> }))} />
+          options={WORLD_STYLES.map(s => {
+            // The kit shows the same real style examples the Look step does, so
+            // a swatch here can never drift from what someone actually picks.
+            const example = STYLE_EXAMPLES.find(entry => entry.id === s.value);
+            return { value: s.value, label: s.label, description: example?.description ?? "", image: example ? <img src={example.src} alt={example.alt} loading="lazy" /> : null };
+          })} />
         <ChoiceTiles legend="Adventure" value={adventure} onChange={setAdventure} options={[
           { value: "explore", label: "Explore", description: "Wander at your own pace." },
           { value: "collect", label: "Collect", description: "Find the lost colors and unlock the portal." },
@@ -72,7 +77,7 @@ function StyleGallery({ style, label }: { style: WorldStyle; label: string }) {
 }
 export function DesignKit() {
   return <WorldStyleScope className="oq-kit-docs"><main className="oq-kit-container oq-kit-stack">
-    <header className="oq-kit-docs__header"><a href="/">ObjectQuest</a><span className="oq-kit-eyebrow">Design system · v2</span></header>
+    <header className="oq-kit-docs__header"><a href="/"><Logo size={30} /></a><span className="oq-kit-eyebrow">Design system · v2</span></header>
     <div className="oq-kit-docs__intro"><p className="oq-kit-eyebrow">Pocket Wonder</p><h1>Small worlds.<br />A shared language.</h1><p className="oq-kit-muted">Every component, in every world style. A living kit for everyday adventures.</p></div>
     <nav className="oq-kit-row" aria-label="World style galleries">{WORLD_STYLES.map(s => <a key={s.value} href={`#${s.value}`} className="oq-kit-button oq-kit-button--secondary">{s.label}</a>)}</nav>
     {WORLD_STYLES.map(s => <StyleGallery key={s.value} style={s.value} label={s.label} />)}

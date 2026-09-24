@@ -58,9 +58,44 @@ body stays system-ui.
 - [x] Landing rebuild, verified at 1440 / 820 / 390
 - [x] Create step 2 Look/Adventure layout (item 8), verified at 1280 / 390
 - [x] Genuine same-source style variants generated + wired in (item 9)
-- [ ] Editor visual consistency (item 7)  ← next
-- [ ] `src/ui/api.ts` brand copy + bundle filename
-- [ ] Contrast pass over the legacy Play/Finish/Capture overlays
+- [x] Editor visual consistency (item 7), verified at 1440 / 820 / 390
+- [x] `src/ui/api.ts` brand copy + bundle filename (granted by coordinator)
+- [x] Contrast pass over the legacy Play/Finish/Capture overlays
+- [ ] Residual brand-reference sweep to report to the coordinator  ← next
+
+### Item 7 notes
+
+`src/ui/theme/tokens.css` now declares the palette on `:root` rather than on
+`.oq-theme`, so the older screens get the same values without being wrapped in
+a theme scope. `.oq-theme` still decides how a region paints itself.
+
+`src/styles.css` keeps every legacy class name and all the markup; only the
+paint changed, from the old dark-violet identity onto the Mousehold tokens.
+The old `--oq-bg` / `--oq-text` / `--oq-accent` names are kept as aliases.
+
+Two real bugs found and fixed while verifying:
+
+1. `index.html` paints `html` pine for the boot screen. `styles.css` set only
+   `body`, and `body { height: 100% }` stops at the viewport, so every screen
+   taller than one screenful showed a pine band below the fold. Reproduced on
+   the editor at 820px. `styles.css` now hands the root back and uses
+   `min-height`.
+2. `StyleReference`'s `<img>` carries width/height attributes (so the layout
+   does not jump while it loads), and those beat `aspect-ratio` unless
+   `height: auto` is set — the reference photo rendered as a tall crop.
+
+Editor also gained a sticky action bar: Save and Play used to sit at the bottom
+of the scrolling panel column, below the fold of a column you had to find
+before you could scroll it.
+
+### Kept deliberately dark
+
+The 3D stage, the placement hint and preview note that float on it, the photo
+card badges, the lightbox, and the in-play HUD chips/subtitles. Those sit over
+a rendered scene or a photograph, not over the page, so the light token
+surfaces would be unreadable there. Verified `/play/sample-rodin-room-corner`:
+the pointer-lock overlay and the "Start gameplay capture" pill both read
+clearly over the scene.
 
 ### Design decisions worth keeping
 

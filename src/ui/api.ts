@@ -10,6 +10,7 @@ import type {
   ProviderSubmitRequest,
   SceneManifest,
 } from "@shared/index.js";
+import { BRAND_BUNDLE_EXTENSION, BRAND_NAME, BRAND_SLUG } from "../brand.js";
 
 export interface GenerationEnvelope {
   request: GenerationRequest;
@@ -57,7 +58,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     res = await fetch(path, init);
   } catch (cause) {
     throw new ApiError(
-      "Could not reach the ObjectQuest server. Check your connection and try again.",
+      `Could not reach the ${BRAND_NAME} server. Check your connection and try again.`,
       0,
       cause,
     );
@@ -278,13 +279,17 @@ export async function importLevelBundle(file: File): Promise<SceneManifest> {
   });
 }
 
-function safeBundleFilename(levelName: string): string {
+/** Exported for tests: the name a person sees on a downloaded world bundle. */
+export function safeBundleFilename(levelName: string): string {
   const stem = levelName
     .trim()
     .replace(/[^a-z0-9._-]+/gi, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
-  return `${stem || "objectquest-level"}.objectquest.json`;
+  // Only the name a person sees on the downloaded file changes. The import
+  // route still accepts the old `.objectquest.json` bundles — the extension is
+  // never parsed, and the accept list already covers plain `.json`.
+  return `${stem || `${BRAND_SLUG}-level`}.${BRAND_BUNDLE_EXTENSION}`;
 }
 
 export async function downloadLevelBundle(levelId: string, levelName: string): Promise<void> {
