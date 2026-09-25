@@ -157,3 +157,130 @@ Same pose and camera in each pair; before = `2625ef7` product files, after = `13
 | `03` / `04` | Same pose facing the next objective: giant collected gem and halo → small gem, clear view |
 | `05` / `06` | Same pose, desk underside in Cartoon: per-channel red/olive drift → consistent brown bands |
 | `07` / `08` | Tripo spawn facing the first marker in Cartoon: black/maroon crush → olive-brown, pink halo → beam and ring |
+
+---
+
+# Extension: narrow review of the Finish share fix `e83f8b1` (4 product files)
+
+## Scope and snapshot
+
+- **Requested by:** the coordinator, after the user approved resuming the fix. The fix was implemented by session `000bc7bc`.
+- **Reviewed:** exactly `src/App.tsx`, `src/ui/screens/FinishScreen.tsx`, `src/ui/screens/finish-screen.css` and `src/capture/media.css` at `e83f8b1`, against its parent `3f7e74a`. I also read `finish-recovery.md`.
+- **Snapshot:** HEAD was `f0913ce` (docs only after `e83f8b1`). The tracked `src/`, `shared/` and `server/` were clean, and their source equals `e83f8b1`.
+- **Read-only:** I made no product edits.
+- **Not re-run:** the unit suite, build and full gameplay, since no defect required it. The owner reports that the 12 fixture tests and the typecheck pass.
+
+## Verdict: approved, with one non-blocking defect (see "Finding F-1")
+
+These all hold:
+
+- no accidental saving or publication of a bundled sample
+- no duplicate saved copy
+- publishing locked while a save-and-share is in flight
+- a failed publish retried by publishing only
+- old URLs safe
+
+## Static trace (actual App entry points)
+
+### Every way into Play
+
+| Entry | `publishable` | `unsaved` |
+|---|---|---|
+| `onPlaySample` | false | sample |
+| `/play/:id` for a bundled id (`resolvePlayRoute` / `resolveFinishRoute`) | false | sample |
+| `/play/:id` for a stored level (`getLevel`) | true | — |
+| `onPlaySavedLevel`, or Preparation with `isNew: false` | true | — |
+| Preparation with `isNew` from `onEditSample` (`fromSample`) | false | sample, so no save is offered |
+| Preparation with `isNew`, anything else: asset, job, import, unpersisted resume | false | draft (the exact `onPlay` manifest) |
+| Share-play, from the friend screen or `/share/...` | false | — (`publication` is kept; Finish shows `existingShareUrl` as a copy action) |
+
+- Replay and Race carry `unsaved` through unchanged.
+- `createRaceVariant` keeps `levelId` and never saves.
+- Race is hidden for publications.
+
+### URL restores never recreate `unsaved.draft`
+
+- A draft's `/play/<id>` or `/finish/<id>` resolves via `getLevel`. That is a real stored level (publishable) or Start, never a saveable draft.
+- `/create/prepare` restores only the user's own asset/job resume state, never an edited sample.
+- So a stale history entry can't offer Save & share again, and a bundled sample can't reach `createLevel` from Finish.
+- Preparation's explicit Save of an edited sample is unchanged and outside this scope.
+
+### Save & share matches Preparation Save exactly
+
+- It makes the same `createLevel` call and the same `clearActiveSource()`.
+- `PreparationScreen.handleSave` adds only local UI state, so nothing durable is skipped.
+- Server create and publish guards are unchanged:
+  - `POST /api/levels`: schema check, private-asset access, owner claim
+  - publish: `assertLevelPublishable`, challenge validation
+
+### Duplicate-copy risk and where it is closed
+
+`store.create` keeps a free `levelId` but **mints a new UUID if the id already exists**, so a second `createLevel` of the same draft would be a duplicate copy. Every path that could make one is closed:
+
+- **Double-click:** the Save & share `Button` is disabled while `loading`.
+- **After the save lands:** App replaces Finish with a publishable finish that has no `onSaveAndShare`.
+- **Publish failure:** retry goes through plain Share, which publishes only.
+- **Replay after saving:** publishable, no `unsaved`.
+- **Residual:** if the create succeeds on the server but its response is lost, an explicit re-click would create a second copy. The same is true of Preparation Save; it is not new.
+
+### Other checks
+
+- **Postcard hook:** switching to a publishable Finish only polls `GET /api/postcards/:id`. There is no automatic postcard write.
+- **CSS:** the card is bounded to `100dvh − 2×pad` and scrolls internally. The narrow layout is capped at 70dvh, and touch targets stay at a 44 px minimum. This is consistent with the owner's fit table, and my 1440×900 real-App frame (`10`) fits with no scroll.
+
+## Bounded real-App check (not a mirror): `tmp-final-opus-review/finish-app.mjs`
+
+### Setup
+
+- Real Chrome (`channel: "chrome"`) on a disposable Vite server at 127.0.0.1:5243. It had a private temp `cacheDir`, no watcher, no HMR and no `/api` proxy; the server is stopped and the cache deleted.
+- The harness drives the **real App's own `screen` state**: its `useState` dispatch, reached through the React fiber. It builds real draft, sample, race and published Finish screens from the real sample and race modules. So the real `onSaveAndShare`, `go()`, the history `replace` and FinishScreen run, with no course playthrough.
+- **Every write was mocked and counted:**
+  - `POST /api/levels` echoes the body with a delay
+  - `POST /api/levels/:id/publish` is scripted to fail or succeed
+  - any other write would be aborted and flagged: there were none
+  - foreign hosts blocked: none requested
+- **Console:** one error, the deliberately scripted 500.
+
+### Results
+
+| Case | Result |
+|---|---|
+| **S1: draft**, double-click plus a third click on Save & share, create 500 ms, first publish fails | **1 create, `review-draft-1`**. During the publish, *after the real App swap*, Share reads "Publishing…" and is disabled, Save & share is gone, and the URL is `replace`d to `/finish/review-draft-1`. The failure shows "Mock publish failure" and plain Share is enabled. The retry publishes the **same id**, with no second create, and ends at "Copy share link again" with the link shown. Writes: create 1, publish 2. |
+| **S2: Race run of a draft** | The create body is the **draft** (mode not `race`), not the race variant. The publish uses the saved id with a race challenge, which is existing semantics. |
+| **S3: bundled sample** | Share is disabled with `aria-describedby` → "bundled example world…". No Save & share. **0 writes**, even after a forced click. |
+| **S4: replay of a shared world** | "Copy share link again" is enabled. The clipboard gets the existing `/share/existing-share-7`. **0 writes.** |
+| **S5: leave Finish while the save is pending** (create 1500 ms, click "Play again" at 200 ms) | The replay starts (`/play/review-draft-5`, canvas). When the save lands, **App yanks the player back to Finish** and `replace`s the `/play` history entry. The publish completes (1 create, 1 publish), but the new Finish shows "Share this world" enabled with **no link**. → F-1 |
+
+**Harness note.** The harness goes through Start between scenarios, just as real runs reach Finish from Play. Without that, a direct Finish→Finish dispatch keeps FinishScreen's state. In the real App, only the intended save swap does that, and it is exactly the case S1 verifies.
+
+## Finding F-1 (non-blocking, real): the post-save navigation is not guarded against the player leaving Finish
+
+- **Location:** `src/App.tsx`, `onSaveAndShare`, the `await createLevel(draft)` followed by `go({ name: "finish", … }, { replace: true })`.
+- **Cause:** the `go` runs unconditionally after the await. Play again, Try Race mode and Create another world stay enabled while "Saving & publishing…" is shown.
+- **Effect,** if the player leaves Finish before the save response arrives:
+  1. They are pulled out of the new screen, for example mid-replay, back to Finish.
+  2. The history entry they were on is replaced.
+  3. The publication succeeds but its link is never shown.
+  4. Clicking the re-enabled Share would publish a **second publication version**. That is not a second saved copy and not a sample.
+- **Guarantees that still hold:** no data loss, no sample publication, no duplicate saved level.
+- **Likelihood:** it needs a click within the save latency, which is sub-second against the local server.
+- **Minimal fix, owner's choice; not implemented here:**
+  - either skip the `go` when App has navigated since the click (for example, compare a navigation token or the current screen before `go`, and still return the publish)
+  - or disable Finish's other actions while `savingAndSharing`
+- **Decision for the coordinator/user:** a small follow-up before the freeze, or an accepted residual.
+
+## Limits
+
+- The check is bounded and state-driven: there was no gameplay run to completion and no real save or publish. Server behaviour comes from reading the code (`store.create` id rule, publish guards).
+- An edited sample (`fromSample`) is always treated as "bundled example" at Finish, even after edits. This is conservative. The player can still save it explicitly in Preparation, then play and share it.
+- A lost create response followed by a re-click can duplicate, the same as Preparation Save.
+
+## Evidence (`nimbalyst-local/screenshots/visual-final-opus-review/`)
+
+| File | Shows |
+|---|---|
+| `10` | Real-App draft Finish at 1440×900 (fits), with the Save & share offer |
+| `11` | Publish in flight after the real swap: Share locked as "Publishing…" |
+| `12` | Publish failed: the error and an enabled plain Share (retry = publish only) |
+| `13` | Bundled sample: the reason text, no save offer |
+| `14` | F-1: back on Finish after leaving for a replay mid-save, with no link shown |
