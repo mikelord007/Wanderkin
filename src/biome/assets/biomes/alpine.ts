@@ -52,7 +52,9 @@ export const ALPINE_ART: BiomeArt = {
   // ambient, more blue sky fill in the shade, slightly longer fog for crisp
   // distance.
   lighting: { ambientKeep: 0.56, hemisphereShare: 0.55, sunElevation: [22, 40], fogScale: 1.08, contactStrength: 0.95 },
-  atmosphere: { water: "frozen", particles: "snow" },
+  // Flakes are tinted cool blue-grey: pure white ones vanish against the
+  // snowfield; these read against snow and sky alike.
+  atmosphere: { water: "frozen", particles: "snow", particleTint: "#c4d0de" },
   families: {
     conifer: {
       category: "tree", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.62, triangleBudget: 900,
