@@ -8,23 +8,25 @@
       name="description"
       content="Turn a photo of an everyday object into a tiny world you can run, climb, and jump around in."
     />
-    <meta name="theme-color" content="#1d3a2e" />
+    <meta name="theme-color" content="#120726" />
     <!-- The favicon is the mark's small optical cut: bigger holes, no stitching,
          a bigger and simpler figure. The full drawing turns to mush at 16px.
          The boot mark below is the full drawing, copied from Logo.tsx. -->
     <link rel="icon" href="/brand/wanderkin-favicon.svg" type="image/svg+xml" />
-    <!-- The display face is the first thing a visitor reads, so it is fetched
+    <!-- The interface face is the first thing a visitor reads, so it is fetched
          alongside the HTML rather than after the CSS that references it. -->
     <link
       rel="preload"
-      href="/brand/fonts/fraunces-latin-var.woff2"
+      href="/brand/fonts/outfit-latin-var.woff2"
       as="font"
       type="font/woff2"
       crossorigin
     />
     <style>
-      /* Inline so the boot screen paints before any bundled CSS/JS loads. */
-      html, body { margin: 0; padding: 0; background: #1d3a2e; }
+      /* Inline so the boot screen paints before any bundled CSS/JS loads. The
+         night ground and a dim horizon: the same planetrise the app opens on. */
+      html, body { margin: 0; padding: 0; background: #120726; }
+      body { background: radial-gradient(ellipse 96% 50% at 50% 108%, #4a2fa8 0%, #2d1870 40%, #12072600 80%), #120726; min-height: 100vh; }
       #root { min-height: 100vh; display: flex; }
       .mh-boot {
         margin: auto;
@@ -33,7 +35,7 @@
         align-items: center;
         gap: 1.25rem;
         font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-        color: #eef2ea;
+        color: #f4eeff;
       }
       /* The mark itself, inlined — a boot screen that has to fetch its own logo
          is a boot screen with a hole in it. */
@@ -43,12 +45,12 @@
         font-weight: 600;
         letter-spacing: -0.02em;
       }
-      .mh-boot p { margin: 0; font-size: 0.875rem; color: #aebdae; }
+      .mh-boot p { margin: 0; font-size: 0.875rem; color: #b6a7d8; }
       .mh-boot__bar {
         width: 120px;
         height: 3px;
         border-radius: 999px;
-        background: #345645;
+        background: #2f2159;
         overflow: hidden;
       }
       .mh-boot__bar::after {
@@ -57,7 +59,7 @@
         width: 40%;
         height: 100%;
         border-radius: 999px;
-        background: #e8a33d;
+        background: linear-gradient(90deg, #8b6cff, #e9e0ff);
         animation: mh-boot-slide 1.1s ease-in-out infinite;
       }
       @keyframes mh-boot-slide {

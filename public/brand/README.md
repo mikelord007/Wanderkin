@@ -47,5 +47,21 @@ has no runtime CDN dependency and renders identically offline.
 Licence: SIL Open Font License 1.1 — full text in `fonts/Fraunces-OFL.txt`.
 Copyright 2018 The Fraunces Project Authors, <https://github.com/undercasetype/Fraunces>.
 
-Body text intentionally stays on the system UI stack: it is already installed,
-costs nothing to load, and its neutrality lets Fraunces carry the personality.
+`fonts/outfit-latin-var.woff2`: Outfit, latin subset, variable across weight
+100–900. The interface face: display headlines, UI and body text. Fraunces is
+now used for the wordmark only. Downloaded from the Fontsource mirror of Google
+Fonts (`cdn.jsdelivr.net/fontsource/fonts/outfit:vf@latest/latin-wght-normal.woff2`)
+on 2026-09-25 and self-hosted, so there is still no runtime CDN dependency.
+
+Licence: SIL Open Font License 1.1, full text in `fonts/Outfit-OFL.txt`.
+Copyright 2021 The Outfit Project Authors, <https://github.com/Outfitio/Outfit-Fonts>.
+
+## Interface palette
+
+The app is set on a violet night with a "planetrise" glow: the mark's button
+seen as a planet, rising with violet and white light round its rim. Night
+`#120726`, dusk `#1c0f38`, veil `#271950`, lavender ink `#f4eeff`, mist
+`#b6a7d8`, violet `#8b6cff`, halo `#e9e0ff`. The mark's marigold (`#f2b24d` in
+the interface) is kept for focus rings and "you are here / next" signals only.
+On these dark grounds the header and friend landing use the mono mark, as this
+file already recommends where the pine tile would fight the backdrop.

@@ -2,12 +2,9 @@
  * Shared styles for the screens still on the original markup — the world
  * editor, preparation, photos, play and finish.
  *
- * These classes predate the component kit, and until now they carried a whole
- * second visual identity: a dark violet palette with gradient buttons, while
- * the rest of the app was light and typographic. Same product, two designs.
- * The markup is unchanged; only the paint is, and it now comes from the same
- * Mousehold tokens the kit uses, so the editor belongs to the same app as the
- * page you reached it from.
+ * These classes predate the component kit. The markup is unchanged; only the
+ * paint is, and it comes from the same planetrise tokens the kit uses, so the
+ * editor belongs to the same app as the page you reached it from.
  */
 @import "./ui/theme/tokens.css";
 
@@ -36,12 +33,12 @@
   box-sizing: border-box;
 }
 
-/* `index.html` paints the root pine so the boot screen has its ground before
-   any stylesheet arrives. Once this file loads the app owns the page, so the
-   root has to be handed back — otherwise `body` stops at the viewport height
-   and every screen taller than one screenful shows pine below the fold. */
+/* `index.html` paints the root night so the boot screen has its ground before
+   any stylesheet arrives; this keeps the same ground once the app owns the
+   page, so a screen taller than one screenful never shows a seam. */
 html {
   background: var(--oq-paper);
+  color-scheme: dark;
 }
 
 html,
@@ -56,7 +53,9 @@ body {
   color: var(--oq-ink);
   font-family: var(--oq-font-body);
   line-height: 1.6;
+  letter-spacing: .006em;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,
@@ -66,20 +65,45 @@ select {
 }
 
 /* The display face reaches these screens too, so an editor heading and a
-   landing heading are recognisably set by the same hand. */
-:is(h1, h2, h3):not([class*="oq-kit"]) {
+   landing heading are recognisably set by the same hand. Zero specificity:
+   this file loads after the component styles (main.tsx imports App first),
+   so anything stronger would flatten every screen's own heading scale. */
+:where(h1, h2, h3):where(:not([class*="oq-kit"])) {
   font-family: var(--oq-font-display);
-  font-variation-settings: var(--oq-display-variation);
-  font-weight: 600;
-  letter-spacing: -.015em;
-  line-height: 1.15;
+  font-weight: 350;
+  letter-spacing: -.025em;
+  line-height: 1.1;
   text-wrap: balance;
 }
 
 :is(button, a, input, textarea, select, summary, [tabindex]):focus-visible {
-  outline: 3px solid var(--mh-marigold);
-  outline-offset: 2px;
+  outline: 3px solid var(--wk-marigold);
+  outline-offset: 3px;
   border-radius: var(--oq-round-sm);
+}
+
+a {
+  color: var(--oq-accent-ink);
+  text-underline-offset: 4px;
+}
+
+/* Working screens stand on a dim horizon: the same planet as the landing, at
+   a third of the light, fixed to the viewport so long pages keep it in view.
+   A pseudo-element, so it is painted once and never repainted on scroll.
+   `isolation` keeps it above the wrapper's own night fill. */
+.oq-creation,
+.oq-screen:not(.oq-screen--full-bleed) {
+  isolation: isolate;
+}
+
+.oq-creation::before,
+.oq-screen:not(.oq-screen--full-bleed)::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--wk-ambient);
 }
 
 .oq-visually-hidden {
@@ -128,12 +152,15 @@ select {
 
 .oq-screen__header h1 {
   margin: 0;
-  font-size: clamp(1.75rem, 1.4rem + 1.4vw, 2.5rem);
+  font-size: clamp(2rem, 1.5rem + 2vw, 3rem);
+  font-weight: 300;
+  letter-spacing: -.03em;
+  line-height: 1.02;
   max-inline-size: 20ch;
 }
 
 .oq-screen__header--hero h1 {
-  font-size: clamp(2.25rem, 1.7rem + 2.2vw, 3.25rem);
+  font-size: clamp(2.4rem, 1.6rem + 3.2vw, 3.8rem);
 }
 
 .oq-subtitle {
@@ -146,7 +173,7 @@ select {
 
 .oq-panel {
   background: var(--oq-surface);
-  border: 1px solid var(--oq-line);
+  border: 1px solid var(--wk-rim);
   border-radius: var(--oq-round-lg);
   box-shadow: var(--oq-elevation);
   padding: var(--oq-space-5);
@@ -164,7 +191,8 @@ select {
 
 .oq-panel h2 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.375rem;
+  font-weight: 400;
 }
 
 .oq-card-grid {
@@ -175,7 +203,8 @@ select {
 
 .oq-level-card {
   background: var(--oq-surface);
-  border: 1px solid var(--oq-line);
+  border: 1px solid var(--wk-rim);
+  box-shadow: var(--wk-highlight);
   border-radius: var(--oq-round-md);
   padding: var(--oq-space-5);
   display: flex;
@@ -186,6 +215,7 @@ select {
 .oq-level-card h3 {
   margin: 0;
   font-size: 1.125rem;
+  font-weight: 500;
 }
 
 .oq-level-card__meta {
@@ -212,11 +242,14 @@ select {
   border: 1px solid transparent;
   padding: 10px 20px;
   font-size: .9375rem;
-  font-weight: 650;
+  font-weight: 500;
+  color: var(--oq-ink);
+  background: transparent;
   line-height: 1.4;
   cursor: pointer;
   transition: background var(--oq-duration) var(--oq-ease),
               border-color var(--oq-duration) var(--oq-ease),
+              box-shadow var(--oq-duration) var(--oq-ease),
               transform var(--oq-duration) var(--oq-ease);
 }
 
@@ -230,18 +263,22 @@ select {
 }
 
 .oq-button--primary {
-  background: var(--oq-action);
+  background: var(--oq-action-fill);
+  border-color: color-mix(in srgb, var(--oq-action) 62%, transparent);
   color: var(--oq-on-action);
+  box-shadow: inset 0 1px 0 #ffffff24, 0 8px 28px -10px color-mix(in srgb, var(--oq-action) 70%, transparent);
 }
 
 .oq-button--primary:not(:disabled):hover {
-  background: var(--oq-action-hover);
+  background: var(--oq-action-fill-hover);
+  border-color: var(--oq-action);
 }
 
 .oq-button--secondary {
-  background: var(--oq-surface);
-  border-color: var(--oq-control-line);
+  background: #1a0d33b8;
+  border-color: #c9b8ff57;
   color: var(--oq-ink);
+  box-shadow: var(--wk-highlight);
 }
 
 .oq-button--ghost {
@@ -250,12 +287,13 @@ select {
 }
 
 .oq-button--secondary:not(:disabled):hover {
-  background: var(--oq-wash);
-  border-color: var(--oq-action);
+  background: #2a1a52d9;
+  border-color: #d9ccffa6;
 }
 
 .oq-button--ghost:not(:disabled):hover {
-  background: var(--oq-wash);
+  background: #ffffff0f;
+  color: var(--oq-ink);
 }
 
 .oq-button--large {
@@ -327,8 +365,8 @@ select {
   position: absolute;
   top: 6px;
   left: 6px;
-  background: #16241fd9;
-  color: #eef2ea;
+  background: #120726d9;
+  color: #f4eeff;
   border-radius: 999px;
   width: 22px;
   height: 22px;
@@ -344,7 +382,7 @@ select {
   bottom: 6px;
   right: 6px;
   background: var(--oq-action);
-  color: var(--oq-on-action);
+  color: #1a0d33;
   border-radius: 999px;
   padding: 2px 9px;
   font-size: .75rem;
@@ -365,7 +403,7 @@ select {
 .oq-lightbox {
   position: fixed;
   inset: 0;
-  background: #101d17f2;
+  background: radial-gradient(ellipse 90% 45% at 50% 112%, #3a1f9a73, transparent 70%), #0a0418f2;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -390,7 +428,7 @@ select {
 }
 
 .oq-lightbox__figure figcaption {
-  color: #c4d2c4;
+  color: var(--wk-mist);
   font-size: .9rem;
 }
 
@@ -400,7 +438,8 @@ select {
   right: var(--oq-space-5);
   background: transparent;
   border: none;
-  color: #eef2ea;
+  border-radius: 50%;
+  color: #f4eeff;
   font-size: 1.5rem;
   min-width: 44px;
   min-height: 44px;
@@ -408,9 +447,9 @@ select {
 }
 
 .oq-lightbox__nav {
-  background: #ffffff1f;
-  border: none;
-  color: #eef2ea;
+  background: #ffffff14;
+  border: 1px solid #c9b8ff40;
+  color: #f4eeff;
   font-size: 2.25rem;
   line-height: 1;
   width: 3rem;
@@ -452,7 +491,7 @@ select {
 }
 
 .oq-capability-card:hover {
-  background: var(--oq-wash);
+  background: #221443;
 }
 
 .oq-capability-card--selected {
@@ -462,7 +501,7 @@ select {
 }
 
 .oq-capability-card__title {
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .oq-capability-card__meta,
@@ -493,7 +532,7 @@ select {
 .oq-slot-row select {
   flex: 1;
   min-height: 40px;
-  background: var(--oq-surface);
+  background: var(--oq-inset);
   color: var(--oq-ink);
   border: 1px solid var(--oq-control-line);
   border-radius: var(--oq-round-sm);
@@ -517,21 +556,21 @@ select {
 }
 
 .oq-loading__spinner-dot {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
-  background: var(--oq-action);
+  background: var(--wk-violet);
   animation: oq-bounce .9s ease-in-out infinite;
 }
 
 .oq-loading__spinner-dot:nth-child(2) {
   animation-delay: .15s;
-  background: var(--mh-fern);
+  background: #b79cff;
 }
 
 .oq-loading__spinner-dot:nth-child(3) {
   animation-delay: .3s;
-  background: var(--mh-marigold);
+  background: var(--wk-halo);
 }
 
 @keyframes oq-bounce {
@@ -540,7 +579,8 @@ select {
 }
 
 .oq-loading__stage {
-  font-weight: 650;
+  font-weight: 400;
+  font-size: 1.125rem;
   margin: 0;
 }
 
@@ -552,7 +592,7 @@ select {
 
 .oq-progressbar {
   width: min(320px, 100%);
-  height: 8px;
+  height: 6px;
   border-radius: 999px;
   background: var(--oq-inset);
   overflow: hidden;
@@ -560,7 +600,8 @@ select {
 
 .oq-progressbar__fill {
   height: 100%;
-  background: var(--oq-action);
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--wk-violet), var(--wk-halo));
   transition: width .3s ease;
 }
 
@@ -578,7 +619,7 @@ select {
 
 .oq-job-facts dd {
   margin: 2px 0 0;
-  font-weight: 650;
+  font-weight: 500;
 }
 
 .oq-error-text {
@@ -602,7 +643,7 @@ select {
 
 .oq-finish-card {
   background: var(--oq-surface);
-  border: 1px solid var(--oq-line);
+  border: 1px solid var(--wk-rim);
   border-radius: var(--oq-round-xl);
   box-shadow: var(--oq-elevation-lift);
   padding: clamp(28px, 5vw, 48px);
@@ -620,7 +661,7 @@ select {
   border-radius: 999px;
   padding: 5px 14px;
   font-size: .8125rem;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .oq-finish-card h1 {
