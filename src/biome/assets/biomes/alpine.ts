@@ -11,13 +11,15 @@
 import { post, signpost } from "../builders/dry.js";
 import { bush, flowers, tuft } from "../builders/foliage.js";
 import { defaultRockVariants } from "../builders/rocks.js";
-import { conifer, defaultConiferVariants, lyingLog } from "../builders/trees.js";
+import { lyingLog } from "../builders/trees.js";
+import { alpineConiferVariants, youngConiferVariants } from "../alpine/conifer.js";
 import { type SnowCapOptions, withSnowCap } from "../meshKit.js";
 import type { BiomeArt, BiomeTones, VariantBuilder } from "../types.js";
 
 const tones = {
-  foliage: { dark: "#1d4538", base: "#2c604d", light: "#4c8468" },
-  foliageAlt: { dark: "#264c3d", base: "#386a54", light: "#669676" },
+  // Needles: deep blue-green, dark enough to hold a silhouette against snow.
+  foliage: { dark: "#16372f", base: "#224c40", light: "#3a6e5b" },
+  foliageAlt: { dark: "#1c3d36", base: "#2b574b", light: "#4b7d69" },
   trunk: { dark: "#4a3526", base: "#6b4d36", light: "#916f50" },
   rock: { dark: "#5d646e", base: "#808792", light: "#a8aeb7" },
   soil: { dark: "#8e979f", base: "#aeb7bf", light: "#cdd5dc" },
@@ -27,6 +29,10 @@ const tones = {
   stoneTop: { dark: "#a9b7c4", base: "#c4d0db", light: "#d6e0e9" },
   stoneSide: { dark: "#5b626c", base: "#7a818c", light: "#a0a7b1" },
   stoneRecess: { dark: "#3b4047", base: "#474c54", light: "#555b63" },
+  // Snow pads on trees and rocks: shaded blue snow → lit snow.
+  snow: { dark: "#a7bacb", base: "#c6d4e0", light: "#d5e1eb" },
+  // Conifer bark: dark, warm red-brown.
+  bark: { dark: "#3b2a22", base: "#5a4032", light: "#7d5c47" },
 } satisfies BiomeTones;
 
 /** Fresh snow on upward faces; heavier toward the top of each asset. */
@@ -45,20 +51,14 @@ export const ALPINE_ART: BiomeArt = {
   atmosphere: { water: "frozen", particles: "snow" },
   families: {
     conifer: {
-      category: "tree", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.62, triangleBudget: 600,
+      category: "tree", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.62, triangleBudget: 900,
       leanMax: 0.03, mirror: true, embed: [0.01, 0.03],
-      variants: [
-        ...snowy(defaultConiferVariants().slice(0, 3)),
-        ...defaultConiferVariants().slice(3),
-      ],
+      variants: alpineConiferVariants(),
     },
     "young-conifer": {
-      category: "tree", role: "supporting", shading: "faceted", castShadow: true, unitRadius: 0.62, triangleBudget: 400,
+      category: "tree", role: "supporting", shading: "faceted", castShadow: true, unitRadius: 0.62, triangleBudget: 500,
       mirror: true, embed: [0.01, 0.03],
-      variants: snowy([
-        conifer({ tiers: 3, width: 0.4, droop: 0.3, trunk: 0.12, seed: 11, points: 7 }),
-        conifer({ tiers: 4, width: 0.34, droop: 0.26, trunk: 0.1, seed: 12, points: 8 }),
-      ], LIGHT_SNOW),
+      variants: youngConiferVariants(),
     },
     juniper: {
       category: "bush", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.8, triangleBudget: 900,
