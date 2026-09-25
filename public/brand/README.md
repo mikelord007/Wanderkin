@@ -11,9 +11,9 @@ makes you.
 
 ## Mark
 
-Planetrise over a sewing button. The four-hole button is a dark planet seen the
-way the whole interface sees its worlds: rising with white and violet light round
-its upper rim. Its holes glow, its stitching is marigold thread, and the tiny
+Planetrise over a sewing button. The four-hole button is a pale lavender planet
+rising on the product's purple, with a bright white rim and a violet halo round
+its upper edge. Its holes glow, its stitching is marigold thread, and the tiny
 explorer (the in-game teal beanie and marigold suit, arm up) stands on the lit
 rim. An everyday object becomes a world, and you are small on it.
 
@@ -22,7 +22,7 @@ so the drawing is identical inline, in an `<img>`, as a favicon and in these
 files. All three files are generated from `src/ui/components/Logo.tsx`, and
 `src/ui/components/Logo.test.ts` fails if they drift from it:
 
-- `wanderkin-mark.svg`: the full drawing on the night tile. Use from 24 px up.
+- `wanderkin-mark.svg`: the full drawing on the purple tile. Use from 24 px up.
 - `wanderkin-favicon.svg`: the small optical cut, for 16–23 px. A thicker rim,
   bigger holes, no stitching or waving arm, and a larger, simpler figure.
   `index.html` uses it as the favicon. `<LogoMark>` switches to it
@@ -32,12 +32,12 @@ files. All three files are generated from `src/ui/components/Logo.tsx`, and
   single ink is needed. A gap between beanie and face keeps the figure from
   reading as a bear.
 
-Colours: night `#120726`, planet `#1c0f38`, violet `#8b6cff`, rim `#f4eeff`,
-holes `#b79cff`, marigold `#f2b24d`, beanie `#3f9f92` / `#2b7a70`. On the dark
-interface the night tile disappears and the planet rises straight out of the
-page; on light grounds the tile carries its own night, or use mono in night
-ink. Clear space: a quarter of the mark's width on every side. Minimum size:
-16 px.
+Colours: tile purple `#6a4af6`, planet `#e4d9fd`, halo `#a58cff`, rim `#ffffff`,
+holes `#7b5cfa`, thread `#e39a2b`, marigold suit `#f2b24d`, beanie `#3f9f92` /
+`#2b7a70`. The purple tile is the product's accent, so the mark reads on the
+light page and on the dark cinematic moments alike; mono takes the ground's ink
+(plum on light, lavender white on dark). Clear space: a quarter of the mark's
+width on every side. Minimum size: 16 px.
 
 ## Wordmark
 
@@ -68,9 +68,11 @@ Copyright 2021 The Outfit Project Authors, <https://github.com/Outfitio/Outfit-F
 
 ## Interface palette
 
-The app is set on a violet night with a "planetrise" glow: the mark's button
-seen as a planet, rising with violet and white light round its rim. Night
-`#120726`, dusk `#1c0f38`, veil `#271950`, lavender ink `#f4eeff`, mist
-`#b6a7d8`, violet `#8b6cff`, halo `#e9e0ff`. The marigold (`#f2b24d` in
-the interface) is kept for focus rings and "you are here / next" signals only.
-The header, boot screen and friend landing use the full mark, whose night tile merges into the page.
+The app is a light product with cinematic purple moments (direction v3): page
+`#faf7ff`, tint `#f2ebff`, white surfaces, border `#e7ddfc`, plum text `#24143d` /
+`#5a4c74` / `#6e6088`, brand purple `#7b5cfa` (labels and fills `#6a4af6`), warm
+`#f2c46d`. The hero's planetrise is a pale world rising with purple rim light. A
+dark set (night `#120726`) remains for rare cinematic moments. The marigold (`#f2b24d`) is kept for the explorer, the
+tittle and "you are here / next" signals; focus rings are purple on light and
+marigold only inside dark moments.
+The header, boot screen and friend landing use the full mark on its purple tile.

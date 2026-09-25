@@ -91,11 +91,11 @@ function BrandSection() {
         <img src="/brand/wanderkin-favicon.svg" width={16} height={16} alt={`${BRAND_NAME} favicon, 16px`} />
       </div><figcaption>Small cut below 24px, and the favicon file at 32 and 16px.</figcaption></figure>
       <figure className="oq-kit-brand__plate"><div className="oq-kit-brand__row">{[48, 24, 16].map(size => <LogoMark key={size} size={size} tone="mono" title={`${BRAND_NAME} mono mark, ${size}px`} />)}</div>
-        <figcaption>Mono, one colour, on night.</figcaption></figure>
+        <figcaption>Mono, one colour, in plum.</figcaption></figure>
       <figure className="oq-kit-brand__plate oq-kit-brand__plate--light"><div className="oq-kit-brand__row">
         <Logo size={36} tone="mono" />
-        <LogoMark size={36} title={`${BRAND_NAME} mark on a light ground`} />
-      </div><figcaption>On the lightest surface (halo): mono lockup in night ink; the full mark carries its own night tile.</figcaption></figure>
+        <LogoMark size={36} title={`${BRAND_NAME} mark on a dark ground`} />
+      </div><figcaption>On the cinematic night: mono lockup in lavender white; the full mark on its purple tile.</figcaption></figure>
     </div>
   </section>;
 }

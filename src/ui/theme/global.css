@@ -85,17 +85,17 @@
   background: var(--oq-surface); box-shadow: var(--wk-highlight);
   color: var(--oq-ink); font-size: .8125rem; font-weight: 500; line-height: 1.2; letter-spacing: .014em;
 }
-/* The avatar: a dark planet with its lit rim, and the explorer as a marigold
-   dot on top. Drawn in CSS so every existing eyebrow gets one. */
+/* The avatar: the mark in miniature. A pale planet with its white rim rising
+   on the purple, and the explorer as a marigold dot on top. Drawn in CSS so
+   every existing eyebrow gets one. */
 .oq-kit-eyebrow::before, .wk-chip::before {
   content: ""; flex: none; width: 22px; height: 22px; border-radius: 50%;
   background:
     radial-gradient(circle at 50% 24%, var(--wk-marigold) 0 2px, transparent 2.5px),
-    radial-gradient(circle at 50% 78%, var(--wk-dusk) 0 7.5px, transparent 8px),
-    radial-gradient(circle at 50% 70%, var(--wk-ink) 0 8px, transparent 8.5px),
-    radial-gradient(circle at 50% 68%, var(--wk-violet) 0 9px, transparent 9.5px),
-    var(--wk-night);
-  box-shadow: inset 0 0 0 1px #ffffff1a;
+    radial-gradient(circle at 50% 78%, #e4d9fd 0 7.5px, transparent 8px),
+    radial-gradient(circle at 50% 70%, #ffffff 0 8px, transparent 8.5px),
+    radial-gradient(circle at 50% 68%, #a58cff 0 9px, transparent 9.5px),
+    var(--wk-purple-ink);
 }
 
 /* The Wanderkin lockup. Everything is in em so the wordmark and its button

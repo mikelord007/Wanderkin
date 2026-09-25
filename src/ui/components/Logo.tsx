@@ -4,8 +4,8 @@ import { BRAND_NAME } from "../../brand.js";
 /**
  * The Wanderkin mark: planetrise over a sewing button.
  *
- * The button is a planet, seen the way the whole interface sees its worlds: a
- * dark disc rising with white and violet light round its upper rim. Its four
+ * The button is a planet rising on the product's purple: a pale lavender
+ * disc with a bright white rim and a violet halo round its upper edge. Its four
  * holes glow, its stitching is marigold thread, and the tiny explorer (the
  * in-game teal beanie and marigold suit, arm up as if they've just spotted
  * something) stands on the lit rim. One picture of the product: an everyday
@@ -16,7 +16,7 @@ import { BRAND_NAME } from "../../brand.js";
  * in the static copies.
  *
  * Three drawings share one set of coordinates:
- * - `full`: the night tile, the lit rim in three steps, stitching, and the
+ * - `full`: the purple tile, the lit rim in three steps, stitching, and the
  *   waving figure. From 24px up.
  * - The small optical cut, used automatically below 24px: a thicker rim,
  *   bigger holes, no stitching or arm, a larger and simpler figure. At 16px the
@@ -34,15 +34,18 @@ export type LogoTone = "full" | "mono";
 /** Below this rendered size the mark switches to the small optical cut. */
 export const LOGO_SMALL_BELOW = 24;
 
-/** Brand colours as drawn by the mark. They match the `--wk-*` tokens. */
+/** Brand colours as drawn by the mark. They match the `--wk-*` tokens: the
+ * light product's purple as the tile, and the planet in the page's lavender
+ * white, rising with its white rim. */
 export const MARK_COLORS = {
-  night: "#120726",
-  planet: "#1c0f38",
-  violet: "#8b6cff",
-  rim: "#f4eeff",
-  hole: "#b79cff",
+  night: "#6a4af6",
+  planet: "#e4d9fd",
+  violet: "#a58cff",
+  rim: "#ffffff",
+  hole: "#7b5cfa",
   marigold: "#f2b24d",
-  face: "#f4eeff",
+  thread: "#e39a2b",
+  face: "#ffffff",
   beanie: "#3f9f92",
   beanieBand: "#2b7a70",
 } as const;
@@ -125,7 +128,7 @@ function FullMark() {
       <circle cx={p.cx} cy={p.cy} r={p.r} fill={MARK_COLORS.planet} />
       <path
         d={`M${tl[0]} ${tl[1]} ${br[0]} ${br[1]}M${tr[0]} ${tr[1]} ${bl[0]} ${bl[1]}`}
-        stroke={MARK_COLORS.marigold}
+        stroke={MARK_COLORS.thread}
         strokeWidth="1.3"
         strokeLinecap="round"
       />

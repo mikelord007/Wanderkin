@@ -368,10 +368,10 @@
   border-radius: 50%;
   background:
     radial-gradient(circle at 50% 24%, var(--hud-marigold) 0 3px, transparent 3.5px),
-    radial-gradient(circle at 50% 78%, #1c0f38 0 12px, transparent 12.5px),
-    radial-gradient(circle at 50% 70%, #f4eeff 0 13px, transparent 13.5px),
-    radial-gradient(circle at 50% 68%, #8b6cff 0 14.5px, transparent 15px),
-    #120726;
+    radial-gradient(circle at 50% 78%, #e4d9fd 0 12px, transparent 12.5px),
+    radial-gradient(circle at 50% 70%, #ffffff 0 13px, transparent 13.5px),
+    radial-gradient(circle at 50% 68%, #a58cff 0 14.5px, transparent 15px),
+    #6a4af6;
 }
 
 .oq-hud__intro strong {

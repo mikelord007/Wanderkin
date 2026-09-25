@@ -8,7 +8,7 @@
       name="description"
       content="Turn a photo of an everyday object into a tiny world you can run, climb, and jump around in."
     />
-    <meta name="theme-color" content="#120726" />
+    <meta name="theme-color" content="#faf7ff" />
     <!-- The favicon is the mark's small optical cut: a thicker lit rim, bigger
          holes, no stitching or arm, and a bigger, simpler figure. The full
          drawing turns to mush at 16px.
@@ -25,9 +25,9 @@
     />
     <style>
       /* Inline so the boot screen paints before any bundled CSS/JS loads. The
-         night ground and a dim horizon: the same planetrise the app opens on. */
-      html, body { margin: 0; padding: 0; background: #120726; }
-      body { background: radial-gradient(ellipse 96% 50% at 50% 108%, #4a2fa8 0%, #2d1870 40%, #12072600 80%), #120726; min-height: 100vh; }
+         pale page and a soft purple horizon: the same planetrise the app opens on. */
+      html, body { margin: 0; padding: 0; background: #faf7ff; }
+      body { background: radial-gradient(ellipse 96% 44% at 50% 108%, #7b5cfa40 0%, #c9b8fd33 40%, #faf7ff00 76%), #faf7ff; min-height: 100vh; }
       #root { min-height: 100vh; display: flex; }
       .mh-boot {
         margin: auto;
@@ -36,7 +36,7 @@
         align-items: center;
         gap: 1.25rem;
         font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-        color: #f4eeff;
+        color: #24143d;
       }
       /* The mark itself, inlined — a boot screen that has to fetch its own logo
          is a boot screen with a hole in it. */
@@ -47,12 +47,12 @@
         font-weight: 500;
         letter-spacing: -0.02em;
       }
-      .mh-boot p { margin: 0; font-size: 0.875rem; color: #b6a7d8; }
+      .mh-boot p { margin: 0; font-size: 0.875rem; color: #5a4c74; }
       .mh-boot__bar {
         width: 120px;
         height: 3px;
         border-radius: 999px;
-        background: #2f2159;
+        background: #e7ddfc;
         overflow: hidden;
       }
       .mh-boot__bar::after {
@@ -61,7 +61,7 @@
         width: 40%;
         height: 100%;
         border-radius: 999px;
-        background: linear-gradient(90deg, #8b6cff, #e9e0ff);
+        background: linear-gradient(90deg, #6a4af6, #a58cff);
         animation: mh-boot-slide 1.1s ease-in-out infinite;
       }
       @keyframes mh-boot-slide {
@@ -76,7 +76,7 @@
   <body>
     <div id="root">
       <div class="mh-boot" role="status" aria-live="polite">
-        <svg class="mh-boot__mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="0" y="0" width="48" height="48" rx="12" fill="#120726"></rect><circle cx="24" cy="31.6" r="16.2" fill="#8b6cff" fill-opacity=".28"></circle><circle cx="24" cy="31.2" r="14.9" fill="#8b6cff"></circle><circle cx="24" cy="31.6" r="14" fill="#f4eeff"></circle><circle cx="24" cy="33.5" r="13.5" fill="#1c0f38"></circle><path d="M20.6 30.4 27.4 37.2M27.4 30.4 20.6 37.2" stroke="#f2b24d" stroke-width="1.3" stroke-linecap="round"></path><circle cx="20.6" cy="30.4" r="1.8" fill="#b79cff"></circle><circle cx="27.4" cy="30.4" r="1.8" fill="#b79cff"></circle><circle cx="20.6" cy="37.2" r="1.8" fill="#b79cff"></circle><circle cx="27.4" cy="37.2" r="1.8" fill="#b79cff"></circle><g transform="translate(24 17.8) scale(.9)"><path d="M-2.2-3.6h1.8v2.7a.9.9 0 0 1-1.8 0ZM.4-3.6h1.8v2.7a.9.9 0 0 1-1.8 0Z" fill="#f2b24d"></path><rect x="-2.6" y="-8.6" width="5.2" height="5.8" rx="2.2" fill="#f2b24d"></rect><path d="M1.8-7.4 4.4-10.6" stroke="#f2b24d" stroke-width="1.6" stroke-linecap="round"></path><circle cx="0" cy="-11.1" r="2.6" fill="#f4eeff"></circle><path d="M-2.8-11.2a2.8 2.8 0 0 1 5.6 0Z" fill="#3f9f92"></path><rect x="-3" y="-11.7" width="6" height="1.2" rx="0.6" fill="#2b7a70"></rect><circle cx="0" cy="-14.2" r="0.9" fill="#3f9f92"></circle></g></svg>
+        <svg class="mh-boot__mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="0" y="0" width="48" height="48" rx="12" fill="#6a4af6"></rect><circle cx="24" cy="31.6" r="16.2" fill="#a58cff" fill-opacity=".28"></circle><circle cx="24" cy="31.2" r="14.9" fill="#a58cff"></circle><circle cx="24" cy="31.6" r="14" fill="#ffffff"></circle><circle cx="24" cy="33.5" r="13.5" fill="#e4d9fd"></circle><path d="M20.6 30.4 27.4 37.2M27.4 30.4 20.6 37.2" stroke="#e39a2b" stroke-width="1.3" stroke-linecap="round"></path><circle cx="20.6" cy="30.4" r="1.8" fill="#7b5cfa"></circle><circle cx="27.4" cy="30.4" r="1.8" fill="#7b5cfa"></circle><circle cx="20.6" cy="37.2" r="1.8" fill="#7b5cfa"></circle><circle cx="27.4" cy="37.2" r="1.8" fill="#7b5cfa"></circle><g transform="translate(24 17.8) scale(.9)"><path d="M-2.2-3.6h1.8v2.7a.9.9 0 0 1-1.8 0ZM.4-3.6h1.8v2.7a.9.9 0 0 1-1.8 0Z" fill="#f2b24d"></path><rect x="-2.6" y="-8.6" width="5.2" height="5.8" rx="2.2" fill="#f2b24d"></rect><path d="M1.8-7.4 4.4-10.6" stroke="#f2b24d" stroke-width="1.6" stroke-linecap="round"></path><circle cx="0" cy="-11.1" r="2.6" fill="#ffffff"></circle><path d="M-2.8-11.2a2.8 2.8 0 0 1 5.6 0Z" fill="#3f9f92"></path><rect x="-3" y="-11.7" width="6" height="1.2" rx="0.6" fill="#2b7a70"></rect><circle cx="0" cy="-14.2" r="0.9" fill="#3f9f92"></circle></g></svg>
         <div class="mh-boot__word">Wanderkin</div>
         <div class="mh-boot__bar" aria-hidden="true"></div>
         <p>Opening the little world…</p>
