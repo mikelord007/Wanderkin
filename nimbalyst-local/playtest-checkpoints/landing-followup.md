@@ -103,10 +103,11 @@ Unit tests: `npx vitest run src/ui/routing.test.ts src/ui/creationStorage.test.t
   with `installCreationMock`'s mocked `/api/**` routes, no real provider or persisted-world traffic.
 
 ## Commit
-Pending — will commit via `mcp__nimbalyst__developer_git_commit_proposal` (not CLI), scoped to exactly:
-`src/App.tsx`, `tests/e2e/browser/landing-resume.test.ts`,
+`ca187e56641ddaad7df2473e003007b172068693` — committed via `mcp__nimbalyst__developer_git_commit_proposal`
+(not CLI), scoped to exactly: `src/App.tsx`, `tests/e2e/browser/landing-resume.test.ts`,
 `nimbalyst-local/playtest-checkpoints/landing-followup.md`. No other file in the working tree touched or
-staged (sibling workers' untracked artifacts left exactly as found).
+staged (sibling workers' untracked artifacts left exactly as found). `git status` after the commit shows no
+other uncommitted changes in any path this worker owns.
 
 ## Remaining issues
 - The pre-existing B5 / creation-walkthrough Customize-screen failure above is unrelated and unfixed —
