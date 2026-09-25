@@ -10,7 +10,7 @@
 import { post, scrub, signpost } from "../builders/dry.js";
 import { tuft } from "../builders/foliage.js";
 import { agave, barrel, echeveria, organPipe, pricklyPear, saguaro } from "../desert/cacti.js";
-import { defaultRockVariants, rock, ROCK_SHAPES } from "../builders/rocks.js";
+import { desertRocks } from "../desert/rocks.js";
 import { lyingLog } from "../builders/trees.js";
 import type { BiomeArt, BiomeTones } from "../types.js";
 
@@ -30,8 +30,7 @@ const tones = {
   fruit: { dark: "#8a3050", base: "#bd4b6d", light: "#dd7b98" },
 } satisfies BiomeTones;
 
-const rocks = defaultRockVariants("rock");
-const S = ROCK_SHAPES;
+const rocks = desertRocks();
 
 export const DESERT_ART: BiomeArt = {
   id: "desert",
@@ -62,28 +61,18 @@ export const DESERT_ART: BiomeArt = {
     },
     "rock-large": {
       category: "rock", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.9, triangleBudget: 400,
-      mirror: true, embed: [0.02, 0.05], alignToNormal: 0.6,
-      variants: [
-        ...rocks.large,
-        rock(S.slab, {
-          layers: [
-            { shape: { ...S.slab, seed: 81, scale: [0.8, 0.55, 0.68] }, y: 0, shift: [0, 0] },
-            { shape: { ...S.slab, seed: 83, scale: [0.7, 0.5, 0.58] }, y: 0.36, shift: [-0.06, 0.05] },
-            { shape: { ...S.slab, seed: 85, scale: [0.55, 0.45, 0.48] }, y: 0.68, shift: [0.05, -0.03] },
-          ],
-          companions: [[S.chip, 0.62, 0.3, 0.26]],
-        }),
-      ],
+      mirror: true, embed: [0.02, 0.05], alignToNormal: 0.4,
+      variants: rocks.hero,
     },
     "rock-medium": {
       category: "rock", role: "supporting", shading: "faceted", castShadow: true, unitRadius: 0.5, triangleBudget: 300,
-      mirror: true, embed: [0.03, 0.08], alignToNormal: 0.7,
-      variants: [...rocks.medium, ...rocks.layered],
+      mirror: true, embed: [0.03, 0.08], alignToNormal: 0.6,
+      variants: rocks.supporting,
     },
     pebble: {
       category: "rock", role: "micro", shading: "faceted", castShadow: false, unitRadius: 0.5, triangleBudget: 60,
       mirror: true, embed: [0.05, 0.15], alignToNormal: 1,
-      variants: rocks.small,
+      variants: rocks.dressing,
     },
     scrub: {
       category: "bush", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.68, triangleBudget: 900,
@@ -201,12 +190,13 @@ export const DESERT_ART: BiomeArt = {
     ],
   },
   wall: {
-    strata: [3, 5],
-    stepping: 0.8,
-    rounding: 0.6,
+    // Sandstone: many thin strata with strong light/dark banding.
+    strata: [4, 6],
+    stepping: 0.85,
+    rounding: 0.65,
     notches: [1, 2],
     top: { dark: "#d2a874", base: "#e6c28e", light: "#f3dbb0" },
-    side: { dark: "#a5613c", base: "#c78652", light: "#e2aa72" },
+    side: { dark: "#9a5332", base: "#c47f4c", light: "#ecb47c" },
     recess: "#7a452c",
     rim: "#f6e1bb",
   },
