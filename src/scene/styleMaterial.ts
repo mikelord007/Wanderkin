@@ -232,8 +232,13 @@ function installStyleShader(
   const previousCompile = material.onBeforeCompile;
   // Chosen at compile time: a helper switched to luminance banding (themed
   // looks) compiles its own program; Original keeps exactly the old one.
+  // Themed helpers band their base colour BEFORE lighting (see
+  // CARTOON_HELPER_ALBEDO_LUMA_BANDS), so nothing is posterised here.
+  const helperAlbedoBands = () => style.id === "cartoon" && !importedAsset && state.helperLumaBands;
   const styleFragment = () => style.id === "cartoon"
-    ? importedAsset || state.helperLumaBands
+    ? helperAlbedoBands()
+      ? ""
+      : importedAsset
       ? CARTOON_ASSET_LUMA_BANDS
       : `
       if (oqColorSteps > 1.0) {
@@ -316,6 +321,14 @@ function installStyleShader(
         : ""}`,
     );
 
+    if (helperAlbedoBands()) {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <color_fragment>",
+        `#include <color_fragment>
+        ${CARTOON_HELPER_ALBEDO_LUMA_BANDS}`,
+      );
+    }
+
     if (wasRelit) {
       shader.fragmentShader = shader.fragmentShader.replace(
         "#include <map_fragment>",
@@ -388,6 +401,24 @@ const CARTOON_ASSET_LUMA_BANDS = /* glsl */ `
         vec3 oqHueKept = clamp(oqColor * (oqBand / max(oqBandLuma, 1e-4)), 0.0, 1.0);
         oqColor = mix(vec3(oqBand), oqHueKept, smoothstep(0.0, 0.04, oqBandLuma));
       }`;
+
+/**
+ * Themed biome helpers (floors, structures): band the BASE colour by
+ * luminance, hue kept, in display space, before any lighting. Banding the
+ * lit colour instead (as the scan does) turns every smooth lighting gradient
+ * on a flat, untextured floor into hard concentric rings: a checkpoint's
+ * point-light glow, shadow penumbrae, hemisphere falloff. Here the flat
+ * tinted floor still steps like Cartoon, and light and shadow stay smooth.
+ */
+const CARTOON_HELPER_ALBEDO_LUMA_BANDS = /* glsl */ `
+        if (oqColorSteps > 1.0) {
+          vec3 oqAlbedo = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.0 / 2.2));
+          float oqBandLuma = dot(oqAlbedo, vec3(0.2126, 0.7152, 0.0722));
+          float oqBand = max(floor(oqBandLuma * oqColorSteps + 0.5) / oqColorSteps, 0.5 / oqColorSteps);
+          vec3 oqHueKept = clamp(oqAlbedo * (oqBand / max(oqBandLuma, 1e-4)), 0.0, 1.0);
+          oqAlbedo = mix(vec3(oqBand), oqHueKept, smoothstep(0.0, 0.04, oqBandLuma));
+          diffuseColor.rgb = pow(oqAlbedo, vec3(2.2));
+        }`;
 
 /** CPU mirror of {@link CARTOON_ASSET_LUMA_BANDS}, for tests. Input and output are display-space RGB in [0, 1]. */
 export function cartoonAssetBandColor(

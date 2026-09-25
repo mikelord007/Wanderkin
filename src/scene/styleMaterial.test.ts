@@ -429,8 +429,18 @@ describe("scene style materials", () => {
       for (const floor of [true, false]) {
         const material = createStyledHelperMaterial("#94704e", STYLE_DEFINITIONS.cartoon, 1, { floor });
         const originalKey = material.customProgramCacheKey();
+        // The helper stub needs color_fragment: themed helpers band their base colour there.
         const compile = () => {
-          const shader = stub();
+          const shader = {
+            ...stub(),
+            fragmentShader: [
+              "#include <map_fragment>",
+              "#include <color_fragment>",
+              "#include <roughnessmap_fragment>",
+              "#include <normal_fragment_maps>",
+              "#include <dithering_fragment>",
+            ].join("\n"),
+          };
           material.onBeforeCompile(shader as never, {} as never);
           return shader.fragmentShader;
         };
@@ -440,6 +450,12 @@ describe("scene style materials", () => {
         const themed = compile();
         expect(themed).toContain("oqBandLuma");
         expect(themed).not.toContain("oqColor = floor(oqColor * oqColorSteps + 0.5) / oqColorSteps;");
+        // Banded BEFORE lighting (base colour), never after: smooth light
+        // falloff on a flat floor must not turn into concentric rings.
+        const lit = themed.slice(themed.indexOf("#include <dithering_fragment>"));
+        const base = themed.slice(themed.indexOf("#include <color_fragment>"), themed.indexOf("#include <roughnessmap_fragment>"));
+        expect(base).toContain("oqBandLuma");
+        expect(lit).not.toContain("oqBandLuma");
         // Back to Original: exactly the previous program, source and key.
         setHelperLumaBands(material, false);
         expect(material.customProgramCacheKey()).toBe(originalKey);
