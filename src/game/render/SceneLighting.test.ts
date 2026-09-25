@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { biomeSunPosition } from "./SceneLighting.js";
+import { biomeLightRig, biomeSunPosition } from "./SceneLighting.js";
 
 describe("biome sun placement", () => {
   const centre = { x: 1, y: 2, z: 3 };
@@ -19,5 +19,16 @@ describe("biome sun placement", () => {
 
   it("survives degenerate input", () => {
     for (const v of biomeSunPosition([0, Number.NaN, 0], centre, 10)) expect(Number.isFinite(v)).toBe(true);
+  });
+
+  it("biome rig trades flat ambient for directional sky/ground fill and tighter shadows", () => {
+    const rig = biomeLightRig({ lighting: { sun: "#fff", sky: "#fff", ground: "#fff", intensity: 2, ambient: 0.8, direction: [1, 1, 1] } }, 0.5);
+    expect(rig.ambient).toBeLessThan(0.8);
+    expect(rig.hemisphere).toBeGreaterThan(0.5);
+    // Roughly the same total fill: nothing gets much darker overall.
+    expect(rig.ambient + rig.hemisphere).toBeGreaterThan(0.8 + 0.5 - 0.1);
+    expect(rig.shadowNormalBias).toBeLessThan(0.012);
+    const broken = biomeLightRig({ lighting: { sun: "#fff", sky: "#fff", ground: "#fff", intensity: 2, ambient: Number.NaN, direction: [1, 1, 1] } }, 0.5);
+    expect(Number.isFinite(broken.ambient) && Number.isFinite(broken.hemisphere)).toBe(true);
   });
 });

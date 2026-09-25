@@ -193,6 +193,7 @@ export function SceneLighting({ bounds, style, biome }: SceneLightingProps) {
   const reducedMotion = usePrefersReducedMotion();
   const keyShadowMapSize = reducedMotion ? 1024 : 2048;
 
+  const rig = themed ? biomeLightRig(themed, style.lighting.fillIntensity) : null;
   const sky = themed
     ? { zenith: themed.sky.zenith, horizon: themed.sky.horizon, fogNear: themed.sky.fogNear, fogFar: themed.sky.fogFar }
     : { zenith: style.sceneColors.background, horizon: style.sceneColors.fog, fogNear: 1.7, fogFar: 7.2 };
@@ -210,11 +211,11 @@ export function SceneLighting({ bounds, style, biome }: SceneLightingProps) {
       />
       <fog attach="fog" args={[sky.horizon, size.radius * sky.fogNear, size.radius * sky.fogFar]} />
       <ambientLight
-        intensity={themed ? themed.lighting.ambient : style.lighting.ambientIntensity}
+        intensity={rig ? rig.ambient : style.lighting.ambientIntensity}
         color={ambientColor}
       />
       <hemisphereLight
-        args={[themed ? themed.lighting.sky : style.sceneColors.fillLight, hemisphereGroundColor, style.lighting.fillIntensity]}
+        args={[themed ? themed.lighting.sky : style.sceneColors.fillLight, hemisphereGroundColor, rig ? rig.hemisphere : style.lighting.fillIntensity]}
       />
       <directionalLight
         position={keyPosition}
@@ -229,8 +230,8 @@ export function SceneLighting({ bounds, style, biome }: SceneLightingProps) {
         shadow-camera-right={shadowExtent}
         shadow-camera-top={shadowExtent}
         shadow-camera-bottom={-shadowExtent}
-        shadow-bias={-0.0008}
-        shadow-normalBias={0.012}
+        shadow-bias={rig ? rig.shadowBias : -0.0008}
+        shadow-normalBias={rig ? rig.shadowNormalBias : 0.012}
         shadow-radius={Math.max(1, style.lighting.shadowSoftness * 4)}
       />
       <directionalLight
@@ -240,6 +241,26 @@ export function SceneLighting({ bounds, style, biome }: SceneLightingProps) {
       />
     </>
   );
+}
+
+/**
+ * Themed looks only (Original keeps every style value): part of the flat
+ * ambient term moves into the sky/ground hemisphere, so props and structures
+ * get clearly lit tops and shaded undersides at about the same overall
+ * brightness, and the sun's shadow bias is tightened for miniature-scale
+ * props (a 1.2 cm normal bias detached the shadows of small stones).
+ */
+export function biomeLightRig(
+  biome: Pick<BiomeDefinition, "lighting">,
+  styleFillIntensity: number,
+): { ambient: number; hemisphere: number; shadowBias: number; shadowNormalBias: number } {
+  const ambient = Number.isFinite(biome.lighting.ambient) ? Math.max(0, biome.lighting.ambient) : 0;
+  return {
+    ambient: ambient * 0.62,
+    hemisphere: styleFillIntensity + ambient * 0.45,
+    shadowBias: -0.0006,
+    shadowNormalBias: 0.006,
+  };
 }
 
 /** Sun placed along the biome's (scene → sun) direction at the same
