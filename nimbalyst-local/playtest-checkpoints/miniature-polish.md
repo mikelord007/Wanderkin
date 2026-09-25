@@ -2,7 +2,7 @@
 
 ## Identity
 
-- **Runtime model:** Claude Code, **`claude-opus-5-5`** (Opus 5.5), as reported by this session's own system context. I didn't verify it against API logs.
+- **Runtime model:** Claude Code, **`claude-opus-5-5`** (Opus 5.5), as reported by this session's own system context. Independently confirmed by the coordinator from this session's transcript `9b87a724-0135-48a9-bf66-1849b1a3eec1.jsonl`: all 105 sampled assistant `model` fields read `claude-opus-5-5`.
 - **Session and role:** a Nimbalyst session working for coordinator `30e37344-f303-4b8a-80c8-ee9f8fd5f3d6`. I implemented the fixes myself: no subagents, no provider, generation, upload, publish or save calls, and no new dependencies.
 - **Date and base:** 2026-09-25. Started at MAIN `2625ef7` (product `7ec73b2`). The concurrent material worker committed `b9a00e5`, which touches only `src/scene/*`, during my captures; I re-ran my focused tests and typecheck on it (see Checks).
 - **Scope:**
