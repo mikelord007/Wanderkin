@@ -8,18 +8,20 @@
  * Tropical worker from hand-off (see ENVIRONMENT_ARCHITECTURE.md §10).
  */
 import { leafRosette } from "../builders/foliage.js";
-import { defaultRockVariants } from "../builders/rocks.js";
 import { post, signpost } from "../builders/dry.js";
 import { lyingLog } from "../builders/trees.js";
 import { broadleafClump, leafyBush, tropicalFlowers, tropicalGrass } from "../tropical/bush.js";
 import { fallenPalmFrond, palmSprout, tropicalPalm } from "../tropical/palm.js";
+import { fallenCoconuts, TROPICAL_ROCK_SHAPES, tropicalRock } from "../tropical/rocks.js";
 import type { BiomeArt, BiomeTones } from "../types.js";
 
 const tones = {
   foliage: { dark: "#2e7a3e", base: "#43a04f", light: "#85c95c" },
   foliageAlt: { dark: "#3f7a2c", base: "#62a73d", light: "#a9d066" },
   trunk: { dark: "#6a4a30", base: "#98704a", light: "#c9a172" },
-  rock: { dark: "#69665f", base: "#928d84", light: "#c1baad" },
+  // Pale weathered limestone; rockDark is the cool coastal basalt.
+  rock: { dark: "#7a7468", base: "#a39b8b", light: "#d3cab5" },
+  rockDark: { dark: "#3d4447", base: "#5b6468", light: "#88908f" },
   soil: { dark: "#b98f5e", base: "#d8b27f", light: "#efd4a4" },
   dry: { dark: "#8c7545", base: "#b69a5b", light: "#dcc68c" },
   cactus: { dark: "#3c6e3a", base: "#55924a", light: "#88b86a" },
@@ -29,7 +31,8 @@ const tones = {
   stoneRecess: { dark: "#5f574d", base: "#766c60", light: "#8c8274" },
   driftwood: { dark: "#9a8b76", base: "#c2b39b", light: "#e3d8c4" },
   foliageDeep: { dark: "#1f5e3a", base: "#2f7f4a", light: "#5aa55f" },
-  nut: { dark: "#5a4526", base: "#7d6435", light: "#a88a4f" },
+  // Young green coconuts: well clear of the orange collectible hue.
+  nut: { dark: "#3f5226", base: "#5e7536", light: "#8aa052" },
 } satisfies BiomeTones;
 
 const PALMS = [
@@ -112,7 +115,35 @@ const SMALL_BUSHES = [
   broadleafClump({ leaves: 4, leafLength: 0.46, leafWidth: 0.3, seed: 13, split: 0.55 }),
 ];
 
-const rocks = defaultRockVariants("rock");
+const S = TROPICAL_ROCK_SHAPES;
+
+// Rounded, weathered pale stones, mossy on top, with companion stones.
+const ROUND_ROCKS = [
+  tropicalRock({ moss: 0.8, bodies: [{ shape: S.dome }, { shape: S.pebble, at: [0.62, 0.18], size: 0.22 }, { shape: S.chip, at: [-0.3, 0.58], size: 0.16 }] }),
+  tropicalRock({ moss: 0.85, bodies: [{ shape: { ...S.dome, seed: 131, scale: [0.72, 0.86, 0.7] } }, { shape: S.loaf, at: [0.5, -0.25], size: 0.55 }, { shape: S.pebble, at: [-0.5, 0.35], size: 0.2 }] }),
+  tropicalRock({ bodies: [{ shape: S.knob }, { shape: { ...S.knob, seed: 133 }, at: [0.5, 0.35], size: 0.5 }, { shape: S.pebble, at: [-0.5, -0.4], size: 0.18 }] }),
+  tropicalRock({ moss: 0.75, bodies: [{ shape: S.wedge }, { shape: S.chip, at: [0.58, 0.32], size: 0.22 }] }),
+];
+
+// Angular, dark coastal rock: crags and tilted slabs leaning together.
+const COASTAL_ROCKS = [
+  tropicalRock({ ramp: "rockDark", bodies: [{ shape: S.crag }, { shape: { ...S.crag, seed: 141 }, at: [0.42, 0.2], size: 0.58, tilt: [0.25, -0.3] }, { shape: S.chip, at: [-0.4, 0.4], size: 0.2 }] }),
+  tropicalRock({ ramp: "rockDark", bodies: [{ shape: S.slab, tilt: [0.08, 0.62] }, { shape: { ...S.slab, seed: 143 }, at: [-0.2, 0.32], size: 0.8, tilt: [0.12, 0.7], yaw: 0.35 }, { shape: S.chip, at: [0.5, -0.3], size: 0.18 }] }),
+  tropicalRock({ ramp: "rockDark", moss: 0.9, bodies: [{ shape: { ...S.crag, scale: [0.8, 0.9, 0.62], seed: 145 }, tilt: [0.15, 0.3] }, { shape: S.slab, at: [0.5, -0.1], size: 0.45, tilt: [0, 0.4] }] }),
+];
+
+// Dressing stones (largest dimension = 1).
+const MEDIUM_ROCKS = [
+  tropicalRock({ fit: "size", moss: 0.85, bodies: [{ shape: { ...S.dome, seed: 151 } }] }),
+  tropicalRock({ fit: "size", bodies: [{ shape: { ...S.loaf, seed: 153 } }] }),
+  tropicalRock({ fit: "size", ramp: "rockDark", bodies: [{ shape: { ...S.crag, seed: 155, scale: [0.8, 0.7, 0.6] }, tilt: [0.2, 0.35] }] }),
+  tropicalRock({ fit: "size", ramp: "rockDark", bodies: [{ shape: { ...S.slab, seed: 157 } }] }),
+];
+const PEBBLES = [
+  tropicalRock({ fit: "size", sink: 0.05, bodies: [{ shape: S.pebble }] }),
+  tropicalRock({ fit: "size", sink: 0.05, bodies: [{ shape: { ...S.pebble, seed: 161, scale: [0.8, 0.6, 1.2] } }] }),
+  tropicalRock({ fit: "size", sink: 0.05, ramp: "rockDark", bodies: [{ shape: S.chip }] }),
+];
 
 export const TROPICAL_ART: BiomeArt = {
   id: "tropical",
@@ -156,20 +187,30 @@ export const TROPICAL_ART: BiomeArt = {
         palmSprout({ fronds: 6, length: 0.5, rise: 0.95, droop: 1.1, leaflets: 5, seed: 43, fit: "size" }),
       ],
     },
-    "rock-large": {
-      category: "rock", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.9, triangleBudget: 400,
-      mirror: true, embed: [0.02, 0.05], alignToNormal: 0.6,
-      variants: [...rocks.large, ...rocks.clustered],
+    "rock-round": {
+      category: "rock", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.99, triangleBudget: 400,
+      mirror: true, embed: [0.03, 0.06], alignToNormal: 0.6,
+      variants: ROUND_ROCKS,
+    },
+    "rock-coastal": {
+      category: "rock", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.95, triangleBudget: 400,
+      mirror: true, embed: [0.02, 0.05], alignToNormal: 0.5,
+      variants: COASTAL_ROCKS,
     },
     "rock-medium": {
       category: "rock", role: "supporting", shading: "faceted", castShadow: true, unitRadius: 0.5, triangleBudget: 300,
       mirror: true, embed: [0.03, 0.08], alignToNormal: 0.7,
-      variants: [...rocks.medium, ...rocks.layered],
+      variants: MEDIUM_ROCKS,
     },
     pebble: {
       category: "rock", role: "micro", shading: "faceted", castShadow: false, unitRadius: 0.5, triangleBudget: 60,
       mirror: true, embed: [0.05, 0.15], alignToNormal: 1,
-      variants: rocks.small,
+      variants: PEBBLES,
+    },
+    coconuts: {
+      category: "dressing", role: "micro", shading: "smooth", castShadow: false, unitRadius: 0.5, triangleBudget: 80,
+      mirror: true, embed: [0.03, 0.06],
+      variants: [fallenCoconuts({ count: 2, seed: 1 }), fallenCoconuts({ count: 3, seed: 2 })],
     },
     tuft: {
       category: "grass", role: "micro", shading: "smooth", castShadow: false, unitRadius: 0.85, triangleBudget: 120,
@@ -242,6 +283,7 @@ export const TROPICAL_ART: BiomeArt = {
           members: [
             { family: "fallen-frond", count: [1, 2], ring: [0.35, 0.85], height: [0.26, 0.38] },
             { family: "driftwood", count: [1, 1], ring: [0.5, 0.9], height: [0.22, 0.32], chance: 0.6 },
+            { family: "coconuts", count: [1, 1], ring: [0.3, 0.7], height: [0.08, 0.12], chance: 0.5 },
             { family: "pebble", count: [1, 3], ring: [0.35, 0.95], height: [0.03, 0.06] },
             { family: "tuft", count: [0, 1], ring: [0.2, 0.6], height: [0.05, 0.09] },
           ],
@@ -293,14 +335,31 @@ export const TROPICAL_ART: BiomeArt = {
     ],
     rock: [
       {
+        weight: 2,
+        preset: {
+          // Rounded pale boulder, companion stones, plants tucked at its foot.
+          id: "rock-cluster",
+          primary: "rock-round",
+          members: [
+            { family: "rock-medium", count: [1, 2], ring: [0.55, 0.9], height: [0.25, 0.45] },
+            { family: "pebble", count: [2, 4], ring: [0.35, 1], height: [0.07, 0.14] },
+            { family: "fern", count: [0, 1], ring: [0.45, 0.9], height: [0.35, 0.5], chance: 0.5 },
+            { family: "tuft", count: [1, 2], ring: [0.3, 0.9], height: [0.14, 0.22] },
+          ],
+        },
+      },
+      {
         weight: 1,
         preset: {
-          id: "rock-cluster",
-          primary: "rock-large",
+          // Dark angular coastal outcrop with driftwood.
+          id: "coastal-outcrop",
+          primary: "rock-coastal",
+          primaryOffset: 0.1,
           members: [
-            { family: "rock-medium", count: [1, 2], ring: [0.55, 0.9], height: [0.3, 0.5] },
-            { family: "pebble", count: [2, 4], ring: [0.35, 1], height: [0.08, 0.16] },
-            { family: "tuft", count: [1, 2], ring: [0.3, 0.9], height: [0.15, 0.25] },
+            { family: "rock-medium", count: [1, 2], ring: [0.55, 0.9], height: [0.22, 0.4] },
+            { family: "pebble", count: [2, 3], ring: [0.4, 1], height: [0.06, 0.12] },
+            { family: "driftwood", count: [1, 1], ring: [0.5, 0.9], height: [0.3, 0.42], chance: 0.45 },
+            { family: "tuft", count: [0, 1], ring: [0.3, 0.9], height: [0.12, 0.2] },
           ],
         },
       },
