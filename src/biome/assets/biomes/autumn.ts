@@ -8,11 +8,12 @@
  * the Autumn worker from hand-off (ENVIRONMENT_ARCHITECTURE.md §10 + Wave 2
  * addendum).
  */
-import { post, signpost } from "../builders/dry.js";
+import { signpost } from "../builders/dry.js";
 import { bush, leafRosette, tuft } from "../builders/foliage.js";
-import { defaultRockVariants } from "../builders/rocks.js";
-import { lyingLog } from "../builders/trees.js";
+import { woodlandRocks } from "../autumn/rocks.js";
 import { autumnTree } from "../autumn/trees.js";
+import { AUTUMN_WALL } from "../autumn/wall.js";
+import { mossyLog, stump } from "../autumn/wood.js";
 import type { BiomeArt, BiomeTones } from "../types.js";
 
 const tones = {
@@ -28,7 +29,14 @@ const tones = {
   // Warm grey-brown bark: dark enough to anchor the crowns, never black.
   trunk: { dark: "#4a3527", base: "#6a4d38", light: "#93735a" },
   birch: { dark: "#8e897e", base: "#c4beb0", light: "#e4dfd2" },
-  rock: { dark: "#5b5a52", base: "#7e7b71", light: "#a6a296" },
+  // Cool grey woodland granite: quiet under the warm canopy.
+  rock: { dark: "#595c5a", base: "#7e817c", light: "#a8aaa2" },
+  moss: { dark: "#45522a", base: "#62733a", light: "#8a9a55" },
+  lichen: { dark: "#8c8a64", base: "#b2ae82", light: "#d0cca2" },
+  // Deadwood: weathered grey-brown bark, pale heartwood on cut ends, ochre shelf fungi.
+  deadwood: { dark: "#4f4238", base: "#75665a", light: "#a09282" },
+  heartwood: { dark: "#8a6440", base: "#b88f62", light: "#d8b88c" },
+  fungus: { dark: "#7a5230", base: "#a87844", light: "#d0a66e" },
   soil: { dark: "#58402a", base: "#78583a", light: "#9e7c58" },
   dry: { dark: "#76552e", base: "#9c7646", light: "#c29e70" },
   cactus: { dark: "#3f5530", base: "#5a7542", light: "#86a064" },
@@ -38,7 +46,7 @@ const tones = {
   stoneRecess: { dark: "#3c3934", base: "#48443e", light: "#56524b" },
 } satisfies BiomeTones;
 
-const rocks = defaultRockVariants("rock");
+const rocks = woodlandRocks();
 
 // Hero broadleaf trees (native units, ≈ 1 tall; crowns kept within the palm
 // footprint class, radius ≤ 0.62 of the height).
@@ -209,20 +217,25 @@ export const AUTUMN_ART: BiomeArt = {
         leafRosette({ leaves: 8, length: 0.58, width: 0.11, rise: 0.85, droop: 0.5, seed: 33, ramp: "foliageAlt", serrate: 0.4 }),
       ],
     },
-    "rock-large": {
+    "rock-mossy": {
+      category: "rock", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.9, triangleBudget: 400,
+      mirror: true, embed: [0.03, 0.06], alignToNormal: 0.5,
+      variants: rocks.mossy,
+    },
+    "rock-lichen": {
       category: "rock", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.9, triangleBudget: 400,
       mirror: true, embed: [0.02, 0.05], alignToNormal: 0.4,
-      variants: [...rocks.large, ...rocks.clustered],
+      variants: rocks.lichen,
     },
     "rock-medium": {
       category: "rock", role: "supporting", shading: "faceted", castShadow: true, unitRadius: 0.5, triangleBudget: 300,
       mirror: true, embed: [0.03, 0.08], alignToNormal: 0.6,
-      variants: [...rocks.medium, ...rocks.layered],
+      variants: rocks.medium,
     },
     pebble: {
       category: "rock", role: "micro", shading: "faceted", castShadow: false, unitRadius: 0.5, triangleBudget: 60,
       mirror: true, embed: [0.05, 0.15], alignToNormal: 1,
-      variants: rocks.small,
+      variants: rocks.pebbles,
     },
     grass: {
       category: "grass", role: "micro", shading: "smooth", castShadow: false, unitRadius: 1.1, triangleBudget: 220,
@@ -233,14 +246,35 @@ export const AUTUMN_ART: BiomeArt = {
       ],
     },
     log: {
-      category: "dressing", role: "supporting", shading: "faceted", castShadow: true, unitRadius: 0.5, triangleBudget: 120,
-      mirror: true, embed: [0.02, 0.05],
-      variants: [lyingLog({ seed: 51, fork: true }), lyingLog({ seed: 52 }), lyingLog({ seed: 53, ramp: "dry", fork: true })],
+      category: "dressing", role: "supporting", shading: "smooth", castShadow: true, unitRadius: 0.5, triangleBudget: 360,
+      mirror: true, embed: [0.02, 0.05], alignToNormal: 0.8,
+      variants: [
+        mossyLog({ seed: 51, moss: 0.45, fungi: 2, stub: true }),
+        mossyLog({ seed: 52, ramp: "deadwood", broken: true, moss: 0.55 }),
+        mossyLog({ seed: 53, radius: 0.08, moss: 0.35, fungi: 1 }),
+      ],
+    },
+    stump: {
+      category: "dressing", role: "supporting", shading: "smooth", castShadow: true, unitRadius: 0.5, triangleBudget: 320,
+      mirror: true, embed: [0.02, 0.04],
+      variants: [
+        stump({ seed: 61, height: 1.6, moss: 0.4, fungi: 1 }),
+        stump({ seed: 62, height: 2.2, ramp: "deadwood", broken: true, moss: 0.5 }),
+        stump({ seed: 63, height: 1.3, roots: 5 }),
+      ],
+    },
+    snag: {
+      category: "dressing", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.38, triangleBudget: 400,
+      mirror: true, embed: [0.02, 0.04], leanMax: 0.05,
+      variants: [
+        stump({ seed: 71, height: 5.5, ramp: "deadwood", broken: true, fungi: 3, moss: 0.3, rootReach: 1.8, fit: "height" }),
+        stump({ seed: 72, height: 4.6, broken: true, fungi: 2, roots: 5, rootReach: 1.6, fit: "height" }),
+      ],
     },
     marker: {
       category: "marker", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.36, triangleBudget: 300,
       mirror: true, embed: [0.03, 0.05],
-      variants: [post({ seed: 1 }), post({ seed: 2, lean: -0.05 }), signpost({ planks: 2, seed: 3 })],
+      variants: [signpost({ planks: 2, seed: 3 }), signpost({ planks: 1, seed: 4, lean: -0.05 })],
     },
   },
   compositions: {
@@ -298,45 +332,62 @@ export const AUTUMN_ART: BiomeArt = {
     ],
     rock: [
       {
+        weight: 3,
+        preset: {
+          // Mossy boulder with companion stones, a log, a fern.
+          id: "mossy-stones",
+          primary: "rock-mossy",
+          members: [
+            { family: "rock-medium", count: [1, 2], ring: [0.55, 0.9], height: [0.25, 0.42] },
+            { family: "pebble", count: [1, 3], ring: [0.35, 1], height: [0.07, 0.13] },
+            { family: "log", count: [1, 1], ring: [0.6, 0.95], height: [0.4, 0.55], chance: 0.35 },
+            { family: "bracken", count: [0, 1], ring: [0.45, 0.9], height: [0.3, 0.42], chance: 0.5 },
+          ],
+        },
+      },
+      {
         weight: 2,
         preset: {
-          id: "mossy-stones",
-          primary: "rock-large",
+          // Lichen-crusted crags and slabs with a stump at their foot.
+          id: "lichen-outcrop",
+          primary: "rock-lichen",
+          primaryOffset: 0.1,
           members: [
-            { family: "rock-medium", count: [1, 2], ring: [0.55, 0.9], height: [0.28, 0.45] },
-            { family: "pebble", count: [1, 3], ring: [0.35, 1], height: [0.08, 0.15] },
-            { family: "bracken", count: [0, 1], ring: [0.45, 0.9], height: [0.3, 0.42], chance: 0.5 },
+            { family: "rock-medium", count: [1, 2], ring: [0.55, 0.9], height: [0.22, 0.38] },
+            { family: "pebble", count: [2, 3], ring: [0.4, 1], height: [0.06, 0.12] },
+            { family: "stump", count: [1, 1], ring: [0.55, 0.9], height: [0.22, 0.32], chance: 0.35 },
           ],
         },
       },
     ],
     wood: [
       {
+        weight: 2,
+        preset: {
+          // A broken snag with a fallen log and stones at its foot.
+          id: "snag",
+          primary: "snag",
+          members: [
+            { family: "log", count: [1, 1], ring: [0.55, 0.95], height: [0.5, 0.7], chance: 0.6 },
+            { family: "stump", count: [0, 1], ring: [0.5, 0.9], height: [0.2, 0.3] },
+            { family: "pebble", count: [1, 2], ring: [0.4, 0.9], height: [0.05, 0.08] },
+          ],
+        },
+      },
+      {
         weight: 1,
         preset: {
           id: "trail-post",
           primary: "marker",
           members: [
-            { family: "log", count: [1, 1], ring: [0.5, 0.9], height: [0.3, 0.42], chance: 0.6 },
+            { family: "stump", count: [1, 1], ring: [0.5, 0.9], height: [0.2, 0.3], chance: 0.6 },
             { family: "pebble", count: [1, 2], ring: [0.4, 0.9], height: [0.05, 0.08] },
           ],
         },
       },
     ],
   },
-  wall: {
-    // Mossy fieldstone: blocky strata, moss on the walkable tops.
-    strata: [3, 5],
-    stepping: 0.7,
-    rounding: 0.55,
-    notches: [1, 2],
-    // Fieldstone courses: block joints.
-    joints: [3, 5],
-    top: tones.stoneTop,
-    side: tones.stoneSide,
-    recess: "#443f38",
-    rim: "#b7c283",
-  },
+  wall: AUTUMN_WALL,
   // Rich dark earth under clusters; ground patches strewn with fallen leaves.
   ground: {
     contactColor: "#3a2618",
