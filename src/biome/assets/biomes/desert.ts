@@ -7,9 +7,9 @@
  * Baseline by the environment lead on the shared builders; owned by the
  * Desert worker from hand-off (see ENVIRONMENT_ARCHITECTURE.md §10).
  */
-import { barrelCactus, cactus, cactusCluster, padCactus } from "../builders/cacti.js";
 import { post, scrub, signpost } from "../builders/dry.js";
-import { leafRosette, tuft } from "../builders/foliage.js";
+import { tuft } from "../builders/foliage.js";
+import { agave, barrel, echeveria, organPipe, pricklyPear, saguaro } from "../desert/cacti.js";
 import { defaultRockVariants, rock, ROCK_SHAPES } from "../builders/rocks.js";
 import { lyingLog } from "../builders/trees.js";
 import type { BiomeArt, BiomeTones } from "../types.js";
@@ -26,6 +26,8 @@ const tones = {
   stoneTop: { dark: "#d2a874", base: "#e6c28e", light: "#f3dbb0" },
   stoneSide: { dark: "#a5613c", base: "#c78652", light: "#e2aa72" },
   stoneRecess: { dark: "#6e3f28", base: "#824c31", light: "#98603f" },
+  succulent: { dark: "#3e6658", base: "#5b8a78", light: "#8fb5a0" },
+  fruit: { dark: "#8a3050", base: "#bd4b6d", light: "#dd7b98" },
 } satisfies BiomeTones;
 
 const rocks = defaultRockVariants("rock");
@@ -36,25 +38,26 @@ export const DESERT_ART: BiomeArt = {
   tones,
   families: {
     "cactus-tall": {
-      category: "cactus", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.34, triangleBudget: 900,
-      leanMax: 0.05, mirror: true, embed: [0.01, 0.03],
+      category: "cactus", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.34, triangleBudget: 1300,
+      leanMax: 0.04, mirror: true, embed: [0.01, 0.03],
       variants: [
-        cactus({ height: 1, radius: 0.1, ribs: 8, curve: 0.04 }),
-        cactus({ height: 1, radius: 0.085, ribs: 7, arms: [{ at: 0.42, angle: 0, reach: 0.12, rise: 0.26 }, { at: 0.58, angle: Math.PI, reach: 0.09, rise: 0.18 }] }),
-        cactus({ height: 1, radius: 0.09, ribs: 8, curve: -0.03, arms: [{ at: 0.5, angle: 0.4, reach: 0.14, rise: 0.3 }], blossoms: 3 }),
-        cactus({ height: 1, radius: 0.08, ribs: 7, arms: [{ at: 0.36, angle: 2.2, reach: 0.1, rise: 0.2 }, { at: 0.55, angle: -0.6, reach: 0.12, rise: 0.28 }, { at: 0.7, angle: 1.1, reach: 0.07, rise: 0.12, thickness: 0.5 }] }),
-        cactusCluster({ stems: 4, seed: 5, ribs: 7 }),
+        saguaro({ seed: 1, arms: [{ at: 0.44, angle: 0, reach: 0.1, rise: 0.26 }, { at: 0.58, angle: Math.PI, reach: 0.08, rise: 0.2 }] }),
+        saguaro({ seed: 2, radius: 0.125, curve: 0.03, arms: [{ at: 0.52, angle: 0.5, reach: 0.11, rise: 0.3 }], blossoms: 3 }),
+        saguaro({ seed: 3, radius: 0.11, arms: [{ at: 0.36, angle: 0.2, reach: 0.09, rise: 0.22 }, { at: 0.55, angle: 2.8, reach: 0.1, rise: 0.3 }, { at: 0.7, angle: 4.5, reach: 0.06, rise: 0.12, thickness: 0.55 }] }),
+        saguaro({ seed: 4, radius: 0.13, curve: -0.04, arms: [] }),
+        organPipe({ stems: 5, seed: 5 }),
       ],
     },
     "cactus-small": {
-      category: "cactus", role: "supporting", shading: "smooth", castShadow: true, unitRadius: 0.5, triangleBudget: 700,
+      category: "cactus", role: "supporting", shading: "smooth", castShadow: true, unitRadius: 0.55, triangleBudget: 900,
       mirror: true, embed: [0.02, 0.04],
       variants: [
-        barrelCactus({ ribs: 9, squat: 0.75 }),
-        barrelCactus({ ribs: 8, squat: 0.62, blossoms: 3 }),
-        padCactus({ pads: 5, seed: 3 }),
-        padCactus({ pads: 4, seed: 8 }),
-        leafRosette({ leaves: 9, length: 1.05, width: 0.09, rise: 1.05, droop: 0.25, seed: 4, ramp: "cactus" }),
+        barrel({ ribs: 14, squat: 0.8, flowers: 5, seed: 1 }),
+        barrel({ ribs: 12, squat: 0.66, flowers: 0, seed: 2 }),
+        pricklyPear({ pads: 5, fruits: 3, seed: 3 }),
+        pricklyPear({ pads: 4, fruits: 2, seed: 8 }),
+        agave({ leaves: 11, seed: 4 }),
+        echeveria({ leaves: 10, seed: 6 }),
       ],
     },
     "rock-large": {
