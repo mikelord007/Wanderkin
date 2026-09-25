@@ -10,6 +10,30 @@
 - Committed: `6f142b1c6b6c40ef99b32647feabfacecc7a275a` — `src/game/core/characterScale.ts`,
   `nimbalyst-local/character-preview.ts`, this checkpoint file. Nothing else staged.
 
+### Addendum: disposable-Vite cache isolation (coordinator-flagged, test-infra only)
+
+The coordinator flagged that a disposable Vite dev server on an unrelated port can still
+invalidate the dependency-optimizer chunks the protected 5173/15173 servers are serving, because
+Vite's default `cacheDir` (`node_modules/.vite`) is shared by every process in the checkout
+regardless of port — the brand worker hit this and repaired it without needing a restart. Every
+disposable Vite invocation this session up to that point (`npx vite --port 15981/15991/15992/
+15993/15994 --strictPort`, and `tmp-scale-refinement/playwright.config.ts`'s `webServer`) used
+that default, unscoped cache. Protected 5173 and 15173 were re-verified 200/clean after the fact
+(`curl` to both, plus a real Chrome run through `tests/e2e/browser/gameplay.test.ts` earlier in
+this same session) — no repair action was taken or needed on my part, and no shared cache was
+cleared.
+
+Fixed going forward, test-infra only, no product scope: added
+`nimbalyst-local/tmp-scale-refinement/vite.disposable.config.mjs` (mirrors the root
+`vite.config.ts`'s react plugin and `@shared` alias, but sets `cacheDir` to a private folder under
+`os.tmpdir()`), and pointed `tmp-scale-refinement/playwright.config.ts`'s `webServer.command` at it
+via `--config`. Re-ran the spawn-views capture against the new config to confirm: the isolated
+cache directory is actually created and used (verified on disk), the app still serves and plays
+correctly, and protected 5173/15173 stayed 200 throughout. Neither of these files is committed
+(scratch, like `tmp-batch2-controls/` before it) — noted here only so the practice survives past
+this session: **any future disposable Vite server in this repo must pass `--config` to a config
+that overrides `cacheDir` away from the repo default, never the bare `npx vite --port N` form.**
+
 ## Task
 
 The previous scale owner shipped the character at a 0.35 m capsule (see
