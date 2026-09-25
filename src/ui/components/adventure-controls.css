@@ -1,63 +1,70 @@
 /* In-play settings panel. It sits inside the dark pause/pre-start cards over
-   live 3D, so it uses the same dark constants as the HUD rather than the
-   page tokens. Layout-only: the parent owns the surrounding overlay. */
+   live 3D, so it uses the HUD's own night constants rather than the page
+   tokens. Layout-only: the parent owns the surrounding overlay. */
 .oq-adventure {
-  display: flex; flex-direction: column; gap: 1rem;
-  width: 100%; min-width: 0; text-align: left; color: #eef2ea;
+  display: flex; flex-direction: column; gap: 1.1rem;
+  width: 100%; min-width: 0; text-align: left; color: #f4eeff;
 }
-.oq-adventure .oq-adventure__heading { margin: 0; font-size: 1.05rem; font-weight: 650; }
+.oq-adventure .oq-adventure__heading { margin: 0; font-size: 1.05rem; font-weight: 500; }
 .oq-adventure__group { min-width: 0; margin: 0; padding: 0; border: 0; }
-.oq-adventure__legend { padding: 0; font-weight: 650; font-size: .9rem; }
-.oq-adventure .oq-adventure__hint { margin: .2rem 0 0; font-size: .8rem; line-height: 1.45; opacity: .72; }
+.oq-adventure__legend { padding: 0; font-weight: 500; font-size: .95rem; }
+.oq-adventure .oq-adventure__hint { margin: .2rem 0 0; font-size: .8125rem; line-height: 1.45; color: #c3b6e2; }
 
-.oq-adventure__options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; margin-top: .6rem; }
+.oq-adventure__options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; margin-top: .65rem; }
 .oq-adventure__options--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.oq-adventure__option { position: relative; min-width: 0; cursor: pointer; }
+.oq-adventure__option { position: relative; min-width: 0; cursor: pointer; pointer-events: auto; }
 .oq-adventure__option input { position: absolute; top: .75rem; left: .75rem; width: 1px; height: 1px; opacity: 0; }
 .oq-adventure__option-body {
-  display: flex; flex-direction: column; gap: .3rem; height: 100%;
-  padding: .7rem; border-radius: 12px;
-  background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .14);
+  display: flex; flex-direction: column; gap: .35rem; height: 100%;
+  padding: .75rem; border-radius: 16px;
+  background: #ffffff08; border: 1px solid #c9b8ff2e;
+  box-shadow: inset 0 1px 0 #ffffff0d;
   outline: 1px solid transparent; outline-offset: -1px;
   transition: background .15s ease, border-color .15s ease, outline-color .15s ease;
 }
-.oq-adventure__option:hover input:not(:disabled) + .oq-adventure__option-body { background: rgba(255, 255, 255, .08); }
-.oq-adventure__option input:checked + .oq-adventure__option-body { border-color: #9fd3a8; outline-color: #9fd3a8; background: rgba(159, 211, 168, .12); }
-.oq-adventure__option input:focus-visible + .oq-adventure__option-body { outline: 3px solid #f2b640; outline-offset: 2px; }
+.oq-adventure__option:hover input:not(:disabled) + .oq-adventure__option-body { background: #ffffff10; border-color: #c9b8ff59; }
+.oq-adventure__option input:checked + .oq-adventure__option-body { border-color: #c6b4ff; outline-color: #c6b4ff; background: #c6b4ff24; }
+.oq-adventure__option input:focus-visible + .oq-adventure__option-body { outline: 3px solid #f2b24d; outline-offset: 3px; }
 .oq-adventure__option input:disabled + .oq-adventure__option-body { opacity: .55; cursor: not-allowed; }
-.oq-adventure__option-label { font-weight: 650; font-size: .875rem; }
-.oq-adventure__option-description { font-size: .75rem; line-height: 1.4; opacity: .72; }
+.oq-adventure__option-label { font-weight: 500; font-size: .9rem; }
+.oq-adventure__option-description { font-size: .78rem; line-height: 1.4; color: #c3b6e2; }
 
+/* The biome swatches are content (a preview of each place's colours), so
+   they keep their own hues rather than the interface palette. */
 .oq-adventure__swatch { display: block; height: .45rem; border-radius: 999px; background: linear-gradient(90deg, #8a9a8f, #c9d1c6); }
 .oq-adventure__option[data-theme="tropical"] .oq-adventure__swatch { background: linear-gradient(90deg, #3aa7c9, #e9d19a 55%, #4f9a55); }
 .oq-adventure__option[data-theme="desert"] .oq-adventure__swatch { background: linear-gradient(90deg, #e2b872, #c98d4f 60%, #8fb3cf); }
 
-.oq-adventure__toggle { display: flex; align-items: flex-start; gap: .6rem; cursor: pointer; }
-.oq-adventure__toggle input { width: 1.1rem; height: 1.1rem; margin: .15rem 0 0; accent-color: #9fd3a8; flex-shrink: 0; }
-.oq-adventure__toggle-label { display: block; font-weight: 650; font-size: .875rem; }
+.oq-adventure__toggle { display: flex; align-items: flex-start; gap: .6rem; cursor: pointer; pointer-events: auto; }
+.oq-adventure__toggle input { width: 1.1rem; height: 1.1rem; margin: .15rem 0 0; accent-color: #c6b4ff; flex-shrink: 0; }
+.oq-adventure__toggle-label { display: block; font-weight: 500; font-size: .9rem; }
 
 /* Separated by a rule so resetting never reads as part of changing the look. */
-.oq-adventure__reset { display: flex; flex-direction: column; gap: .75rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, .12); }
+.oq-adventure__reset { display: flex; flex-direction: column; gap: .75rem; padding-top: 1.1rem; border-top: 1px solid #c9b8ff26; }
 .oq-adventure__actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; }
 .oq-adventure .oq-adventure__button {
-  min-height: 44px; padding: .6rem 1.1rem; border-radius: 999px; cursor: pointer;
-  font: inherit; font-size: .875rem; font-weight: 650;
-  color: #eef2ea; background: transparent; border: 1px solid rgba(255, 255, 255, .28);
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px; padding: .6rem 1.2rem; border-radius: 999px; cursor: pointer; pointer-events: auto;
+  font: inherit; font-size: .9rem; font-weight: 500;
+  color: #f4eeff; background: #1a0d33b8; border: 1px solid #c9b8ff57;
+  box-shadow: inset 0 1px 0 #ffffff12;
 }
-.oq-adventure .oq-adventure__button:not(:disabled):hover { background: rgba(255, 255, 255, .08); }
-.oq-adventure .oq-adventure__button:focus-visible { outline: 3px solid #f2b640; outline-offset: 2px; }
+.oq-adventure .oq-adventure__button:not(:disabled):hover { background: #2a1a52; border-color: #d9ccffa6; }
+.oq-adventure .oq-adventure__button:focus-visible { outline: 3px solid #f2b24d; outline-offset: 3px; }
 .oq-adventure .oq-adventure__button:disabled { opacity: .5; cursor: not-allowed; }
-.oq-adventure .oq-adventure__button--reset { border-color: #e7a86b; color: #f6d2ae; }
-.oq-adventure .oq-adventure__button--danger { background: #b4532a; border-color: #b4532a; color: #fff; }
-.oq-adventure .oq-adventure__button--danger:not(:disabled):hover { background: #9c4420; }
-.oq-adventure__confirm { padding: .75rem; border-radius: 12px; background: rgba(180, 83, 42, .16); border: 1px solid rgba(231, 168, 107, .5); }
-.oq-adventure .oq-adventure__confirm p { margin: 0 0 .6rem; font-size: .875rem; opacity: 1; }
+/* Reset and its confirmation stay warm, apart from the violets, so a
+   destructive step never looks like one more setting. */
+.oq-adventure .oq-adventure__button--reset { border-color: #f0a58780; color: #ffd0bb; }
+.oq-adventure .oq-adventure__button--danger { background: #b8413a; border-color: #d9665e; color: #fff; }
+.oq-adventure .oq-adventure__button--danger:not(:disabled):hover { background: #a1352f; }
+.oq-adventure__confirm { padding: .8rem; border-radius: 16px; background: #3a1629; border: 1px solid #ffaaa459; }
+.oq-adventure .oq-adventure__confirm p { margin: 0 0 .6rem; font-size: .875rem; color: #f4eeff; }
 
-.oq-adventure .oq-adventure__status { display: flex; align-items: center; gap: .5rem; margin: 0; font-size: .875rem; opacity: 1; }
+.oq-adventure .oq-adventure__status { display: flex; align-items: center; gap: .5rem; margin: 0; font-size: .875rem; color: #f4eeff; }
 .oq-adventure__spinner { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: oq-adventure-spin .9s linear infinite; }
 @keyframes oq-adventure-spin { to { transform: rotate(360deg); } }
-.oq-adventure__error { padding: .6rem .75rem; border-radius: 10px; border-left: 4px solid #f08a6c; background: rgba(240, 138, 108, .12); }
-.oq-adventure .oq-adventure__error p { margin: 0; font-size: .875rem; opacity: 1; }
+.oq-adventure__error { padding: .65rem .85rem; border-radius: 14px; border: 1px solid #ffaaa459; background: #3a1629; }
+.oq-adventure .oq-adventure__error p { margin: 0; font-size: .875rem; color: #ffd4d0; }
 
 @media (max-width: 560px) {
   .oq-adventure__options, .oq-adventure__options--three { grid-template-columns: 1fr; }
