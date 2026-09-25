@@ -296,7 +296,7 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
   const effect = definition.ambient.effect;
   const particleCount = Math.max(0, Math.floor(budget.particles));
   if (effect !== "none" && particleCount > 0 && canDraw(`particles:${effect}`, 1)) {
-    particles = createParticleField(art?.atmosphere?.particles ?? effect, particleCount, layout, definition, wind);
+    particles = createParticleField(art?.atmosphere?.particles ?? effect, particleCount, layout, definition, wind, art?.atmosphere?.particleTint);
     particles.object.visible = !reducedMotion;
     geometries.push(...particles.geometries);
     materials.push(...particles.materials);

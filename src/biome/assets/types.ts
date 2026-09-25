@@ -195,6 +195,13 @@ export interface AtmosphereStyle {
   water?: WaterStyle;
   /** Restyles the ambient particles (count and budget unchanged). */
   particles?: ParticlePreset;
+  /**
+   * Particle colour (hex), replacing the look's own (snow #fbfdff, embers
+   * #ff8a3a, dust = `palette.sand`, motes #fff6d8). Unset keeps that colour.
+   * Tone rules apply: saturation ≤ 0.78, lightness 0.10–0.88, ≥ 30° from the
+   * collectible hue.
+   */
+  particleTint?: string;
 }
 
 /**

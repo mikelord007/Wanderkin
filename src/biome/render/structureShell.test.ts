@@ -3,19 +3,25 @@ import * as THREE from "three";
 import { registeredBiomeArt } from "../assets/biomes/index.js";
 import { createStructureShell, MAX_COURSES, SHELL_SINK, shellTolerance } from "./structureShell.js";
 
-const CASES: { dimensions: [number, number, number]; scale: [number, number, number] }[] = [
+const CASES: { dimensions: [number, number, number]; scale: [number, number, number]; courseHeight?: number }[] = [
   { dimensions: [0.36, 0.42, 0.36], scale: [1, 1, 1] }, // a generated stair step
   { dimensions: [1.8, 0.12, 0.36], scale: [1, 1, 1] }, // a bridge
   { dimensions: [1, 1, 1], scale: [0.5, 0.3, 1.2] }, // non-uniform authored box
   { dimensions: [0.2, 0.8, 0.25], scale: [-1, 1, 1] }, // mirrored, narrow
   { dimensions: [3, 0.5, 2], scale: [1, 1, 1] }, // large platform
+  // Course-height walls (no shipped wall sets it yet): a tall step at the
+  // MAX_COURSES cap, and a stretched, mirrored box sized in world units.
+  { dimensions: [0.5, 2.1, 0.5], scale: [1, 1, 1], courseHeight: 0.15 }, // tall step, capped courses
+  { dimensions: [0.6, 0.5, 0.4], scale: [-1, 1.8, 0.7], courseHeight: 0.12 }, // non-uniform, mirrored
 ];
 
 describe("structure shells", () => {
   for (const art of registeredBiomeArt()) {
-    for (const { dimensions, scale } of CASES) {
-      it(`${art.id} ${dimensions.join("x")} @ ${scale.join(",")}: top equals and covers the collider top, sides within ±τ`, () => {
-        const shell = createStructureShell({ dimensions, scale, style: art.wall, seed: `case-${dimensions.join()}` });
+    for (const { dimensions, scale, courseHeight } of CASES) {
+      const label = courseHeight === undefined ? "" : ` course ${courseHeight}`;
+      it(`${art.id} ${dimensions.join("x")} @ ${scale.join(",")}${label}: top equals and covers the collider top, sides within ±τ`, () => {
+        const style = courseHeight === undefined ? art.wall : { ...art.wall, courseHeight };
+        const shell = createStructureShell({ dimensions, scale, style, seed: `case-${dimensions.join()}` });
         const [w, h, d] = dimensions;
         const [hx, hy, hz] = [w / 2, h / 2, d / 2];
         const tau = shellTolerance(w * Math.abs(scale[0]), d * Math.abs(scale[2]));

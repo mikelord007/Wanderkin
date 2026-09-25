@@ -92,6 +92,27 @@ describe("particle presets", () => {
     expect(drift("motes").y).toBeGreaterThan(0);
     expect(drift("motes").flutter).toBe(0.004);
   });
+
+  it("an art tint replaces only the colour; unset keeps each look's own colour", () => {
+    const definition = getBiomeDefinition("alpine");
+    const colour = (effect: "dust" | "motes" | "snow" | "embers", tint?: string) => {
+      const field = createParticleField(effect, 20, LAYOUT, definition, createWindUniforms(definition.wind, false), tint);
+      const material = field.object.material as THREE.ShaderMaterial;
+      const out = { hex: (material.uniforms.uColor!.value as THREE.Color).getHexString(), opacity: material.uniforms.uOpacity!.value as number, blending: material.blending, rand: Array.from(field.geometries[0]!.getAttribute("aRand").array) };
+      disposeOwned(field);
+      return out;
+    };
+    expect(colour("snow").hex).toBe("fbfdff");
+    expect(colour("embers").hex).toBe("ff8a3a");
+    expect(colour("motes").hex).toBe("fff6d8");
+    expect(colour("dust").hex).toBe(new THREE.Color(definition.palette.sand).getHexString());
+    const tinted = colour("snow", "#b4c2d4");
+    const plain = colour("snow");
+    expect(tinted.hex).toBe("b4c2d4");
+    // Everything else (stream, opacity, blending) is untouched.
+    expect({ ...tinted, hex: plain.hex }).toEqual(plain);
+    expect(colour("embers", "#d8623a").blending).toBe(THREE.AdditiveBlending);
+  });
 });
 
 describe("ground patch styles", () => {
@@ -167,6 +188,11 @@ describe("Wave 2 biomes in the decoration layer", () => {
       const particles = layer.root.children.find((child) => child.name.startsWith("biome-particles:"));
       const expected = { alpine: "snow", autumn: "motes", ember: "embers" }[id];
       expect(particles?.name).toBe(`biome-particles:${expected}`);
+      // The art's particle tint (if any) reaches the draw; otherwise the look's colour.
+      const defaults = { snow: "#fbfdff", motes: "#fff6d8", embers: "#ff8a3a" };
+      const tint = getBiomeArt(id)!.atmosphere?.particleTint ?? defaults[expected as keyof typeof defaults];
+      const uColor = ((particles as THREE.Points).material as THREE.ShaderMaterial).uniforms.uColor!.value as THREE.Color;
+      expect(uColor.getHexString()).toBe(new THREE.Color(tint).getHexString());
       layer.dispose();
     }
   });

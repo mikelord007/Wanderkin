@@ -60,6 +60,8 @@ export function createParticleField(
   layout: BiomeLayout,
   definition: BiomeDefinition,
   wind: WindUniforms,
+  /** Art colour override (`atmosphere.particleTint`); unset keeps the look's colour. */
+  tint?: string,
 ): ParticleField {
   const look = PARTICLE_LOOKS[effect];
   const { min, max } = layout.bounds;
@@ -98,7 +100,7 @@ export function createParticleField(
     uDrift: { value: drift },
     uPointSize: { value: extent * look.size },
     uViewportScale: { value: 400 },
-    uColor: { value: new THREE.Color(look.color(definition)) },
+    uColor: { value: new THREE.Color(tint ?? look.color(definition)) },
     uOpacity: { value: look.opacity },
     uBob: { value: look.bob },
     uFlutter: { value: look.flutter },

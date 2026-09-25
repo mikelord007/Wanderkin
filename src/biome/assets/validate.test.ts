@@ -24,6 +24,16 @@ const REQUIRED: Record<string, AssetCategory[]> = {
   autumn: ["tree", "bush", "rock"],
   ember: ["rock", "bush"],
 };
+/** §3.5 layer caps on art triangles (a new biome may declare anything up to these). */
+const TRIANGLE_CAPS = { standard: 110_000, reduced: 45_000 };
+/** Approved per-biome ceilings (Wave 2 addendum): raising one is a review decision. */
+const APPROVED_TRIANGLES: Record<string, { standard: number; reduced: number }> = {
+  tropical: { standard: 110_000, reduced: 45_000 },
+  desert: { standard: 80_000, reduced: 35_000 },
+  alpine: { standard: 80_000, reduced: 35_000 },
+  autumn: { standard: 90_000, reduced: 45_000 },
+  ember: { standard: 75_000, reduced: 32_000 },
+};
 
 function luminance(hex: string): number {
   const c = new THREE.Color(hex); // linear
@@ -166,6 +176,17 @@ describe.each(arts.map((art) => [art.id, art] as const))("art guardrails: %s", (
     if (art.atmosphere?.water && art.atmosphere.water !== "liquid") expect(definition.ambient.water, "water style without water").toBe(true);
     if (art.atmosphere?.particles) expect(definition.ambient.effect, "particle preset without particles").not.toBe("none");
     const collectible = hsl(definition.mission.collectibleColor).h;
+    const tint = art.atmosphere?.particleTint;
+    if (tint !== undefined) {
+      expect(definition.ambient.effect, "particle tint without particles").not.toBe("none");
+      expect(tint).toMatch(/^#[0-9a-f]{6}$/i);
+      const c = hsl(tint);
+      expect(c.s, `particleTint ${tint} saturation`).toBeLessThanOrEqual(0.78);
+      expect(c.l, `particleTint ${tint} lightness`).toBeGreaterThanOrEqual(0.1);
+      expect(c.l, `particleTint ${tint} lightness`).toBeLessThanOrEqual(0.88);
+      // Drifting specks must never read as collectibles.
+      if (c.s > 0.15) expect(hueGap(c.h, collectible), `particleTint ${tint} hue`).toBeGreaterThanOrEqual(30);
+    }
     const { ground } = art;
     if (ground.crackGlow) {
       expect(ground.cracks ?? 0, "crackGlow needs cracks").toBeGreaterThan(0);
@@ -185,6 +206,16 @@ describe.each(arts.map((art) => [art.id, art] as const))("art guardrails: %s", (
         if (c.s > 0.15) expect(hueGap(c.h, collectible), `${hex} litter hue`).toBeGreaterThanOrEqual(30);
       }
     }
+  });
+
+  it("art triangle budgets sit within the layer caps and the approved per-biome ceilings", () => {
+    const { standard, reduced } = art.budgets.triangles;
+    expect(standard, "standard ≤ layer cap").toBeLessThanOrEqual(TRIANGLE_CAPS.standard);
+    expect(reduced, "reduced ≤ layer cap").toBeLessThanOrEqual(TRIANGLE_CAPS.reduced);
+    const approved = APPROVED_TRIANGLES[art.id];
+    expect(approved, "every shipped biome has an approved ceiling").toBeDefined();
+    expect(standard, "standard ≤ approved").toBeLessThanOrEqual(approved!.standard);
+    expect(reduced, "reduced ≤ approved").toBeLessThanOrEqual(approved!.reduced);
   });
 
   it("reduced effects budgets are strictly lower", () => {
