@@ -118,7 +118,9 @@ share this cache dir and can knock each other over the same way.
       `window.__objectquest`, header, or `--mh-*` / `.mh-*` class or token name was
       edited.
 - [x] `npx vitest run src`: 47 files / 294 tests pass. `tsc -p tsconfig.json` clean.
-- [ ] Commit
+- [x] Commit `d5ea77c` (Nimbalyst atomic commit, 13 exact paths). Not included:
+      `src/game/core/characterScale.ts` (scale worker, dirty) and the scratch
+      tooling in `nimbalyst-local/tmp-brand/`.
 
 ## Left alone on purpose (report, not edit)
 
