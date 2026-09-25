@@ -31,7 +31,7 @@ const tones = {
   stoneTop: { dark: "#5c5756", base: "#77716e", light: "#9a9390" },
   // Basalt wall sides: lifted well above the dark recess (#16151a) so the
   // column joints, crack columns and courses separate under dusk light.
-  stoneSide: { dark: "#3a3742", base: "#5a5563", light: "#857e8e" },
+  stoneSide: { dark: "#3a3742", base: "#5a5563", light: "#948c9e" },
   stoneRecess: { dark: "#1a191e", base: "#222126", light: "#2c2a30" },
   /** Pale ash settled on column tops, rims and ledges; bleached snags. */
   ash: { dark: "#5e5958", base: "#7c7674", light: "#a49d98" },
@@ -249,19 +249,22 @@ export const EMBER_ART: BiomeArt = {
     ],
   },
   wall: {
-    // Columnar basalt: one or two tall courses (the columns run the full
-    // height), every perimeter column pushed in or out on its own, sharp
-    // corners, dark vertical joints, and many shadowed "crack" columns so
-    // the faces break into a rhythm of uneven prisms rather than planks.
+    // Columnar basalt in tiers: two or three courses of columns, every
+    // perimeter column pushed in or out on its own, sharp corners, dark
+    // vertical joints, and many shadowed "crack" columns so the faces break
+    // into a rhythm of uneven prisms rather than planks. With a single
+    // course, a tall step's shaded face read as one plain dark slab: the
+    // extra courses give every face seam lines and alternating bands, and
+    // the denser joints make sure some land on every face.
     // Pale ash-dusted tops, a warm-lit rim.
-    strata: [1, 2],
+    strata: [2, 3],
     // Stepping 0.8 / rounding 0.3: the chamfer clears the column jitter at
     // the corners (stepping 1 turns corner faces inside out on some seeds).
     stepping: 0.8,
     rounding: 0.3,
     notches: [4, 7],
-    joints: [8, 12],
-    seam: 0.9,
+    joints: [12, 18],
+    seam: 1,
     top: tones.stoneTop,
     side: tones.stoneSide,
     recess: "#16151a",
