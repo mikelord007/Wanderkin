@@ -13,7 +13,7 @@ export const TROPICAL: BiomeDefinition = {
   id: "tropical",
   name: "Tropical Island",
   palette: {
-    sand: "#f3cda2",
+    sand: "#f7ae84",
     vegetation: "#3fae5a",
     rock: "#8f8a80",
     wood: "#9a6b3f",

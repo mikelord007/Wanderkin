@@ -13,7 +13,7 @@ export const DESERT: BiomeDefinition = {
   id: "desert",
   name: "Desert",
   palette: {
-    sand: "#e3bf85",
+    sand: "#e8b46c",
     vegetation: "#6f9a4e",
     rock: "#a9774f",
     wood: "#7d5a3a",
