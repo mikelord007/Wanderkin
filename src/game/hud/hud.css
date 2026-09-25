@@ -658,7 +658,7 @@
 /* ---- Look & adventure settings (pause and click-to-play cards) -------- */
 
 .oq-hud__card:has(> .oq-hud__settings[open]) {
-  width: min(36rem, 100%);
+  width: min(42rem, 100%);
   max-height: calc(100dvh - 4rem);
   overflow-y: auto;
   border-radius: 999px 999px 28px 28px / 110px 110px 28px 28px;
@@ -728,4 +728,23 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* A short window (1280x720 and similar): with the look picker open, the card
+   tightens its own spacing so the whole card, six looks included, fits
+   without scrolling. Only the settings-open card changes. */
+@media (max-height: 820px) {
+  .oq-hud__card:has(> .oq-hud__settings[open]) {
+    padding: 1.5rem 1.6rem 1rem;
+    border-radius: 999px 999px 24px 24px / 70px 70px 24px 24px;
+  }
+  .oq-hud__card:has(> .oq-hud__settings[open]) h2 { font-size: 1.6rem; margin-bottom: .15rem; }
+  .oq-hud__card:has(> .oq-hud__settings[open]) > p { margin-bottom: .6rem; line-height: 1.45; }
+  .oq-hud__card:has(> .oq-hud__settings[open]) .oq-hud__settings { margin-top: .75rem; padding-top: .5rem; }
+  .oq-hud__card:has(> .oq-hud__settings[open]) .oq-hud__settings[open] > summary { margin-bottom: .3rem; min-height: 36px; }
+  .oq-hud__card:has(> .oq-hud__settings[open]) .oq-adventure { gap: .6rem; }
+  .oq-hud__card:has(> .oq-hud__settings[open]) .oq-adventure__reset { padding-top: .7rem; gap: .5rem; }
+  .oq-hud__card:has(> .oq-hud__settings[open]) .oq-adventure__options { margin-top: .4rem; }
+  .oq-hud__card:has(> .oq-hud__settings[open]) .oq-adventure__options .oq-adventure__option-body { padding: .45rem .7rem; gap: .1rem; }
+  .oq-hud__card:has(> .oq-hud__settings[open]) .oq-adventure__actions .oq-adventure__hint { margin: 0; }
 }

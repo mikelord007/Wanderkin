@@ -11,7 +11,6 @@
 .oq-adventure .oq-adventure__hint { margin: .2rem 0 0; font-size: .8125rem; line-height: 1.45; color: #5a4c74; }
 
 .oq-adventure__options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; margin-top: .65rem; }
-.oq-adventure__options--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .oq-adventure__option { position: relative; min-width: 0; cursor: pointer; pointer-events: auto; }
 .oq-adventure__option input { position: absolute; top: .75rem; left: .75rem; width: 1px; height: 1px; opacity: 0; }
 .oq-adventure__option-body {
@@ -28,11 +27,33 @@
 .oq-adventure__option-label { font-weight: 600; font-size: .9rem; }
 .oq-adventure__option-description { font-size: .78rem; line-height: 1.4; color: #5a4c74; }
 
-/* The biome swatches are content (a preview of each place's colours), so
-   they keep their own hues rather than the interface palette. */
-.oq-adventure__swatch { display: block; height: .45rem; border-radius: 999px; background: linear-gradient(90deg, #8a9a8f, #c9d1c6); }
-.oq-adventure__option[data-theme="tropical"] .oq-adventure__swatch { background: linear-gradient(90deg, #3aa7c9, #e9d19a 55%, #4f9a55); }
-.oq-adventure__option[data-theme="desert"] .oq-adventure__swatch { background: linear-gradient(90deg, #e2b872, #c98d4f 60%, #8fb3cf); }
+/* --- The look picker: six looks in a 3 x 2 grid of compact tiles. Each tile
+   is a tiny landscape (sky fading to its horizon over the ground, with one
+   glint of the look's collectible colour) beside the name and one short line.
+   The swatches are content, a preview of each place's colours, so they keep
+   their own hues rather than the interface palette. Original shows a photo
+   glyph instead: it is the way back to the world as you captured it. */
+.oq-adventure__looks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .45rem; margin-top: .6rem; }
+.oq-adventure__look .oq-adventure__option-body { flex-direction: row; align-items: center; gap: .55rem; padding: .45rem .55rem .45rem .45rem; min-height: 3.25rem; }
+.oq-adventure__look-text { display: grid; gap: .05rem; min-width: 0; }
+.oq-adventure__look .oq-adventure__option-label { font-size: .84rem; line-height: 1.2; }
+.oq-adventure__look .oq-adventure__option-description { font-size: .72rem; line-height: 1.3; }
+.oq-adventure__swatch {
+  position: relative; flex: none; width: 2.25rem; height: 2.25rem; border-radius: 10px; overflow: hidden;
+  background:
+    radial-gradient(circle at 70% 64%, var(--sw-glint) 0 .16rem, transparent .19rem),
+    linear-gradient(to bottom, var(--sw-zenith) 0%, var(--sw-horizon) 56%, var(--sw-ground) 56.5%, var(--sw-ground) 100%);
+  box-shadow: inset 0 0 0 1px rgba(36, 20, 61, .12);
+}
+/* A soft hill line on the ground, so the swatch reads as a place. */
+.oq-adventure__swatch::after { content: ""; position: absolute; left: -20%; right: -20%; top: 50%; height: 40%; border-radius: 50% 50% 0 0; background: var(--sw-ground); filter: brightness(.94); }
+.oq-adventure__swatch--photo { display: grid; place-items: center; color: #6a4af6; background: #f2ebff; box-shadow: inset 0 0 0 1px #d6c9f8; }
+.oq-adventure__swatch--photo::after { display: none; }
+.oq-adventure__swatch--photo svg { width: 1.2rem; height: 1.2rem; }
+/* Original is the reset: it keeps a dashed edge until chosen, so it reads as
+   "back to the photo" rather than as one more theme. */
+.oq-adventure__look[data-theme="original"] .oq-adventure__option-body { border-style: dashed; }
+.oq-adventure__look[data-theme="original"] input:checked + .oq-adventure__option-body { border-style: solid; }
 
 .oq-adventure__toggle { display: flex; align-items: flex-start; gap: .6rem; cursor: pointer; pointer-events: auto; }
 .oq-adventure__toggle input { width: 1.1rem; height: 1.1rem; margin: .15rem 0 0; accent-color: #6a4af6; flex-shrink: 0; }
@@ -64,9 +85,15 @@
 .oq-adventure__error { padding: .65rem .85rem; border-radius: 12px; border: 1px solid #f2c3bf; background: #fcebea; }
 .oq-adventure .oq-adventure__error p { margin: 0; font-size: .875rem; color: #8a1f18; }
 
-@media (max-width: 560px) {
-  .oq-adventure__options, .oq-adventure__options--three { grid-template-columns: 1fr; }
-  .oq-adventure__swatch { display: none; }
+/* Narrow cards (phones, and the pause card below ~600px): two columns keep
+   all six looks visible in three short rows. */
+@media (max-width: 600px) {
+  .oq-adventure__looks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* Each tile stacks: the landscape becomes a strip across the top. */
+  .oq-adventure__look .oq-adventure__option-body { flex-direction: column; align-items: stretch; gap: .4rem; padding: .45rem; }
+  .oq-adventure__look .oq-adventure__swatch { width: 100%; height: 1.9rem; border-radius: 8px; }
+  .oq-adventure__look-text { padding-inline: .15rem; }
+  .oq-adventure__options { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
   .oq-adventure__spinner { animation: none; }

@@ -2,9 +2,10 @@ import { createElement, isValidElement, type ReactElement, type ReactNode } from
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import {
-  ADVENTURE_COPY, ADVENTURE_OPTIONS, AdventureControls, AdventureControlsView, THEME_OPTIONS,
+  ADVENTURE_COPY, ADVENTURE_OPTIONS, AdventureControls, AdventureControlsView, LOOK_LABELS, THEME_OPTIONS,
   type AdventureControlsProps,
 } from "./AdventureControls.js";
+import { BIOME_IDS } from "../../biome/presets.js";
 
 type ViewProps = Parameters<typeof AdventureControlsView>[0];
 
@@ -56,14 +57,39 @@ function html(props: Partial<AdventureControlsProps> = {}) {
 }
 
 describe("AdventureControls", () => {
-  it("offers exactly Original, Tropical Island and Desert, and both adventures", () => {
+  it("offers all six looks in the shared biome order, with Original first, and both adventures", () => {
     expect(THEME_OPTIONS.map((o) => [o.value, o.label])).toEqual([
       ["original", "Original"], ["tropical", "Tropical Island"], ["desert", "Desert"],
+      ["alpine", "Snowy Alpine"], ["autumn", "Autumn Forest"], ["ember", "Volcanic Ember"],
     ]);
+    expect(THEME_OPTIONS.map((o) => o.value)).toEqual([...BIOME_IDS]);
     expect(ADVENTURE_OPTIONS.map((o) => o.value)).toEqual(["restore-portal", "reach-beacon"]);
     const markup = html({ biomeId: "desert", template: "reach-beacon" });
     const checked = [...markup.matchAll(/<input type="radio"[^>]*checked=""[^>]*value="([^"]+)"/g)].map((m) => m[1]);
     expect(checked).toEqual(["desert", "reach-beacon"]);
+  });
+
+  it("names every look id, so a future look appears with a proper label", () => {
+    for (const id of BIOME_IDS) {
+      const entry = LOOK_LABELS[id];
+      expect(entry, id).toBeDefined();
+      expect(entry.value).toBe(id);
+      expect(entry.label.trim().length, id).toBeGreaterThan(0);
+      expect(entry.description.trim().length, id).toBeGreaterThan(0);
+      // Only Original is the photo itself; every other look shows its palette.
+      if (id === "original") expect(entry.swatch).toBeNull();
+      else expect(Object.values(entry.swatch ?? {}).every((c) => /^#[0-9a-f]{6}$/i.test(c)), id).toBe(true);
+    }
+  });
+
+  it("renders the looks as one labelled radio group with a tile per look", () => {
+    const markup = html({ biomeId: "ember" });
+    expect(markup).toMatch(/<div class="oq-adventure__looks" role="radiogroup" aria-labelledby="[^"]+-theme-legend">/);
+    for (const id of BIOME_IDS) expect(markup).toContain(`data-theme="${id}"`);
+    const lookRadios = [...markup.matchAll(/<input type="radio" name="([^"]+)"[^>]*value="(original|tropical|desert|alpine|autumn|ember)"/g)];
+    expect(lookRadios).toHaveLength(BIOME_IDS.length);
+    expect(new Set(lookRadios.map((m) => m[1])).size).toBe(1);
+    expect(markup).toContain(ADVENTURE_COPY.themeHint);
   });
 
   it("changing the look only calls onBiomeChange and never starts a new adventure", () => {
