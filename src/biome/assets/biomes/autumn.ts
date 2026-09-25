@@ -230,9 +230,9 @@ const MUSHROOMS = [
 export const AUTUMN_ART: BiomeArt = {
   id: "autumn",
   tones,
-  // Golden-hour woodland: warm, softer shadows (more fill), slightly closer
-  // haze so the layered crowns recede.
-  lighting: { ambientKeep: 0.6, hemisphereShare: 0.5, sunElevation: [22, 46], fogScale: 0.94, contactStrength: 1.05 },
+  // Golden-hour woodland: a low warm sun for long soft shadows, softer
+  // shade (more fill), slightly closer haze so the layered crowns recede.
+  lighting: { ambientKeep: 0.6, hemisphereShare: 0.5, sunElevation: [20, 40], fogScale: 0.94, contactStrength: 1.05 },
   families: {
     broadleaf: {
       category: "tree", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.66, triangleBudget: 1600,
@@ -524,8 +524,8 @@ export const AUTUMN_ART: BiomeArt = {
     contactScale: 0.9,
     patchColor: "#6a4a2e",
     patches: {
-      tints: [{ color: "#7a5636", weight: 2 }, { color: "#8a6a3a", weight: 1 }],
-      litter: ["#c2622a", "#9c3525", "#c89a34"],
+      tints: [{ color: "#6e5440", weight: 2 }, { color: "#7a6444", weight: 1 }],
+      litter: ["#c0702a", "#9a4a2c", "#bd942c"],
     },
   },
   variation: { toneJitter: 0.05, hueJitterDeg: 5 },

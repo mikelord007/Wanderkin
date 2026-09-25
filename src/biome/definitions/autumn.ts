@@ -16,7 +16,7 @@ export const AUTUMN: BiomeDefinition = {
   id: "autumn",
   name: "Autumn Forest",
   palette: {
-    sand: "#94704e",
+    sand: "#8c786c",
     vegetation: "#c8792e",
     rock: "#8c8677",
     wood: "#6e4a2e",
@@ -27,7 +27,7 @@ export const AUTUMN: BiomeDefinition = {
   lighting: { sun: "#ffd79a", sky: "#e9dcc4", ground: "#c9a878", intensity: 2.2, ambient: 0.82, direction: [4, 5.5, -3] },
   // A warm golden haze a little closer in, so far groves soften into mist.
   sky: { zenith: "#8aa9c4", horizon: "#efdcb8", fogNear: 1.3, fogFar: 5.8 },
-  surface: { color: "#b3864f", blend: 0.4, upwardNormalMin: 0.8, patchCoverage: 0.6 },
+  surface: { color: "#9c8674", blend: 0.36, upwardNormalMin: 0.8, patchCoverage: 0.6 },
   props: { kinds: ["palm", "shrub", "rock", "wood", "dry-plant"], density: 0.55, scaleRange: [0.8, 3.1] },
   wind: { direction: [-0.8, -0.6], strength: 0.3 },
   ambient: { effect: "motes", water: false },
