@@ -357,7 +357,8 @@
   animation: oq-prompt-in 220ms ease-out;
 }
 
-/* The chip's avatar: the explorer's button, as on every chip in the app. */
+/* The chip's avatar: the mark in miniature (planet, lit rim, explorer), as on
+   every chip in the app. */
 .oq-hud__intro::before {
   content: "";
   grid-row: span 2;
@@ -365,9 +366,11 @@
   height: 2.25rem;
   border-radius: 50%;
   background:
-    radial-gradient(circle at 50% 50%, var(--hud-marigold) 0 5px, transparent 5.5px),
-    radial-gradient(circle at 50% 50%, #f2efe5 0 11px, transparent 11.5px),
-    #271950;
+    radial-gradient(circle at 50% 24%, var(--hud-marigold) 0 3px, transparent 3.5px),
+    radial-gradient(circle at 50% 78%, #1c0f38 0 12px, transparent 12.5px),
+    radial-gradient(circle at 50% 70%, #f4eeff 0 13px, transparent 13.5px),
+    radial-gradient(circle at 50% 68%, #8b6cff 0 14.5px, transparent 15px),
+    #120726;
   box-shadow: inset 0 0 0 1px #ffffff1a;
 }
 

@@ -9,8 +9,9 @@
       content="Turn a photo of an everyday object into a tiny world you can run, climb, and jump around in."
     />
     <meta name="theme-color" content="#120726" />
-    <!-- The favicon is the mark's small optical cut: bigger holes, no stitching,
-         a bigger and simpler figure. The full drawing turns to mush at 16px.
+    <!-- The favicon is the mark's small optical cut: a thicker lit rim, bigger
+         holes, no stitching or arm, and a bigger, simpler figure. The full
+         drawing turns to mush at 16px.
          The boot mark below is the full drawing, copied from Logo.tsx. -->
     <link rel="icon" href="/brand/wanderkin-favicon.svg" type="image/svg+xml" />
     <!-- The interface face is the first thing a visitor reads, so it is fetched
@@ -41,8 +42,9 @@
          is a boot screen with a hole in it. */
       .mh-boot__mark { width: 64px; height: 64px; }
       .mh-boot__word {
+        font-family: "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
         font-size: 1.375rem;
-        font-weight: 600;
+        font-weight: 500;
         letter-spacing: -0.02em;
       }
       .mh-boot p { margin: 0; font-size: 0.875rem; color: #b6a7d8; }
@@ -74,7 +76,7 @@
   <body>
     <div id="root">
       <div class="mh-boot" role="status" aria-live="polite">
-        <svg class="mh-boot__mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="0" y="0" width="48" height="48" rx="12" fill="#1d3a2e"></rect><circle cx="22" cy="30.5" r="16" fill="#f2efe5"></circle><circle cx="22" cy="30.5" r="12" fill="#e2dac6"></circle><circle cx="18.3" cy="26.8" r="1.95" fill="#1d3a2e"></circle><circle cx="25.7" cy="26.8" r="1.95" fill="#1d3a2e"></circle><circle cx="18.3" cy="34.2" r="1.95" fill="#1d3a2e"></circle><circle cx="25.7" cy="34.2" r="1.95" fill="#1d3a2e"></circle><path d="M18.3 26.8 25.7 34.2M25.7 26.8 18.3 34.2" stroke="#e8a33d" stroke-width="1.5" stroke-linecap="round"></path><g transform="rotate(20 22 30.5) translate(22 14.5) scale(.92)"><path d="M-2.2-3.6h1.8v2.7a.9.9 0 0 1-1.8 0ZM.4-3.6h1.8v2.7a.9.9 0 0 1-1.8 0Z" fill="#e8a33d"></path><rect x="-2.6" y="-8.6" width="5.2" height="5.8" rx="2.2" fill="#e8a33d"></rect><path d="M1.8-7.4 4.4-10.6" stroke="#e8a33d" stroke-width="1.6" stroke-linecap="round"></path><circle cx="0" cy="-11.1" r="2.6" fill="#f2efe5"></circle><path d="M-2.8-11.2a2.8 2.8 0 0 1 5.6 0Z" fill="#3f9f92"></path><rect x="-3" y="-11.7" width="6" height="1.2" rx="0.6" fill="#2b7a70"></rect><circle cx="0" cy="-14.2" r="0.9" fill="#3f9f92"></circle></g></svg>
+        <svg class="mh-boot__mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="0" y="0" width="48" height="48" rx="12" fill="#120726"></rect><circle cx="24" cy="31.6" r="16.2" fill="#8b6cff" fill-opacity=".28"></circle><circle cx="24" cy="31.2" r="14.9" fill="#8b6cff"></circle><circle cx="24" cy="31.6" r="14" fill="#f4eeff"></circle><circle cx="24" cy="33.5" r="13.5" fill="#1c0f38"></circle><path d="M20.6 30.4 27.4 37.2M27.4 30.4 20.6 37.2" stroke="#f2b24d" stroke-width="1.3" stroke-linecap="round"></path><circle cx="20.6" cy="30.4" r="1.8" fill="#b79cff"></circle><circle cx="27.4" cy="30.4" r="1.8" fill="#b79cff"></circle><circle cx="20.6" cy="37.2" r="1.8" fill="#b79cff"></circle><circle cx="27.4" cy="37.2" r="1.8" fill="#b79cff"></circle><g transform="translate(24 17.8) scale(.9)"><path d="M-2.2-3.6h1.8v2.7a.9.9 0 0 1-1.8 0ZM.4-3.6h1.8v2.7a.9.9 0 0 1-1.8 0Z" fill="#f2b24d"></path><rect x="-2.6" y="-8.6" width="5.2" height="5.8" rx="2.2" fill="#f2b24d"></rect><path d="M1.8-7.4 4.4-10.6" stroke="#f2b24d" stroke-width="1.6" stroke-linecap="round"></path><circle cx="0" cy="-11.1" r="2.6" fill="#f4eeff"></circle><path d="M-2.8-11.2a2.8 2.8 0 0 1 5.6 0Z" fill="#3f9f92"></path><rect x="-3" y="-11.7" width="6" height="1.2" rx="0.6" fill="#2b7a70"></rect><circle cx="0" cy="-14.2" r="0.9" fill="#3f9f92"></circle></g></svg>
         <div class="mh-boot__word">Wanderkin</div>
         <div class="mh-boot__bar" aria-hidden="true"></div>
         <p>Opening the little world…</p>

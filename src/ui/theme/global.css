@@ -74,14 +74,17 @@
   background: #ffffff0a; box-shadow: var(--wk-highlight);
   color: var(--oq-ink); font-size: .8125rem; font-weight: 500; line-height: 1.2; letter-spacing: .014em;
 }
-/* The avatar: a small dusk disc with the marigold button in it. Drawn in CSS
-   so every existing eyebrow gets one without new markup. */
+/* The avatar: the mark in miniature. A dark planet with its lit rim, and the
+   explorer as a marigold dot on top. Drawn in CSS so every existing eyebrow
+   gets one without new markup. */
 .oq-kit-eyebrow::before, .wk-chip::before {
   content: ""; flex: none; width: 22px; height: 22px; border-radius: 50%;
   background:
-    radial-gradient(circle at 50% 50%, var(--wk-marigold) 0 3.5px, transparent 4px),
-    radial-gradient(circle at 50% 50%, #f2efe5 0 7px, transparent 7.5px),
-    var(--wk-veil);
+    radial-gradient(circle at 50% 24%, var(--wk-marigold) 0 2px, transparent 2.5px),
+    radial-gradient(circle at 50% 78%, var(--wk-dusk) 0 7.5px, transparent 8px),
+    radial-gradient(circle at 50% 70%, var(--wk-ink) 0 8px, transparent 8.5px),
+    radial-gradient(circle at 50% 68%, var(--wk-violet) 0 9px, transparent 9.5px),
+    var(--wk-night);
   box-shadow: inset 0 0 0 1px #ffffff1a;
 }
 
@@ -89,10 +92,11 @@
    tittle keep their proportions at any font size. */
 .mh-logo { display: inline-flex; align-items: center; gap: .5em; font-size: 1.25rem; color: var(--wk-ink); }
 .mh-logo__mark { flex: none; }
+/* The wordmark is set in the interface face, a step heavier than the light
+   headlines so the name holds its own at nav size. */
 .mh-logo__word {
-  font-family: var(--oq-font-brand);
-  font-variation-settings: "SOFT" 100, "WONK" 1;
-  font-weight: 650; font-size: 1em; letter-spacing: -.015em; line-height: 1;
+  font-family: var(--oq-font-display);
+  font-weight: 500; font-size: 1.05em; letter-spacing: -.025em; line-height: 1;
 }
 /* The plain name, for screen readers and copy-paste. The drawn letters beside it
    carry the dotless i. */

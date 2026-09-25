@@ -59,7 +59,7 @@ export function FriendLandingScreen({ shareId, onPlay, onHome }: FriendLandingSc
 
   return (
     <main className="oq-screen oq-friend">
-      <header className="oq-friend__brand"><Logo size={30} tone="mono" /></header>
+      <header className="oq-friend__brand"><Logo size={30} /></header>
       <section className="oq-panel oq-friend__card">
         <div className="oq-friend__copy">
           <p className="oq-friend__eyebrow wk-chip">A friend shared a little world</p>

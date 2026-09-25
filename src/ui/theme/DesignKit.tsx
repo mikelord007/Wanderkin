@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   AudioControls, Button, Card, ChoiceTiles, DEFAULT_AUDIO_SETTINGS, EmptyState, HUDChip, Icon,
-  Logo, Modal, PlayFrame, ProgressPanel, Sheet, Stepper, STYLE_EXAMPLES, SubtitleBar, TextField,
+  Logo, LogoMark, Modal, PlayFrame, ProgressPanel, Sheet, Stepper, STYLE_EXAMPLES, SubtitleBar, TextField,
   Toast, WORLD_STYLES, WorldStyleScope, type ProgressStage, type WorldStyle,
 } from "../components/index.js";
 import { BRAND_NAME } from "../../brand.js";
@@ -76,10 +76,34 @@ function StyleGallery({ style, label }: { style: WorldStyle; label: string }) {
     <Sheet open={sheet} onClose={() => setSheet(false)} title="World settings"><AudioControls value={audio} onChange={setAudio} /><Button onClick={() => setSheet(false)}>Done</Button></Sheet>
   </WorldStyleScope>;
 }
+/** The logo system at real sizes, on the darkest and the lightest grounds. */
+function BrandSection() {
+  return <section className="oq-kit-gallery oq-kit-brand" id="brand" aria-labelledby="brand-heading">
+    <header className="oq-kit-gallery__header"><div><p className="oq-kit-eyebrow">Logo</p><h2 id="brand-heading">Brand</h2></div></header>
+    <div className="oq-kit-brand__grid">
+      <figure className="oq-kit-brand__plate oq-kit-brand__plate--wide"><div className="oq-kit-brand__row"><Logo size={36} /></div>
+        <figcaption>Lockup: mark and wordmark, as in the navigation (36px mark).</figcaption></figure>
+      <figure className="oq-kit-brand__plate"><div className="oq-kit-brand__row">{[64, 48, 36, 24].map(size => <LogoMark key={size} size={size} title={`${BRAND_NAME} mark, ${size}px`} />)}</div>
+        <figcaption>Full mark, 64 / 48 / 36 / 24px.</figcaption></figure>
+      <figure className="oq-kit-brand__plate"><div className="oq-kit-brand__row">
+        <LogoMark size={20} title={`${BRAND_NAME} small mark, 20px`} />
+        <img src="/brand/wanderkin-favicon.svg" width={32} height={32} alt={`${BRAND_NAME} favicon, 32px`} />
+        <img src="/brand/wanderkin-favicon.svg" width={16} height={16} alt={`${BRAND_NAME} favicon, 16px`} />
+      </div><figcaption>Small cut below 24px, and the favicon file at 32 and 16px.</figcaption></figure>
+      <figure className="oq-kit-brand__plate"><div className="oq-kit-brand__row">{[48, 24, 16].map(size => <LogoMark key={size} size={size} tone="mono" title={`${BRAND_NAME} mono mark, ${size}px`} />)}</div>
+        <figcaption>Mono, one colour, on night.</figcaption></figure>
+      <figure className="oq-kit-brand__plate oq-kit-brand__plate--light"><div className="oq-kit-brand__row">
+        <Logo size={36} tone="mono" />
+        <LogoMark size={36} title={`${BRAND_NAME} mark on a light ground`} />
+      </div><figcaption>On the lightest surface (halo): mono lockup in night ink; the full mark carries its own night tile.</figcaption></figure>
+    </div>
+  </section>;
+}
 export function DesignKit() {
   return <WorldStyleScope className="oq-kit-docs"><main className="oq-kit-container oq-kit-stack">
-    <header className="oq-kit-docs__header"><a href="/"><Logo size={30} tone="mono" /></a><span className="oq-kit-eyebrow">Design system · v2</span></header>
+    <header className="oq-kit-docs__header"><a href="/"><Logo size={30} /></a><span className="oq-kit-eyebrow">Design system · v2</span></header>
     <div className="oq-kit-docs__intro"><p className="oq-kit-eyebrow">{BRAND_NAME} design system</p><h1>Small worlds.<br />A shared language.</h1><p className="oq-kit-muted">Every component, in every world style. A living kit for everyday adventures.</p></div>
+    <BrandSection />
     <nav className="oq-kit-row" aria-label="World style galleries">{WORLD_STYLES.map(s => <a key={s.value} href={`#${s.value}`} className="oq-kit-button oq-kit-button--secondary">{s.label}</a>)}</nav>
     {WORLD_STYLES.map(s => <StyleGallery key={s.value} style={s.value} label={s.label} />)}
     <footer className="oq-kit-muted">Self-hosted fonts. Local icons. Real sample photography. Built for keyboard, touch, and reduced motion.</footer>

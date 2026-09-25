@@ -1,8 +1,8 @@
 /*
  * Wanderkin design tokens: planetrise.
  *
- * The logo is a sewing button the size of a planet with a tiny explorer on
- * top. The interface is the view from that explorer's night: a deep violet
+ * The logo is a sewing button seen as a planet at planetrise, with a tiny
+ * explorer standing on its lit rim. The interface is the view from that explorer's night: a deep violet
  * sky, and a dark world curving up from the bottom of the screen with violet
  * and white light spilling round its rim. That rim light is the one bold
  * thing in the system (see `--wk-planetrise`); everything else is quiet,
@@ -30,20 +30,6 @@
     U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-/* Fraunces: the wordmark only. The brand defines the name as live Fraunces
-   text; the rest of the interface speaks in Outfit. */
-@font-face {
-  font-family: "Fraunces";
-  font-style: normal;
-  font-weight: 400 700;
-  font-display: swap;
-  src: url("/brand/fonts/fraunces-latin-var.woff2") format("woff2-variations"),
-       url("/brand/fonts/fraunces-latin-var.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
-    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191,
-    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
 :root {
   /* --- The named palette --- */
   --wk-night: #120726;     /* page ground */
@@ -53,16 +39,17 @@
   --wk-mist: #b6a7d8;      /* muted text, 8:1 on night */
   --wk-violet: #8b6cff;    /* glow body */
   --wk-halo: #e9e0ff;      /* glow core */
-  /* The warm button the explorer stands on. Used only for focus and for "you
-     are here / next": never as decoration. */
+  /* The explorer's marigold suit and stitching in the mark. Used only for
+     focus and for "you are here / next": never as decoration. */
   --wk-marigold: #f2b24d;
 
-  /* --- Brand constants, the same values the logo is drawn in. --- */
-  --mh-pine: #1d3a2e;
-  --mh-ivy: #2e6b4f;
-  --mh-fern: #56997a;
+  /* --- Older names, kept as aliases for rules and inline styles that still
+     reach for them. The mark's own colours live in Logo.tsx (MARK_COLORS). --- */
+  --mh-pine: var(--wk-night);
+  --mh-ivy: var(--wk-violet);
+  --mh-fern: #b79cff;
   --mh-marigold: var(--wk-marigold);
-  --mh-plaster: #f2efe5;
+  --mh-plaster: var(--wk-ink);
 
   /* --- Surfaces --- */
   --oq-paper: var(--wk-night);
@@ -102,7 +89,6 @@
   /* --- Type --- */
   --oq-font-body: "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
   --oq-font-display: "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --oq-font-brand: "Fraunces", "Iowan Old Style", "Palatino Linotype", Palatino, serif;
   --oq-display-variation: normal;
   --wk-display-weight: 300;
 

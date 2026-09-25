@@ -2,70 +2,100 @@ import type { CSSProperties } from "react";
 import { BRAND_NAME } from "../../brand.js";
 
 /**
- * The Wanderkin mark: a sewing button the size of a planet, and the tiny
- * explorer standing on top of it. The explorer wears the in-game beanie and
- * suit, and has an arm up as if they've just spotted something. One picture of
- * the whole product: an everyday object becomes a world, and you are very small
- * on it.
+ * The Wanderkin mark: planetrise over a sewing button.
+ *
+ * The button is a planet, seen the way the whole interface sees its worlds: a
+ * dark disc rising with white and violet light round its upper rim. Its four
+ * holes glow, its stitching is marigold thread, and the tiny explorer (the
+ * in-game teal beanie and marigold suit, arm up as if they've just spotted
+ * something) stands on the lit rim. One picture of the product: an everyday
+ * object becomes a world, and you are very small on it.
+ *
+ * No gradients and no ids: the glow is solid circles stacked from haze to rim,
+ * so the drawing renders identically inline, in an <img>, as a favicon, and
+ * in the static copies.
  *
  * Three drawings share one set of coordinates:
- * - `full`: the pine tile with shading, stitching, and a tilted, waving figure.
- * - The small optical cut, used automatically below 24px: bigger holes, no
- *   stitching or arm, a larger and simpler figure. At 16px the full drawing's
- *   holes are half a pixel wide and the arm blurs away. This is the favicon.
- * - `mono`: one colour, `currentColor`, no tile. For photos, a dark HUD, or
- *   anywhere the tile would fight the backdrop.
+ * - `full`: the night tile, the lit rim in three steps, stitching, and the
+ *   waving figure. From 24px up.
+ * - The small optical cut, used automatically below 24px: a thicker rim,
+ *   bigger holes, no stitching or arm, a larger and simpler figure. At 16px the
+ *   full drawing's holes are half a pixel wide. This is the favicon.
+ * - `mono`: one colour, `currentColor`, no tile. The rim becomes a single arc
+ *   held apart from the planet. For light grounds, photos, or anywhere a
+ *   single ink is needed.
  *
- * `public/brand/wanderkin-mark.svg`, `wanderkin-favicon.svg` and the boot
- * screen in `index.html` are copies of these drawings. `Logo.test.ts` checks
- * they have not drifted.
+ * `public/brand/wanderkin-mark.svg`, `wanderkin-favicon.svg`,
+ * `wanderkin-mark-mono.svg` and the boot screen in `index.html` are copies of
+ * these drawings. `Logo.test.ts` checks they have not drifted.
  */
 export type LogoTone = "full" | "mono";
 
 /** Below this rendered size the mark switches to the small optical cut. */
 export const LOGO_SMALL_BELOW = 24;
 
-/** Brand colours as drawn by the mark. They match the `--mh-*` tokens. */
+/** Brand colours as drawn by the mark. They match the `--wk-*` tokens. */
 export const MARK_COLORS = {
-  pine: "#1d3a2e",
-  plaster: "#f2efe5",
-  dish: "#e2dac6",
-  marigold: "#e8a33d",
+  night: "#120726",
+  planet: "#1c0f38",
+  violet: "#8b6cff",
+  rim: "#f4eeff",
+  hole: "#b79cff",
+  marigold: "#f2b24d",
+  face: "#f4eeff",
   beanie: "#3f9f92",
   beanieBand: "#2b7a70",
 } as const;
 
 /** A circle as one path segment, so it can join an even-odd compound path. */
 function ring(cx: number, cy: number, r: number): string {
-  return `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z`;
+  return `M${+(cx - r).toFixed(2)} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z`;
 }
 
-/** The button: centre, radius, dished centre, and hole spacing, per cut. */
-const BUTTON = {
-  full: { cx: 22, cy: 30.5, r: 16, dish: 12, hole: 3.7, holeR: 1.95 },
-  small: { cx: 22, cy: 31, r: 15.5, dish: 0, hole: 4.6, holeR: 2.6 },
+/**
+ * The planet and its light, per cut. Each light circle sits a little higher
+ * than the one in front of it, so the rim is thickest at the top and thins to
+ * nothing at the sides: the shape of light round a planet's limb.
+ */
+const PLANET = {
+  full: { cx: 24, cy: 33.5, r: 13.5, rim: { cy: 31.6, r: 14 }, band: { cy: 31.2, r: 14.9 }, haze: { cy: 31.6, r: 16.2 }, hole: 3.4, holeR: 1.8, holeCy: 33.8 },
+  small: { cx: 24, cy: 34, r: 13.8, rim: { cy: 31.4, r: 14.8 }, band: { cy: 30.8, r: 15.8 }, haze: { cy: 0, r: 0 }, hole: 4.4, holeR: 2.4, holeCy: 34.6 },
 } as const;
 
 type Point = [number, number];
 
+/** Rounded so float noise never reaches the SVG text. */
+const q = (n: number) => +n.toFixed(2);
+
 /** Top-left, top-right, bottom-left, bottom-right. */
-function holes(b: (typeof BUTTON)[keyof typeof BUTTON]): [Point, Point, Point, Point] {
+function holes(p: (typeof PLANET)[keyof typeof PLANET]): [Point, Point, Point, Point] {
   return [
-    [b.cx - b.hole, b.cy - b.hole],
-    [b.cx + b.hole, b.cy - b.hole],
-    [b.cx - b.hole, b.cy + b.hole],
-    [b.cx + b.hole, b.cy + b.hole],
+    [q(p.cx - p.hole), q(p.holeCy - p.hole)],
+    [q(p.cx + p.hole), q(p.holeCy - p.hole)],
+    [q(p.cx - p.hole), q(p.holeCy + p.hole)],
+    [q(p.cx + p.hole), q(p.holeCy + p.hole)],
   ];
 }
 
-/**
- * Where the explorer stands: just past the top of the button, square to its
- * curve the way you stand on a planet. The lean leaves room for a big button.
- */
+/** Where the explorer stands: upright, feet just into the top of the lit rim
+ * (rim top is 17.6 on the full cut, 16.6 on the small one). */
 const STANCE = {
-  full: `rotate(20 ${BUTTON.full.cx} ${BUTTON.full.cy}) translate(${BUTTON.full.cx} ${BUTTON.full.cy - BUTTON.full.r}) scale(.92)`,
-  small: `rotate(18 ${BUTTON.small.cx} ${BUTTON.small.cy}) translate(${BUTTON.small.cx} ${BUTTON.small.cy - BUTTON.small.r}) scale(1.1)`,
+  full: "translate(24 17.8) scale(.9)",
+  small: "translate(24 16.8) scale(.98)",
+  mono: "translate(24 16.4) scale(.9)",
+  monoSmall: "translate(24 15.6) scale(.98)",
 } as const;
+
+/** The mono rim: an arc over the top of the planet, clear of its edge. */
+const MONO_RIM = {
+  full: { r: 16.2, width: 2.2 },
+  small: { r: 16.6, width: 3 },
+} as const;
+function rimArc(cx: number, cy: number, r: number): string {
+  const x = r * Math.cos(Math.PI / 6);
+  const y = cy - r * Math.sin(Math.PI / 6);
+  return `M${q(cx - x)} ${q(y)}A${r} ${r} 0 0 1 ${q(cx + x)} ${q(y)}`;
+}
 
 /*
  * The explorer, drawn feet-first at the origin with up as -y, about 15 units
@@ -84,27 +114,29 @@ const POMPOM = { cx: 0, cy: -14.2, r: 0.9 };
 const MONO_FACE = "M-2.55-10.6A2.6 2.6 0 1 0 2.55-10.6Z";
 
 function FullMark() {
-  const b = BUTTON.full;
-  const [tl, tr, bl, br] = holes(b);
+  const p = PLANET.full;
+  const [tl, tr, bl, br] = holes(p);
   return (
     <>
-      <rect x="0" y="0" width="48" height="48" rx="12" fill={MARK_COLORS.pine} />
-      <circle cx={b.cx} cy={b.cy} r={b.r} fill={MARK_COLORS.plaster} />
-      <circle cx={b.cx} cy={b.cy} r={b.dish} fill={MARK_COLORS.dish} />
-      {holes(b).map(([x, y]) => (
-        <circle key={`${x},${y}`} cx={x} cy={y} r={b.holeR} fill={MARK_COLORS.pine} />
-      ))}
+      <rect x="0" y="0" width="48" height="48" rx="12" fill={MARK_COLORS.night} />
+      <circle cx={p.cx} cy={p.haze.cy} r={p.haze.r} fill={MARK_COLORS.violet} fillOpacity=".28" />
+      <circle cx={p.cx} cy={p.band.cy} r={p.band.r} fill={MARK_COLORS.violet} />
+      <circle cx={p.cx} cy={p.rim.cy} r={p.rim.r} fill={MARK_COLORS.rim} />
+      <circle cx={p.cx} cy={p.cy} r={p.r} fill={MARK_COLORS.planet} />
       <path
         d={`M${tl[0]} ${tl[1]} ${br[0]} ${br[1]}M${tr[0]} ${tr[1]} ${bl[0]} ${bl[1]}`}
         stroke={MARK_COLORS.marigold}
-        strokeWidth="1.5"
+        strokeWidth="1.3"
         strokeLinecap="round"
       />
+      {holes(p).map(([x, y]) => (
+        <circle key={`${x},${y}`} cx={x} cy={y} r={p.holeR} fill={MARK_COLORS.hole} />
+      ))}
       <g transform={STANCE.full}>
         <path d={LEGS} fill={MARK_COLORS.marigold} />
         <rect {...TORSO} fill={MARK_COLORS.marigold} />
         <path d={ARM} stroke={MARK_COLORS.marigold} strokeWidth="1.6" strokeLinecap="round" />
-        <circle {...HEAD} fill={MARK_COLORS.plaster} />
+        <circle {...HEAD} fill={MARK_COLORS.face} />
         <path d={BEANIE} fill={MARK_COLORS.beanie} />
         <rect {...BEANIE_BAND} fill={MARK_COLORS.beanieBand} />
         <circle {...POMPOM} fill={MARK_COLORS.beanie} />
@@ -114,17 +146,19 @@ function FullMark() {
 }
 
 function SmallMark() {
-  const b = BUTTON.small;
+  const p = PLANET.small;
   return (
     <>
-      <rect x="0" y="0" width="48" height="48" rx="11" fill={MARK_COLORS.pine} />
-      <circle cx={b.cx} cy={b.cy} r={b.r} fill={MARK_COLORS.plaster} />
-      {holes(b).map(([x, y]) => (
-        <circle key={`${x},${y}`} cx={x} cy={y} r={b.holeR} fill={MARK_COLORS.pine} />
+      <rect x="0" y="0" width="48" height="48" rx="11" fill={MARK_COLORS.night} />
+      <circle cx={p.cx} cy={p.band.cy} r={p.band.r} fill={MARK_COLORS.violet} />
+      <circle cx={p.cx} cy={p.rim.cy} r={p.rim.r} fill={MARK_COLORS.rim} />
+      <circle cx={p.cx} cy={p.cy} r={p.r} fill={MARK_COLORS.planet} />
+      {holes(p).map(([x, y]) => (
+        <circle key={`${x},${y}`} cx={x} cy={y} r={p.holeR} fill={MARK_COLORS.hole} />
       ))}
       <g transform={STANCE.small}>
         <rect {...SMALL_BODY} fill={MARK_COLORS.marigold} />
-        <circle {...HEAD} fill={MARK_COLORS.plaster} />
+        <circle {...HEAD} fill={MARK_COLORS.face} />
         <path d={BEANIE} fill={MARK_COLORS.beanie} />
       </g>
     </>
@@ -132,15 +166,15 @@ function SmallMark() {
 }
 
 function MonoMark({ small }: { small: boolean }) {
-  const b = small ? BUTTON.small : BUTTON.full;
-  // Even-odd does the carving: the disc, then (full cut only) a thin groove
-  // where the dish meets the rim, then the four holes.
-  const groove = small ? "" : ring(b.cx, b.cy, b.dish + 0.5) + ring(b.cx, b.cy, b.dish - 0.5);
-  const disc = ring(b.cx, b.cy, b.r) + groove + holes(b).map(([x, y]) => ring(x, y, b.holeR)).join("");
+  const p = small ? PLANET.small : PLANET.full;
+  const rim = small ? MONO_RIM.small : MONO_RIM.full;
+  // Even-odd carves the holes out of the planet.
+  const disc = ring(p.cx, p.cy, p.r) + holes(p).map(([x, y]) => ring(x, y, p.holeR)).join("");
   return (
     <g fill="currentColor">
+      <path d={rimArc(p.cx, p.cy, rim.r)} fill="none" stroke="currentColor" strokeWidth={rim.width} strokeLinecap="round" />
       <path d={disc} fillRule="evenodd" />
-      <g transform={small ? STANCE.small : STANCE.full}>
+      <g transform={small ? STANCE.monoSmall : STANCE.mono}>
         {small ? <rect {...SMALL_BODY} /> : (
           <>
             <path d={LEGS} />
@@ -180,10 +214,11 @@ export function LogoMark({ size = 36, tone = "full", title }: {
 }
 
 /**
- * The name as drawn in the wordmark. The one liberty taken with the typeface:
- * the dot on the "i" is a small marigold button, the same one the explorer
- * stands on. Screen readers get the plain name; the drawn letters are hidden
- * from them so nothing spells out a dotless i.
+ * The name as drawn in the wordmark, set in the interface face. The one
+ * liberty taken with the typeface: the dot on the "i" is a small marigold
+ * button, the same one the explorer's suit is cut from. Screen readers get the
+ * plain name; the drawn letters are hidden from them so nothing spells out a
+ * dotless i.
  */
 function Wordmark() {
   const i = BRAND_NAME.lastIndexOf("i");
@@ -201,8 +236,8 @@ function Wordmark() {
 }
 
 /**
- * Mark plus wordmark. The wordmark is live text rather than outlines so it
- * inherits the page's display face and never blurs.
+ * The horizontal lockup: mark plus wordmark. The wordmark is live text rather
+ * than outlines so it inherits the page's colour and never blurs.
  */
 export function Logo({ size = 36, tone = "full", as: Tag = "span", style }: {
   size?: number;

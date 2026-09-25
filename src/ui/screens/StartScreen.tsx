@@ -171,7 +171,7 @@ export function StartScreen({
       <div className="oq-welcome__band oq-shade">
         <div className="oq-kit-container">
           <nav className="oq-welcome__nav" aria-label="Main navigation">
-            <Logo size={34} tone="mono" />
+            <Logo size={34} />
             <Button variant="secondary" className="oq-welcome__nav-action" onClick={showWorlds}>My worlds <Icon name="arrow" /></Button>
           </nav>
           <section className="oq-welcome__hero" aria-labelledby="welcome-heading">

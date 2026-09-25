@@ -13,3 +13,15 @@
 .oq-kit-style-swatch svg { width: 56px; height: 56px; stroke-width: 1; }
 .oq-kit-demo-fullscreen { position: fixed; inset: 0; z-index: 50; }
 @media(max-width:699px) { .oq-kit-gallery { padding: 16px; margin-inline: -4px; border-radius: 20px; } .oq-kit-docs__header { align-items: flex-start; flex-direction: column; } .oq-kit-swatches span { width: 24px; height: 24px; } }
+/* Brand: the logo system at real sizes. Plates are night except the last,
+   which is the system's lightest surface, to prove the mono lockup and the
+   tiled mark both hold up there. */
+.oq-kit-brand__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 16px; }
+.oq-kit-brand__plate { margin: 0; display: grid; gap: 14px; align-content: space-between; padding: 22px; border-radius: var(--oq-round-lg); border: 1px solid var(--wk-rim); background: var(--wk-night); }
+.oq-kit-brand__plate--wide { grid-column: 1 / -1; }
+.oq-kit-brand__plate--light { background: var(--wk-halo); border-color: #12072622; color: var(--wk-night); }
+.oq-kit-brand__plate--light .mh-logo { color: var(--wk-night); }
+.oq-kit-brand__plate.oq-kit-brand__plate--light figcaption { color: #3b2a66; }
+.oq-kit-brand__row { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 20px; min-height: 64px; }
+.oq-kit-brand__plate figcaption { font-size: .875rem; color: var(--oq-muted); }
+.oq-kit-brand .mh-logo { font-size: 1.375rem; }
