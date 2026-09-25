@@ -90,7 +90,33 @@ describe("biome surface blend on cloned scan materials", () => {
     expect(readBiomeSurface(floor)!.global).toBeGreaterThan(0.5);
     expect(readBiomeSurface(step)!.global).toBeGreaterThan(0.3);
     applyBiomeSurfaceToMaterial(floor, null, "floor");
-    expect(readBiomeSurface(floor)).toEqual({ strength: 0, patchCount: 0, global: 0 });
+    expect(readBiomeSurface(floor)).toMatchObject({ strength: 0, patchCount: 0, global: 0, floorTint: 0 });
+  });
+
+  it("tints the scan's own floor-level ground like the helper floor, and nothing higher", () => {
+    const withFloor = { ...layout("tropical"), bounds: { min: [0, 0.12, 0] as const, max: [2, 1, 2] as const } } as BiomeLayout;
+    const treatment = biomeSurfaceTreatment(getBiomeDefinition("tropical"), withFloor, "standard")!;
+    expect(treatment.helper.floorLevel).toBe(0.12);
+    expect(treatment.helper.floorBand).toBeGreaterThan(0.03);
+    // Seats and desk tops in real scans sit >= 25 cm above the floor.
+    expect(treatment.helper.floorBand).toBeLessThan(0.1);
+    const scan = new THREE.MeshStandardMaterial();
+    const floor = new THREE.MeshStandardMaterial();
+    const step = new THREE.MeshStandardMaterial();
+    for (const m of [scan, floor, step]) installBiomeSurfaceBlend(m);
+    applyBiomeSurfaceToMaterial(scan, treatment);
+    applyBiomeSurfaceToMaterial(floor, treatment, "floor");
+    applyBiomeSurfaceToMaterial(step, treatment, "structure");
+    expect(readBiomeSurface(scan)).toMatchObject({ floorTint: treatment.helper.floorStrength, floorLevel: 0.12, global: 0 });
+    expect(readBiomeSurface(floor)!.floorTint).toBe(0);
+    expect(readBiomeSurface(step)!.floorTint).toBe(0);
+    // Original (no treatment) switches it off again.
+    applyBiomeSurfaceToMaterial(scan, null);
+    expect(readBiomeSurface(scan)!.floorTint).toBe(0);
+    // The shader gates the whole block on the uniform, so Original skips it.
+    const shader = fakeShader();
+    scan.onBeforeCompile(shader as never, undefined as never);
+    expect(shader.fragmentShader).toContain("if (oqBiomeFloorTint > 0.0)");
   });
 
   it("is subtle, localized and bounded", () => {
@@ -124,7 +150,7 @@ describe("biome surface blend on cloned scan materials", () => {
     installBiomeSurfaceBlendOnObject(clone); // idempotent
     const keys = () => materialsOf(clone).map((m) => m.customProgramCacheKey());
     const original = keys();
-    for (const k of original) expect(k.match(/oq-biome-surface-v2/g)).toHaveLength(1);
+    for (const k of original) expect(k.match(/oq-biome-surface-v3/g)).toHaveLength(1);
 
     applyBiomeSurface(clone, biomeSurfaceTreatment(getBiomeDefinition("tropical"), layout("tropical"), "standard"));
     expect(keys()).toEqual(original);
@@ -132,7 +158,7 @@ describe("biome surface blend on cloned scan materials", () => {
 
     applyBiomeSurface(clone, null);
     expect(keys()).toEqual(original);
-    for (const m of materialsOf(clone)) expect(readBiomeSurface(m)).toEqual({ strength: 0, patchCount: 0, global: 0 });
+    for (const m of materialsOf(clone)) expect(readBiomeSurface(m)).toMatchObject({ strength: 0, patchCount: 0, global: 0, floorTint: 0 });
   });
 
   it("chains after the style shader and gates every change behind a non-zero uniform", () => {
@@ -149,9 +175,11 @@ describe("biome surface blend on cloned scan materials", () => {
     const injected = shader.fragmentShader.slice(shader.fragmentShader.indexOf("#include <map_fragment>"));
     // Every write to diffuseColor sits inside a gate that is false for Original.
     const writes = [...injected.matchAll(/diffuseColor\.rgb =/g)].map((m) => m.index!);
-    expect(writes).toHaveLength(2);
+    expect(writes).toHaveLength(3);
     expect(writes[0]).toBeGreaterThan(injected.indexOf("if (oqBiomeGlobal > 0.0)"));
-    expect(writes[1]).toBeGreaterThan(injected.indexOf("if (oqBiomeStrength > 0.0)"));
+    expect(writes[1]).toBeGreaterThan(injected.indexOf("if (oqBiomeFloorTint > 0.0)"));
+    expect(writes[2]).toBeGreaterThan(injected.indexOf("if (oqBiomeStrength > 0.0)"));
+    expect(injected.indexOf("if (oqBiomeFloorTint > 0.0)")).toBeGreaterThan(-1);
     expect(injected.indexOf("if (oqBiomeGlobal > 0.0)")).toBeGreaterThan(-1);
     expect(shader.uniforms).toHaveProperty("oqBiomeStrength");
     expect(shader.uniforms).toHaveProperty("oqBiomePatches");

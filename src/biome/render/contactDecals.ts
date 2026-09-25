@@ -14,6 +14,9 @@ import type { GroundStyle } from "../assets/types.js";
 import type { OwnedObject } from "./atmosphereEffects.js";
 import { seededRandom } from "./selection.js";
 
+/** Gameplay readability (§9): decal alpha never exceeds this. */
+export const MAX_CONTACT_OPACITY = 0.45;
+
 export function createContactDecals(
   clusters: readonly ComposedCluster[],
   ground: GroundStyle,
@@ -38,7 +41,7 @@ export function createContactDecals(
         patch: cracked ? 2 : 1,
       });
     }
-    decals.push({ cluster, radius: cluster.radius * Math.min(1, ground.contactScale) * 0.8, color: contact, opacity: Math.min(0.6, ground.contactOpacity), patch: 0 });
+    decals.push({ cluster, radius: cluster.radius * Math.min(1, ground.contactScale) * 0.8, color: contact, opacity: Math.min(MAX_CONTACT_OPACITY, ground.contactOpacity), patch: 0 });
   }
 
   const geometry = new THREE.CircleGeometry(1, 24);

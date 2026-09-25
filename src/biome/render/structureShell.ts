@@ -11,7 +11,9 @@
  *    highlight tone, marking the collision edge.
  *  - Sides: horizontal strata that step in and out, with chamfered corners,
  *    uneven columns and darker crack columns; ledges face up (light) or down
- *    (recess dark).
+ *    (recess dark). A thin dark seam runs along the foot of every stratum and
+ *    thin staggered joints cut each one, so the strata still read as planks
+ *    or courses in deep furniture shade, where tone bands alone flatten.
  *  - Base: sinks a little below the collider bottom so it never floats.
  * Every vertex stays within the box ± τ horizontally, where
  * τ = min(1.2 cm, 4% of the smaller horizontal side) in world units.
@@ -138,10 +140,23 @@ export function createStructureShell({ dimensions, scale, style, seed }: Structu
     const out = i === 0 ? 1 : i % 2 === 1 ? 1 - style.stepping * 1.4 : 0.9;
     const jitter = base.map(() => (random() - 0.5) * 0.5 * style.stepping);
     // Strata read mostly through tone (the geometry may only move ±τ):
-    // alternate clearly lighter and darker bands.
-    const tone = (i % 2 === 0 ? 0.72 : 0.3) + (random() - 0.5) * 0.16;
+    // alternate clearly lighter and darker bands, wide enough to survive shade.
+    const tone = (i % 2 === 0 ? 0.82 : 0.22) + (random() - 0.5) * 0.14;
     return { top, bottom: cuts[i + 1]!, ring: outline(Math.max(-1, Math.min(1, out)), jitter, chamfer), tone };
   });
+  // Staggered vertical joints: per stratum, a few columns carry a thin joint
+  // at a random position along them (never the same column in the next one).
+  const [jointLow, jointHigh] = style.joints ?? [2, 4];
+  const joints = layers.map(() => new Map<number, number>());
+  joints.forEach((set, i) => {
+    const count = Math.round(jointLow + (jointHigh - jointLow) * random());
+    for (let j = 0; j < count; j += 1) {
+      const column = Math.floor(random() * base.length);
+      if (corner[column] || joints[i - 1]?.has(column)) continue;
+      set.set(column, 0.25 + random() * 0.5);
+    }
+  });
+  const seamDarkness = Math.min(1, Math.max(0, style.seam ?? 0.7));
 
   // ---- Triangles (non-indexed, flat shaded) ------------------------------
   const positions: number[] = [];
@@ -183,6 +198,10 @@ export function createStructureShell({ dimensions, scale, style, seed }: Structu
   }
   // Strata walls and the ledges between them.
   layers.forEach((layer, i) => {
+    const last = i === layers.length - 1;
+    // The seam at the foot of the stratum (the lowest one sits in the ground).
+    const seamTop = last ? layer.bottom : layer.bottom + (layer.top - layer.bottom) * 0.14;
+    const lerpXZ = (p: { x: number; z: number }, q: { x: number; z: number }, t: number) => ({ x: p.x + (q.x - p.x) * t, z: p.z + (q.z - p.z) * t });
     for (let k = 0; k < layer.ring.length; k += 1) {
       const n = (k + 1) % layer.ring.length;
       const a = layer.ring[k]!;
@@ -190,9 +209,19 @@ export function createStructureShell({ dimensions, scale, style, seed }: Structu
       const crack = cracks.has(`${k}:${i}`);
       const heightT = (layer.top - sideBottom) / Math.max(1e-6, sideTop - sideBottom);
       let color = mix(side.dark, side.light, layer.tone + 0.2 * heightT - 0.1);
-      if (i === layers.length - 1) color = mix(color, recess, 0.35); // darker base
+      if (last) color = mix(color, recess, 0.35); // darker base
       if (crack) color = mix(color, recess, 0.6);
-      quad([a.x, layer.top, a.z], [a.x, layer.bottom, a.z], [b.x, layer.bottom, b.z], [b.x, layer.top, b.z], color);
+      const seamColor = mix(color, recess, seamDarkness);
+      // Face segments along the column: a thin dark joint splits it in two.
+      const joint = joints[i]!.get(k);
+      const cuts01 = joint === undefined ? [0, 1] : [0, joint - 0.035, joint + 0.035, 1];
+      for (let c = 0; c + 1 < cuts01.length; c += 1) {
+        const p = lerpXZ(a, b, cuts01[c]!);
+        const q = lerpXZ(a, b, cuts01[c + 1]!);
+        const isJoint = cuts01.length === 4 && c === 1;
+        quad([p.x, layer.top, p.z], [p.x, seamTop, p.z], [q.x, seamTop, q.z], [q.x, layer.top, q.z], isJoint ? seamColor : color);
+        if (seamTop > layer.bottom) quad([p.x, seamTop, p.z], [p.x, layer.bottom, p.z], [q.x, layer.bottom, q.z], [q.x, seamTop, q.z], seamColor);
+      }
     }
     const next = layers[i + 1];
     if (!next) return;

@@ -21,6 +21,9 @@ export const TROPICAL_WALL: WallStyle = {
   rounding: 0.55,
   // Dark gaps / knots, each confined to one plank.
   notches: [1, 2],
+  // Plank ends: many short, staggered joints; strong seams between planks.
+  joints: [6, 9],
+  seam: 0.8,
   // Sun-bleached boards on the walkable face.
   top: { dark: "#a8997c", base: "#c7b99c", light: "#ddd2b8" },
   // Wide dark → light span: damp plank vs bleached plank.

@@ -175,6 +175,9 @@ export const EMBER_ART: BiomeArt = {
     stepping: 0.4,
     rounding: 0.2,
     notches: [1, 3],
+    // Columnar basalt: many vertical joints.
+    joints: [5, 8],
+    seam: 0.8,
     top: tones.stoneTop,
     side: tones.stoneSide,
     recess: "#1c1b20",

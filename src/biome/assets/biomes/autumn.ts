@@ -201,6 +201,8 @@ export const AUTUMN_ART: BiomeArt = {
     stepping: 0.7,
     rounding: 0.55,
     notches: [1, 2],
+    // Fieldstone courses: block joints.
+    joints: [3, 5],
     top: tones.stoneTop,
     side: tones.stoneSide,
     recess: "#443f38",

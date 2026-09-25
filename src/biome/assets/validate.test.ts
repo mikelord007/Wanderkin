@@ -10,6 +10,8 @@ import { PROP_UNIT_RADIUS } from "../render/propGeometry.js";
 import type { BiomePropKind } from "../types.js";
 import { registeredBiomeArt } from "./biomes/index.js";
 import { variantMesh } from "./compose.js";
+import { resolveBiomeLighting } from "./lighting.js";
+import { MAX_CONTACT_OPACITY } from "../render/contactDecals.js";
 import type { AssetCategory } from "./types.js";
 
 /** Spec "Repetition reduction" minimums (per biome that uses the category). */
@@ -133,6 +135,11 @@ describe.each(arts.map((art) => [art.id, art] as const))("art guardrails: %s", (
       within(l.sunElevation[1], 15, 65, "sunElevation[1]");
       expect(l.sunElevation[0]).toBeLessThanOrEqual(l.sunElevation[1]);
     }
+  });
+
+  it("contact shadows stay within the readability cap (§9) after the lighting multiplier", () => {
+    const strength = resolveBiomeLighting(art.lighting).contactStrength;
+    expect(art.ground.contactOpacity * strength).toBeLessThanOrEqual(MAX_CONTACT_OPACITY + 1e-9);
   });
 
   it("atmosphere and ground styles only restyle what the definition enables", () => {

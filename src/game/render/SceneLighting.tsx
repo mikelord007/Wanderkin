@@ -78,9 +78,6 @@ function GradientBackdrop({
   );
 }
 
-/** Biome sun elevation is clamped so shadows stay long enough to read
- * furniture depth; the style path keeps its own lowered window key. */
-
 export function SceneLighting({ bounds, style, biome }: SceneLightingProps) {
   const themed = biome && biome.id !== "original" ? biome : null;
   const gl = useThree((state) => state.gl);

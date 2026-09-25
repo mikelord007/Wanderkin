@@ -153,6 +153,10 @@ const PEBBLES = [
 export const TROPICAL_ART: BiomeArt = {
   id: "tropical",
   tones,
+  // A little less sky-blue hemisphere fill than the default (0.45): shaded
+  // helper floor under furniture otherwise crosses a Cartoon per-channel
+  // blue step and shows a pink band (review L1, Tripo sofa shade).
+  lighting: { hemisphereShare: 0.35 },
   families: {
     palm: {
       category: "tree", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.62, triangleBudget: 1300,

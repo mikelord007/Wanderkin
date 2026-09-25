@@ -205,6 +205,9 @@ export const DESERT_ART: BiomeArt = {
     stepping: 0.85,
     rounding: 0.65,
     notches: [1, 2],
+    // A few vertical fractures; seams mark the strata in shade.
+    joints: [1, 3],
+    seam: 0.6,
     top: { dark: "#d2a874", base: "#e6c28e", light: "#f3dbb0" },
     side: { dark: "#9a5332", base: "#c47f4c", light: "#ecb47c" },
     recess: "#7a452c",

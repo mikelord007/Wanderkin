@@ -476,6 +476,13 @@ function placeProps(
     }
   }
 
+  // Structure skirts: a few rock clusters at the foot of generated steps,
+  // bridges and platforms, so a shelled structure sits in the ground rather
+  // than on it. Candidates are only ORDERED here: every anchor passes the
+  // full `testAnchor` check (which keeps 0.1 clear of every helper box,
+  // off routes and objectives, and apart from other props).
+  placeStructureSkirts(analysis, exclusion, definition, options, target, taken, placements);
+
   const weighted = kinds.filter((kind) => kind !== "windsock" && (options.allowTall || !TALL_KINDS.has(kind)));
   if (weighted.length === 0) return placements;
   const totalWeight = weighted.reduce((sum, kind) => sum + KIND_WEIGHT[kind], 0);
@@ -523,6 +530,77 @@ function placeProps(
     }
   }
   return placements;
+}
+
+/** Most skirt clusters around one structure, and their share of the budget. */
+export const SKIRT_PER_STRUCTURE = 2;
+export const SKIRT_BUDGET_SHARE = 0.15;
+/** The helper-box clearance `testAnchor` enforces horizontally. */
+const HELPER_CLEARANCE = 0.1;
+
+/** Horizontal distance from a point to a box's footprint (0 inside). */
+export function footprintDistance(x: number, z: number, box: { min: Vec3; max: Vec3 }): number {
+  const dx = Math.max(box.min[0] - x, 0, x - box.max[0]);
+  const dz = Math.max(box.min[2] - z, 0, z - box.max[2]);
+  return Math.hypot(dx, dz);
+}
+
+function placeStructureSkirts(
+  analysis: SceneAnalysis,
+  exclusion: ExclusionAnalysis,
+  definition: BiomeDefinition,
+  options: PlaceOptions,
+  target: number,
+  taken: Taken[],
+  placements: BiomePropPlacement[],
+): void {
+  if (!definition.props.kinds.includes("rock") || options.helperBoxes.length === 0) return;
+  const cap = Math.min(options.budget - placements.length, Math.floor(target * SKIRT_BUDGET_SHARE));
+  if (cap <= 0) return;
+  // Own stream, so the skirts never shift the main placement draws.
+  const random = seededRandom(`${options.seed}:skirts`);
+  const standable = analysis.surfaces.standable;
+  const maxSlope = Math.acos(Math.min(1, Math.max(0, definition.surface.upwardNormalMin)));
+  const [scaleLow, scaleHigh] = definition.props.scaleRange;
+  const [shareLow, shareHigh] = KIND_SCALE_SHARE.rock;
+  let placed = 0;
+  for (const box of options.helperBoxes) {
+    if (placed >= cap) break;
+    // Low-to-mid rocks read as a base, not as a second structure.
+    const share = shareLow + (shareHigh - shareLow) * 0.5 * random();
+    const height = options.bodyHeight * (scaleLow + (scaleHigh - scaleLow) * share);
+    const spec: AnchorRequest = { kind: "rock", height, radius: height * PROP_FOOTPRINT_RATIO.rock, maxSlopeRadians: maxSlope, edgeMargin: height * PROP_FOOTPRINT_RATIO.rock * 0.15 };
+    const inner = HELPER_CLEARANCE + spec.radius;
+    const outer = inner + Math.max(spec.radius * 1.5, analysis.surfaceOptions.cellSize * 2);
+    // Ground at the structure's foot, just outside its footprint.
+    const ring = standable
+      .map((patch, index) => ({ index, d: footprintDistance(patch.point[0], patch.point[2], box), jitter: random() }))
+      // Helper boxes are sunk into the floor, so "the foot" is the ground
+      // from a little below the box bottom to a little above it.
+      .filter(({ index, d }) => {
+        const y = standable[index]!.point[1];
+        return d >= inner && d <= outer && y >= box.min[1] - 0.08 && y <= box.min[1] + 0.15;
+      })
+      .sort((a, b) => a.d + a.jitter * spec.radius - (b.d + b.jitter * spec.radius));
+    let aroundThis = 0;
+    for (const { index } of ring) {
+      if (aroundThis >= SKIRT_PER_STRUCTURE || placed >= cap) break;
+      const anchor = testAnchor(analysis, exclusion, standable[index]!, spec, taken, options, 0);
+      if (!anchor) continue;
+      taken.push({ position: anchor.position, radius: spec.radius, height: spec.height });
+      placements.push({
+        id: `prop-rock-skirt-${placements.length + 1}`,
+        kind: "rock",
+        position: anchor.position,
+        normal: anchor.normal,
+        scale: spec.height,
+        yaw: random() * Math.PI * 2,
+        radius: spec.radius,
+      });
+      aroundThis += 1;
+      placed += 1;
+    }
+  }
 }
 
 function horizontal(a: Vec3, b: Vec3): number {

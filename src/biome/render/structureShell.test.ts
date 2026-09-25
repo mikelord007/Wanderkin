@@ -78,6 +78,38 @@ describe("structure shells", () => {
     });
   }
 
+  it("marks every stratum with a dark seam and staggered joints, so shade cannot flatten it into a box", () => {
+    const base = registeredBiomeArt().find((art) => art.id === "tropical")!.wall;
+    const style = { ...base, strata: [5, 5] as const, notches: [0, 0] as const };
+    const luma = (r: number, g: number, b: number) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const sideStats = (joints: readonly [number, number], seam: number) => {
+      const shell = createStructureShell({ dimensions: [0.6, 0.5, 0.4], scale: [1, 1, 1], style: { ...style, joints, seam }, seed: "seams" });
+      const pos = shell.mesh.geometry.getAttribute("position");
+      const col = shell.mesh.geometry.getAttribute("color");
+      const nrm = shell.mesh.geometry.getAttribute("normal");
+      let sideTriangles = 0;
+      let darkest = Infinity;
+      let lightest = 0;
+      for (let t = 0; t < pos.count; t += 3) {
+        if (Math.abs(nrm.getY(t)) > 0.3) continue; // side walls only
+        sideTriangles += 1;
+        const l = luma(col.getX(t), col.getY(t), col.getZ(t));
+        darkest = Math.min(darkest, l);
+        lightest = Math.max(lightest, l);
+      }
+      shell.dispose();
+      return { sideTriangles, contrast: lightest / Math.max(darkest, 1e-6) };
+    };
+    const plain = sideStats([0, 0], 0);
+    const seamed = sideStats([0, 0], 0.8);
+    const jointed = sideStats([6, 6], 0.8);
+    // Joints split columns (seam strips are always there; `seam` sets their darkness).
+    expect(jointed.sideTriangles).toBeGreaterThan(seamed.sideTriangles);
+    // Seams push the darkest side tone well below the bands (linear luma ratio).
+    expect(seamed.contrast).toBeGreaterThan(plain.contrast * 1.3);
+    expect(seamed.contrast).toBeGreaterThan(4);
+  });
+
   it("dispose releases its geometry and material exactly once, and it is never raycast", () => {
     const art = registeredBiomeArt()[0]!;
     const shell = createStructureShell({ dimensions: [1, 0.4, 0.5], scale: [1, 1, 1], style: art.wall, seed: "d" });

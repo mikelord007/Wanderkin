@@ -123,6 +123,17 @@ export interface WallStyle {
   rounding: number;
   /** Shallow erosion notches per side, inclusive range. */
   notches: readonly [number, number];
+  /**
+   * Thin vertical joints per stratum around the whole perimeter, staggered
+   * between strata (plank ends, block joints), inclusive range. Default [2, 4].
+   */
+  joints?: readonly [number, number];
+  /**
+   * 0–1 darkness of the thin seam line at the foot of every stratum and of
+   * the joints (toward `recess`). Default 0.7. Seams keep strata legible in
+   * furniture shade, where tone bands alone flatten.
+   */
+  seam?: number;
   /** Tones: `top` is the walkable face, `rim` the collision edge highlight. */
   top: ToneRamp;
   side: ToneRamp;

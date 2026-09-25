@@ -1,12 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_MOVEMENT_CONFIG, type SceneManifest } from "@shared/index.js";
 import { capsuleHeight, toMiniatureScale } from "../game/core/characterScale.js";
-import { createGameFloor } from "../scene/helpers.js";
+import { createGameFloor, helperEntityTriangles } from "../scene/helpers.js";
 import { validateRoute } from "../scene/route.js";
+import { computeBounds } from "../scene/transform.js";
 import { DEFAULT_ADVENTURE_BUDGET, generateAdventure } from "./adventures.js";
-import { analyzeManifest, assetGeometryFromLoaded, raycastDown, surfaceFromAuthoredCentre } from "./geometry.js";
+import { analyzeManifest, assetGeometryFromLoaded, helperEntitiesOf, raycastDown, surfaceFromAuthoredCentre } from "./geometry.js";
 import { bedFixture, countertopFixture, deskFixture, poorFixture, sampleScanFixture, type GeometryFixture } from "./geometryFixtures.js";
-import { PROP_FOOTPRINT_RATIO, computeGameplayExclusions, groveOrder, groveScale, prepareBiomeLayout, segmentDistance } from "./placement.js";
+import {
+  PROP_FOOTPRINT_RATIO,
+  SKIRT_BUDGET_SHARE,
+  SKIRT_PER_STRUCTURE,
+  computeGameplayExclusions,
+  footprintDistance,
+  groveOrder,
+  groveScale,
+  prepareBiomeLayout,
+  segmentDistance,
+} from "./placement.js";
 import { getBiomeDefinition } from "./presets.js";
 import { PROP_UNIT_RADIUS } from "./render/propGeometry.js";
 import type { BiomeLayout, BiomeId } from "./types.js";
@@ -154,6 +165,41 @@ describe("prepareBiomeLayout", () => {
       expect(performance.now() - started).toBeLessThan(2000);
       expect(layout.props.some((prop) => prop.kind === "palm")).toBe(true);
       assertPropsSafe(fixture, layout);
+    }
+  });
+
+  it("dresses the foot of generated structures with rocks, outside their footprint and off the route", () => {
+    for (const id of ["sample-rodin-room-corner", "sample-tripo-room-corner"]) {
+      const fixture = sampleScanFixture(id, true);
+      const boxes = helperEntitiesOf(fixture.manifest).filter((entity) => entity.kind !== "floor").map((entity) => computeBounds(helperEntityTriangles(entity)));
+      expect(boxes.length).toBeGreaterThan(0);
+      for (const biome of ["tropical", "desert", "alpine", "autumn", "ember"] as const) {
+        const layout = layoutFor(fixture, biome);
+        const skirts = layout.props.filter((prop) => prop.id.includes("-skirt-"));
+        expect(skirts.length, `${id} ${biome} skirts`).toBeGreaterThan(0);
+        expect(skirts.length).toBeLessThanOrEqual(Math.max(1, Math.floor(getBiomeDefinition(biome).budget.props * SKIRT_BUDGET_SHARE)));
+        for (const prop of skirts) {
+          expect(prop.kind).toBe("rock");
+          const distances = boxes.map((box) => footprintDistance(prop.position[0], prop.position[2], box));
+          // Never on or against a structure (testAnchor keeps 0.1 clear of every helper box).
+          for (const [k, d] of distances.entries()) {
+            const box = boxes[k]!;
+            const overlapsVertically = prop.position[1] + prop.scale > box.min[1] && prop.position[1] < box.max[1] + 0.2;
+            if (overlapsVertically) expect(d, `${prop.id} vs structure ${k}`).toBeGreaterThanOrEqual(0.1 + prop.radius - 1e-9);
+          }
+          // ...but at the foot of one: within a couple of grid cells of it.
+          expect(Math.min(...distances)).toBeLessThanOrEqual(0.1 + prop.radius + 0.75);
+          // Off the route, spawn, checkpoints and objectives.
+          const tip: [number, number, number] = [prop.position[0], prop.position[1] + prop.scale, prop.position[2]];
+          for (const zone of layout.exclusions) {
+            expect(segmentDistance(prop.position, tip, zone.start, zone.end)).toBeGreaterThanOrEqual(zone.radius + prop.radius - 1e-9);
+          }
+        }
+        // Adjacent steps share borders, so bound the total, not the nearest box.
+        expect(skirts.length).toBeLessThanOrEqual(SKIRT_PER_STRUCTURE * boxes.length);
+        expect(layout.exclusions.length).toBeGreaterThan(0);
+        assertPropsSafe(fixture, layout);
+      }
     }
   });
 

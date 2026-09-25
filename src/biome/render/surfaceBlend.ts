@@ -10,6 +10,10 @@
  * Only upward-facing texels inside an approved support patch are tinted, at
  * most `strength`, and the tint keeps the texel's own luminance so grain,
  * print and edges from the photo stay readable through the sand/grass.
+ *
+ * Exception: the scan's own flat ground at floor level (a scanned floor or
+ * rug a few cm above the game floor) takes the helper floor's tint, so it
+ * cannot show its photo colour through as a stain next to re-skinned floor.
  */
 import * as THREE from "three";
 import { getBiomeArt } from "../assets/biomes/index.js";
@@ -32,7 +36,17 @@ export interface BiomeSurfaceTreatment {
    * and it gives traversal structures a biome-specific look. Edges drawn by
    * `SceneEntities` stay, so structures remain readable.
    */
-  helper: { floorColor: string; structureColor: string; floorStrength: number; structureStrength: number; grainFrequency: number };
+  helper: {
+    floorColor: string;
+    structureColor: string;
+    floorStrength: number;
+    structureStrength: number;
+    grainFrequency: number;
+    /** World y of the game floor's top (the lowest standable surface). */
+    floorLevel: number;
+    /** Upward scan texels up to this far above `floorLevel` are tinted like the floor. */
+    floorBand: number;
+  };
   /**
    * The biome's wall style: box helpers (steps, bridges, stepped routes) are
    * drawn as a sculpted visual shell instead of a plain box (see
@@ -53,7 +67,17 @@ interface BiomeSurfaceUniforms {
   oqBiomeUpMin: { value: number };
   oqBiomePatchCount: { value: number };
   oqBiomePatches: { value: THREE.Vector4[] };
+  oqBiomeFloorTint: { value: number };
+  oqBiomeFloorLevel: { value: number };
+  oqBiomeFloorBand: { value: number };
 }
+
+/**
+ * Scan ground within this height of the floor top reads as floor. Real scans
+ * put their floor-level ground 0–3 cm above the game floor; the next flat
+ * surfaces (seats, desk tops) sit tens of cm higher.
+ */
+export const SCAN_FLOOR_BAND = 0.045;
 
 const USER_DATA_KEY = "objectQuestBiomeSurface";
 
@@ -80,6 +104,8 @@ export function biomeSurfaceTreatment(
       floorStrength: 0.92,
       structureStrength: 0.85,
       grainFrequency: Number.isFinite(extent) && extent > 0 ? 40 / extent : 10,
+      floorLevel: Number.isFinite(min[1]) ? min[1] : 0,
+      floorBand: SCAN_FLOOR_BAND,
     },
     structureShell: getBiomeArt(definition.id)?.wall ?? null,
   };
@@ -95,6 +121,9 @@ function createUniforms(): BiomeSurfaceUniforms {
     oqBiomeUpMin: { value: 0.8 },
     oqBiomePatchCount: { value: 0 },
     oqBiomePatches: { value: Array.from({ length: MAX_SURFACE_PATCHES }, () => new THREE.Vector4(0, 0, 0, 1)) },
+    oqBiomeFloorTint: { value: 0 },
+    oqBiomeFloorLevel: { value: 0 },
+    oqBiomeFloorBand: { value: SCAN_FLOOR_BAND },
   };
 }
 
@@ -123,7 +152,7 @@ export function installBiomeSurfaceBlend(material: THREE.Material): void {
       ${BIOME_SURFACE_INJECTION}`,
     );
   };
-  material.customProgramCacheKey = () => `${previousKey.call(material)}:oq-biome-surface-v2`;
+  material.customProgramCacheKey = () => `${previousKey.call(material)}:oq-biome-surface-v3`;
   material.needsUpdate = true;
 }
 
@@ -138,12 +167,17 @@ export function applyBiomeSurfaceToMaterial(
     uniforms.oqBiomeGlobal.value = 0;
     uniforms.oqBiomeStrength.value = 0;
     uniforms.oqBiomePatchCount.value = 0;
+    uniforms.oqBiomeFloorTint.value = 0;
     return;
   }
   const { helper } = treatment;
   uniforms.oqBiomeGlobal.value = role === "floor" ? helper.floorStrength : role === "structure" ? helper.structureStrength : 0;
   uniforms.oqBiomeGlobalColor.value.set(role === "structure" ? helper.structureColor : helper.floorColor);
   uniforms.oqBiomeGrain.value = helper.grainFrequency;
+  // Scan ground at floor level takes the floor's whole-surface tint.
+  uniforms.oqBiomeFloorTint.value = role === "scan" ? helper.floorStrength : 0;
+  uniforms.oqBiomeFloorLevel.value = helper.floorLevel;
+  uniforms.oqBiomeFloorBand.value = helper.floorBand;
   const count = Math.min(treatment.patches.length, MAX_SURFACE_PATCHES);
   // Helpers are already re-skinned wholesale; a second, patch-shaped tint on
   // top of that only draws rims around the translucent decals.
@@ -179,10 +213,16 @@ export function applyBiomeSurface(object: THREE.Object3D, treatment: BiomeSurfac
 }
 
 /** Current uniform values, for tests and diagnostics. */
-export function readBiomeSurface(material: THREE.Material): { strength: number; patchCount: number; global: number } | null {
+export function readBiomeSurface(material: THREE.Material): { strength: number; patchCount: number; global: number; floorTint: number; floorLevel: number } | null {
   const uniforms = material.userData[USER_DATA_KEY] as BiomeSurfaceUniforms | undefined;
   return uniforms
-    ? { strength: uniforms.oqBiomeStrength.value, patchCount: uniforms.oqBiomePatchCount.value, global: uniforms.oqBiomeGlobal.value }
+    ? {
+        strength: uniforms.oqBiomeStrength.value,
+        patchCount: uniforms.oqBiomePatchCount.value,
+        global: uniforms.oqBiomeGlobal.value,
+        floorTint: uniforms.oqBiomeFloorTint.value,
+        floorLevel: uniforms.oqBiomeFloorLevel.value,
+      }
     : null;
 }
 
@@ -197,6 +237,9 @@ const BIOME_SURFACE_DECLARATIONS = /* glsl */ `
   uniform float oqBiomeUpMin;
   uniform int oqBiomePatchCount;
   uniform vec4 oqBiomePatches[OQ_BIOME_MAX_PATCHES];
+  uniform float oqBiomeFloorTint;
+  uniform float oqBiomeFloorLevel;
+  uniform float oqBiomeFloorBand;
   float oqBiomeHash(vec2 p) {
     vec3 p3 = fract(vec3(p.xyx) * 0.1031);
     p3 += dot(p3, p3.yzx + 33.33);
@@ -231,6 +274,14 @@ const BIOME_SURFACE_INJECTION = /* glsl */ `
       // per-channel posterization thresholds and turns into hard blotches
       // (seen in the real app). Texture comes from the decals instead.
       diffuseColor.rgb = mix(diffuseColor.rgb, oqBiomeGlobalColor, oqBiomeGlobal);
+    }
+    if (oqBiomeFloorTint > 0.0) {
+      // Scan ground at floor level: the same flat tint as the helper floor,
+      // fading out over the top of the band so a low step keeps its photo.
+      vec3 oqFloorN = normalize(cross(oqBiomeDx, oqBiomeDy) + vec3(0.0, 1e-7, 0.0));
+      float oqFloorUp = smoothstep(oqBiomeUpMin - 0.08, oqBiomeUpMin + 0.06, oqFloorN.y);
+      float oqNearFloor = 1.0 - smoothstep(oqBiomeFloorBand * 0.65, oqBiomeFloorBand, oqBiomeWorldPos.y - oqBiomeFloorLevel);
+      diffuseColor.rgb = mix(diffuseColor.rgb, oqBiomeGlobalColor, oqBiomeFloorTint * oqFloorUp * oqNearFloor);
     }
     if (oqBiomeStrength > 0.0) {
       vec3 oqBiomeN = normalize(cross(oqBiomeDx, oqBiomeDy) + vec3(0.0, 1e-7, 0.0));
