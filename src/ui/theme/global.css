@@ -13,8 +13,8 @@
 .oq-theme *, .oq-theme *::before, .oq-theme *::after { box-sizing: border-box; }
 .oq-theme :where(h1,h2,h3,h4,p,figure,ul,ol) { margin: 0; }
 
-/* Headlines are light and large with tight leading, the way the horizon
-   type sits in the reference: size carries the weight, not boldness. */
+/* Headlines carry hierarchy by size, weight and width, not by colour. The
+   display headline is light and huge (hero); product headings are tighter. */
 .oq-theme :where(h1,h2,h3) {
   font-family: var(--oq-font-display);
   font-weight: 400;
@@ -31,8 +31,8 @@
   letter-spacing: -.035em;
   line-height: 1;
 }
-.oq-theme h2 { font-size: clamp(1.6rem, 1.3rem + 1.2vw, 2.4rem); font-weight: 350; letter-spacing: -.025em; }
-.oq-theme h3 { font-size: clamp(1.125rem, 1.05rem + .3vw, 1.25rem); font-weight: 500; letter-spacing: -.01em; line-height: 1.3; }
+.oq-theme h2 { font-size: var(--wk-type-h2-product); font-weight: 400; letter-spacing: -.025em; }
+.oq-theme h3 { font-size: var(--wk-type-h3); font-weight: 500; letter-spacing: -.01em; line-height: 1.3; }
 .oq-theme :where(p, li) { text-wrap: pretty; }
 .oq-theme :where(strong, b) { font-weight: 600; }
 /* Nothing reads comfortably past ~70 characters. Opt-in, so table-like and
@@ -41,10 +41,10 @@
 .oq-measure--tight { max-inline-size: 46ch; }
 
 .oq-theme :where(button,input,textarea,select) { font: inherit; }
-/* The focus ring is the explorer's marigold button: the one warm thing on a
-   violet screen, so it can never be mistaken for decoration. */
+/* Focus is purple on the light product (5.4:1 on white) and the explorer's
+   marigold inside dark moments, where purple would disappear. */
 .oq-theme :where(button,a,input,textarea,select,summary,[tabindex]):focus-visible {
-  outline: 3px solid var(--wk-marigold); outline-offset: 3px;
+  outline: 3px solid var(--wk-focus); outline-offset: 3px;
   border-radius: var(--oq-round-sm);
 }
 .oq-theme :where(.oq-kit-button, summary):focus-visible { border-radius: var(--oq-round-pill); }
@@ -52,31 +52,41 @@
 .oq-theme a:hover { color: var(--oq-ink); }
 .oq-theme img { max-width: 100%; display: block; }
 .oq-theme :where(button,a) { -webkit-tap-highlight-color: transparent; }
-.oq-theme ::selection { background: #8b6cff66; color: var(--wk-ink); }
+.oq-theme ::selection { background: #7b5cfa40; color: var(--oq-ink); }
 
-.oq-shade { color: var(--oq-ink); }
-
-.oq-kit-container { width: min(100%, 1180px); margin-inline: auto; padding-inline: clamp(20px, 4vw, 48px); }
+.oq-kit-container { width: min(100%, calc(var(--wk-max) + 2 * var(--wk-page-x))); margin-inline: auto; padding-inline: var(--wk-page-x); }
 .oq-kit-stack { display: flex; flex-direction: column; gap: var(--oq-space-5); }
 .oq-kit-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--oq-space-3); }
-.oq-kit-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,272px),1fr)); gap: var(--oq-space-5); }
+.oq-kit-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,272px),1fr)); gap: var(--wk-grid-gap); }
 .oq-kit-muted { color: var(--oq-muted); }
 .oq-kit-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .oq-kit-error { color: var(--oq-error-ink); }
 
-/* The chip: the reference's little pill with an avatar, which in Wanderkin
-   carries the explorer's button. Every short lead-in label wears it, so a
-   label looks like a label on every screen without shouting in capitals. */
+/* --- Layout primitives. Every landing and library section is built from
+   these, so rhythm is set in one place: section padding, the heading group,
+   and the gap between that group and the content under it. --- */
+.wk-section { padding-block: var(--wk-section-y); }
+.wk-section--tint { background: var(--wk-tint); }
+.wk-section__head { display: grid; gap: var(--wk-gap-sm); max-inline-size: 720px; margin-bottom: var(--wk-gap-group); }
+.wk-section__head h2 { font-size: var(--wk-type-h2); font-weight: 400; letter-spacing: -.03em; line-height: 1.05; }
+.wk-section__head p { font-size: var(--wk-type-lede); color: var(--oq-secondary); max-inline-size: var(--wk-measure); }
+.wk-section__head--center { margin-inline: auto; text-align: center; justify-items: center; }
+/* The shared media frame: rounded, a subtle lavender border, a soft shadow and
+   a thin surface around the picture. Refinement, not heavy chrome. */
+.wk-frame { position: relative; overflow: hidden; border-radius: var(--wk-r-card); background: var(--wk-surface); border: 1px solid var(--wk-border); box-shadow: var(--wk-shadow-md); }
+.wk-frame > img, .wk-frame__media { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+/* The chip: a small pill with the mark in miniature as its avatar. Short
+   lead-in labels wear it, so a label reads as a label without capitals. */
 .oq-kit-eyebrow, .wk-chip {
   display: inline-flex; align-items: center; gap: 8px; width: fit-content;
   min-height: 30px; padding: 3px 13px 3px 4px;
   border: 1px solid var(--wk-rim); border-radius: var(--oq-round-pill);
-  background: #ffffff0a; box-shadow: var(--wk-highlight);
+  background: var(--oq-surface); box-shadow: var(--wk-highlight);
   color: var(--oq-ink); font-size: .8125rem; font-weight: 500; line-height: 1.2; letter-spacing: .014em;
 }
-/* The avatar: the mark in miniature. A dark planet with its lit rim, and the
-   explorer as a marigold dot on top. Drawn in CSS so every existing eyebrow
-   gets one without new markup. */
+/* The avatar: a dark planet with its lit rim, and the explorer as a marigold
+   dot on top. Drawn in CSS so every existing eyebrow gets one. */
 .oq-kit-eyebrow::before, .wk-chip::before {
   content: ""; flex: none; width: 22px; height: 22px; border-radius: 50%;
   background:
@@ -89,8 +99,9 @@
 }
 
 /* The Wanderkin lockup. Everything is in em so the wordmark and its button
-   tittle keep their proportions at any font size. */
-.mh-logo { display: inline-flex; align-items: center; gap: .5em; font-size: 1.25rem; color: var(--wk-ink); }
+   tittle keep their proportions at any font size. Colour follows the ground:
+   plum on the light product, lavender white in the hero. */
+.mh-logo { display: inline-flex; align-items: center; gap: .5em; font-size: 1.25rem; color: var(--oq-ink); }
 .mh-logo__mark { flex: none; }
 /* The wordmark is set in the interface face, a step heavier than the light
    headlines so the name holds its own at nav size. */
@@ -105,15 +116,14 @@
   clip: rect(0,0,0,0); white-space: nowrap;
 }
 .mh-logo__i { position: relative; }
-/* The tittle is a small marigold button: the one the explorer stands on in the
-   mark. It sits where the typeface's own dot would. */
+/* The tittle is a small marigold button, cut from the explorer's suit. It sits
+   where the typeface's own dot would. */
 .mh-logo__tittle {
   position: absolute; left: 50%; bottom: .79em;
   width: .22em; height: .22em; margin-left: -.11em;
   border-radius: 50%; background: #e8a33d;
 }
 
-@media (max-width: 699px) { .oq-kit-container { padding-inline: 20px; } }
 @media (prefers-reduced-motion: reduce) {
   .oq-theme *, .oq-theme *::before, .oq-theme *::after {
     animation: none !important; transition: none !important; scroll-behavior: auto !important;

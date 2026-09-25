@@ -1,18 +1,14 @@
 /*
- * Wanderkin design tokens: planetrise.
+ * Wanderkin design tokens (v3): a light product with cinematic purple moments.
  *
- * The logo is a sewing button seen as a planet at planetrise, with a tiny
- * explorer standing on its lit rim. The interface is the view from that explorer's night: a deep violet
- * sky, and a dark world curving up from the bottom of the screen with violet
- * and white light spilling round its rim. That rim light is the one bold
- * thing in the system (see `--wk-planetrise`); everything else is quiet,
- * dark and typographic.
+ * Most of the product sits on a pale lavender page with white cards and dark
+ * plum type; purple is the accent, not the ground, which is what gives it its
+ * force. The hero and the few other cinematic moments switch to the dark set
+ * with `.oq-shade` (alias `.wk-dark`), and keep the planetrise there.
  *
- * The values live on `:root` so screens still on the older markup (editor,
- * play, finish, capture) share the same palette without a theme wrapper.
- * `.oq-theme` decides how a region paints itself; this file only decides what
- * the colours are. A world's chosen look retints the action colour further
- * down, per subtree.
+ * Every section consumes these tokens; nothing downstream should reach for a
+ * raw colour, spacing or radius that has a name here. A world's chosen look
+ * retints the action colour further down, per subtree.
  */
 
 /* Outfit: display and UI. Geometric like a planet, with round friendly
@@ -31,118 +27,189 @@
 }
 
 :root {
-  /* --- The named palette --- */
-  --wk-night: #120726;     /* page ground */
-  --wk-dusk: #1c0f38;      /* raised surface */
-  --wk-veil: #271950;      /* inset and control fill */
-  --wk-ink: #f4eeff;       /* lavender white */
-  --wk-mist: #b6a7d8;      /* muted text, 8:1 on night */
-  --wk-violet: #8b6cff;    /* glow body */
-  --wk-halo: #e9e0ff;      /* glow core */
-  /* The explorer's marigold suit and stitching in the mark. Used only for
-     focus and for "you are here / next": never as decoration. */
-  --wk-marigold: #f2b24d;
+  /* === Palette ======================================================== */
+  /* Light product set (the default). */
+  --wk-page: #faf7ff;          /* page background */
+  --wk-tint: #f2ebff;          /* alternate section background */
+  --wk-surface: #ffffff;       /* cards, elevated surfaces */
+  --wk-border: #e7ddfc;        /* subtle border */
+  --wk-text: #24143d;          /* primary text, 15.9:1 on page */
+  --wk-text-2: #5a4c74;        /* secondary text, 6.6:1 on tint */
+  /* Muted text. The brief's #7C6E95 is 4.0:1 on the tint, so it is taken a
+     step darker to keep AA on every light surface (4.9:1 on the tint). */
+  --wk-text-3: #6e6088;
+  --wk-purple: #7b5cfa;        /* brand purple: large and graphic uses */
+  /* Purple for text and button fills. #7B5CFA is 4.4:1 against white, so
+     anything that carries a label uses this slightly deeper purple (5.4:1). */
+  --wk-purple-ink: #6a4af6;
+  --wk-purple-hover: #5634e8;
+  --wk-glow: rgba(123, 92, 250, .18);
+  --wk-warm: #f2c46d;          /* warm accent: decorative only, never a focus ring */
+  --wk-cinema: #120221;        /* deep cinematic purple, used sparingly */
 
-  /* --- Older names, kept as aliases for rules and inline styles that still
-     reach for them. The mark's own colours live in Logo.tsx (MARK_COLORS). --- */
+  /* Dark set, as named constants for the hero and other cinematic moments. */
+  --wk-night: #120726;
+  --wk-dusk: #1c0f38;
+  --wk-veil: #271950;
+  --wk-ink: #f4eeff;
+  --wk-mist: #b6a7d8;
+  --wk-violet: #8b6cff;
+  --wk-halo: #e9e0ff;
+  /* The explorer's marigold suit. Decorative on light; the focus ring on dark. */
+  --wk-marigold: #f2b24d;
+  /* Older names, kept as aliases for rules that still reach for them. */
   --mh-pine: var(--wk-night);
-  --mh-ivy: var(--wk-violet);
+  --mh-ivy: var(--wk-purple);
   --mh-fern: #b79cff;
   --mh-marigold: var(--wk-marigold);
   --mh-plaster: var(--wk-ink);
 
-  /* --- Surfaces --- */
-  --oq-paper: var(--wk-night);
-  --oq-surface: var(--wk-dusk);
-  --oq-inset: var(--wk-veil);
-  --oq-shade: var(--wk-night);
-
-  /* --- Ink --- */
-  --oq-ink: var(--wk-ink);
-  --oq-muted: var(--wk-mist);
+  /* === Semantic surfaces and ink ===================================== */
+  --oq-paper: var(--wk-page);
+  --oq-surface: var(--wk-surface);
+  --oq-inset: #f6f1ff;
+  --oq-shade: var(--wk-cinema);
+  --oq-ink: var(--wk-text);
+  --oq-secondary: var(--wk-text-2);
+  --oq-muted: var(--wk-text-3);
   --oq-on-shade: var(--wk-ink);
   --oq-on-shade-muted: var(--wk-mist);
+  --oq-line: var(--wk-border);
+  /* An interactive edge (inputs, outlined controls): 3.1:1 on the page. */
+  --oq-control-line: #8c7bb8;
+  --wk-rim: var(--wk-border);
+  --wk-highlight: inset 0 1px 0 #ffffff;
+  --wk-focus: var(--wk-purple-ink);
 
-  /* --- Lines: a hairline that only separates, and a control outline that
-     clears 3:1 on dusk for an interactive edge. --- */
+  /* === Action ========================================================= */
+  --oq-action: var(--wk-purple-ink);
+  --oq-action-hover: var(--wk-purple-hover);
+  --oq-on-action: #ffffff;
+  --oq-accent-ink: var(--wk-purple-ink);
+  /* Secondary and ghost controls. */
+  --oq-btn2-bg: var(--wk-surface);
+  --oq-btn2-border: #d6c9f8;
+  --oq-btn2-hover-bg: var(--wk-tint);
+  --oq-btn2-hover-border: #b3a0f0;
+  --oq-ghost-hover: rgba(106, 74, 246, .08);
+
+  /* === Status ========================================================= */
+  --oq-success-ink: #1e7a4e;
+  --oq-success-wash: #e6f6ee;
+  --oq-error-ink: #b3261e;
+  --oq-error-wash: #fcebea;
+  --oq-warning-ink: #8a5a00;
+  --oq-warning-wash: #fff4db;
+
+  /* === Type =========================================================== */
+  --oq-font-body: "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --oq-font-display: "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --oq-display-variation: normal;
+  --wk-display-weight: 300;
+  /* Marketing headings stay expressive; product headings are tighter. */
+  --wk-type-h2: clamp(2rem, 1.35rem + 2.1vw, 3rem);
+  --wk-type-h2-product: clamp(1.6rem, 1.3rem + 1vw, 2.1rem);
+  --wk-type-h3: 1.25rem;
+  --wk-type-lede: clamp(1.0625rem, 1rem + .25vw, 1.1875rem);
+  --wk-type-small: .875rem;
+  --wk-measure: 60ch;
+
+  /* === Spacing ======================================================== */
+  --wk-max: 1240px;
+  --wk-page-x: clamp(20px, 4vw, 40px);          /* 32px+ from ~800px wide */
+  --wk-section-y: clamp(72px, 8.5vw, 120px);     /* between major sections */
+  --wk-gap-group: clamp(40px, 4.4vw, 64px);      /* between groups in a section */
+  --wk-gap: clamp(24px, 2.2vw, 32px);            /* normal content gap */
+  --wk-gap-sm: 14px;                             /* inside a content group */
+  --wk-card-pad: clamp(20px, 1.8vw, 28px);
+  --wk-grid-gap: 24px;
+  /* The 4px scale the older rules use. */
+  --oq-space-1: 4px; --oq-space-2: 8px; --oq-space-3: 12px;
+  --oq-space-4: 16px; --oq-space-5: 24px; --oq-space-6: 32px;
+  --oq-space-7: 48px; --oq-space-8: 72px; --oq-space-9: 104px;
+  --oq-section: var(--wk-section-y);
+
+  /* === Shape ========================================================== */
+  --wk-r-inner: 12px;    /* media inside a card, inputs */
+  --wk-r-card: 20px;     /* cards */
+  --wk-r-stage: 28px;    /* large framed stages */
+  --oq-round-sm: var(--wk-r-inner); --oq-round-md: 16px; --oq-round-lg: var(--wk-r-card);
+  --oq-round-xl: var(--wk-r-stage);
+  --oq-round-pill: 999px;
+
+  /* === Depth ========================================================== */
+  --wk-shadow-sm: 0 1px 2px rgba(36, 20, 61, .06), 0 2px 8px rgba(36, 20, 61, .04);
+  --wk-shadow-md: 0 2px 4px rgba(36, 20, 61, .05), 0 14px 34px -10px rgba(36, 20, 61, .14);
+  --wk-shadow-lg: 0 4px 8px rgba(36, 20, 61, .05), 0 30px 64px -22px rgba(36, 20, 61, .26);
+  --wk-shadow-glow: 0 22px 54px -20px rgba(123, 92, 250, .5);
+  --oq-elevation: var(--wk-shadow-sm);
+  --oq-elevation-lift: var(--wk-shadow-lg);
+
+  /* === Atmosphere (CSS gradients only) ================================ */
+  /* The hero's planetrise, used only inside dark moments. */
+  --wk-planetrise:
+    radial-gradient(ellipse 50% 62% at 50% 116%, var(--wk-night) 0%, var(--wk-night) 58%, #12072600 76%),
+    radial-gradient(ellipse 92% 60% at 50% 106%, #fbf8ff 0%, var(--wk-halo) 14%, #b79cff 30%, var(--wk-violet) 44%, #4a2bb8 62%, #2a1470 76%, #12072600 92%);
+  /* On the light product, a faint lavender horizon behind working screens. */
+  --wk-ambient: radial-gradient(ellipse 90% 38% at 50% 108%, rgba(123, 92, 250, .12), rgba(123, 92, 250, 0) 72%);
+
+  --oq-duration: 160ms;
+  --oq-ease: cubic-bezier(.2,.7,.3,1);
+  color-scheme: light;
+}
+
+/* A world's chosen look retints the action colour only. Structure, spacing and
+   type stay identical so a hand-painted world is recognisably the same app.
+   Both tints hold 4.5:1 with white labels. */
+[data-world-style="hand-painted"] {
+  --oq-action: #b0452a; --oq-action-hover: #8f3419; --oq-accent-ink: #a23f25;
+}
+[data-world-style="watercolor"] {
+  --oq-action: #1f6f85; --oq-action-hover: #155668; --oq-accent-ink: #1b6479;
+}
+/* Colours derived from the action tint. A custom property is resolved where it
+   is declared, so these are declared again on every retinted scope or they
+   would keep the root's purple. */
+:root, [data-world-style] {
+  --oq-action-fill: var(--oq-action);
+  --oq-action-fill-hover: var(--oq-action-hover);
+  --oq-wash: color-mix(in srgb, var(--oq-action) 9%, #ffffff);
+}
+
+/* The dark set: the hero and the rare cinematic moment. Everything inside
+   reads the same semantic names, so the component kit works unchanged. */
+.oq-shade, .wk-dark {
+  --oq-paper: var(--wk-night);
+  --oq-surface: #180c31;
+  --oq-inset: var(--wk-veil);
+  --oq-ink: var(--wk-ink);
+  --oq-secondary: var(--wk-mist);
+  --oq-muted: var(--wk-mist);
   --oq-line: #2f2159;
   --oq-control-line: #7a68ad;
-  --wk-rim: #c9b8ff38;       /* the 1px lavender edge on raised things */
+  --wk-rim: #c9b8ff38;
   --wk-highlight: inset 0 1px 0 #ffffff12;
-
-  /* --- Action. The fill is mixed into night rather than laid over it, so a
-     button's label keeps its contrast whatever is behind the button. --- */
+  --wk-focus: var(--wk-marigold);
   --oq-action: #c6b4ff;
   --oq-action-hover: #ddd1ff;
   --oq-on-action: var(--wk-ink);
   --oq-accent-ink: #d6c9ff;
-
-  /* --- Status. Held apart from the violets so "saved" never reads as
-     decoration and "failed" never reads as a style choice. --- */
+  --oq-action-fill: color-mix(in srgb, #c6b4ff 36%, #1a0d33);
+  --oq-action-fill-hover: color-mix(in srgb, #c6b4ff 48%, #1a0d33);
+  --oq-wash: color-mix(in srgb, #c6b4ff 14%, var(--wk-dusk));
+  --oq-btn2-bg: #1a0d33b8;
+  --oq-btn2-border: #c9b8ff57;
+  --oq-btn2-hover-bg: #2a1a52d9;
+  --oq-btn2-hover-border: #d9ccffa6;
+  --oq-ghost-hover: #ffffff0f;
   --oq-success-ink: #8fe3b8;
   --oq-success-wash: #15302d;
   --oq-error-ink: #ffaaa4;
   --oq-error-wash: #3a1629;
   --oq-warning-ink: #f5c77a;
   --oq-warning-wash: #33241c;
-
-  /* --- Type --- */
-  --oq-font-body: "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --oq-font-display: "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --oq-display-variation: normal;
-  --wk-display-weight: 300;
-
-  /* --- Spacing: a 4px base with steps far enough apart to read as intent. --- */
-  --oq-space-1: 4px; --oq-space-2: 8px; --oq-space-3: 12px;
-  --oq-space-4: 16px; --oq-space-5: 24px; --oq-space-6: 32px;
-  --oq-space-7: 48px; --oq-space-8: 72px; --oq-space-9: 104px;
-  --oq-section: clamp(56px, 8vw, 104px);
-
-  /* --- Shape, by hierarchy: inset, card, stage, and the pill every control
-     wears. --- */
-  --oq-round-sm: 14px; --oq-round-md: 18px; --oq-round-lg: 22px;
-  --oq-round-xl: 28px;
-  --oq-round-pill: 999px;
   --oq-elevation: var(--wk-highlight);
   --oq-elevation-lift: var(--wk-highlight), 0 24px 60px #05010f99;
-
-  /* --- Planetrise. A dark world (top layer) rising in front of its own
-     atmosphere (lower layer). Only gradients: no blurred layers, nothing that
-     costs anything per frame. --- */
-  --wk-planetrise:
-    radial-gradient(ellipse 50% 62% at 50% 116%, var(--wk-night) 0%, var(--wk-night) 58%, #12072600 76%),
-    radial-gradient(ellipse 92% 60% at 50% 106%, #fbf8ff 0%, var(--wk-halo) 14%, #b79cff 30%, var(--wk-violet) 44%, #4a2bb8 62%, #2a1470 76%, #12072600 92%);
-  /* The same horizon at a third of the light, for screens where text may
-     pass over it. Its brightest stop keeps muted text above 5:1. */
-  --wk-ambient:
-    radial-gradient(ellipse 54% 60% at 50% 118%, var(--wk-night) 0%, var(--wk-night) 60%, #12072600 80%),
-    radial-gradient(ellipse 96% 50% at 50% 108%, #3b2688 0%, #3b2688 26%, #26145f 52%, #12072600 86%);
-
-  --oq-duration: 160ms;
-  --oq-ease: cubic-bezier(.2,.7,.3,1);
-  color-scheme: dark;
-}
-
-/* A world's chosen look retints the action colour only. Structure, spacing and
-   type stay identical so a hand-painted world is recognisably the same app. */
-[data-world-style="hand-painted"] {
-  --oq-action: #ffc2a6; --oq-action-hover: #ffd6c3; --oq-accent-ink: #ffcdb6;
-}
-[data-world-style="watercolor"] {
-  --oq-action: #a9e2ec; --oq-action-hover: #c6eef4; --oq-accent-ink: #b8e8f0;
-}
-/* Colours derived from the action tint. A custom property is resolved where it
-   is declared, so these are declared again on every retinted scope or they
-   would keep the root's lavender. */
-:root, [data-world-style] {
-  --oq-action-fill: color-mix(in srgb, var(--oq-action) 36%, #1a0d33);
-  --oq-action-fill-hover: color-mix(in srgb, var(--oq-action) 48%, #1a0d33);
-  --oq-wash: color-mix(in srgb, var(--oq-action) 14%, var(--wk-dusk));
-}
-
-/* The whole app is dark now, so the shade scope is a deeper well rather than
-   an inversion: the editor's 3D stages and the landing's arrival band. */
-.oq-shade {
-  --oq-surface: #180c31;
+  color: var(--oq-ink);
   color-scheme: dark;
 }
