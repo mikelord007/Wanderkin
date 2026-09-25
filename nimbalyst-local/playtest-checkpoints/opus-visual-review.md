@@ -5,6 +5,8 @@ Runtime model: **`claude-opus-5-5`** (Opus 5.5), taken from this session's own s
 Reviewed product: `7ec73b2`. HEAD at the time was `b2106fc`, and everything after `7ec73b2` is docs only. The tracked tree was clean before and after this review.
 Date: 2026-09-25.
 
+> **Update:** F1, F2 and F6 were then implemented by this same session, as authorized by the coordinator, in product commit `b9a00e5`. See "Implementation" at the end. F3/F4 went to a separate worker. F5 is not authorized. The review sections below are left as written at review time, except where the implementation section explicitly corrects them.
+
 ## Verdict
 
 **Not ready to call done. The smaller character is a real improvement; the surface/material work is not.**
@@ -175,3 +177,128 @@ Then decide, with the user if the coordinator prefers:
 None of these is a new mechanic or a redesign. Each maps directly to the user's asks: "material lighting" (F1, F2, F6), "shrinking the character down" (F3, F4) and a convincing giant household (F5).
 
 Subjective acceptance stays with the user's own play-test.
+
+## Implementation: F1 + F2 + F6 (product commit `b9a00e5`)
+
+Authorized by the coordinator after this review. Exclusive paths: `src/scene/materialRegions.ts`, `src/scene/styleMaterial.ts`, their tests, and comment-only edits to `src/scene/samples.ts`. Runtime was `claude-opus-5-5` (self-reported). F3/F4 (markers, stride) belong to a separate worker; I left their files untouched and unstaged. F5 is not authorized.
+
+All three fixes live in `styleMaterial.ts`, and the commit tool stages whole files, so they share one product commit.
+
+### Correction to my own review
+
+F1 recommended "flip the sense, divider ≈ −0.6". **That was wrong.** I had read it off a perspective tint sweep. Measuring the real vertices (below) puts the true seam at **x ≈ −1.0**. A single X plane is not enough either, because the laptop sits on the desk. I implemented measured boxes instead.
+
+### F1: the regions now come from the real geometry
+
+- **Method.** I parsed `public/samples/rodin.glb` POSITION data and applied the sample manifest's own transform (uniform ×4.2208, no rotation). From that I built top-down height maps, slices and a front elevation, with the script at `tmp-opus-visual-review/analyze-rodin.mjs`. I then checked each box against the tint overlay in real Chrome from the front, back, side and junction views.
+- **Measurements:**
+  - **Desk** (x −4.0…−1.05): top plane at y ≈ 1.80–1.82, drawer pedestal side panel at x ≈ −1.65.
+  - **Seam:** a full-height gap at **x ≈ −1.0**.
+  - **Sofa:** left arm at x −0.95…−0.35 (top 1.9); seat at y 1.26–1.29, which is the course's elevated surface where checkpoints 2 and 3 sit; backrest to about 2.5 at z < −1.0.
+  - **Laptop:** screen to 2.5 m at z ≈ −0.6.
+    - The keyboard deck rises only 1–5 cm above the desk top. Vertices above the desk plane stop at z ≈ 0.3.
+    - Towards the front, the reconstruction fuses the deck into the desk-plane triangles. The overlay against the texture shows the deck reaching z ≈ 0.8.
+- **Profile:**
+  - wood = desk box, capped just above the desk top at 1.835
+  - fabric = sofa box from y 0.22, so the feet and floor patches stay neutral
+  - neutral = a laptop box (x −3.25…−1.9, z −0.85…0.82, from y 1.78) and a mouse box (x −3.95…−3.2, z −0.55…0.05)
+  - Everything standing above the desk top (bottles, vase) is outside all boxes, so it is neutral.
+  - Edge softness is 0.01 m.
+  - It is still keyed only to the actual loaded-bytes sha256. Unknown hashes still return `null`.
+- **Boundary corrections found during verification.** I report these as the smallest precise fixes rather than assuming every desk-side triangle is wood:
+  1. The first neutral box missed the keyboard deck: it was tinted wood in `26-laptop-tint`.
+  2. A pure height cut can't separate the deck from the desk top, which is not perfectly flat. The tests caught that it would speckle the desk top.
+  3. One large footprint box would have neutralised most of the desk top, which the tests also caught.
+
+  The final shape is the two tight boxes above. Cost: the desk top directly under the laptop footprint loses grain. That is deliberate, since the laptop's front edge is geometrically fused with the desk there.
+- **Shader:** box weights come from uniform arrays (`#define OQ_REGION_BOXES`). The normal is bumped separately per field and blended by weight, so a box edge can never become a height step or a false ridge. `classifyMaterialPoint` in `materialRegions.ts` is a CPU mirror of it for tests.
+- **Regression tests** (`materialRegions.test.ts`), tied to measurement and identity rather than names:
+  - 12 measured reference points: seat under checkpoints 2 and 3 → fabric; backrest and left arm → fabric; desk top (two spots) and pedestal → wood; desk leg → wood; laptop screen, fused deck, item above the desk and sofa foot → neutral.
+  - Plus tests against **the real `rodin.glb` bytes**:
+    - the bytes' sha256 equals the profile key
+    - more than 95% of the seat and backrest vertices are fabric
+    - more than 95% of the desk-top (beside the laptop) and pedestal vertices are wood
+    - the sofa's left arm has 0 wood vertices
+    - everything above y 1.9 on the desk side is neutral
+    - the keyboard deck is under 2% wood
+    - more than 75% of the mesh is covered, so the checks can't pass on empty boxes
+  - **Mutation-checked:** swapping wood and fabric fails 10 tests; putting back the old −0.06 divider fails 5.
+
+### F2: Cartoon bands imported assets by luminance
+
+- For imported assets only (the `cloneStyledMaterial` path), Cartoon now quantizes **luminance** into the same 5 bands and rescales the colour to that band. The texture's hue is kept at every band.
+- The lowest band is half a step (0.1), not black. Near-black texels ease toward neutral grey, so rescaling can't amplify hidden noise into saturated colour.
+- Helper, floor and marker materials keep the original per-channel rounding. The program cache key includes `asset`/`helper`, and a test asserts this. When I applied luminance bands globally, the spawn ring merged into the grass.
+- Genuine PBR maps are untouched: the Tripo material still has its base colour, metallic-roughness and normal maps, and the PBR-preservation tests still pass.
+- Deterministic tests use a CPU mirror (`cartoonAssetBandColor`):
+  - a warm brown with a rising sheen stays within 12° of its source hue, where per-channel rounding drifts more than 25° (red, yellow and grey bands)
+  - dark non-black texture colours keep luminance above 0.09, where per-channel rounding gives 0
+- Real Chrome, Tripo spawn, same deterministic spawn camera: `fix/20` (before, black with maroon patches) vs `fix/21` (after, readable dark brown). The Rodin sofa-seat rainbow gloss is gone (`fix/10-cartoon…` vs `fix/11-cartoon…`).
+
+### F6: fade units and detail tuning
+
+- **Fade units:** `oqDetailFade` now converts radians/m to cycles (×1/2π) and fades each field by its own frequency between 0.2 and 0.45 cycles per pixel (below Nyquist).
+- **Fabric:** 130 rad/m weave (4.8 cm period in game, about 1.2 cm real). Amplitude 0.0035 → 0.008, tuned down from 0.0095 because at that strength the ribbing dominated the seat under the explorer in Hand-painted. Roughness 0.84–1.0 (matte).
+- **Wood:** a new grain function (lines along X that wander and fade in and out along the board) replaces the 28 rad/m plank stripes. It runs at 120 rad/m with amplitude 0.003, reduced from 0.0045 because the first version read as regular corrugation. Roughness 0.52–0.72 (satin, down from the old 0.42 gloss).
+- **Per-style strength:** Cartoon runs at **0.25**. At full strength, fine relief under 5 flat bands only dithers band edges into dotted/hatched contours (`fix/14-…REJECTED-dither`). Hand-painted and Watercolor run at full strength.
+- **Result:**
+  - Painted styles: visible woven upholstery on the sofa and wavy grain on the desk (`fix/11-*`, `fix/13-*`).
+  - Cartoon: clean bands with a trace of relief; its material difference shows mainly as matte vs satin.
+- **Moving-camera check:** `tmp-opus-visual-review/pan.mjs` does 9-frame sub-pixel pans (3 mm per frame) at mid and grazing distance over the seat and the desk, with the HUD hidden, measuring frame-to-frame |Δ|. Current vs baseline:
+
+  | Metric | Result |
+  | --- | --- |
+  | Pixels jumping by more than 12 levels | Lower or within +0.06 percentage points of baseline in every style and pose (current 0.3–1.6%, baseline 0.4–2.5%; worst case Watercolor desk-mid 1.21% vs 1.14%) |
+  | Mean frame delta | Equal or lower, except desk-grazing (+0.18 to +0.30/255) |
+
+  The desk-grazing rise comes with no rise in jumping pixels (0.52–1.00% vs 0.52–1.64%), so it is gentle shading motion, not sparkle. Stills show no moiré at far, mid or grazing distance (`fix/22`, `fix/23`, `verify/final/*/30-*`, `31-*`).
+
+### samples.ts (comments only)
+
+- The `RODIN_DESK_Y` doc comment now says the surface is the sofa seat. The constant keeps its historical name.
+- The step-flight comments say seat instead of desk. The checkpoint comments say "in front of the desk's left end", "on the sofa seat" and "across the seat … beside the sofa's left arm".
+- Every changed line is a comment; constants, IDs, the route and geometry are unchanged. CRLF endings are preserved.
+
+### Verification
+
+- `npx tsc -p tsconfig.json --noEmit` and `npx tsc -p server/tsconfig.json --noEmit`: both exit 0.
+- `npx vitest run src/scene src/game/assets src/game/render`: 11 files, **122/122 pass**. This run happened while the sibling worker's uncommitted render/animator edits were in the working tree. Per instruction, I did not run the full suite before both owners freeze.
+- Real Chrome, two disposable Vite servers with **private cacheDirs under the OS temp dir**, both deleted afterwards:
+  - 5212 served `styleMaterial.ts`/`materialRegions.ts` exactly as committed at `7ec73b2` (via a Vite `load` hook, no file changes)
+  - 5211 served the working tree
+  - Every `/api` call was mocked GET-only, and 0 requests were blocked
+  - Identical scripted cameras (overview front/back/side/corner, desk/sofa junction from both sides, seat/arm/desk/pedestal/laptop close-ups, grazing views, dolly sequences) in all three styles
+  - **0 console/page errors in every run**
+- Production "Play now" flow, both samples: 0 errors, rendering and moving (`fix/30`, `fix/31`).
+- The review hooks (tint overlay, overview camera, R3F state) existed only as serve-time transforms in `tmp-opus-visual-review/vite.review.config.mjs`. `grep -rn oqReview src shared` finds nothing in shipped source.
+- Protected services afterwards: 5173 → 200, 15173 → 200, 8787 `/api/capabilities` → 200, 18799 `/api/capabilities` → 200. There were no provider, generation, upload, publish or save calls, and no storage, saved-world, stash or Finish changes.
+- Disclosure: while I captured, the sibling F3/F4 worker was editing `Checkpoints.tsx`, `GameStage.tsx`, `ModeEntities.tsx`, `PlayerAvatar.tsx` and the animator. Both of my servers served those same working-tree files, so every material A/B pair differs only in my two files. Marker and avatar appearance in the frames reflects their work in progress, not a shipped state.
+
+### Evidence (`nimbalyst-local/screenshots/opus-visual-review/fix/`)
+
+- `01`/`02`: front tint, before (inverted) and after.
+- `03`: back tint, after.
+- `04`/`05`: junction from front and back.
+- `06`/`07`: laptop and mouse neutral, including the fused deck at a grazing angle.
+- `10`–`13`: sofa seat and desk top, before and after, for Cartoon, Hand-painted and Watercolor.
+- `14`: the rejected full-strength Cartoon dither.
+- `20`/`21`: Tripo Cartoon spawn, before and after.
+- `22`/`23`: far and grazing views, no moiré.
+- `30`/`31`: production Play-now smoke.
+
+### Honest residuals
+
+- **Boundary quality:**
+  - Regions are boxes on one combined mesh. Small items on the desk top that lie flat below 1.835 m (for example the paper sheets right of the laptop) receive desk-wood detail.
+  - The sofa's wooden feet are neutral rather than wood.
+  - The desk top directly under the laptop footprint has no grain.
+- **Scope of the fix:**
+  - Only the one known Rodin asset has regions. Tripo and every user-generated asset get only the relight (Rodin-style bakes) and/or the Cartoon luminance bands.
+  - No metal region exists or is claimed.
+  - No semantic segmentation is claimed.
+- **Cartoon:**
+  - Cartoon deliberately shows only a trace of relief.
+  - The luminance bands change the Cartoon look of all imported assets (warmer, readable darks, hue kept). The user should judge that visually; I don't claim they will accept it.
+- **Environment-map experiment:** the RoomEnvironment test on Tripo remains review evidence only. A global environment washed out the floor, and the black Tripo crush is now handled by F2 instead.
+- **Moving-camera evidence:** based on sub-pixel pans and stills. I have not reviewed it as video.
+- **Not touched, owned elsewhere:** F3 markers, F4 stride, F5 environment/palette, and the pre-existing Tripo checkpoint-5 flake.
