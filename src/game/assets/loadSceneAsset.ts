@@ -64,6 +64,10 @@ export async function parseSceneAsset(
     url,
     scene: gltf.scene,
     collision,
+    // This fixture-only parser decodes an already-in-memory buffer and
+    // never goes through the network loader's hashing step, so it has no
+    // downloaded-bytes hash to report — never fabricate or approximate one.
+    sha256: null,
     byteLength: buffer.byteLength,
     meshCount,
   };

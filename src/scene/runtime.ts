@@ -37,15 +37,30 @@ export interface LoadedSceneAsset {
   /** Asset-local collision geometry in Rapier trimesh form. Apply the same
    * entity transform the scene gets. */
   collision: { vertices: Float32Array; indices: Uint32Array };
+  /**
+   * SHA-256 of the bytes actually downloaded and decoded for this asset —
+   * {@link LoadedAsset.sha256}, passed through unchanged. `null` where
+   * WebCrypto is unavailable (non-secure context).
+   *
+   * This is the only hash a consumer should ever use to recognise an exact
+   * known asset (e.g. selecting a material region profile): it reflects what
+   * was actually fetched, not what a manifest's `AssetReference.sha256`
+   * merely declares. A manifest can declare any value; only this field is
+   * computed from the real bytes.
+   */
+  sha256: string | null;
 }
 
 /**
  * Cached loader for the game runtime.
  *
  * Thin adapter over {@link loadAsset}: same cache, same single download, but
- * shaped to the `{ scene, collision }` pair the runtime asked for. The
- * "analyzing" stage is reported as "decoding" because it is part of the same
- * post-download wait from a player's point of view.
+ * shaped to the `{ scene, collision, sha256 }` triple the runtime asked for.
+ * `sha256` is {@link loadAsset}'s own hash of the downloaded bytes, passed
+ * through unchanged — never recomputed here, and never substituted with a
+ * manifest's declared value. The "analyzing" stage is reported as "decoding"
+ * because it is part of the same post-download wait from a player's point of
+ * view.
  */
 export async function loadSceneAsset(
   url: string,
@@ -65,6 +80,7 @@ export async function loadSceneAsset(
   return {
     scene: loaded.scene,
     collision: toIndexedMesh(loaded.triangles),
+    sha256: loaded.sha256,
   };
 }
 

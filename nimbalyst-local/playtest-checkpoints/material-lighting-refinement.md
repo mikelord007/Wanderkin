@@ -444,3 +444,81 @@ Staged and committed via `developer_git_commit_proposal`: `src/scene/styleMateri
 `nimbalyst-local/screenshots/materials/underfurniture-crush-fix/`. `GameStage.tsx` and every other
 scale-owned file were not read for editing purposes and not modified — only played through as a
 normal user of the already-frozen build to capture evidence.
+
+## Follow-up: two gaps from independent review 1445148's third pass
+
+### 1. Region selection now uses the loader's actual computed hash, not the manifest's declared one
+
+The review correctly caught a real gap: this checkpoint's own docs (`materialRegions.ts`,
+`cloneStyledObject`'s JSDoc) describe the sha256 used for region selection as "the loaded asset's
+verified content hash... computed from the fetched bytes at load time" — but `SceneEntities.tsx`
+was actually reading `manifest.assets[].sha256`, the manifest's *declared* `AssetReference.sha256`.
+The loader (`src/scene/loader.ts`) independently computes a real hash of the downloaded bytes
+(`LoadedAsset.sha256`) already, but `src/scene/runtime.ts`'s `loadSceneAsset()` — the adapter
+`SceneEntities.tsx` actually consumes — discarded it, returning only `{ scene, collision }`. A
+manifest that declared the known Rodin hash next to different real bytes would have received the
+Rodin region treatment on the wrong mesh; nothing checked the two ever matched.
+
+**Fix** (minimal field propagation, per the review's exact scoping — no re-fetch/re-hash, no
+shared-schema change, no server/storage work):
+- `src/scene/runtime.ts`: added `sha256: string | null` to `LoadedSceneAsset`, populated directly
+  from `loadAsset()`'s own `LoadedAsset.sha256` in `loadSceneAsset()` — passed through unchanged,
+  never recomputed.
+- `src/game/render/SceneEntities.tsx`: now reads `asset.sha256` (the loader-computed value)
+  directly instead of building a `manifest.assets[].sha256` lookup map. The manifest's declared
+  hash is no longer consulted anywhere in material-region selection.
+- `src/game/assets/loadSceneAsset.ts`: one forced, mechanical one-line fix — `ParsedSceneAsset`
+  (the offline fixture-only parser `sampleAsset.test.ts` uses, which decodes an in-memory buffer
+  and never goes through the network loader's hashing step) now sets `sha256: null` to satisfy the
+  now-required interface field. This is outside "runtime.ts and its directly related test only,"
+  but was unavoidable — the interface change does not compile otherwise. Reporting it explicitly
+  rather than silently expanding: it is one line, adds no behavior, computes no new hash.
+
+**Regression test** (`src/scene/runtime.test.ts`, real network-shaped load — `fetch` stubbed to
+serve the actual bundled `.glb` bytes, no shortcuts around the real download/hash/decode path):
+- Serves the real `rodin.glb` bytes and asserts `loadSceneAsset()`'s returned `sha256` equals
+  `c750cb2c1fcd2197f8c373b791703bc90073075e11d08cafb0be4d84012d54b8` — the exact constant
+  `materialRegions.ts` keys the Rodin profile on. This closes the loop end-to-end: real bytes →
+  real computed hash → matches the known profile key, with nothing declared in between.
+- Serves the real `tripo.glb` bytes behind a URL shaped like a declared-Rodin asset (standing in
+  for a manifest that declares the Rodin hash next to different real bytes) and asserts the
+  returned hash is neither null nor the known Rodin constant — proving the actual bytes, not any
+  declared identity, drive the result. Combined with `materialRegions.test.ts`'s existing proof
+  that `getKnownMaterialProfile` only matches an exact real hash, this closes the regression the
+  review asked for: a declared-known/actual-unknown-bytes asset cannot receive the Rodin profile.
+
+**Verification.** `npx tsc -p tsconfig.json --noEmit` → exit 0. `npx vitest run src/scene
+src/game/assets` → 6 files, **41 tests pass** (was 39; +2 new hash-propagation tests; the +2 from
+the prior floor-fix follow-up are included in that count). Real Chrome, private per-investigation
+Vite cacheDir (deleted after use), full production "Play now" flow (real network-shaped fetch,
+real hash, real `SceneEntities.tsx` — not a mocked fixture) mantled onto the desk: wood-grain
+region still renders correctly, zero console errors, confirming the switch from declared to actual
+hash changed nothing for the one asset that has always legitimately matched by either measure.
+Re-verified protected 5173/15173/8787/18799 healthy after teardown. Did not re-run the full unit
+suite or the three-style sweep — this change doesn't touch style/region shader code, only which
+hash value reaches it.
+
+### 2. Matched AFTER delivered for `before-sofa-underside-baked-flat.png`
+
+That "before" screenshot (captured very early, at the literal spawn position, before this
+worker's later before/after pairs were captured at deliberately matched camera positions) never
+got a same-position "after" — an unmatched visual-evidence claim, correctly flagged. Rather than
+treat the (also real, also controlled) `underfurniture-crush-fix/` set as a substitute for a
+different camera position, captured the actual matching frame: same level, same deterministic
+spawn point (`[-4.02, 0.09, -1.086]`, confirmed identical via `window.__objectquest` diagnostics,
+not just eyeballed), current code (relit + region + floor-fix all applied), zero console errors.
+Saved as `nimbalyst-local/screenshots/materials/after-sofa-underside-relit-floor-fixed.png`. It
+shows the same warm-toned, visibly-detailed but genuinely darker underside as the
+`underfurniture-crush-fix` set (expected — same fix, same general surface), now with an exact
+same-position "before" to compare against instead of a same-subject-different-angle one.
+
+### Commit (this follow-up)
+
+Staged and committed via `developer_git_commit_proposal`: `src/scene/runtime.ts`,
+`src/scene/runtime.test.ts`, `src/game/render/SceneEntities.tsx`,
+`src/game/assets/loadSceneAsset.ts` (the one forced one-line fix), this checkpoint, and the new
+`nimbalyst-local/screenshots/materials/after-sofa-underside-relit-floor-fixed.png`. No
+scale/camera/GameStage files, no shared schema files, and no server/storage files were touched.
+Reviewer's other findings — no blocking issue in immutable `fc121b1`/`b012dd2`, the reduced-motion
+shadow-resolution fallback is explicitly not a GPU-capacity signal and no broader graphics-settings
+feature is implied by it — are unchanged and not revisited here.
