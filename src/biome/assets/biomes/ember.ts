@@ -29,7 +29,9 @@ const tones = {
   // Fire-lily petals and ember-fern tips: deep red, never the collectible's cyan.
   accent: { dark: "#8c2a22", base: "#c23a30", light: "#e0705e" },
   stoneTop: { dark: "#5c5756", base: "#77716e", light: "#9a9390" },
-  stoneSide: { dark: "#28262d", base: "#3a3740", light: "#57525c" },
+  // Basalt wall sides: lifted well above the dark recess (#16151a) so the
+  // column joints, crack columns and courses separate under dusk light.
+  stoneSide: { dark: "#3a3742", base: "#5a5563", light: "#857e8e" },
   stoneRecess: { dark: "#1a191e", base: "#222126", light: "#2c2a30" },
   /** Pale ash settled on column tops, rims and ledges; bleached snags. */
   ash: { dark: "#5e5958", base: "#7c7674", light: "#a49d98" },
