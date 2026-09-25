@@ -14,6 +14,9 @@
   sofa-comparison render was "the correct way to judge" — correctly rejected as not satisfying
   "when character spawns, environment looks bigger" in the actual production camera. See the new
   section below for what changed as a result.
+- Reopen committed: `13caa6b8d01b3c6b0dbb8113a231d601b1c57084` — `characterScale.ts`,
+  `characterScale.test.ts`, `constants.ts`, `GameStage.tsx`, `cameraRig.test.ts`,
+  `tests/e2e/browser/gameplay.test.ts` (narrow grant), this checkpoint file.
 
 ### Addendum: disposable-Vite cache isolation (coordinator-flagged, test-infra only)
 
