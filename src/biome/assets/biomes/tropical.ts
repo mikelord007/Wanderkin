@@ -16,6 +16,7 @@ import { broadleafClump, leafyBush, tropicalFlowers, tropicalGrass } from "../tr
 import { fallenPalmFrond, palmSprout, tropicalPalm } from "../tropical/palm.js";
 import { bambooPoles } from "../tropical/marker.js";
 import { fallenCoconuts, TROPICAL_ROCK_SHAPES, tropicalRock } from "../tropical/rocks.js";
+import { TROPICAL_WALL } from "../tropical/wall.js";
 import type { BiomeArt, BiomeTones } from "../types.js";
 
 const tones = {
@@ -388,16 +389,7 @@ export const TROPICAL_ART: BiomeArt = {
       },
     ],
   },
-  wall: {
-    strata: [2, 3],
-    stepping: 0.5,
-    rounding: 0.7,
-    notches: [0, 1],
-    top: { dark: "#cdb98f", base: "#e0cda4", light: "#f0e0bb" },
-    side: { dark: "#8f8577", base: "#b3a894", light: "#d2c7b0" },
-    recess: "#6f665a",
-    rim: "#f5ead0",
-  },
+  wall: TROPICAL_WALL,
   ground: { contactColor: "#5a4a32", contactOpacity: 0.42, contactScale: 0.95, patchColor: "#a8875a" },
   variation: { toneJitter: 0.05, hueJitterDeg: 5 },
   budgets: { triangles: { standard: 110_000, reduced: 45_000 }, membersPerCluster: { standard: 8, reduced: 4 } },
