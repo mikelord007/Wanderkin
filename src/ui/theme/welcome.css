@@ -1,7 +1,8 @@
 /*
  * The landing page (v3): a clean, light product site with one cinematic
  * purple moment, the hero's planetrise. Sections alternate between
- * explanatory and product-focused, on the page colour or the tint, and every
+ * explanatory (centred headings) and product-focused (left-aligned headings),
+ * on the page colour or the tint, and every
  * value comes from the tokens (tokens.css) and layout primitives (global.css).
  *
  *   hero (cinematic, light) · transformation (explanatory, page) ·
@@ -115,7 +116,9 @@
 .wk-interlude {
   position: relative; overflow: hidden; display: grid; align-items: center;
   min-height: clamp(360px, 56vh, 580px);
-  background: linear-gradient(115deg, #efe6ff 0%, #f6f1ff 55%, var(--wk-page) 100%);
+  /* The page colour, with the tint pooled only behind the giant button, so it
+     separates cleanly from the tinted section above it. */
+  background: radial-gradient(ellipse 48% 80% at 96% 50%, #ece3ff 0%, #f4efff 45%, #faf7ff00 75%), var(--wk-page);
 }
 .wk-interlude__inner { position: relative; z-index: 1; }
 .wk-interlude__line {
