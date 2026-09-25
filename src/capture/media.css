@@ -1,31 +1,29 @@
-/* The in-play capture pill. It floats over live 3D, so it is a near-opaque
-   night capsule (no blur), styled like the HUD's own pills beside it. */
-.oq-capture-controls { position: absolute; z-index: 20; left: max(16px,env(safe-area-inset-left)); bottom: max(18px,env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 10px; padding: 5px; border-radius: 999px; color: #f4eeff; background: #120726e0; border: 1px solid #c9b8ff38; box-shadow: inset 0 1px 0 #ffffff12, 0 12px 30px #05010f66; font-family: "Outfit", system-ui, sans-serif; }
-.oq-capture-controls p { margin: 0 12px; font-size: .8125rem; color: #c3b6e2; }
-.oq-capture-controls .oq-kit-button { min-height: 42px; padding: 8px 18px 8px 14px; font-size: .9rem; background: transparent; border-color: transparent; box-shadow: none; }
-.oq-capture-controls .oq-kit-button:not(:disabled):hover { background: #ffffff12; border-color: #c9b8ff40; }
+/* The in-play capture pill (v3, light): a near-opaque white capsule with plum
+   text, styled like the HUD's own pills beside it. No blur. */
+.oq-capture-controls { position: absolute; z-index: 20; left: max(16px,env(safe-area-inset-left)); bottom: max(18px,env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 10px; padding: 5px; border-radius: 999px; color: #24143d; background: #ffffffeb; border: 1px solid #e7ddfc; box-shadow: 0 1px 2px rgba(36, 20, 61, .08), 0 8px 24px -8px rgba(36, 20, 61, .28); font-family: "Outfit", system-ui, sans-serif; }
+.oq-capture-controls p { margin: 0 12px; font-size: .8125rem; color: #5a4c74; }
+.oq-capture-controls .oq-kit-button { min-height: 42px; padding: 8px 18px 8px 14px; font-size: .9rem; color: #24143d; background: transparent; border-color: transparent; box-shadow: none; }
+.oq-capture-controls .oq-kit-button:not(:disabled):hover { background: #f2ebff; border-color: #e7ddfc; }
 /* The record light: a small ring while idle, a lit red dot while recording. */
-.oq-capture-controls .oq-kit-button::before { content: ""; flex: none; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid #ff8a93; }
-.oq-capture-controls[data-recording="true"] .oq-kit-button::before { background: #ff5d6c; border-color: #ff5d6c; box-shadow: 0 0 0 4px #ff5d6c33; }
-.oq-capture-controls[data-recording="true"] { border-color: #ff8a9366; }
+.oq-capture-controls .oq-kit-button::before { content: ""; flex: none; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid #d6453d; }
+.oq-capture-controls[data-recording="true"] .oq-kit-button::before { background: #d6453d; border-color: #d6453d; box-shadow: 0 0 0 4px #d6453d33; }
+.oq-capture-controls[data-recording="true"] { border-color: #f2c3bf; }
 
 /* --- Completion media cards (Finish) --- */
 .oq-media-cards { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-top: 16px; }
-.oq-media-card { min-width: 0; padding: 14px; border: 1px solid var(--wk-rim); border-radius: var(--oq-round-lg); background: var(--wk-veil); box-shadow: var(--wk-highlight); }
-.oq-media-card h2 { margin: 2px 0 6px; font-family: var(--oq-font-display); font-size: 1.1rem; font-weight: 400; }
-.oq-media-card p { margin: 6px 0 10px; color: var(--oq-muted); font-size: .8125rem; line-height: 1.45; }
-/* Sentence case like every other label now; the colour does the labelling. */
-.oq-media-card__label { color: var(--oq-accent-ink) !important; font-size: .78rem !important; font-weight: 500; }
+.oq-media-card { min-width: 0; padding: 14px; border: 1px solid var(--wk-border); border-radius: var(--wk-r-card); background: var(--wk-tint); }
+.oq-media-card h2 { margin: 2px 0 6px; font-family: var(--oq-font-display); font-size: 1.1rem; font-weight: 500; }
+.oq-media-card p { margin: 6px 0 10px; color: var(--wk-text-2); font-size: .8125rem; line-height: 1.45; }
+/* Sentence case like every other label; the colour does the labelling. */
+.oq-media-card__label { color: var(--wk-purple-ink) !important; font-size: .78rem !important; font-weight: 600; }
 /* aspect-ratio keeps the preview from distorting; max-height keeps a full
-   two-card stack (each card's own video, at full width on a narrow single-
-   column layout) from being the thing that forces the finish card to
-   scroll. object-fit: cover crops rather than squashes when max-height wins. */
-.oq-media-card video, .oq-saved-postcard video { display: block; width: 100%; aspect-ratio: 16 / 9; max-height: clamp(84px, 12dvh, 150px); margin: 8px 0; border-radius: 12px; background: var(--wk-night); object-fit: cover; }
+   two-card stack from being the thing that forces the finish card to scroll.
+   object-fit: cover crops rather than squashes when max-height wins. */
+.oq-media-card video, .oq-saved-postcard video { display: block; width: 100%; aspect-ratio: 16 / 9; max-height: clamp(84px, 12dvh, 150px); margin: 8px 0; border-radius: var(--wk-r-inner); background: var(--wk-cinema); object-fit: cover; }
 /* Compact so "Download gameplay highlight" stays one line in a half-width
-   card instead of doubling the button's height; min-height keeps the 44px
-   touch target. */
-.oq-media-card .oq-kit-button, .oq-media-card > a { width: 100%; margin-top: 6px; min-height: 44px; padding: 8px 10px; font-size: .8125rem; }
+   card; min-height keeps the 44px touch target. */
+.oq-media-card .oq-kit-button, .oq-media-card > a { width: 100%; margin-top: 6px; min-height: 44px; padding: 8px 10px; font-size: .8rem; }
 .oq-media-card__note { font-size: .78rem !important; }
-.oq-saved-postcard { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--oq-line); }
+.oq-saved-postcard { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--wk-border); }
 .oq-saved-postcard .oq-kit-button { width: 100%; }
 @media (max-width: 760px) { .oq-media-cards { grid-template-columns: 1fr; } .oq-capture-controls { right: 16px; border-radius: 22px; flex-wrap: wrap; } }

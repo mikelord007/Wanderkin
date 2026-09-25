@@ -4,20 +4,22 @@
    rather than in the product UI. Scoped under .oq-hud so it cannot leak
    into the surrounding application's styles.
 
-   Same planetrise system as the rest of the app, with one rule of its own:
-   this floats over a live 3D canvas, so every surface is a near-opaque night
-   fill and every glow is a gradient. No backdrop-filter, no blur, nothing
-   that is recomputed per frame while you play. */
+   v3: the same light product system as the rest of the app. White and pale
+   lavender panels, plum text, purple primary. It floats over a live 3D canvas,
+   so every panel is near-opaque (legible over bright sky and dark furniture
+   alike) and there is no backdrop-filter, no blur, nothing recomputed per
+   frame while you play. */
 
 .oq-hud {
-  --hud-night: #120726;
-  --hud-surface: #120726e0;
-  --hud-card: #1c0f38f5;
-  --hud-rim: #c9b8ff38;
-  --hud-ink: #f4eeff;
-  --hud-mist: #c3b6e2;
-  --hud-action: #c6b4ff;
+  --hud-panel: #ffffffeb;        /* near-opaque white over the scene */
+  --hud-card: #ffffff;
+  --hud-border: #e7ddfc;
+  --hud-ink: #24143d;
+  --hud-ink-2: #5a4c74;
+  --hud-action: #6a4af6;
+  --hud-action-hover: #5634e8;
   --hud-marigold: #f2b24d;
+  --hud-shadow: 0 1px 2px rgba(36, 20, 61, .08), 0 8px 24px -8px rgba(36, 20, 61, .28);
   position: absolute;
   inset: 0;
   z-index: 1;
@@ -32,9 +34,9 @@
 
 /* ---- Buttons ---------------------------------------------------------
    The base rule is wrapped in :where() so it weighs one class, the same as
-   `.oq-hud__primary` below it. It used to be `.oq-hud button` (a class and
-   an element), which outranked the primary rule and painted Play grey. Kit
-   buttons (the Sound panel) and the adventure panel keep their own rules. */
+   `.oq-hud__primary` below it. (It used to be `.oq-hud button`, which
+   outranked the primary rule and painted Play grey.) Kit buttons (the Sound
+   panel) and the adventure panel keep their own rules. */
 
 .oq-hud :where(.oq-hud__card, .oq-hud__top-actions) :where(button) {
   display: inline-flex;
@@ -47,18 +49,17 @@
   font-weight: 500;
   pointer-events: auto;
   cursor: pointer;
-  border: 1px solid #c9b8ff57;
+  border: 1px solid #d6c9f8;
   border-radius: 999px;
   padding: .6rem 1.35rem;
-  background: #1a0d33b8;
-  color: inherit;
-  box-shadow: inset 0 1px 0 #ffffff12;
+  background: #ffffff;
+  color: var(--hud-ink);
   transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
 }
 
 .oq-hud :where(.oq-hud__card, .oq-hud__top-actions) :where(button):hover {
-  background: #2a1a52;
-  border-color: #d9ccffa6;
+  background: #f2ebff;
+  border-color: #b3a0f0;
 }
 
 .oq-hud :where(.oq-hud__card, .oq-hud__top-actions) :where(button):active {
@@ -66,21 +67,20 @@
 }
 
 .oq-hud :where(button, summary, [role="button"]):focus-visible {
-  outline: 3px solid var(--hud-marigold);
+  outline: 3px solid var(--hud-action);
   outline-offset: 3px;
 }
 
-/* "Lit": the action tint mixed into night, so the label keeps contrast. */
 .oq-hud__primary {
-  background: color-mix(in srgb, var(--hud-action) 38%, #1a0d33);
-  border-color: color-mix(in srgb, var(--hud-action) 66%, transparent);
-  color: var(--hud-ink);
-  box-shadow: inset 0 1px 0 #ffffff29, 0 10px 30px -12px var(--hud-action);
+  background: var(--hud-action);
+  border-color: var(--hud-action);
+  color: #ffffff;
+  box-shadow: 0 8px 22px -10px rgba(106, 74, 246, .75);
 }
 
 .oq-hud__primary:hover {
-  background: color-mix(in srgb, var(--hud-action) 50%, #1a0d33);
-  border-color: var(--hud-action);
+  background: var(--hud-action-hover);
+  border-color: var(--hud-action-hover);
 }
 
 .oq-hud button svg {
@@ -89,37 +89,36 @@
   height: 17px;
 }
 
-/* ---- Objective capsule ----------------------------------------------- */
+/* ---- Objective panel ------------------------------------------------- */
 
 .oq-hud__objective {
   position: absolute;
   top: 1.1rem;
   left: 1.1rem;
   padding: .8rem 1.15rem .85rem;
-  border-radius: 22px;
-  background: var(--hud-surface);
-  border: 1px solid var(--hud-rim);
-  box-shadow: inset 0 1px 0 #ffffff12;
+  border-radius: 20px;
+  background: var(--hud-panel);
+  border: 1px solid var(--hud-border);
+  box-shadow: var(--hud-shadow);
   min-width: 11rem;
 }
 
 .oq-hud__objective-label {
   font-size: .8125rem;
-  font-weight: 500;
-  color: var(--hud-mist);
+  font-weight: 600;
+  color: var(--hud-action);
 }
 
 .oq-hud__objective-count {
   font-size: 1.625rem;
-  font-weight: 300;
+  font-weight: 400;
   letter-spacing: -.02em;
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
 }
 
 .oq-hud__objective-count span {
-  color: var(--hud-mist);
-  opacity: .8;
+  color: var(--hud-ink-2);
 }
 
 .oq-hud__objective p {
@@ -127,7 +126,7 @@
   margin: .35rem 0 0;
   font-size: .8125rem;
   line-height: 1.4;
-  color: var(--hud-mist);
+  color: var(--hud-ink-2);
 }
 
 .oq-hud__top-actions {
@@ -154,18 +153,20 @@
 .oq-hud .oq-hud__top-actions button {
   min-height: 42px;
   padding: .5rem 1.05rem;
-  background: var(--hud-surface);
-  border-color: var(--hud-rim);
+  background: var(--hud-panel);
+  border-color: var(--hud-border);
+  box-shadow: var(--hud-shadow);
 }
 
 .oq-hud .oq-hud__top-actions button:hover {
-  background: #22134a;
-  border-color: #d9ccffa6;
+  background: #ffffff;
+  border-color: #b3a0f0;
 }
 
 .oq-hud .oq-hud__top-actions button[aria-expanded="true"] {
-  background: color-mix(in srgb, var(--hud-action) 30%, #1a0d33);
-  border-color: color-mix(in srgb, var(--hud-action) 66%, transparent);
+  color: #ffffff;
+  background: var(--hud-action);
+  border-color: var(--hud-action);
 }
 
 .oq-hud__sound {
@@ -175,11 +176,11 @@
   right: 1.1rem;
   width: min(22rem, calc(100vw - 2.2rem));
   padding: 1.1rem 1.2rem 1.2rem;
-  border-radius: 22px;
+  border-radius: 20px;
   color: var(--hud-ink);
   background: var(--hud-card);
-  border: 1px solid var(--hud-rim);
-  box-shadow: inset 0 1px 0 #ffffff12, 0 24px 60px #05010f99;
+  border: 1px solid var(--hud-border);
+  box-shadow: 0 24px 60px -18px rgba(36, 20, 61, .4);
   pointer-events: auto;
   user-select: auto;
 }
@@ -207,7 +208,7 @@
   width: 1.15rem;
   height: .28rem;
   border-radius: 999px;
-  background: #ffffff29;
+  background: #e7ddfc;
 }
 
 .oq-hud__pip--done {
@@ -239,16 +240,17 @@
   display: grid;
   place-items: center;
   color: var(--hud-marigold);
-  filter: drop-shadow(0 1px 3px #12072699);
+  filter: drop-shadow(0 1px 2px rgba(36, 20, 61, .55));
 }
 
 .oq-hud__pointer-distance {
   font-size: .75rem;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   padding: .12rem .55rem;
   border-radius: 999px;
-  background: var(--hud-surface);
-  border: 1px solid var(--hud-rim);
+  background: var(--hud-panel);
+  border: 1px solid var(--hud-border);
 }
 
 /* ---- Contextual prompt ----------------------------------------------- */
@@ -263,10 +265,10 @@
   gap: .6rem;
   padding: .4rem 1.1rem .4rem .45rem;
   border-radius: 999px;
-  background: var(--hud-surface);
-  border: 1px solid color-mix(in srgb, var(--hud-action) 60%, transparent);
-  box-shadow: 0 0 0 4px #8b6cff1f;
-  font-weight: 500;
+  background: var(--hud-panel);
+  border: 1px solid #cbbcf9;
+  box-shadow: var(--hud-shadow), 0 0 0 4px rgba(123, 92, 250, .14);
+  font-weight: 600;
   animation: oq-prompt-in 160ms ease-out;
 }
 
@@ -284,8 +286,8 @@
   height: 1.75rem;
   padding: 0 .4rem;
   border-radius: 999px;
-  background: #ffffff14;
-  border: 1px solid #c9b8ff59;
+  color: #ffffff;
+  background: var(--hud-action);
   font-size: .78rem;
   font-weight: 600;
 }
@@ -297,9 +299,10 @@
   right: 1.1rem;
   bottom: 1.1rem;
   padding: .75rem 1rem;
-  border-radius: 20px;
-  background: #120726cc;
-  border: 1px solid #c9b8ff26;
+  border-radius: 18px;
+  background: #ffffffd9;
+  border: 1px solid var(--hud-border);
+  box-shadow: var(--hud-shadow);
   font-size: .78rem;
   line-height: 1.75;
 }
@@ -317,7 +320,7 @@
 
 .oq-hud__controls dd {
   margin: 0;
-  color: var(--hud-mist);
+  color: var(--hud-ink-2);
 }
 
 .oq-hud__touch-notice {
@@ -328,9 +331,8 @@
 }
 
 /* ---- Intro and checkpoint feedback ------------------------------------
-   The intro used to sit at the bottom, on top of the narration subtitle. It
-   now lives at the top centre as a chip (the button avatar, then the words),
-   out of the subtitle's band entirely. Feedback takes the row below it. */
+   The intro is a chip at the top centre (the mark in miniature, then the
+   words), out of the subtitle's band entirely. Feedback takes the row below. */
 
 .oq-hud__intro,
 .oq-hud__feedback {
@@ -340,9 +342,9 @@
   display: flex;
   align-items: center;
   text-align: left;
-  background: var(--hud-surface);
-  border: 1px solid var(--hud-rim);
-  box-shadow: inset 0 1px 0 #ffffff12, 0 12px 30px #05010f66;
+  background: var(--hud-panel);
+  border: 1px solid var(--hud-border);
+  box-shadow: var(--hud-shadow);
 }
 
 .oq-hud__intro {
@@ -357,8 +359,7 @@
   animation: oq-prompt-in 220ms ease-out;
 }
 
-/* The chip's avatar: the mark in miniature (planet, lit rim, explorer), as on
-   every chip in the app. */
+/* The chip's avatar: the mark in miniature (planet, lit rim, explorer). */
 .oq-hud__intro::before {
   content: "";
   grid-row: span 2;
@@ -371,11 +372,10 @@
     radial-gradient(circle at 50% 70%, #f4eeff 0 13px, transparent 13.5px),
     radial-gradient(circle at 50% 68%, #8b6cff 0 14.5px, transparent 15px),
     #120726;
-  box-shadow: inset 0 0 0 1px #ffffff1a;
 }
 
 .oq-hud__intro strong {
-  font-weight: 500;
+  font-weight: 600;
   font-size: .95rem;
   line-height: 1.25;
 }
@@ -383,7 +383,7 @@
 .oq-hud__intro span {
   font-size: .8rem;
   line-height: 1.35;
-  color: var(--hud-mist);
+  color: var(--hud-ink-2);
 }
 
 .oq-hud__feedback {
@@ -391,8 +391,8 @@
   gap: .6rem;
   padding: .55rem 1.2rem .55rem .9rem;
   border-radius: 999px;
-  border-color: color-mix(in srgb, var(--hud-marigold) 55%, transparent);
-  font-weight: 500;
+  border-color: #efd9a6;
+  font-weight: 600;
   animation: oq-prompt-in 180ms ease-out;
 }
 
@@ -402,24 +402,26 @@
   height: .55rem;
   border-radius: 50%;
   background: var(--hud-marigold);
-  box-shadow: 0 0 0 4px #f2b24d33;
+  box-shadow: 0 0 0 4px #f2b24d40;
 }
 
+/* A race countdown: huge white numerals held by a plum shadow, legible over
+   sky and furniture alike. */
 .oq-hud__countdown {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
   font-size: clamp(4rem, 14vw, 9rem);
-  font-weight: 200;
+  font-weight: 300;
   letter-spacing: -.04em;
-  color: #fbf8ff;
-  text-shadow: 0 0 40px #8b6cffcc, 0 6px 30px #12072699;
+  color: #ffffff;
+  text-shadow: 0 2px 0 #6a4af6, 0 8px 30px rgba(36, 20, 61, .55);
 }
 
-/* ---- Overlays: a planetrise behind every card --------------------------
-   Gradients only. The pause overlay also sits over the running canvas, so
-   the old blur is gone; the tint is dark enough on its own. */
+/* ---- Overlays ---------------------------------------------------------
+   A light plum veil keeps the world visible behind every card; a faint
+   lavender horizon at the foot echoes the landing. Gradients only. */
 
 .oq-hud__overlay {
   position: absolute;
@@ -429,39 +431,28 @@
   padding: 2rem;
   pointer-events: auto;
   background:
-    radial-gradient(ellipse 34% 46% at 50% 104%, #120726f2 0%, #120726f2 80%, #12072600 100%),
-    radial-gradient(ellipse 120% 44% at 50% 108%, #d9ccffb3 0%, #9d80ff99 24%, #5a3bd080 44%, #2a147066 64%, #12072600 88%),
-    #0c041ccc;
+    radial-gradient(ellipse 120% 40% at 50% 110%, rgba(123, 92, 250, .38) 0%, rgba(201, 184, 253, .2) 40%, rgba(250, 247, 255, 0) 72%),
+    rgba(36, 20, 61, .38);
 }
 
 .oq-hud__overlay--invite {
   background:
-    radial-gradient(ellipse 120% 40% at 50% 110%, #9d80ff66 0%, #5a3bd04d 30%, #12072600 70%),
-    #0c041c73;
+    radial-gradient(ellipse 120% 40% at 50% 110%, rgba(123, 92, 250, .3) 0%, rgba(250, 247, 255, 0) 70%),
+    rgba(36, 20, 61, .16);
   cursor: pointer;
 }
 
+/* Every card is a doorway: an arched top, a white panel, a purple rim along
+   the arch. Border-radius and one inset shadow: nothing per frame. */
 .oq-hud__card {
   position: relative;
   width: min(28rem, 100%);
-  padding: 1.9rem 1.9rem 1.75rem;
-  border-radius: 28px;
+  padding: 2.9rem 1.9rem 1.75rem;
+  border-radius: 999px 999px 28px 28px / 150px 150px 28px 28px;
   background: var(--hud-card);
-  border: 1px solid var(--hud-rim);
-  box-shadow: inset 0 1px 0 #ffffff14, 0 30px 70px #05010fb3;
+  border: 1px solid var(--hud-border);
+  box-shadow: inset 0 3px 0 #7b5cfa, 0 30px 70px -20px rgba(36, 20, 61, .5);
   text-align: center;
-}
-
-/* The planet's rim in miniature along the card's lower edge. */
-.oq-hud__card::after {
-  content: "";
-  position: absolute;
-  left: 12%;
-  right: 12%;
-  bottom: -1px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, #8b6cffaa 30%, #f4eeff 50%, #8b6cffaa 70%, transparent);
-  pointer-events: none;
 }
 
 .oq-hud__card h2 {
@@ -470,11 +461,12 @@
   font-weight: 300;
   letter-spacing: -.03em;
   line-height: 1.1;
+  color: var(--hud-ink);
 }
 
 .oq-hud__card p {
   margin: 0 0 1.35rem;
-  color: var(--hud-mist);
+  color: var(--hud-ink-2);
   font-size: .9375rem;
   line-height: 1.55;
 }
@@ -498,6 +490,7 @@
   line-height: 1.05;
   font-variant-numeric: tabular-nums;
   margin-bottom: .25rem;
+  color: var(--hud-action);
 }
 
 /* ---- Loading --------------------------------------------------------- */
@@ -514,15 +507,16 @@
   display: flex;
   align-items: center;
   gap: .65rem;
-  color: #8f80b8;
+  color: #6e6088;
 }
 
 .oq-hud__stage--active {
   color: var(--hud-ink);
+  font-weight: 500;
 }
 
 .oq-hud__stage--done {
-  color: var(--hud-mist);
+  color: var(--hud-ink-2);
 }
 
 .oq-hud__stage-dot {
@@ -535,15 +529,15 @@
 }
 
 .oq-hud__stage--active .oq-hud__stage-dot {
-  background: var(--hud-marigold);
-  border-color: var(--hud-marigold);
-  box-shadow: 0 0 0 4px #f2b24d33;
+  background: var(--hud-action);
+  border-color: var(--hud-action);
+  box-shadow: 0 0 0 4px rgba(106, 74, 246, .18);
   animation: oq-pulse 1.1s ease-in-out infinite;
 }
 
 .oq-hud__stage--done .oq-hud__stage-dot {
-  background: var(--hud-action);
-  border-color: var(--hud-action);
+  background: #1e7a4e;
+  border-color: #1e7a4e;
 }
 
 @keyframes oq-pulse {
@@ -555,7 +549,7 @@
 .oq-hud__bar {
   height: 6px;
   border-radius: 999px;
-  background: #ffffff14;
+  background: #efe7ff;
   overflow: hidden;
   margin-bottom: .6rem;
 }
@@ -563,7 +557,7 @@
 .oq-hud__bar-fill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #8b6cff, #f4eeff);
+  background: linear-gradient(90deg, #6a4af6, #a58cff);
   transition: width 140ms linear;
 }
 
@@ -583,23 +577,23 @@
 
 .oq-hud__bytes {
   font-size: .8rem;
-  color: var(--hud-mist);
+  color: var(--hud-ink-2);
   font-variant-numeric: tabular-nums;
 }
 
 .oq-hud__warnings {
   margin-top: 1rem;
   padding-top: .85rem;
-  border-top: 1px solid #c9b8ff26;
+  border-top: 1px solid var(--hud-border);
   text-align: left;
   font-size: .8rem;
-  color: var(--hud-mist);
+  color: var(--hud-ink-2);
   line-height: 1.5;
 }
 
 .oq-hud__warnings strong {
   color: var(--hud-ink);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .oq-hud__warnings ul {
@@ -627,7 +621,7 @@
   }
 }
 
-/* Below ~1100px the centred intro would meet the objective capsule, so it
+/* Below ~1100px the centred intro would meet the objective panel, so it
    drops to the row under the top bar; feedback steps down with it. */
 @media (max-width: 1100px) {
   .oq-hud__intro {
@@ -667,13 +661,14 @@
   width: min(36rem, 100%);
   max-height: calc(100dvh - 4rem);
   overflow-y: auto;
-  scrollbar-color: #7a68ad transparent;
+  border-radius: 999px 999px 28px 28px / 110px 110px 28px 28px;
+  scrollbar-color: #cbbcf9 transparent;
 }
 
 .oq-hud__settings {
   margin-top: 1.25rem;
   padding-top: 1rem;
-  border-top: 1px solid #c9b8ff26;
+  border-top: 1px solid var(--hud-border);
   text-align: left;
   cursor: auto;
 }
@@ -690,9 +685,9 @@
   padding: .4rem 1rem;
   border-radius: 999px;
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 600;
   font-size: .9rem;
-  color: var(--hud-mist);
+  color: var(--hud-action);
   list-style: none;
   pointer-events: auto;
 }
@@ -713,13 +708,11 @@
 }
 
 .oq-hud__settings > summary:hover {
-  color: var(--hud-ink);
-  background: #ffffff0d;
+  background: #f2ebff;
 }
 
 .oq-hud__settings[open] > summary {
   margin-bottom: 1rem;
-  color: var(--hud-ink);
 }
 
 .oq-hud__settings[open] > summary::after {
