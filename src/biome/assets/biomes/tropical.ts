@@ -7,11 +7,12 @@
  * Baseline by the environment lead on the shared builders; owned by the
  * Tropical worker from hand-off (see ENVIRONMENT_ARCHITECTURE.md §10).
  */
-import { bush, flowers, leafRosette, tuft } from "../builders/foliage.js";
+import { leafRosette } from "../builders/foliage.js";
 import { defaultRockVariants } from "../builders/rocks.js";
 import { post, signpost } from "../builders/dry.js";
 import { lyingLog } from "../builders/trees.js";
-import { fallenPalmFrond, tropicalPalm } from "../tropical/palm.js";
+import { broadleafClump, leafyBush, tropicalFlowers, tropicalGrass } from "../tropical/bush.js";
+import { fallenPalmFrond, palmSprout, tropicalPalm } from "../tropical/palm.js";
 import type { BiomeArt, BiomeTones } from "../types.js";
 
 const tones = {
@@ -75,6 +76,42 @@ const YOUNG_PALMS = [
   }),
 ];
 
+const BUSHES = [
+  // Round leafy bush.
+  leafyBush({
+    masses: [{ c: [0, 0.3, 0], r: 0.3 }, { c: [0.22, 0.2, 0.1], r: 0.22 }, { c: [-0.2, 0.22, -0.1], r: 0.22, ramp: "foliage" }, { c: [0.02, 0.18, -0.24], r: 0.19 }],
+    leaves: 30, leafSize: 1.05, seed: 1,
+  }),
+  // Low, wide mound.
+  leafyBush({
+    masses: [{ c: [0, 0.22, 0], r: 0.28, squash: 0.8 }, { c: [0.22, 0.16, 0.06], r: 0.2 }, { c: [-0.2, 0.16, 0.08], r: 0.2, ramp: "foliage" }, { c: [0.02, 0.15, -0.2], r: 0.18 }],
+    leaves: 30, leafSize: 1.0, lift: 0.95, seed: 2,
+  }),
+  // Tall, tiered shrub.
+  leafyBush({
+    masses: [{ c: [0, 0.24, 0], r: 0.24 }, { c: [0.05, 0.48, 0.03], r: 0.2, ramp: "foliage" }, { c: [-0.03, 0.7, -0.02], r: 0.15, ramp: "foliage", bias: 0 }, { c: [0.15, 0.18, -0.08], r: 0.17 }],
+    leaves: 30, leafSize: 1.05, lift: 0.6, seed: 3,
+  }),
+  // Flowering (hibiscus-like), used sparingly.
+  leafyBush({
+    masses: [{ c: [0, 0.28, 0], r: 0.28 }, { c: [-0.16, 0.18, 0.08], r: 0.2, ramp: "foliage" }, { c: [0.15, 0.2, -0.07], r: 0.21 }],
+    leaves: 26, leafSize: 1.05, seed: 4, flowers: 5,
+  }),
+  // Elephant-ear clump: big heart-shaped leaves on arching stems.
+  broadleafClump({ leaves: 7, leafLength: 0.46, leafWidth: 0.42, seed: 5 }),
+  // Dense, dark leafy dome with pale new growth on top.
+  leafyBush({
+    masses: [{ c: [0, 0.32, 0], r: 0.3 }, { c: [0.16, 0.2, 0.14], r: 0.2 }, { c: [-0.16, 0.2, 0.12], r: 0.2 }, { c: [0.0, 0.52, -0.02], r: 0.17, ramp: "foliageAlt", bias: 0.1 }],
+    leaves: 30, leafSize: 0.95, lift: 0.85, leafWidth: 0.45, seed: 6,
+  }),
+];
+
+const SMALL_BUSHES = [
+  leafyBush({ masses: [{ c: [0, 0.22, 0], r: 0.26 }, { c: [0.15, 0.15, 0.07], r: 0.18, ramp: "foliage" }, { c: [-0.13, 0.15, -0.09], r: 0.18 }], leaves: 18, leafSize: 1.05, seed: 11 }),
+  leafyBush({ masses: [{ c: [0, 0.2, 0], r: 0.24, squash: 0.8 }, { c: [0.18, 0.14, -0.05], r: 0.18 }], leaves: 16, leafSize: 1.05, lift: 0.9, seed: 12 }),
+  broadleafClump({ leaves: 4, leafLength: 0.46, leafWidth: 0.3, seed: 13, split: 0.55 }),
+];
+
 const rocks = defaultRockVariants("rock");
 
 export const TROPICAL_ART: BiomeArt = {
@@ -92,16 +129,15 @@ export const TROPICAL_ART: BiomeArt = {
       variants: YOUNG_PALMS,
     },
     bush: {
-      category: "bush", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.8, triangleBudget: 900,
+      category: "bush", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.86, triangleBudget: 900,
       mirror: true, embed: [0.02, 0.04],
-      variants: [
-        bush({ lobes: 7, spread: 0.5, height: 1.1, seed: 1, newGrowth: true }),
-        bush({ lobes: 5, spread: 0.48, height: 1.0, seed: 2 }),
-        bush({ lobes: 9, spread: 0.56, height: 1.15, seed: 3, newGrowth: true }),
-        bush({ lobes: 6, spread: 0.44, height: 1.35, seed: 4 }),
-        bush({ lobes: 8, spread: 0.5, height: 1.1, seed: 5, blossoms: 4 }),
-        bush({ lobes: 4, spread: 0.46, height: 1.0, seed: 6, newGrowth: true }),
-      ],
+      variants: BUSHES,
+      weights: [1, 1, 1, 0.6, 0.8, 0.8],
+    },
+    "bush-small": {
+      category: "bush", role: "supporting", shading: "smooth", castShadow: true, unitRadius: 0.84, triangleBudget: 600,
+      mirror: true, embed: [0.02, 0.04],
+      variants: SMALL_BUSHES,
     },
     broadleaf: {
       category: "bush", role: "supporting", shading: "smooth", castShadow: true, unitRadius: 0.5, triangleBudget: 700,
@@ -109,7 +145,15 @@ export const TROPICAL_ART: BiomeArt = {
       variants: [
         leafRosette({ leaves: 6, length: 1.3, width: 0.13, rise: 0.95, droop: 0.9, seed: 1 }),
         leafRosette({ leaves: 5, length: 1.5, width: 0.16, rise: 0.8, droop: 1.0, seed: 2, serrate: 0.45 }),
-        leafRosette({ leaves: 7, length: 1.1, width: 0.1, rise: 1.1, droop: 0.7, seed: 3, ramp: "foliageAlt" }),
+        broadleafClump({ leaves: 5, leafLength: 0.46, leafWidth: 0.3, seed: 7, fit: "size" }),
+      ],
+    },
+    fern: {
+      category: "bush", role: "supporting", shading: "smooth", castShadow: true, unitRadius: 0.5, triangleBudget: 600,
+      mirror: true, embed: [0, 0.02],
+      variants: [
+        palmSprout({ fronds: 7, length: 0.5, rise: 0.7, droop: 1.0, leaflets: 5, seed: 41, fit: "size" }),
+        palmSprout({ fronds: 6, length: 0.5, rise: 0.95, droop: 1.1, leaflets: 5, seed: 43, fit: "size" }),
       ],
     },
     "rock-large": {
@@ -128,9 +172,13 @@ export const TROPICAL_ART: BiomeArt = {
       variants: rocks.small,
     },
     tuft: {
-      category: "grass", role: "micro", shading: "smooth", castShadow: false, unitRadius: 1.1, triangleBudget: 220,
+      category: "grass", role: "micro", shading: "smooth", castShadow: false, unitRadius: 0.85, triangleBudget: 120,
       mirror: true, embed: [0, 0.02],
-      variants: [tuft({ blades: 7, splay: 0.5, seed: 1 }), tuft({ blades: 9, splay: 0.7, seed: 2, ramp: "foliageAlt" }), tuft({ blades: 5, splay: 0.35, seed: 3 })],
+      variants: [
+        tropicalGrass({ blades: 7, splay: 0.45, seed: 1 }),
+        tropicalGrass({ blades: 9, splay: 0.65, seed: 2, ramp: "foliageAlt" }),
+        tropicalGrass({ blades: 5, splay: 0.3, seed: 3, width: 0.09 }),
+      ],
     },
     "fallen-frond": {
       category: "dressing", role: "micro", shading: "smooth", castShadow: false, unitRadius: 0.5, triangleBudget: 120,
@@ -144,7 +192,7 @@ export const TROPICAL_ART: BiomeArt = {
     },
     flowers: {
       category: "dressing", role: "micro", shading: "smooth", castShadow: false, unitRadius: 0.5, triangleBudget: 240,
-      variants: [flowers({ stems: 3, seed: 1 }), flowers({ stems: 4, seed: 2 })],
+      variants: [tropicalFlowers({ stems: 3, seed: 1 }), tropicalFlowers({ stems: 2, seed: 2 })],
     },
     marker: {
       category: "marker", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.36, triangleBudget: 300,
@@ -161,8 +209,9 @@ export const TROPICAL_ART: BiomeArt = {
           primary: "palm",
           primaryOffset: 0.12,
           members: [
-            { family: "bush", count: [1, 2], ring: [0.45, 0.8], height: [0.22, 0.38] },
+            { family: "bush-small", count: [1, 2], ring: [0.45, 0.8], height: [0.24, 0.38] },
             { family: "broadleaf", count: [0, 1], ring: [0.4, 0.75], height: [0.35, 0.5] },
+            { family: "fern", count: [0, 1], ring: [0.4, 0.85], height: [0.25, 0.35], chance: 0.5 },
             { family: "pebble", count: [1, 3], ring: [0.3, 0.9], height: [0.04, 0.08] },
             { family: "tuft", count: [1, 3], ring: [0.25, 0.85], height: [0.06, 0.11] },
             { family: "fallen-frond", count: [1, 1], ring: [0.35, 0.8], height: [0.28, 0.4], chance: 0.55 },
@@ -206,10 +255,11 @@ export const TROPICAL_ART: BiomeArt = {
           id: "bush-patch",
           primary: "bush",
           members: [
-            { family: "bush", count: [1, 2], ring: [0.5, 0.85], height: [0.5, 0.72] },
-            { family: "flowers", count: [1, 1], ring: [0.3, 0.8], height: [0.25, 0.35], chance: 0.35 },
-            { family: "tuft", count: [1, 2], ring: [0.3, 0.9], height: [0.2, 0.3] },
-            { family: "pebble", count: [0, 2], ring: [0.4, 0.95], height: [0.1, 0.16] },
+            { family: "bush-small", count: [1, 2], ring: [0.5, 0.85], height: [0.45, 0.7] },
+            { family: "fern", count: [0, 1], ring: [0.45, 0.9], height: [0.3, 0.45] },
+            { family: "flowers", count: [1, 1], ring: [0.35, 0.8], height: [0.18, 0.26], chance: 0.25 },
+            { family: "tuft", count: [1, 2], ring: [0.3, 0.9], height: [0.14, 0.22] },
+            { family: "pebble", count: [0, 2], ring: [0.45, 0.95], height: [0.08, 0.14] },
           ],
         },
       },
@@ -220,8 +270,23 @@ export const TROPICAL_ART: BiomeArt = {
           primary: "bush",
           primaryOffset: 0.2,
           members: [
-            { family: "broadleaf", count: [1, 2], ring: [0.45, 0.85], height: [0.8, 1] },
-            { family: "tuft", count: [1, 2], ring: [0.3, 0.9], height: [0.2, 0.3] },
+            { family: "broadleaf", count: [1, 2], ring: [0.45, 0.85], height: [0.55, 0.8] },
+            { family: "fern", count: [0, 1], ring: [0.4, 0.9], height: [0.35, 0.5], chance: 0.6 },
+            { family: "tuft", count: [1, 2], ring: [0.3, 0.9], height: [0.14, 0.22] },
+          ],
+        },
+      },
+      {
+        weight: 1,
+        preset: {
+          // Low ground foliage around a single bush: ferns, a shed frond, stones.
+          id: "fern-glade",
+          primary: "bush",
+          primaryOffset: 0.15,
+          members: [
+            { family: "fern", count: [2, 3], ring: [0.4, 0.9], height: [0.35, 0.5] },
+            { family: "fallen-frond", count: [1, 1], ring: [0.4, 0.85], height: [0.3, 0.42], chance: 0.4 },
+            { family: "pebble", count: [1, 2], ring: [0.4, 0.95], height: [0.07, 0.12] },
           ],
         },
       },
