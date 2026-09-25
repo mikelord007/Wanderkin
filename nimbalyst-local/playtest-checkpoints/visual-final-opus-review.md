@@ -108,7 +108,21 @@ Between 09:22:50 and 09:26:33, `src/App.tsx`, `src/capture/media.css`, `src/ui/s
 - The build is re-proven on the exact `13ed712` export.
 - My in-game captures only exercise gameplay rendering.
 
-**The coordinator should confirm who is editing Finish/App, since that work was recorded as paused pending user confirmation.**
+**Resolved attribution.** The coordinator confirmed a new user approval (1790308309791) to resume the preserved Finish fix. It is owned by the fresh Opus session `000bc7bc-659f-4f51-b170-a21bbcde8b9c`. That uncommitted Finish/App work is **not** part of `13ed712`, and nothing in this review attributes it there.
+
+### Snapshot each check actually ran on
+
+| Check | HEAD | Source snapshot actually tested |
+|---|---|---|
+| Unit suite, 544/544 (09:21:35–09:21:42) | `ce8f3be` (source = `13ed712`) | Working tree. `src/`, `shared/` and `server/` were verified clean immediately before the run (no modified or untracked files), and the earliest Finish edit is at 09:22:50. So this is exactly `13ed712`. |
+| Client and server typecheck (started about 09:21:45) | `ce8f3be` | Working tree. The first `.ts`/`.tsx` Finish edit (`App.tsx`) is at 09:24:49, after the build and after the servers started at 09:23:52. So the TS inputs were exactly `13ed712`. |
+| First build (temp outDir) | `ce8f3be` | Working tree. It may have included the uncommitted `media.css` (09:22:50). **Superseded by the next row.** |
+| Typecheck and build on an export | n/a | An exact `git archive 13ed712` copy, independent of the working tree. Client tsc, server tsc, vite build and the server build all exit 0. **This is the build gate.** |
+| Chrome A/B (09:23:52–about 09:26) | `ce8f3be` | "Before" pins the 8 product files to `2625ef7`; "after" serves those files at `13ed712`. Every other file came from the working tree, served identically to both variants. |
+
+**Chrome caveat.** `src/capture/media.css` is imported by `PlayScreen`, and it was already modified before the servers started. So the HUD capture button in all the screenshots may show uncommitted Finish styling. That is identical in both variants and is not part of any reviewed pair difference.
+
+`App.tsx`, `FinishScreen.tsx` and `finish-screen.css` changed mid-run. The Finish screen is never shown in these captures. With no watcher, Vite keeps the transform from its first request, which was before the `App.tsx` change for both servers. The 3D scene, markers, avatar and materials, which are what the pairs compare, come only from committed files.
 
 ## Non-blocking visual residuals (for the user's play-test; not requests)
 
