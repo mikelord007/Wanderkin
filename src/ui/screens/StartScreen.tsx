@@ -171,36 +171,41 @@ export function StartScreen({
       <div className="oq-welcome__band oq-shade">
         <div className="oq-kit-container">
           <nav className="oq-welcome__nav" aria-label="Main navigation">
-            <Logo size={34} />
-            <Button variant="ghost" onClick={showWorlds}>My worlds <Icon name="arrow" /></Button>
+            <Logo size={34} tone="mono" />
+            <Button variant="secondary" className="oq-welcome__nav-action" onClick={showWorlds}>My worlds <Icon name="arrow" /></Button>
           </nav>
           <section className="oq-welcome__hero" aria-labelledby="welcome-heading">
             <div className="oq-welcome__intro">
+              <p className="wk-chip">{BRAND_TAGLINE}</p>
               <h1 id="welcome-heading">Your sofa is a mountain range.</h1>
               <p className="oq-welcome__lede">Photograph something ordinary. {BRAND_NAME} rebuilds it in 3D and shrinks you down until the cushions are cliffs.</p>
-              <div className="oq-kit-row">
+              <div className="oq-kit-row oq-welcome__ctas">
                 <Button onClick={onCreateFromPhotos}>Make my world <Icon name="arrow" /></Button>
                 <Button variant="secondary" disabled={!sampleLevels?.[0]} onClick={() => { if (sampleLevels?.[0]) onPlaySample(sampleLevels[0]); }}><Icon name="play" />Play a sample</Button>
               </div>
-              <p className="oq-welcome__note">The sample is already built in — no photo, no waiting.</p>
-            </div>
-            <div className="oq-welcome__example">
-              <div className="oq-welcome__comparison">
-                <figure>
-                  <img className="oq-welcome__photo" src="/samples/photo-4.jpg" alt="A photo of a small room: a wooden desk with a laptop beside a dark fabric sofa" />
-                  <figcaption>The photograph<span>One corner of a real room</span></figcaption>
-                </figure>
-                <figure>
-                  <div className="oq-welcome__render">
-                    <Suspense fallback={<p className="oq-welcome__preview-status" role="status">Opening the little world…</p>}><SampleWorldPreview /></Suspense>
-                  </div>
-                  <figcaption>The same corner<span>Now somewhere you can stand</span></figcaption>
-                </figure>
-              </div>
-              <p className="oq-welcome__example-footer">A real bundled world, running live — not a mock-up.</p>
+              <p className="oq-welcome__note"><Icon name="spark" />The sample is already built in — no photo, no waiting.</p>
             </div>
           </section>
         </div>
+      </div>
+      <div className="oq-kit-container">
+        <section className="oq-welcome__horizon" aria-label="From a photograph to a world">
+          <div className="oq-welcome__example">
+            <div className="oq-welcome__comparison">
+              <figure>
+                <img className="oq-welcome__photo" src="/samples/photo-4.jpg" alt="A photo of a small room: a wooden desk with a laptop beside a dark fabric sofa" />
+                <figcaption>The photograph<span>One corner of a real room</span></figcaption>
+              </figure>
+              <figure>
+                <div className="oq-welcome__render">
+                  <Suspense fallback={<p className="oq-welcome__preview-status" role="status">Opening the little world…</p>}><SampleWorldPreview /></Suspense>
+                </div>
+                <figcaption>The same corner<span>Now somewhere you can stand</span></figcaption>
+              </figure>
+            </div>
+            <p className="oq-welcome__example-footer">A real bundled world, running live — not a mock-up.</p>
+          </div>
+        </section>
       </div>
       <main className="oq-kit-container">
         <div className="oq-welcome__steps" aria-label={`How ${BRAND_NAME} works`}>

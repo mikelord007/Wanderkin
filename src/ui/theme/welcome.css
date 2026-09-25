@@ -1,49 +1,79 @@
 /*
  * The landing page.
  *
- * Structure is two bands: a pine one you arrive in — the view from under the
- * furniture — and the plaster page below it where the real work (your worlds,
- * the samples) lives. All of the boldness is spent on that first band and on
- * the headline; everything after it is deliberately quiet.
- *
- * Spacing runs on --oq-section between bands and the 4px scale within them, so
- * no two gaps land a few pixels apart and read as a mistake.
+ * The first screen is the whole idea in one picture: the headline, and under
+ * it a dark world rising with violet and white light round its rim. That
+ * planetrise is where all of the page's boldness is spent. Below the fold the
+ * page stands on the planet's night side and stays quiet: the before/after,
+ * the three steps, the samples and your worlds.
  */
 
 .oq-welcome { min-height: 100vh; width: 100%; align-self: flex-start; }
 
 /* --- The arrival band -------------------------------------------------- */
 .oq-welcome__band {
-  background: var(--mh-pine);
-  /* A single shaft of light from the top right — the one piece of decoration
-     on the page, and the reason the palette has a warm accent at all. */
-  background-image: radial-gradient(120% 90% at 82% -20%, #2f5a45 0%, transparent 60%);
-  padding-bottom: clamp(40px, 6vw, 76px);
+  position: relative; isolation: isolate; overflow: hidden;
+  display: flex; flex-direction: column;
+  min-height: min(100svh, 1040px);
+  background: var(--wk-night);
+}
+.oq-welcome__band > .oq-kit-container { flex: 1; display: flex; flex-direction: column; }
+/* Four layers, top first: a fade into the ground so the band has no hard
+   bottom edge; the dark planet; the rim light, a very wide flat ellipse so it
+   is brightest just beside the planet's limb; and a faint haze over the dome. */
+.oq-welcome__band::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    linear-gradient(to bottom, #12072600 76%, #1207268c 90%, var(--wk-night) 100%),
+    radial-gradient(ellipse 28% 60% at 50% 100%, var(--wk-night) 0%, var(--wk-night) 84%, #12072600 100%),
+    radial-gradient(ellipse 130% 68% at 50% 100%, #ffffff 0%, #fbf8ff 20%, #e6dcff 27%, #bba2ff 35%, #8b6cff 45%, #5a3bd0 57%, #33198a 70%, #1c0d4f 82%, #12072600 94%),
+    radial-gradient(ellipse 62% 80% at 50% 100%, #2d1878 0%, #1f0f52 45%, #12072600 80%);
+  animation: wk-planetrise 1.1s var(--oq-ease) both;
+}
+/* The one orchestrated moment: the planet lifts into place as the page opens. */
+@keyframes wk-planetrise {
+  from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; transform: none; }
 }
 
 .oq-welcome__nav {
   display: flex; align-items: center; justify-content: space-between;
   gap: var(--oq-space-4); padding-block: var(--oq-space-5);
 }
-.oq-welcome__nav .mh-logo { color: var(--oq-on-shade); }
+.oq-welcome__nav .mh-logo { color: var(--wk-ink); }
+.oq-welcome__nav .oq-welcome__nav-action { min-height: 40px; padding: 8px 18px; font-size: .9rem; }
 
 .oq-welcome__hero {
-  display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
-  gap: clamp(32px, 5vw, 72px); align-items: center;
-  padding-block: clamp(32px, 5vw, 64px) 0;
+  flex: 1; display: flex; justify-content: center;
+  padding-block: clamp(28px, 7vh, 88px) clamp(120px, 22vh, 240px);
 }
-.oq-welcome__intro { display: flex; flex-direction: column; align-items: flex-start; gap: var(--oq-space-5); }
-/* No forced line break: the headline is balanced and capped by measure, so it
-   breaks where the width actually wants it to at every size. */
-.oq-welcome__intro h1 { max-inline-size: 15ch; }
-.oq-welcome__lede { max-inline-size: 46ch; font-size: clamp(1.0625rem, 1rem + .3vw, 1.1875rem); color: var(--oq-on-shade-muted); }
-.oq-welcome__note { font-size: .875rem; color: var(--oq-on-shade-muted); max-inline-size: 50ch; }
+.oq-welcome__intro {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: var(--oq-space-5); max-width: 1000px;
+}
+/* The headline is the page's type specimen: light, enormous and tightly led,
+   so the words sit together as one shape above the horizon. */
+.oq-welcome__intro h1 {
+  max-inline-size: 11ch;
+  font-size: clamp(3rem, 1.1rem + 7.2vw, 7.4rem);
+  font-weight: 300; line-height: .94; letter-spacing: -.045em;
+  color: #f7f2ff;
+}
+.oq-welcome__lede { max-inline-size: 44ch; font-size: clamp(1.0625rem, 1rem + .35vw, 1.25rem); line-height: 1.55; color: #ddd3f5; }
+.oq-welcome__ctas { justify-content: center; margin-top: var(--oq-space-2); }
+/* The note sits on the planet's dark dome, where the reference keeps its
+   small line-icon row. */
+.oq-welcome__note { font-size: .875rem; color: var(--wk-mist); max-inline-size: 50ch; }
+.oq-welcome__note svg { display: inline-block; width: 16px; height: 16px; margin-right: 8px; vertical-align: -3px; color: var(--oq-accent-ink); }
 
-/* --- The before / after ------------------------------------------------ */
+/* --- The before / after, standing on the night side of the planet ------ */
+.oq-welcome__horizon { position: relative; margin-top: calc(var(--oq-space-7) * -1); }
 .oq-welcome__example {
+  max-width: 920px; margin-inline: auto;
   border-radius: var(--oq-round-xl);
-  background: #ffffff0f;
-  border: 1px solid #ffffff24;
+  background: var(--wk-dusk);
+  border: 1px solid var(--wk-rim);
+  box-shadow: var(--wk-highlight), 0 -30px 80px -40px #8b6cff66;
   padding: clamp(14px, 1.6vw, 20px);
 }
 .oq-welcome__comparison { display: grid; grid-template-columns: 1fr 1fr; gap: var(--oq-space-3); }
@@ -53,18 +83,18 @@
   overflow: hidden; position: relative;
 }
 .oq-welcome__photo { object-fit: cover; object-position: 63% center; }
-.oq-welcome__render { background: #16291f; }
+.oq-welcome__render { background: #0e061f; }
 .oq-welcome__model { height: 100%; width: 100%; }
 .oq-welcome__preview-status {
   position: absolute; inset: 0; display: grid; place-content: center;
-  text-align: center; padding: 16px; font-size: .8125rem; color: var(--oq-on-shade-muted);
+  text-align: center; padding: 16px; font-size: .8125rem; color: var(--wk-mist);
 }
-.oq-welcome__comparison figcaption { font-size: .875rem; font-weight: 650; color: var(--oq-on-shade); }
-.oq-welcome__comparison figcaption span { display: block; font-weight: 400; color: var(--oq-on-shade-muted); }
+.oq-welcome__comparison figcaption { padding-inline: 4px; font-size: .9375rem; font-weight: 500; color: var(--wk-ink); }
+.oq-welcome__comparison figcaption span { display: block; font-weight: 400; font-size: .875rem; color: var(--wk-mist); }
 .oq-welcome__example-footer {
-  margin-top: var(--oq-space-4); padding-top: var(--oq-space-3);
-  border-top: 1px solid #ffffff1f;
-  font-size: .8125rem; color: var(--oq-on-shade-muted);
+  margin-top: var(--oq-space-4); padding: var(--oq-space-3) 4px 0;
+  border-top: 1px solid var(--oq-line);
+  font-size: .8125rem; color: var(--wk-mist);
 }
 
 /* --- The three steps. A real sequence, so it earns its numbers. -------- */
@@ -72,12 +102,12 @@
   display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(24px, 3vw, 48px);
   padding-block: var(--oq-section);
 }
-.oq-welcome__step { display: grid; gap: var(--oq-space-2); }
+.oq-welcome__step { display: grid; gap: var(--oq-space-2); align-content: start; }
 .oq-welcome__step > span {
-  width: 34px; height: 34px; display: grid; place-items: center;
-  border-radius: 50%; margin-bottom: var(--oq-space-1);
-  color: var(--oq-accent-ink); background: var(--oq-wash);
-  font-size: .9375rem; font-weight: 750; font-variant-numeric: tabular-nums;
+  width: 36px; height: 36px; display: grid; place-items: center;
+  border-radius: 50%; margin-bottom: var(--oq-space-2);
+  color: var(--wk-ink); border: 1px solid var(--oq-control-line);
+  font-size: .9375rem; font-weight: 400; font-variant-numeric: tabular-nums;
 }
 .oq-welcome__step p { color: var(--oq-muted); max-inline-size: 34ch; }
 
@@ -90,9 +120,8 @@
 .oq-welcome__section-heading p { color: var(--oq-muted); font-size: .9375rem; }
 
 /* The thumbnail sits beside the title; the description and the actions get the
-   full card width. Wrapping the whole card in a horizontal flex was what left
-   the action row too narrow to hold two buttons on one line. `1fr` on the
-   description keeps every card's buttons on the same baseline across a row. */
+   full card width. `1fr` on the description keeps every card's buttons on the
+   same baseline across a row. */
 .oq-welcome__sample-card { display: grid; grid-template-rows: auto 1fr auto; gap: var(--oq-space-3); }
 .oq-welcome__sample-head { display: flex; align-items: center; gap: var(--oq-space-3); min-width: 0; }
 .oq-welcome__sample-head img { flex: none; width: 56px; aspect-ratio: 1; border-radius: var(--oq-round-sm); object-fit: cover; }
@@ -102,8 +131,8 @@
 /* --- Import + footer. Quiet by design; these are not the point. -------- */
 .oq-welcome__imports { border-top: 1px solid var(--oq-line); padding-top: var(--oq-space-5); }
 .oq-welcome__imports summary {
-  cursor: pointer; min-height: 44px; display: flex; align-items: center;
-  font-weight: 650; color: var(--oq-muted);
+  cursor: pointer; min-height: 44px; display: flex; align-items: center; width: fit-content;
+  font-weight: 500; color: var(--oq-accent-ink);
 }
 .oq-welcome__imports > div { padding-top: var(--oq-space-4); }
 .oq-welcome__imports p { margin-top: var(--oq-space-3); font-size: .875rem; }
@@ -114,27 +143,32 @@
   font-size: .875rem; color: var(--oq-muted);
 }
 
-/* --- Widths ------------------------------------------------------------
-   Four steps, each one fixing something specific rather than a generic
-   shrink: the hero stacks, the steps go to two-up then one, the sample rows
-   drop their thumbnail beside the text, and the nav loses its wordmark. */
-@media (max-width: 1040px) {
-  .oq-welcome__hero { grid-template-columns: 1fr; align-items: start; }
-  .oq-welcome__intro h1 { max-inline-size: 20ch; }
-  .oq-welcome__example { max-width: 720px; }
-}
+/* --- Widths ------------------------------------------------------------ */
 @media (max-width: 860px) {
   .oq-welcome__steps { grid-template-columns: repeat(2, 1fr); row-gap: var(--oq-space-6); }
+  /* A narrow screen keeps the same planet, just broader in proportion, so the
+     rim light stays beside the limb instead of under the buttons. */
+  .oq-welcome__band::before {
+    background:
+      linear-gradient(to bottom, #12072600 90%, var(--wk-night) 100%),
+      radial-gradient(ellipse 40% 34% at 50% 100%, var(--wk-night) 0%, var(--wk-night) 84%, #12072600 100%),
+      radial-gradient(ellipse 160% 26% at 50% 100%, #ffffff 0%, #f3edff 12%, #d3c2ff 22%, #9d80ff 34%, #6a48e0 48%, #3a2096 64%, #1f0f55 78%, #12072600 92%),
+      radial-gradient(ellipse 80% 50% at 50% 100%, #2d1878 0%, #1f0f52 45%, #12072600 80%);
+  }
 }
 @media (max-width: 620px) {
   .oq-welcome__steps { grid-template-columns: 1fr; gap: var(--oq-space-5); }
   .oq-welcome__comparison { gap: var(--oq-space-2); }
-  .oq-welcome__intro .oq-kit-row { width: 100%; }
-  /* Full-width stacked actions rather than two squeezed pills: at this width
-     `nowrap` on a shared row is what pushed the old buttons off the edge. */
+  .oq-welcome__hero { padding-block: var(--oq-space-6) 180px; }
+  .oq-welcome__ctas { width: 100%; flex-direction: column; align-items: stretch; }
+  /* Full-width stacked actions rather than two squeezed pills. */
   .oq-welcome__intro .oq-kit-button { width: 100%; }
+  .oq-welcome__horizon { margin-top: calc(var(--oq-space-5) * -1); }
 }
 @media (max-width: 440px) {
   .oq-welcome__nav .mh-logo__word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
   .oq-welcome__sample-card .oq-kit-button { flex: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .oq-welcome__band::before { animation: none; }
 }
