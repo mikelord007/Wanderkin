@@ -12,7 +12,7 @@ import { useState, type ReactNode, type RefObject } from "react";
 import type { GameLoadStage } from "../types.js";
 import type { AdventureHudCopy } from "../../biome/missionCopy.js";
 import type { GameplaySessionSnapshot } from "../modes/session.js";
-import { AudioControls, SubtitleBar, type AudioSettings } from "../../ui/components/index.js";
+import { AudioControls, Icon, SubtitleBar, type AudioSettings } from "../../ui/components/index.js";
 import type { SubtitleState } from "../../audio/useGameAudio.js";
 import "./hud.css";
 
@@ -243,9 +243,9 @@ export function Hud(props: HudProps) {
               aria-controls="game-audio-controls"
               title="Sound settings — press M to mute/unmute without opening this panel"
             >
-              Sound
+              <Icon name="sound" />Sound
             </button>
-            <button type="button" onClick={props.onPause} aria-label="Pause game">Pause</button>
+            <button type="button" onClick={props.onPause} aria-label="Pause game"><Icon name="pause" />Pause</button>
           </div>
           {soundOpen ? <div className="oq-hud__sound" id="game-audio-controls"><AudioControls value={props.audioSettings} onChange={props.onAudioSettingsChange} /></div> : null}
 
