@@ -1,11 +1,13 @@
 /**
- * Tropical Island art: bright, lush, playful, warm. Palms with drooping
- * serrated fronds, layered bushes, broad-leaf plants, weathered grey-beige
- * stones, driftwood and a few pink blossoms, grouped into palm oases, bush
- * patches and rock clusters with open sand between them.
+ * Tropical Island art: bright, lush, playful, warm. Segmented, leaning
+ * palms under feathered crowns; leafy bushes (dark masses in a shingled
+ * leaf fringe), elephant-ear clumps and ferns; pale mossy limestone and
+ * dark angular coastal basalt; driftwood, coconuts, bamboo markers and a
+ * few pink blossoms. Grouped into palm oases, beach palms, bush patches,
+ * fern glades, rock clusters and coastal outcrops with open sand between.
  *
- * Baseline by the environment lead on the shared builders; owned by the
- * Tropical worker from hand-off (see ENVIRONMENT_ARCHITECTURE.md §10).
+ * Builders live in `../tropical/`. Owned by the Tropical worker (see
+ * ENVIRONMENT_ARCHITECTURE.md §10).
  */
 import { leafRosette } from "../builders/foliage.js";
 import { signpost } from "../builders/dry.js";
