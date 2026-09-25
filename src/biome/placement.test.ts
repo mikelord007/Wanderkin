@@ -6,10 +6,11 @@ import { validateRoute } from "../scene/route.js";
 import { generateAdventure } from "./adventures.js";
 import { analyzeManifest, assetGeometryFromLoaded, raycastDown, surfaceFromAuthoredCentre } from "./geometry.js";
 import { bedFixture, countertopFixture, deskFixture, poorFixture, sampleScanFixture, type GeometryFixture } from "./geometryFixtures.js";
-import { PROP_FOOTPRINT_RATIO, computeGameplayExclusions, prepareBiomeLayout, segmentDistance } from "./placement.js";
+import { PROP_FOOTPRINT_RATIO, computeGameplayExclusions, groveOrder, groveScale, prepareBiomeLayout, segmentDistance } from "./placement.js";
 import { getBiomeDefinition } from "./presets.js";
 import { PROP_UNIT_RADIUS } from "./render/propGeometry.js";
 import type { BiomeLayout, BiomeId } from "./types.js";
+import { seededRandom } from "./render/selection.js";
 
 const RUNTIME = toMiniatureScale(DEFAULT_MOVEMENT_CONFIG);
 const BODY = capsuleHeight(RUNTIME);
@@ -265,4 +266,53 @@ describe("prepareBiomeLayout", () => {
       expect(PROP_FOOTPRINT_RATIO[kind]).toBeGreaterThanOrEqual(PROP_UNIT_RADIUS[kind]);
     }
   });
+
+  // ---- Composition-aware ordering (environment upgrade, Phase 5) ----------
+  // Only the ORDER in which safe spots are tried changes; every placement
+  // above still passes the unchanged anchor test (all tests above run on it).
+
+  it("orders candidates grove-first: a deterministic permutation with spaced centres", () => {
+    const points = Array.from({ length: 400 }, (_, i) => [(i % 20) * 0.1, 0, Math.floor(i / 20) * 0.1] as [number, number, number]);
+    const order = points.map((_, i) => (i * 37) % 400); // a fixed scramble
+    const first = groveOrder(points, order, seededRandom("g"), 0.6, 0.25);
+    const again = groveOrder(points, order, seededRandom("g"), 0.6, 0.25);
+    expect(first.order).toEqual(again.order);
+    expect([...first.order].sort((a, b) => a - b)).toEqual([...order].sort((a, b) => a - b));
+    expect(first.inGrove.size).toBeGreaterThan(0);
+    expect(first.inGrove.size).toBeLessThan(points.length); // open ground remains
+    // Every grove candidate comes before any open-ground candidate.
+    const lastGrove = Math.max(...first.order.map((index, rank) => (first.inGrove.has(index) ? rank : -1)));
+    const firstOpen = first.order.findIndex((index) => !first.inGrove.has(index));
+    expect(lastGrove).toBeLessThan(firstOpen);
+  });
+
+  it("gives sparser biomes groves further apart, and keeps most props in groves", () => {
+    const tropical = groveScale(BODY, getBiomeDefinition("tropical").props.density);
+    const desert = groveScale(BODY, getBiomeDefinition("desert").props.density);
+    expect(desert.spacing).toBeGreaterThan(tropical.spacing);
+    expect(desert.reach).toBeLessThan(tropical.reach);
+    expect(tropical.openShare).toBeLessThanOrEqual(0.3);
+  });
+
+  it.each([deskFixture, countertopFixture, bedFixture].map((make) => [make().name, make] as const))(
+    "%s: desert props gather into groves with open sand between them",
+    (_name, make) => {
+      const fixture = make();
+      const layout = layoutFor(fixture, "desert", "groves");
+      const analysis = analyzeManifest(fixture.manifest, assetGeometryFromLoaded(fixture.assets), RUNTIME);
+      const cell = analysis.surfaceOptions.cellSize;
+      const area = analysis.surfaces.standable.length * cell * cell;
+      const props = layout.props;
+      expect(props.length).toBeGreaterThan(5);
+      // Clark–Evans ratio: 1 = random scatter, < 1 = clustered.
+      let sum = 0;
+      for (const a of props) {
+        let best = Infinity;
+        for (const b of props) if (a !== b) best = Math.min(best, Math.hypot(a.position[0] - b.position[0], a.position[2] - b.position[2]));
+        sum += best;
+      }
+      const ratio = sum / props.length / (0.5 * Math.sqrt(area / props.length));
+      expect(ratio).toBeLessThan(0.9);
+    },
+  );
 });

@@ -26,7 +26,7 @@ export function createContactDecals(
   for (const cluster of clusters) {
     // Patch first (drawn under the blob), only sometimes, never the whole scene.
     if (soil && random() < 0.55) {
-      decals.push({ cluster, radius: cluster.radius * (0.85 + random() * 0.15), color: soil.clone().offsetHSL(0, 0, (random() - 0.5) * 0.05), opacity: 0.5, patch: 1 });
+      decals.push({ cluster, radius: cluster.radius * (0.85 + random() * 0.15), color: soil.clone().offsetHSL(0, 0, (random() - 0.5) * 0.05), opacity: 0.3, patch: 1 });
     }
     decals.push({ cluster, radius: cluster.radius * Math.min(1, ground.contactScale) * 0.8, color: contact, opacity: Math.min(0.6, ground.contactOpacity), patch: 0 });
   }

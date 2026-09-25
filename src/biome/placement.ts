@@ -487,6 +487,19 @@ function placeProps(
   }
   plan.sort((a, b) => KIND_SCALE_SHARE[b][1] - KIND_SCALE_SHARE[a][1]);
 
+  // Cluster-seeded candidate order (own stream, so no other draw shifts).
+  const { spacing, reach, openShare } = groveScale(options.bodyHeight, definition.props.density);
+  const grove = groveOrder(
+    standable.map((patch) => patch.point),
+    order,
+    seededRandom(`${options.seed}:groves`),
+    spacing,
+    reach,
+  );
+  order.splice(0, order.length, ...grove.order);
+  const openLimit = Math.ceil(target * openShare);
+  let openPlaced = 0;
+
   let cursor = 0;
   const maxTests = Math.min(order.length * 3, 6000);
   let tests = 0;
@@ -494,12 +507,17 @@ function placeProps(
     if (placements.length >= options.budget) break;
     const spec = request(kind);
     for (let attempt = 0; attempt < order.length && tests < maxTests; attempt += 1) {
-      const patch = standable[order[cursor % order.length]!]!;
+      const candidate = order[cursor % order.length]!;
+      const patch = standable[candidate]!;
       cursor += 1;
       tests += 1;
+      // Open ground between groves is kept mostly open.
+      const open = !grove.inGrove.has(candidate);
+      if (open && openPlaced >= openLimit) continue;
       const anchor = testAnchor(analysis, exclusion, patch, spec, taken, options, 0);
       if (anchor) {
         accept(kind, spec, anchor);
+        if (open) openPlaced += 1;
         break;
       }
     }
@@ -509,6 +527,65 @@ function placeProps(
 
 function horizontal(a: Vec3, b: Vec3): number {
   return Math.hypot(a[0] - b[0], a[2] - b[2]);
+}
+
+/**
+ * Composition-aware candidate order (environment upgrade, Phase 5). Grove
+ * centres are picked by a seeded greedy Poisson-disc over the candidates, at
+ * least `spacing` apart; every candidate within `reach` of a centre is tried
+ * first, nearest-to-centre first across all groves (so tall props claim the
+ * centres and dressing fills around them), and only then the open ground in
+ * `order`. This only changes WHICH safe spots are tried first: every anchor
+ * still passes the full `testAnchor` check, so no guarantee changes.
+ * Returns a permutation of `order` and which candidates lie in a grove.
+ */
+export function groveOrder(
+  points: readonly Vec3[],
+  order: readonly number[],
+  random: () => number,
+  spacing: number,
+  reach: number,
+): { order: number[]; inGrove: Set<number> } {
+  const centres: Vec3[] = [];
+  const shuffled = [...order];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
+  }
+  for (const index of shuffled) {
+    const point = points[index]!;
+    if (centres.every((centre) => horizontal(centre, point) >= spacing || Math.abs(centre[1] - point[1]) > reach)) centres.push(point);
+  }
+  const inGrove: { index: number; key: number }[] = [];
+  const open: number[] = [];
+  for (const index of order) {
+    const point = points[index]!;
+    let nearest = Infinity;
+    for (const centre of centres) {
+      if (Math.abs(centre[1] - point[1]) > reach) continue;
+      nearest = Math.min(nearest, horizontal(centre, point));
+    }
+    if (nearest <= reach) inGrove.push({ index, key: nearest + random() * reach * 0.15 });
+    else open.push(index);
+  }
+  inGrove.sort((a, b) => a.key - b.key);
+  return { order: [...inGrove.map((entry) => entry.index), ...open], inGrove: new Set(inGrove.map((entry) => entry.index)) };
+}
+
+/**
+ * Grove spacing and reach in character heights: sparser biomes (lower
+ * density) get groves further apart and tighter, so a desert keeps more
+ * open sand than an island.
+ */
+export function groveScale(bodyHeight: number, density: number): { spacing: number; reach: number; openShare: number } {
+  const d = Math.min(1, Math.max(0, density));
+  return {
+    spacing: bodyHeight * (6 + 8 * (1 - d)),
+    reach: bodyHeight * (1.5 + 5 * d),
+    // Share of the placement target allowed on open ground between groves
+    // (lone rocks, a cactus by itself); the rest must join a grove.
+    openShare: 0.25,
+  };
 }
 
 export interface Anchor {
