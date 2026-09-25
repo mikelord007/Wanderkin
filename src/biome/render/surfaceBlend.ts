@@ -19,6 +19,7 @@ import * as THREE from "three";
 import { getBiomeArt } from "../assets/biomes/index.js";
 import type { WallStyle } from "../assets/types.js";
 import type { BiomeDefinition, BiomeLayout, BiomeSurfacePatch, EffectsQuality } from "../types.js";
+import { setHelperLumaBands } from "../../scene/styleMaterial.js";
 import { layoutMatchesDefinition, MAX_SURFACE_PATCHES, selectSurfacePatches } from "./selection.js";
 
 export interface BiomeSurfaceTreatment {
@@ -163,6 +164,8 @@ export function applyBiomeSurfaceToMaterial(
 ): void {
   const uniforms = material.userData[USER_DATA_KEY] as BiomeSurfaceUniforms | undefined;
   if (!uniforms) return;
+  // Themed helpers band by luminance so a tinted floor keeps its hue in shade.
+  if (role !== "scan") setHelperLumaBands(material, treatment !== null);
   if (!treatment) {
     uniforms.oqBiomeGlobal.value = 0;
     uniforms.oqBiomeStrength.value = 0;

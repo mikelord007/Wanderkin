@@ -8,6 +8,7 @@ import {
   createStyledHelperMaterial,
   disposeStyledObject,
   isBakedEmissiveOnlyMaterial,
+  setHelperLumaBands,
   setObjectColorRestoration,
 } from "./styleMaterial.js";
 
@@ -422,6 +423,61 @@ describe("scene style materials", () => {
       // Luminance banding only brightens it (sheen desaturates the lit
       // colour itself, so allow a little drift), never inventing a hue.
       expect(worstLumaDrift).toBeLessThan(12);
+    });
+
+    it("themed looks switch a helper to luminance banding in its own program; Original keeps the old one", () => {
+      for (const floor of [true, false]) {
+        const material = createStyledHelperMaterial("#94704e", STYLE_DEFINITIONS.cartoon, 1, { floor });
+        const originalKey = material.customProgramCacheKey();
+        const compile = () => {
+          const shader = stub();
+          material.onBeforeCompile(shader as never, {} as never);
+          return shader.fragmentShader;
+        };
+        const originalSource = compile();
+        setHelperLumaBands(material, true);
+        expect(material.customProgramCacheKey()).toBe(`${originalKey}-luma`);
+        const themed = compile();
+        expect(themed).toContain("oqBandLuma");
+        expect(themed).not.toContain("oqColor = floor(oqColor * oqColorSteps + 0.5) / oqColorSteps;");
+        // Back to Original: exactly the previous program, source and key.
+        setHelperLumaBands(material, false);
+        expect(material.customProgramCacheKey()).toBe(originalKey);
+        expect(compile()).toBe(originalSource);
+        material.dispose();
+      }
+      // Hand-painted and Watercolor never posterise: nothing changes.
+      for (const style of [STYLE_DEFINITIONS["hand-painted"], STYLE_DEFINITIONS.watercolor]) {
+        const material = createStyledHelperMaterial("#94704e", style, 1, { floor: true });
+        const key = material.customProgramCacheKey();
+        const shader = stub();
+        material.onBeforeCompile(shader as never, {} as never);
+        setHelperLumaBands(material, true);
+        const after = stub();
+        material.onBeforeCompile(after as never, {} as never);
+        expect(material.customProgramCacheKey()).toBe(key);
+        expect(after.fragmentShader).toBe(shader.fragmentShader);
+        material.dispose();
+      }
+    });
+
+    it("keeps a shaded warm floor on its hue: no olive mustard, no pink sand", () => {
+      const hue = (c: readonly number[]) => {
+        const [r, g, b] = c as [number, number, number];
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const h = max === r ? ((g - b) / (max - min)) % 6 : max === g ? (b - r) / (max - min) + 2 : (r - g) / (max - min) + 4;
+        return (h * 60 + 360) % 360;
+      };
+      const perChannel = (c: readonly number[]) => c.map((v) => Math.floor(v * 5 + 0.5) / 5);
+      // Autumn mustard floor at half light (review finding: #666600 olive).
+      const mustard = [0.4, 0.3, 0.08] as const;
+      expect(hue(perChannel(mustard))).toBeCloseTo(60, 0);
+      expect(Math.abs(hue(cartoonAssetBandColor(mustard)) - hue(mustard))).toBeLessThan(1);
+      // Tropical sand in blue-tinted shade (wave 1 L1: pink band).
+      const sand = [0.8, 0.6, 0.5] as const;
+      expect(perChannel(sand)[2]).toBe(perChannel(sand)[1]); // blue jumps up to green's step: pink cast
+      expect(Math.abs(hue(cartoonAssetBandColor(sand)) - hue(sand))).toBeLessThan(1);
     });
 
     it("never crushes a dark, non-black texture colour to black", () => {

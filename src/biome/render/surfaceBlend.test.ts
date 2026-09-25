@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { STYLE_DEFINITIONS } from "@shared/index.js";
-import { cloneStyledObject } from "../../scene/styleMaterial.js";
+import { cloneStyledObject, createStyledHelperMaterial } from "../../scene/styleMaterial.js";
 import { getBiomeDefinition } from "../presets.js";
 import type { BiomeLayout } from "../types.js";
 import {
@@ -91,6 +91,24 @@ describe("biome surface blend on cloned scan materials", () => {
     expect(readBiomeSurface(step)!.global).toBeGreaterThan(0.3);
     applyBiomeSurfaceToMaterial(floor, null, "floor");
     expect(readBiomeSurface(floor)).toMatchObject({ strength: 0, patchCount: 0, global: 0, floorTint: 0 });
+  });
+
+  it("themed helpers band by luminance (their own program); Original and the scan keep theirs", () => {
+    const treatment = biomeSurfaceTreatment(getBiomeDefinition("autumn"), layout("autumn"), "standard")!;
+    const floor = createStyledHelperMaterial("#6BCB77", STYLE_DEFINITIONS.cartoon, 1, { floor: true });
+    installBiomeSurfaceBlend(floor);
+    const originalKey = floor.customProgramCacheKey();
+    applyBiomeSurfaceToMaterial(floor, treatment, "floor");
+    expect(floor.customProgramCacheKey()).toContain(":helper-luma");
+    applyBiomeSurfaceToMaterial(floor, null, "floor");
+    expect(floor.customProgramCacheKey()).toBe(originalKey);
+    // The scan path is untouched (it already bands by luminance as an asset).
+    const scanClone = cloneStyledObject(sourceScene(), STYLE_DEFINITIONS.cartoon, 1, null);
+    installBiomeSurfaceBlendOnObject(scanClone);
+    const keys = materialsOf(scanClone).map((m) => m.customProgramCacheKey());
+    applyBiomeSurface(scanClone, treatment);
+    expect(materialsOf(scanClone).map((m) => m.customProgramCacheKey())).toEqual(keys);
+    floor.dispose();
   });
 
   it("tints the scan's own floor-level ground like the helper floor, and nothing higher", () => {

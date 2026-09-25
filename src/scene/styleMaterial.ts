@@ -17,6 +17,12 @@ interface StyleUniformState {
   edgeColor: { value: THREE.Color };
   paperTexture: { value: number };
   watercolorWash: { value: number };
+  /**
+   * Helper materials only: band Cartoon by luminance (the imported-asset
+   * path) instead of per channel. Off by default and in Original; themed
+   * biome looks switch it on (see {@link setHelperLumaBands}).
+   */
+  helperLumaBands: boolean;
 }
 
 const USER_DATA_KEY = "objectQuestStyleUniforms";
@@ -219,12 +225,15 @@ function installStyleShader(
     edgeColor: { value: new THREE.Color(style.render.outline.color) },
     paperTexture: { value: style.render.paperTextureOpacity },
     watercolorWash: { value: style.render.watercolorWashStrength },
+    helperLumaBands: false,
   };
   material.userData[USER_DATA_KEY] = state;
 
   const previousCompile = material.onBeforeCompile;
-  const styleFragment = style.id === "cartoon"
-    ? importedAsset
+  // Chosen at compile time: a helper switched to luminance banding (themed
+  // looks) compiles its own program; Original keeps exactly the old one.
+  const styleFragment = () => style.id === "cartoon"
+    ? importedAsset || state.helperLumaBands
       ? CARTOON_ASSET_LUMA_BANDS
       : `
       if (oqColorSteps > 1.0) {
@@ -292,7 +301,7 @@ function installStyleShader(
       float oqLuma = dot(oqColor, vec3(0.2126, 0.7152, 0.0722));
       oqColor = mix(vec3(oqLuma), oqColor, oqSaturation);
       oqColor = clamp((oqColor - 0.5) * oqContrast + 0.5, 0.0, 1.0);
-      ${styleFragment}
+      ${styleFragment()}
       float oqStyledLuma = dot(oqColor, vec3(0.2126, 0.7152, 0.0722));
       gl_FragColor.rgb = mix(vec3(oqStyledLuma), oqColor, oqColorRestoration);
       ${wasRelit
@@ -332,7 +341,24 @@ function installStyleShader(
   material.customProgramCacheKey = () =>
     `objectquest-style-v2:${style.id}:${style.render.outline.enabled ? 1 : 0}:${
       regionProfile ? `region-boxes-${regionProfile.boxes.length}` : "none"
-    }:${wasRelit ? "relit" : "unlit-passthrough"}:${importedAsset ? "asset" : "helper"}`;
+    }:${wasRelit ? "relit" : "unlit-passthrough"}:${importedAsset ? "asset" : "helper"}${
+      !importedAsset && state.helperLumaBands && style.id === "cartoon" ? "-luma" : ""
+    }`;
+  material.needsUpdate = true;
+}
+
+/**
+ * Themed biome looks: band a Cartoon helper (floor, structure) by luminance,
+ * keeping its hue, instead of rounding R, G and B separately. Per-channel
+ * rounding shifts a warm floor's hue in shade (mustard → olive, sand → pink)
+ * because each channel crosses a step at a different light level. Only
+ * recompiles when the setting changes; Original never turns it on, so its
+ * program (source and cache key) is untouched. No effect outside Cartoon.
+ */
+export function setHelperLumaBands(material: THREE.Material, enabled: boolean): void {
+  const state = material.userData[USER_DATA_KEY] as StyleUniformState | undefined;
+  if (!state || state.helperLumaBands === enabled) return;
+  state.helperLumaBands = enabled;
   material.needsUpdate = true;
 }
 
