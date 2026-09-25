@@ -274,7 +274,9 @@ export function createSupportPatches(
         float wob = oqPatchNoise(q / max(r, 1e-4) * 1.7 + oqPatchSeed);
         float edgeR = 0.55 + 0.42 * wob;
         float n = oqPatchNoise(q * 3.2 + oqPatchSeed);
-        float edge = 1.0 - smoothstep(edgeR - 0.28, edgeR, r + (n - 0.5) * 0.16);
+        // A crisp, stylised drift outline: a wide soft falloff read as a
+        // blurry smear when a patch sat close to the chase camera.
+        float edge = 1.0 - smoothstep(edgeR - 0.07, edgeR, r + (n - 0.5) * 0.16);
         // Smooth mottling only: hashed cells scale with the patch and read
         // as pixel blocks on large patches seen up close.
         float mottle = oqPatchNoise(q * 7.0 + oqPatchSeed * 1.3);
@@ -284,7 +286,7 @@ export function createSupportPatches(
       }`,
     );
   };
-  material.customProgramCacheKey = () => "objectquest-biome-patch-v1";
+  material.customProgramCacheKey = () => "objectquest-biome-patch-v2";
 
   const mesh = new THREE.InstancedMesh(geometry, material, patches.length);
   mesh.name = "biome-support-patches";
