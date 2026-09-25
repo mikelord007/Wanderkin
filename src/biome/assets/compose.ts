@@ -165,6 +165,38 @@ function pickPreset(options: readonly { preset: CompositionPreset; weight: numbe
   return options[options.length - 1]!.preset;
 }
 
+/** Smooth value noise in [-1, 1] over world XZ (one cell ≈ `cell` units). */
+function regionNoise(x: number, z: number, cell: number, salt: number): number {
+  const hash = (i: number, j: number) => {
+    const h = Math.sin(i * 127.1 + j * 311.7 + salt * 74.7) * 43758.5453;
+    return (h - Math.floor(h)) * 2 - 1;
+  };
+  const u = x / cell;
+  const v = z / cell;
+  const i = Math.floor(u);
+  const j = Math.floor(v);
+  const fu = u - i;
+  const fv = v - j;
+  const su = fu * fu * (3 - 2 * fu);
+  const sv = fv * fv * (3 - 2 * fv);
+  const a = hash(i, j) + (hash(i + 1, j) - hash(i, j)) * su;
+  const b = hash(i, j + 1) + (hash(i + 1, j + 1) - hash(i, j + 1)) * su;
+  return a + (b - a) * sv;
+}
+
+/**
+ * Regional tone drift: neighbouring groves share a slight hue/lightness
+ * offset that changes slowly across the scene (natural patchiness, not
+ * per-object noise). Bounded by the art's own jitter limits.
+ */
+export function regionalTone(art: BiomeArt, x: number, z: number): { hue: number; light: number } {
+  const cell = 1.2; // world units: a few groves per cell on a room-scale scan
+  return {
+    hue: ((regionNoise(x, z, cell, 1) * art.variation.hueJitterDeg * 0.6) * Math.PI) / 180,
+    light: regionNoise(x, z, cell, 2) * art.variation.toneJitter * 0.8,
+  };
+}
+
 /** Row-major linear-RGB hue rotation about the grey axis, times a lightness factor. */
 export function toneMatrix(hueRadians: number, lightness: number): number[] {
   const c = Math.cos(hueRadians);
@@ -279,6 +311,7 @@ export function composeCluster(
   const position = new THREE.Vector3();
   const scale = new THREE.Vector3();
 
+  const region = regionalTone(art, bx, bz);
   const members: ComposedMember[] = kept.map((member) => {
     // Each member draws from its own stream, so dropping one member (reduced
     // quality, the per-cluster cap) never changes how another looks.
@@ -309,7 +342,7 @@ export function composeCluster(
       matrix: new THREE.Matrix4().compose(position, rotation, scale),
       base: [bx + member.x, y, bz + member.z],
       height: member.height,
-      tone: toneMatrix(hueJitter, lightJitter),
+      tone: toneMatrix(hueJitter + region.hue, lightJitter + region.light),
       role: family.role,
     };
   });
