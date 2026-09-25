@@ -48,6 +48,8 @@ export interface AlpineConiferOptions {
   gap?: number;
   /** Bare dead leader above the crown, fraction of the height (0 = none). */
   snag?: number;
+  /** Close each tier underneath (default true); tiny sprigs skip it, it is never seen. */
+  underside?: boolean;
   /** Needle ramps (default foliage / foliageAlt, alternating by tier). */
   ramps?: readonly [string, string];
 }
@@ -88,138 +90,152 @@ export function snowRamp(tones: BiomeTones) {
   return linearRamp(tones.snow ?? tones.stoneTop);
 }
 
+/** One conifer part, ready for {@link MeshKit.add} (colours are baked as attributes). */
+export interface ConiferPart {
+  geometry: THREE.BufferGeometry;
+  sway: number | ((p: THREE.Vector3) => number) | "attribute";
+  smooth: boolean;
+}
+
+/**
+ * The conifer's parts in native units (about one unit tall, base on y = 0,
+ * crown mass centred over the origin). Dwarf pines and buried sprigs reuse
+ * them at other scales and angles.
+ */
+export function coniferParts(options: AlpineConiferOptions, tones: BiomeTones): ConiferPart[] {
+  const random = builderRandom(options.seed);
+  const parts: ConiferPart[] = [];
+  const bark = linearRamp(tones.bark ?? tones.trunk);
+  const needleA = linearRamp(tones[options.ramps?.[0] ?? "foliage"] ?? tones.foliage);
+  const needleB = linearRamp(tones[options.ramps?.[1] ?? "foliageAlt"] ?? tones.foliageAlt);
+  const snow = snowRamp(tones);
+  const tiers = Math.max(3, Math.min(7, Math.round(options.tiers)));
+  const taper = options.taper ?? 0.74;
+  const gap = options.gap ?? 0;
+  const lean = options.lean ?? 0;
+  const wind = options.wind ?? 0;
+  const snag = options.snag ?? 0;
+  const snowTiers = options.snowTiers ?? 1;
+
+  // Crown extent: the top tier's apex sits at yTop; a snag rises above it.
+  const yTop = 1 - snag;
+  const spine = (y: number) => new THREE.Vector3(lean * y ** 1.5, y, 0);
+  // Evenly spaced apexes; tier heights overlap unless `gap` opens them up.
+  // Solve for the lowest apex so its drooping tips land at the trunk line.
+  const k = 1.6 - gap;
+  const shrink = (f: number) => 1 - 0.3 * f;
+  const lift0 = k * (1 + options.droop);
+  const a0 = (options.trunk + (lift0 * yTop) / (tiers - 1)) / (1 + lift0 / (tiers - 1));
+  const step = (yTop - a0) / (tiers - 1);
+
+  // Trunk: tapered, flared at the root, following the lean; hidden in the crown.
+  const trunkTop = snag > 0 ? 1 : yTop - step * 0.5;
+  const trunkGeometry = tube({
+      spine: (t) => spine(trunkTop * t),
+      radius: (t, a) => 0.04 * (1 - 0.75 * t) * (1 + 0.7 * (1 - Math.min(1, t / 0.12)) ** 2) * (1 + 0.08 * Math.cos(a * 3 + options.seed)),
+      rings: snag > 0 ? 6 : 3,
+      sides: 6,
+      cap: "point",
+      color: (t, a) => {
+        // Weathered silver-grey on the dead leader, bark below.
+        const dead = snag > 0 && t * trunkTop > yTop - step * 0.4;
+        const c = rampAt(bark, 0.25 + 0.3 * Math.max(0, Math.cos(a)) + 0.15 * t);
+        return dead ? c.lerp(snow.dark, 0.55) : c;
+      },
+      sway: (t) => t * t * 0.25,
+    });
+  if (snag > 0) {
+    // Two broken branch stubs on the dead leader.
+    for (let s = 0; s < 2; s += 1) {
+      const y = yTop + snag * (0.3 + s * 0.3);
+      const from = spine(y);
+      const angle = random() * Math.PI * 2;
+      const to = from.clone().add(new THREE.Vector3(Math.cos(angle) * 0.07, 0.03, Math.sin(angle) * 0.07));
+      parts.push({
+        geometry: tube({ spine: (t) => from.clone().lerp(to, t), radius: (t) => 0.012 * (1 - 0.6 * t), rings: 1, sides: 4, cap: "point", color: () => rampAt(bark, 0.55).lerp(snow.dark, 0.5) }),
+        sway: 0.25,
+        smooth: true,
+      });
+    }
+  }
+
+  parts.push({ geometry: trunkGeometry, sway: "attribute", smooth: true });
+  const soup = new Soup();
+  for (let i = 0; i < tiers; i += 1) {
+    const f = i / (tiers - 1);
+    const h = step * k * shrink(f);
+    const apexY = a0 + step * i;
+    const baseY = apexY - h;
+    const centre = spine(baseY);
+    const radius = options.width * (1 - taper * f) * (0.94 + random() * 0.12);
+    const points = Math.max(5, options.points - Math.round(2 * f));
+    const ring = points * 2;
+    const turn = random() * Math.PI * 2;
+    const apex = spine(apexY);
+    const under = centre.clone().add(new THREE.Vector3(0, h * 0.12, 0));
+    const snowy = (1 - f) < snowTiers + 1e-9;
+    const reach = options.snow * (snowy ? 0.85 + 0.15 * f : 0.45);
+    const needle = i % 2 === 0 ? needleA : needleB;
+    const shade = (random() - 0.5) * 0.12;
+
+    const outer: Vec[] = [];
+    const shoulder: Vec[] = [];
+    const lip: Vec[] = [];
+    for (let q = 0; q < ring; q += 1) {
+      const tip = q % 2 === 0;
+      const angle = turn + (q / ring) * Math.PI * 2 + (random() - 0.5) * 0.14;
+      const downwind = 1 + wind * Math.cos(angle);
+      const r = radius * downwind * (tip ? 0.9 + random() * 0.1 : 0.66);
+      const y = baseY + (tip ? -options.droop * h * (0.8 + random() * 0.4) : options.droop * h * 0.22);
+      const o = new THREE.Vector3(centre.x + Math.cos(angle) * r, y, centre.z + Math.sin(angle) * r);
+      outer.push(o);
+      // Snow runs out along each branch ridge and retreats in the notches.
+      const s = clamp01(reach * (tip ? 0.9 + random() * 0.1 : 0.76));
+      const pad = apex.clone().lerp(o, s);
+      pad.y += h * 0.1 * options.snow * (tip ? 1 : 0.6);
+      shoulder.push(pad);
+      // The pad's front edge: a short, nearly vertical band of snow that
+      // shows from the low gameplay camera, where the tops are grazing.
+      const edge = pad.clone().lerp(o, 0.12);
+      edge.y -= h * 0.2 * reach;
+      lip.push(edge);
+    }
+    const snowColor = (ny: number) => rampAt(snow, clamp01(0.3 + 0.6 * ny + 0.1 * f));
+    const needleColor = (ny: number) => rampAt(needle, clamp01(0.18 + 0.42 * Math.max(0, ny) + 0.22 * f + shade));
+    const undersideColor = () => rampAt(needle, 0.04).multiplyScalar(0.8);
+    for (let q = 0; q < ring; q += 1) {
+      const n = (q + 1) % ring;
+      if (reach > 0.02) {
+        soup.tri(apex, shoulder[n]!, shoulder[q]!, snowColor);
+        soup.quad(shoulder[q]!, shoulder[n]!, lip[n]!, lip[q]!, snowColor);
+        soup.quad(lip[q]!, lip[n]!, outer[n]!, outer[q]!, needleColor);
+      } else {
+        soup.tri(apex, outer[n]!, outer[q]!, needleColor);
+      }
+      if (options.underside !== false) soup.tri(under, outer[q]!, outer[n]!, undersideColor);
+    }
+  }
+  parts.push({ geometry: soup.geometry(), sway: (p) => 0.12 + p.y * 0.45, smooth: false });
+  // Leaning and wind-bent crowns: set the base back so the crown's mass
+  // sits over the footprint centre and the tree fits at full size.
+  let minX = Infinity;
+  let maxX = -Infinity;
+  for (const { geometry } of parts) {
+    const position = geometry.getAttribute("position");
+    for (let v = 0; v < position.count; v += 1) {
+      minX = Math.min(minX, position.getX(v));
+      maxX = Math.max(maxX, position.getX(v));
+    }
+  }
+  const setBack = -0.5 * (minX + maxX) * 0.85;
+  for (const { geometry } of parts) geometry.translate(setBack, 0, 0);
+  return parts;
+}
+
 export function alpineConifer(options: AlpineConiferOptions): VariantBuilder {
   return (tones: BiomeTones): UnitMesh => {
-    const random = builderRandom(options.seed);
     const kit = new MeshKit();
-    const parts: { geometry: THREE.BufferGeometry; sway: number | ((p: THREE.Vector3) => number) | "attribute"; smooth: boolean }[] = [];
-    const bark = linearRamp(tones.bark ?? tones.trunk);
-    const needleA = linearRamp(tones[options.ramps?.[0] ?? "foliage"] ?? tones.foliage);
-    const needleB = linearRamp(tones[options.ramps?.[1] ?? "foliageAlt"] ?? tones.foliageAlt);
-    const snow = snowRamp(tones);
-    const tiers = Math.max(3, Math.min(7, Math.round(options.tiers)));
-    const taper = options.taper ?? 0.74;
-    const gap = options.gap ?? 0;
-    const lean = options.lean ?? 0;
-    const wind = options.wind ?? 0;
-    const snag = options.snag ?? 0;
-    const snowTiers = options.snowTiers ?? 1;
-
-    // Crown extent: the top tier's apex sits at yTop; a snag rises above it.
-    const yTop = 1 - snag;
-    const spine = (y: number) => new THREE.Vector3(lean * y ** 1.5, y, 0);
-    // Evenly spaced apexes; tier heights overlap unless `gap` opens them up.
-    // Solve for the lowest apex so its drooping tips land at the trunk line.
-    const k = 1.6 - gap;
-    const shrink = (f: number) => 1 - 0.3 * f;
-    const lift0 = k * (1 + options.droop);
-    const a0 = (options.trunk + (lift0 * yTop) / (tiers - 1)) / (1 + lift0 / (tiers - 1));
-    const step = (yTop - a0) / (tiers - 1);
-
-    // Trunk: tapered, flared at the root, following the lean; hidden in the crown.
-    const trunkTop = snag > 0 ? 1 : yTop - step * 0.5;
-    const trunkGeometry = tube({
-        spine: (t) => spine(trunkTop * t),
-        radius: (t, a) => 0.04 * (1 - 0.75 * t) * (1 + 0.7 * (1 - Math.min(1, t / 0.12)) ** 2) * (1 + 0.08 * Math.cos(a * 3 + options.seed)),
-        rings: snag > 0 ? 6 : 3,
-        sides: 6,
-        cap: "point",
-        color: (t, a) => {
-          // Weathered silver-grey on the dead leader, bark below.
-          const dead = snag > 0 && t * trunkTop > yTop - step * 0.4;
-          const c = rampAt(bark, 0.25 + 0.3 * Math.max(0, Math.cos(a)) + 0.15 * t);
-          return dead ? c.lerp(snow.dark, 0.55) : c;
-        },
-        sway: (t) => t * t * 0.25,
-      });
-    if (snag > 0) {
-      // Two broken branch stubs on the dead leader.
-      for (let s = 0; s < 2; s += 1) {
-        const y = yTop + snag * (0.3 + s * 0.3);
-        const from = spine(y);
-        const angle = random() * Math.PI * 2;
-        const to = from.clone().add(new THREE.Vector3(Math.cos(angle) * 0.07, 0.03, Math.sin(angle) * 0.07));
-        parts.push({
-          geometry: tube({ spine: (t) => from.clone().lerp(to, t), radius: (t) => 0.012 * (1 - 0.6 * t), rings: 1, sides: 4, cap: "point", color: () => rampAt(bark, 0.55).lerp(snow.dark, 0.5) }),
-          sway: 0.25,
-          smooth: true,
-        });
-      }
-    }
-
-    parts.push({ geometry: trunkGeometry, sway: "attribute", smooth: true });
-    const soup = new Soup();
-    for (let i = 0; i < tiers; i += 1) {
-      const f = i / (tiers - 1);
-      const h = step * k * shrink(f);
-      const apexY = a0 + step * i;
-      const baseY = apexY - h;
-      const centre = spine(baseY);
-      const radius = options.width * (1 - taper * f) * (0.94 + random() * 0.12);
-      const points = Math.max(5, options.points - Math.round(2 * f));
-      const ring = points * 2;
-      const turn = random() * Math.PI * 2;
-      const apex = spine(apexY);
-      const under = centre.clone().add(new THREE.Vector3(0, h * 0.12, 0));
-      const snowy = (1 - f) < snowTiers + 1e-9;
-      const reach = options.snow * (snowy ? 0.85 + 0.15 * f : 0.45);
-      const needle = i % 2 === 0 ? needleA : needleB;
-      const shade = (random() - 0.5) * 0.12;
-
-      const outer: Vec[] = [];
-      const shoulder: Vec[] = [];
-      const lip: Vec[] = [];
-      for (let q = 0; q < ring; q += 1) {
-        const tip = q % 2 === 0;
-        const angle = turn + (q / ring) * Math.PI * 2 + (random() - 0.5) * 0.14;
-        const downwind = 1 + wind * Math.cos(angle);
-        const r = radius * downwind * (tip ? 0.9 + random() * 0.1 : 0.66);
-        const y = baseY + (tip ? -options.droop * h * (0.8 + random() * 0.4) : options.droop * h * 0.22);
-        const o = new THREE.Vector3(centre.x + Math.cos(angle) * r, y, centre.z + Math.sin(angle) * r);
-        outer.push(o);
-        // Snow runs out along each branch ridge and retreats in the notches.
-        const s = clamp01(reach * (tip ? 0.9 + random() * 0.1 : 0.76));
-        const pad = apex.clone().lerp(o, s);
-        pad.y += h * 0.1 * options.snow * (tip ? 1 : 0.6);
-        shoulder.push(pad);
-        // The pad's front edge: a short, nearly vertical band of snow that
-        // shows from the low gameplay camera, where the tops are grazing.
-        const edge = pad.clone().lerp(o, 0.12);
-        edge.y -= h * 0.2 * reach;
-        lip.push(edge);
-      }
-      const snowColor = (ny: number) => rampAt(snow, clamp01(0.3 + 0.6 * ny + 0.1 * f));
-      const needleColor = (ny: number) => rampAt(needle, clamp01(0.18 + 0.42 * Math.max(0, ny) + 0.22 * f + shade));
-      const undersideColor = () => rampAt(needle, 0.04).multiplyScalar(0.8);
-      for (let q = 0; q < ring; q += 1) {
-        const n = (q + 1) % ring;
-        if (reach > 0.02) {
-          soup.tri(apex, shoulder[n]!, shoulder[q]!, snowColor);
-          soup.quad(shoulder[q]!, shoulder[n]!, lip[n]!, lip[q]!, snowColor);
-          soup.quad(lip[q]!, lip[n]!, outer[n]!, outer[q]!, needleColor);
-        } else {
-          soup.tri(apex, outer[n]!, outer[q]!, needleColor);
-        }
-        soup.tri(under, outer[q]!, outer[n]!, undersideColor);
-      }
-    }
-    parts.push({ geometry: soup.geometry(), sway: (p) => 0.12 + p.y * 0.45, smooth: false });
-    // Leaning and wind-bent crowns: set the base back so the crown's mass
-    // sits over the footprint centre and the tree fits at full size.
-    let minX = Infinity;
-    let maxX = -Infinity;
-    for (const { geometry } of parts) {
-      const position = geometry.getAttribute("position");
-      for (let v = 0; v < position.count; v += 1) {
-        minX = Math.min(minX, position.getX(v));
-        maxX = Math.max(maxX, position.getX(v));
-      }
-    }
-    const setBack = -0.5 * (minX + maxX) * 0.85;
-    for (const { geometry, sway, smooth } of parts) {
-      geometry.translate(setBack, 0, 0);
-      kit.add(geometry, { color: "attribute", sway, smooth });
-    }
+    for (const { geometry, sway, smooth } of coniferParts(options, tones)) kit.add(geometry, { color: "attribute", sway, smooth });
     return kit.finish({ groundAo: { height: 0.12, strength: 0.3 } });
   };
 }

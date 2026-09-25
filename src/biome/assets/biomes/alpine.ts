@@ -1,21 +1,22 @@
 /**
- * Alpine art: crisp, cold, quiet. Layered snow-dusted conifers, low
- * juniper mounds, grey granite with snow on its upward faces, frozen water
- * and slow falling snow. Few, tall, dark trees against pale ground give the
- * silhouette; the snow caps tie every family together.
+ * Alpine art: a cold, quiet, miniature winter mountain on the furniture.
+ * Layered snow-laden conifers and dwarf pines, dark granite and slate under
+ * thick snow pillows, cairns and trail poles, sparse straw grass poking
+ * through, frozen water and slow falling snow. Few dark shapes on wide
+ * snowfields give the silhouette; snow ties every family together.
  *
- * Wave 2 baseline by the environment lead on the shared builders; owned by
- * the Alpine worker from hand-off (ENVIRONMENT_ARCHITECTURE.md §10 + Wave 2
- * addendum).
+ * Wave 2 baseline by the environment lead; owned by the Alpine worker
+ * (ENVIRONMENT_ARCHITECTURE.md §10 + Wave 2 addendum). Builders live in
+ * `../alpine/`.
  */
-import { post, signpost } from "../builders/dry.js";
-import { bush, flowers, tuft } from "../builders/foliage.js";
+import { tuft } from "../builders/foliage.js";
 import { lyingLog } from "../builders/trees.js";
 import { alpineConiferVariants, youngConiferVariants } from "../alpine/conifer.js";
+import { alpineMarkerVariants } from "../alpine/markers.js";
 import { alpineRocks } from "../alpine/rocks.js";
+import { alpineShrubVariants, snowDrift } from "../alpine/shrubs.js";
 import { ALPINE_WALL } from "../alpine/wall.js";
-import { type SnowCapOptions, withSnowCap } from "../meshKit.js";
-import type { BiomeArt, BiomeTones, VariantBuilder } from "../types.js";
+import type { BiomeArt, BiomeTones } from "../types.js";
 
 const tones = {
   // Needles: deep blue-green, dark enough to hold a silhouette against snow.
@@ -35,16 +36,13 @@ const tones = {
   snow: { dark: "#a7bacb", base: "#c6d4e0", light: "#d5e1eb" },
   // Slate: darker, bluer bedding for layered rock.
   slate: { dark: "#343a45", base: "#4b5261", light: "#6c7483" },
+  // Painted trail-marker bands: a cold red, far from the collectible's amber.
+  paint: { dark: "#7a2a31", base: "#a3333d", light: "#c8555e" },
   // Conifer bark: dark, warm red-brown.
   bark: { dark: "#3b2a22", base: "#5a4032", light: "#7d5c47" },
 } satisfies BiomeTones;
 
-/** Fresh snow on upward faces; heavier toward the top of each asset. */
-const SNOW: SnowCapOptions = { color: "#eef4f8", threshold: 0.55, heightBias: 0.6 };
-const LIGHT_SNOW: SnowCapOptions = { ...SNOW, threshold: 0.7, strength: 0.75 };
-
 const rocks = alpineRocks();
-const snowy = (list: readonly VariantBuilder[], options = SNOW) => list.map((builder) => withSnowCap(builder, options));
 
 export const ALPINE_ART: BiomeArt = {
   id: "alpine",
@@ -64,16 +62,10 @@ export const ALPINE_ART: BiomeArt = {
       mirror: true, embed: [0.01, 0.03],
       variants: youngConiferVariants(),
     },
-    juniper: {
-      category: "bush", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.8, triangleBudget: 900,
-      mirror: true, embed: [0, 0.03],
-      variants: snowy([
-        bush({ lobes: 6, spread: 0.52, height: 1.25, seed: 1 }),
-        bush({ lobes: 5, spread: 0.48, height: 1.2, seed: 2, altRamp: "foliage" }),
-        bush({ lobes: 7, spread: 0.5, height: 1.35, seed: 3 }),
-        bush({ lobes: 4, spread: 0.44, height: 1.2, seed: 4, ramp: "foliageAlt" }),
-        bush({ lobes: 6, spread: 0.5, height: 1.3, seed: 5, blossoms: 3 }),
-      ], LIGHT_SNOW),
+    "dwarf-pine": {
+      category: "bush", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.8, triangleBudget: 900,
+      mirror: true, embed: [0.02, 0.05],
+      variants: alpineShrubVariants(),
     },
     "rock-large": {
       category: "rock", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.9, triangleBudget: 400,
@@ -90,28 +82,31 @@ export const ALPINE_ART: BiomeArt = {
       mirror: true, embed: [0.05, 0.15], alignToNormal: 1,
       variants: rocks.dressing,
     },
-    "alpine-grass": {
-      category: "grass", role: "micro", shading: "smooth", castShadow: false, unitRadius: 1.1, triangleBudget: 220,
-      mirror: true, embed: [0, 0.02],
-      variants: [
-        tuft({ blades: 7, splay: 0.5, seed: 21, ramp: "dry" }),
-        tuft({ blades: 6, splay: 0.7, seed: 22, ramp: "dry", width: 0.035 }),
-      ],
+    // Wind-shaped snow at the foot of trees, rocks and markers.
+    drift: {
+      category: "dressing", role: "micro", shading: "smooth", castShadow: false, unitRadius: 0.5, triangleBudget: 400,
+      mirror: true, embed: [0.02, 0.04], alignToNormal: 1,
+      variants: [snowDrift(601), snowDrift(603), snowDrift(605)],
     },
-    "alpine-flowers": {
-      category: "dressing", role: "micro", shading: "smooth", castShadow: false, unitRadius: 1.1, triangleBudget: 400,
-      mirror: true, embed: [0, 0.02],
-      variants: [flowers({ stems: 5, seed: 31, ramp: "accent" }), flowers({ stems: 4, seed: 32, ramp: "accent" })],
+    // Sparse straw grass poking through the snow.
+    "winter-grass": {
+      category: "grass", role: "micro", shading: "smooth", castShadow: false, unitRadius: 1.1, triangleBudget: 220,
+      mirror: true, embed: [0.02, 0.05],
+      variants: [
+        tuft({ blades: 6, splay: 0.45, seed: 21, ramp: "dry" }),
+        tuft({ blades: 5, splay: 0.7, seed: 22, ramp: "dry", width: 0.035 }),
+        tuft({ blades: 8, splay: 0.3, seed: 23, ramp: "dry", width: 0.03 }),
+      ],
     },
     "fallen-branch": {
       category: "dressing", role: "micro", shading: "faceted", castShadow: false, unitRadius: 0.5, triangleBudget: 120,
-      mirror: true, embed: [0.02, 0.05],
-      variants: [lyingLog({ seed: 41, fork: true }), lyingLog({ seed: 42, ramp: "trunk" })],
+      mirror: true, embed: [0.03, 0.06],
+      variants: [lyingLog({ seed: 41, ramp: "bark", fork: true }), lyingLog({ seed: 42, ramp: "bark" })],
     },
     marker: {
-      category: "marker", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.36, triangleBudget: 300,
-      mirror: true, embed: [0.03, 0.05],
-      variants: snowy([post({ seed: 1 }), post({ seed: 2, lean: 0.05 }), signpost({ planks: 2, seed: 3 })], LIGHT_SNOW),
+      category: "marker", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.39, triangleBudget: 400,
+      mirror: true, embed: [0.02, 0.04],
+      variants: alpineMarkerVariants(),
     },
   },
   compositions: {
@@ -123,10 +118,10 @@ export const ALPINE_ART: BiomeArt = {
           primary: "conifer",
           primaryOffset: 0.15,
           members: [
-            { family: "young-conifer", count: [0, 1], ring: [0.55, 0.95], height: [0.4, 0.62] },
-            { family: "pebble", count: [1, 2], ring: [0.45, 1], height: [0.03, 0.06] },
-            { family: "alpine-grass", count: [0, 2], ring: [0.4, 0.9], height: [0.06, 0.1] },
-            { family: "fallen-branch", count: [1, 1], ring: [0.5, 0.9], height: [0.14, 0.2], chance: 0.35 },
+            { family: "young-conifer", count: [1, 1], ring: [0.55, 0.95], height: [0.32, 0.55], chance: 0.7 },
+            { family: "drift", count: [1, 1], ring: [0.3, 0.6], height: [0.28, 0.4] },
+            { family: "winter-grass", count: [0, 2], ring: [0.45, 0.95], height: [0.06, 0.1] },
+            { family: "fallen-branch", count: [1, 1], ring: [0.5, 0.9], height: [0.14, 0.2], chance: 0.3 },
           ],
         },
       },
@@ -135,20 +130,35 @@ export const ALPINE_ART: BiomeArt = {
         preset: {
           id: "lone-pine",
           primary: "conifer",
-          members: [{ family: "pebble", count: [1, 2], ring: [0.5, 1], height: [0.03, 0.05] }],
+          members: [
+            { family: "drift", count: [1, 1], ring: [0.3, 0.55], height: [0.3, 0.42] },
+            { family: "pebble", count: [0, 1], ring: [0.5, 1], height: [0.03, 0.05] },
+          ],
+        },
+      },
+      {
+        weight: 1,
+        preset: {
+          id: "treeline-copse",
+          primary: "conifer",
+          primaryOffset: 0.2,
+          members: [
+            { family: "young-conifer", count: [1, 2], ring: [0.5, 0.95], height: [0.4, 0.62] },
+            { family: "dwarf-pine", count: [0, 1], ring: [0.55, 0.95], height: [0.14, 0.2] },
+          ],
         },
       },
     ],
     shrub: [
       {
-        weight: 2,
+        weight: 3,
         preset: {
-          id: "juniper-mound",
-          primary: "juniper",
+          id: "krummholz",
+          primary: "dwarf-pine",
           members: [
-            { family: "pebble", count: [1, 2], ring: [0.5, 1], height: [0.1, 0.16] },
-            { family: "alpine-flowers", count: [0, 1], ring: [0.5, 0.9], height: [0.25, 0.35] },
-            { family: "alpine-grass", count: [1, 2], ring: [0.45, 0.95], height: [0.25, 0.35] },
+            { family: "winter-grass", count: [1, 2], ring: [0.5, 0.95], height: [0.3, 0.45] },
+            { family: "pebble", count: [0, 1], ring: [0.5, 1], height: [0.1, 0.16] },
+            { family: "drift", count: [0, 1], ring: [0.55, 0.9], height: [0.6, 0.8], chance: 0.5 },
           ],
         },
       },
@@ -161,8 +171,8 @@ export const ALPINE_ART: BiomeArt = {
           primary: "rock-large",
           members: [
             { family: "rock-medium", count: [1, 2], ring: [0.55, 0.9], height: [0.28, 0.45] },
-            { family: "pebble", count: [2, 3], ring: [0.35, 1], height: [0.08, 0.15] },
-            { family: "alpine-flowers", count: [0, 1], ring: [0.45, 0.9], height: [0.12, 0.18], chance: 0.4 },
+            { family: "pebble", count: [1, 2], ring: [0.35, 1], height: [0.08, 0.15] },
+            { family: "winter-grass", count: [0, 1], ring: [0.45, 0.9], height: [0.14, 0.22], chance: 0.5 },
           ],
         },
       },
@@ -171,7 +181,10 @@ export const ALPINE_ART: BiomeArt = {
         preset: {
           id: "lone-boulder",
           primary: "rock-large",
-          members: [{ family: "pebble", count: [1, 2], ring: [0.5, 1], height: [0.08, 0.14] }],
+          members: [
+            { family: "drift", count: [1, 1], ring: [0.45, 0.75], height: [0.4, 0.55] },
+            { family: "pebble", count: [0, 1], ring: [0.5, 1], height: [0.08, 0.14] },
+          ],
         },
       },
     ],
@@ -179,11 +192,11 @@ export const ALPINE_ART: BiomeArt = {
       {
         weight: 1,
         preset: {
-          id: "trail-post",
+          id: "trail-marker",
           primary: "marker",
           members: [
             { family: "pebble", count: [1, 2], ring: [0.4, 0.9], height: [0.05, 0.08] },
-            { family: "fallen-branch", count: [1, 1], ring: [0.5, 0.9], height: [0.3, 0.42], chance: 0.5 },
+            { family: "drift", count: [0, 1], ring: [0.45, 0.8], height: [0.3, 0.45], chance: 0.6 },
           ],
         },
       },
