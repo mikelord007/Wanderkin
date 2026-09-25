@@ -93,8 +93,12 @@ describe("autumn timber shells", () => {
     expect(luminance(top.base)).toBeGreaterThan(luminance(side.base));
     expect(luminance(AUTUMN_WALL.rim)).toBeGreaterThan(luminance(top.light));
     expect(luminance(AUTUMN_WALL.recess)).toBeLessThan(luminance(side.dark));
-    // Fewer, thicker beams than Tropical's planks, in a darker, warmer wood.
-    expect(AUTUMN_WALL.strata[1]).toBeLessThan(TROPICAL_WALL.strata[0]);
+    // Enough courses and beam ends that tall steps never show a flat face.
+    expect(AUTUMN_WALL.strata[0]).toBeGreaterThanOrEqual(5);
+    expect(AUTUMN_WALL.joints![0]).toBeGreaterThanOrEqual(5);
+    // A darker, redder wood than Tropical's sun-bleached planks.
     expect(luminance(side.base)).toBeLessThan(luminance(TROPICAL_WALL.side.base));
+    const hsl = (hex: string) => new THREE.Color(hex).getHSL({ h: 0, s: 0, l: 0 });
+    expect(hsl(side.base).s).toBeGreaterThan(hsl(TROPICAL_WALL.side.base).s);
   });
 });

@@ -235,7 +235,7 @@ export const AUTUMN_ART: BiomeArt = {
   lighting: { ambientKeep: 0.6, hemisphereShare: 0.5, sunElevation: [20, 40], fogScale: 0.94, contactStrength: 1.05 },
   families: {
     broadleaf: {
-      category: "tree", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.66, triangleBudget: 1600,
+      category: "tree", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.6, triangleBudget: 1600,
       leanMax: 0.04, mirror: true, embed: [0.01, 0.03],
       variants: TREES,
       // The bare late-autumn tree is a rarer accent.
@@ -338,7 +338,7 @@ export const AUTUMN_ART: BiomeArt = {
       variants: [
         mossyLog({ seed: 51, moss: 0.45, fungi: 2, stub: true }),
         mossyLog({ seed: 52, ramp: "deadwood", broken: true, moss: 0.55 }),
-        mossyLog({ seed: 53, radius: 0.08, moss: 0.35, fungi: 1 }),
+        mossyLog({ seed: 53, radius: 0.11, moss: 0.35, fungi: 1 }),
       ],
     },
     stump: {
@@ -529,5 +529,5 @@ export const AUTUMN_ART: BiomeArt = {
     },
   },
   variation: { toneJitter: 0.05, hueJitterDeg: 5 },
-  budgets: { triangles: { standard: 90_000, reduced: 40_000 }, membersPerCluster: { standard: 6, reduced: 3 } },
+  budgets: { triangles: { standard: 90_000, reduced: 45_000 }, membersPerCluster: { standard: 6, reduced: 3 } },
 };

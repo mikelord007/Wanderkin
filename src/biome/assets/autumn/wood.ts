@@ -72,7 +72,7 @@ function barkColor(bark: Ramp, moss: Ramp | null, mossFrom: number) {
 
 export interface MossyLogOptions {
   seed: number;
-  /** Radius relative to the length (default 0.1). */
+  /** Radius relative to the length (default 0.13: reads as a log, not a stick, at gameplay distance). */
   radius?: number;
   /** Bark ramp (default "trunk"). */
   ramp?: string;
@@ -95,7 +95,7 @@ export function mossyLog(options: MossyLogOptions): VariantBuilder {
     const heart = linearRamp(tones.heartwood ?? tones.dry);
     const moss = options.moss === undefined ? null : linearRamp(tones.moss ?? tones.foliage);
     const fungus = linearRamp(tones.fungus ?? tones.dry);
-    const R = options.radius ?? 0.1;
+    const R = options.radius ?? 0.13;
     const bow = (random() - 0.5) * 0.12;
     const spine = (t: number) => new THREE.Vector3(-0.5 + t, R * 0.85, bow * Math.sin(t * Math.PI));
     const splinter = (a: number) => (Math.sin(a * 3 + options.seed) > 0.2 ? 1 : 0.55);
@@ -106,8 +106,8 @@ export function mossyLog(options: MossyLogOptions): VariantBuilder {
           const body = R * (1 - 0.18 * t) * (1 + 0.05 * Math.cos(a * 5 + t * 3));
           return options.broken && t > 0.94 ? body * (0.55 + 0.45 * splinter(a) * (1 - (t - 0.94) / 0.06)) : body;
         },
-        rings: 8,
-        sides: 8,
+        rings: 6,
+        sides: 7,
         cap: options.broken ? "point" : "open",
       }),
       { color: barkColor(bark, moss, options.moss ?? 1), smooth: true },
@@ -118,7 +118,7 @@ export function mossyLog(options: MossyLogOptions): VariantBuilder {
     for (const [t, sign] of ends) {
       const at = spine(t);
       const ahead = spine(Math.min(1, t + 0.01)).sub(spine(Math.max(0, t - 0.01))).normalize().multiplyScalar(sign);
-      const face = cutFace(R * (1 - 0.18 * t) * 1.02, 8, heart, darkBark);
+      const face = cutFace(R * (1 - 0.18 * t) * 1.02, 7, heart, darkBark);
       face.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), ahead));
       face.translate(at.x, at.y, at.z);
       kit.add(face, { color: "attribute", smooth: true });
