@@ -26,9 +26,10 @@ export const ALPINE_WALL: WallStyle = {
   joints: [3, 5],
   seam: 0.78,
   // Snow on the walkable face (and on the ledges between courses).
-  top: { dark: "#a9bccd", base: "#c4d2df", light: "#d9e3ec" },
-  // Dark granite course → frost-lit course.
-  side: { dark: "#353b45", base: "#5d6571", light: "#9aa3af" },
+  top: { dark: "#a9bccd", base: "#c4d2df", light: "#d6e0e9" },
+  // Dark granite course → frost-lit course (kept well below the snow top,
+  // so the walkable face stands apart in direct sun).
+  side: { dark: "#353b45", base: "#5d6571", light: "#8a939f" },
   recess: "#23272e",
   // Packed snow on the collision edge, brighter than the top.
   rim: "#eaf0f5",
