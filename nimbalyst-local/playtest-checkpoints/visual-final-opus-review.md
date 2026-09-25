@@ -284,3 +284,41 @@ These all hold:
 | `12` | Publish failed: the error and an enabled plain Share (retry = publish only) |
 | `13` | Bundled sample: the reason text, no save offer |
 | `14` | F-1: back on Finish after leaving for a replay mid-save, with no link shown |
+
+## F-1 closed: fix `9b761eb` verified (APPROVED)
+
+**Snapshot.** HEAD was `9b761eb`, and its tracked `src/`, `shared/` and `server/` were clean. `9b761eb` changes only `src/App.tsx` among product files, plus the owner's harness and checkpoint. I read the exact diff and the `finish-recovery.md` tail. My verification harness is `tmp-final-opus-review/finish-app-f1.mjs`. It is my S1 and S5 unchanged, plus Back and newer-source cases, run on the same isolated setup:
+
+- port 5243, private temp cacheDir, no watcher, no HMR, no proxy
+- every write mocked; the server was confirmed to serve the fixed App (`currentScreenRef` is present in the served file)
+- server stopped and cache deleted afterwards
+
+### Static review
+
+- **Screen guard.**
+  - Every navigation installs a new `Screen` object: `go`, popstate and initial route resolution. All three already call `setScreen`, which is now a stable wrapper that sets `currentScreenRef` synchronously. A layout effect also re-syncs it from the committed screen.
+  - After the save, the swap runs only when `currentScreenRef.current === screen`, where `screen` is the Finish that was clicked. So a player who has left for any reason is never pulled back, and their history entry is never replaced.
+  - The explicitly requested publish still runs.
+- **Save once.** `saveDraftOnce` memoises the pending create on the draft object that `unsaved` carries through Replay and Race. On failure it deletes the key, so a retry is possible. A later Finish of an already-saved draft offers plain Share of the stored copy. URL restores never recreate that draft object.
+- **Recovery record.** `clearActiveSource` runs only if the active source is byte-identical to when the save started. So a newer creation's record survives, and the normal case still clears it, as Preparation Save does.
+- **Unchanged:** server guards and `handleSavePreparedLevel`.
+
+### Independent real-App results against `9b761eb`
+
+| Case | Result |
+|---|---|
+| **S1**, unchanged (double-click plus a third click, first publish fails) | 1 create. "Publishing…" locked mid-flight after the real swap. The retry publishes only, and the link is shown. Writes: create 1, publish 2 (same id). |
+| **S5**, my original F-1 repro (Play again at 200 ms into a 1500 ms save), plus a newer creation's active source written mid-save | **Stays on `/play/review-draft-5` in the replay, not yanked back** (`15`). History length is unchanged. The newer `activeSource` is kept. Writes: create 1, publish 1. |
+| **S6**, browser Back at 200 ms into the save | Stays on `/`, not yanked back. The old draft's unchanged recovery record is cleared, as on a normal save. Writes: create 1, publish 1. |
+
+- **Console:** only the deliberately scripted 500, plus one GET answered by the harness's default mocked 404. There were no other writes and no blocked hosts.
+- **Protected services afterwards:** 5173, 15173, 8787 and 18799 all return 200.
+- I didn't re-run the owner's 11 cases. The diff above and my three cases cover the guard, the save-once rule, the recovery-record check and the normal handoff and retry. I also did no full suite or build, as instructed.
+
+### Residual, accepted and disclosed by the owner
+
+Leaving Finish, reaching a later Finish of the same draft and clicking Share or Save & share again can publish a second *publication version*. Both are explicit clicks, and there is still only one saved copy.
+
+| File | Shows |
+|---|---|
+| `15` | F-1 fixed: the player stays in the replay after the late save lands |
