@@ -44,8 +44,10 @@ import {
   clearActiveCreationId,
   loadActiveCreation,
   loadCreationWorldItems,
+  removeCreationRecord,
   setActiveCreationId,
 } from "./ui/creationStorage.js";
+import { isUntouchedCreationRecord } from "./ui/creationFlow.js";
 import type { CompletedRunMedia } from "./capture/types.js";
 import { usePostcard } from "./capture/usePostcard.js";
 import { downloadGameplayHighlight } from "./capture/recorder.js";
@@ -336,8 +338,16 @@ export function App() {
   // find it on the very next visit to "/" and silently reopen Create instead
   // of showing the landing page the user just backed out to. Clearing only
   // the pointer (not the record) still leaves it resumable as a Draft card
-  // via My worlds if one was ever actually created.
+  // via My worlds if one was ever actually created — but `initialRecord()`
+  // mints and persists a fresh record on every mount when nothing is
+  // active, so repeating "open Create, back out immediately" would
+  // otherwise leave one permanent empty "Untitled world" draft per cycle.
+  // Pruning it here when (and only when) it's still provably untouched
+  // avoids that clutter without ever discarding a draft that holds real
+  // user work (a photo, a job, or a config edit).
   const handleCreationBack = useCallback(() => {
+    const creation = loadActiveCreation();
+    if (creation && isUntouchedCreationRecord(creation)) removeCreationRecord(creation.id);
     clearActiveCreationId();
     goStart();
   }, [goStart]);

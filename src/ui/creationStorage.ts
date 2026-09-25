@@ -30,6 +30,16 @@ export function saveCreationRecord(record: CreationRecord, storage: Storage | nu
   storage.setItem(RECORDS_KEY, JSON.stringify([record, ...records]));
 }
 
+/** Removes exactly one record by id — used to prune a record that turned
+ * out to be untouched (see `isUntouchedCreationRecord`) rather than leaving
+ * it behind as a permanent empty "Untitled world" draft. Never called for a
+ * record carrying any real user work. */
+export function removeCreationRecord(id: string, storage: Storage | null = storageOrNull()): void {
+  if (!storage) return;
+  const records = loadCreationRecords(storage).filter((candidate) => candidate.id !== id);
+  storage.setItem(RECORDS_KEY, JSON.stringify(records));
+}
+
 export function setActiveCreationId(id: string, storage: Storage | null = storageOrNull()): void {
   storage?.setItem(ACTIVE_KEY, id);
 }

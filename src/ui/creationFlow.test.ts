@@ -4,6 +4,7 @@ import {
   approvedPreviewMatchesSelection,
   canBuildWorld,
   createCreationRecord,
+  isUntouchedCreationRecord,
   toPendingWorldItem,
   withCreationUpdate,
   toWorldWorkflow,
@@ -71,5 +72,24 @@ describe("creation flow", () => {
       jobs: { shape: { id: "shape-1", state: "ready", kind: "image-to-3d", updatedAt: "2026-09-24T00:02:00.000Z", consumedByAssetId: "mesh-1" } },
     });
     expect(toWorldWorkflow(record)).toMatchObject({ reviewedImageAssetId: "cutout-1", selectedReference: { approvedPreviewAssetId: "preview-1" }, jobs: [{ jobId: "shape-1", consumedByAssetId: "mesh-1" }] });
+  });
+
+  it("flags a freshly minted record as untouched, and anything with real work as not", () => {
+    const fresh = createCreationRecord("world-1", "2026-09-24T00:00:00.000Z");
+    expect(isUntouchedCreationRecord(fresh)).toBe(true);
+
+    expect(isUntouchedCreationRecord(withCreationUpdate(fresh, {
+      photo: { id: "photo-1", url: "/photo.jpg", order: 1 },
+    }))).toBe(false);
+    expect(isUntouchedCreationRecord(withCreationUpdate(fresh, {
+      jobs: { object: { id: "job-1", state: "queued", kind: "image-edit" } },
+    }))).toBe(false);
+    expect(isUntouchedCreationRecord(withCreationUpdate(fresh, {
+      selection: { ...fresh.selection, atmosphere: "Cloud garden" },
+    }))).toBe(false);
+    expect(isUntouchedCreationRecord(withCreationUpdate(fresh, {
+      crop: { scale: 1.5, x: 0, y: 0 },
+    }))).toBe(false);
+    expect(isUntouchedCreationRecord(withCreationUpdate(fresh, { step: "review" }))).toBe(false);
   });
 });

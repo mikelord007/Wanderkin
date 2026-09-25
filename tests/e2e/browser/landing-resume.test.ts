@@ -33,10 +33,29 @@ test("backing out of a just-started creation draft does not hijack the next visi
   await expect(page.getByRole("heading", { name: "Your sofa is a mountain range." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "What will your world be made of?" })).toHaveCount(0);
 
-  // The abandoned draft is not lost — it stays reachable through the
-  // existing explicit affordance in My worlds.
+  // A draft with nothing in it (no photo, no job, no config edit) is pruned
+  // rather than kept forever as an empty "Untitled world" card — otherwise
+  // repeating this exact cycle would litter My worlds with one stray draft
+  // per attempt (see the companion "repeated" test below).
   await page.getByRole("button", { name: "My worlds" }).click();
-  await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Resume" })).toHaveCount(0);
+});
+
+test("repeatedly opening Create and backing out before a photo leaves no stray drafts", async ({ page }) => {
+  await installCreationMock(page);
+  await page.goto("/");
+
+  for (let cycle = 0; cycle < 3; cycle += 1) {
+    await page.getByRole("button", { name: "Create my world" }).first().click();
+    await expect(page.getByRole("heading", { name: "What will your world be made of?" })).toBeVisible();
+    await page.getByRole("button", { name: "← Back" }).click();
+    await expect(page.getByRole("heading", { name: "Your sofa is a mountain range." })).toBeVisible();
+  }
+
+  await page.reload();
+  await page.getByRole("button", { name: "My worlds" }).click();
+  await expect(page.getByRole("button", { name: "Resume" })).toHaveCount(0);
+  await expect(page.getByText("Untitled world")).toHaveCount(0);
 });
 
 test("an in-progress build still resumes straight to its progress screen on reload", async ({ page }) => {

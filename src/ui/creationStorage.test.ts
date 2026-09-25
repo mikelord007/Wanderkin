@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createCreationRecord } from "./creationFlow.js";
+import { createCreationRecord, isUntouchedCreationRecord } from "./creationFlow.js";
 import {
+  clearActiveCreationId,
   loadActiveCreation,
   loadCreationWorldItems,
   loadCreationRecords,
+  removeCreationRecord,
   saveCreationRecord,
   setActiveCreationId,
   updateCreationJob,
@@ -88,5 +90,51 @@ describe("creation storage", () => {
       { kind: "pending", id: "pending", actionLabel: "View progress", jobId: "pending" },
       { kind: "pending", id: "draft", actionLabel: "Resume", jobId: "draft" },
     ]);
+  });
+
+  it("repeated open-then-back-out-before-a-photo cycles leave no stray drafts behind", () => {
+    // Mirrors CreationJourneyScreen.initialRecord() (mint + persist + activate
+    // when nothing is active) paired with App.tsx's handleCreationBack (prune
+    // the active record if still untouched, then clear the pointer) — the
+    // exact sequence that reproduced N drafts for N cycles before the fix.
+    const storage = new MemoryStorage();
+    function openCreateThenBackOut(id: string, now: string) {
+      const restored = loadActiveCreation(storage);
+      const record = restored ?? createCreationRecord(id, now);
+      if (!restored) {
+        saveCreationRecord(record, storage);
+        setActiveCreationId(record.id, storage);
+      }
+      const active = loadActiveCreation(storage);
+      if (active && isUntouchedCreationRecord(active)) removeCreationRecord(active.id, storage);
+      clearActiveCreationId(storage);
+    }
+
+    openCreateThenBackOut("cycle-1", "2026-09-24T00:00:00.000Z");
+    openCreateThenBackOut("cycle-2", "2026-09-24T00:01:00.000Z");
+    openCreateThenBackOut("cycle-3", "2026-09-24T00:02:00.000Z");
+
+    expect(loadCreationRecords(storage)).toEqual([]);
+    expect(loadCreationWorldItems(storage)).toEqual([]);
+  });
+
+  it("still leaves an abandoned draft resumable once it carries real work", () => {
+    const storage = new MemoryStorage();
+    const withPhoto = {
+      ...createCreationRecord("has-photo", "2026-09-24T00:00:00.000Z"),
+      step: "review" as const,
+      photo: { id: "photo-1", url: "/photo.jpg", order: 1 },
+      jobs: { object: { id: "job-1", state: "ready" as const, kind: "image-edit" as const } },
+    };
+    saveCreationRecord(withPhoto, storage);
+    setActiveCreationId(withPhoto.id, storage);
+
+    const active = loadActiveCreation(storage);
+    expect(active && isUntouchedCreationRecord(active)).toBe(false);
+    if (active && isUntouchedCreationRecord(active)) removeCreationRecord(active.id, storage);
+    clearActiveCreationId(storage);
+
+    expect(loadCreationRecords(storage)).toHaveLength(1);
+    expect(loadCreationWorldItems(storage)).toHaveLength(1);
   });
 });

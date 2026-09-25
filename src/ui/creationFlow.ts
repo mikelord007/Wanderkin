@@ -111,6 +111,37 @@ export function canBuildWorld(record: CreationRecord): record is CreationRecord 
   return approvedPreviewMatchesSelection(record);
 }
 
+/** True only for a record that still looks exactly like what
+ * `createCreationRecord()` minted — no photo, no job of any kind, and no
+ * customization carried over from an earlier photo that was since replaced.
+ * (`crop`/`selection` can only ever be edited once a photo exists, i.e.
+ * once `jobs.object` exists, so the jobs check alone already implies them —
+ * the explicit comparisons just make that guarantee obvious at the call
+ * site instead of relying on it silently.) Used to tell a genuinely
+ * untouched draft, safe to delete outright, apart from one that carries
+ * real user work — a photo, a job, or a config edit — which must never be
+ * silently discarded just because the user backed out of the screen. */
+export function isUntouchedCreationRecord(record: CreationRecord): boolean {
+  return (
+    record.step === "photo"
+    && !record.photo
+    && !record.objectImage
+    && !record.useOriginalImage
+    && !record.reviewedImageAssetId
+    && !record.selectedReference
+    && !record.preview
+    && !record.title
+    && !record.questIntro
+    && Object.keys(record.jobs).length === 0
+    && record.crop.scale === DEFAULT_CROP.scale
+    && record.crop.x === DEFAULT_CROP.x
+    && record.crop.y === DEFAULT_CROP.y
+    && record.selection.style === DEFAULT_CREATION_SELECTION.style
+    && record.selection.mode === DEFAULT_CREATION_SELECTION.mode
+    && record.selection.atmosphere === DEFAULT_CREATION_SELECTION.atmosphere
+  );
+}
+
 export function creationNeedsAttention(record: CreationRecord): CreationAttentionStage | null {
   const order: CreationAttentionStage[] = ["object", "preview", "shape", "story", "music", "narration"];
   return order.find((stage) => record.jobs[stage]?.state === "failed") ?? null;

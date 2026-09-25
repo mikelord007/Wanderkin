@@ -119,3 +119,68 @@ other uncommitted changes in any path this worker owns.
   `creationFlow.ts`/`CreationJourneyScreen.tsx`).
 - User's own hands-on browser playtest of the fix is still the closing step, per this project's standing
   preference for manual verification of feel/regressions beyond automated coverage.
+
+## Follow-up: independent review finding, fixed (empty-draft clutter)
+
+`nimbalyst-local/playtest-checkpoints/followup-review.md` (commit `64316d8`) independently re-derived and
+verified, against the actual unmodified storage functions (not just read), a real second-order side effect
+of `ca187e5`: clearing `objectquest:v2:active-creation` on first-step Back correctly stops the landing-page
+hijack, but `CreationJourneyScreen.initialRecord()` (`src/ui/screens/CreationJourneyScreen.tsx:14`) mints
+*and immediately persists* a brand-new empty record every time it mounts with nothing active. Before
+`ca187e5`, the pointer was never cleared, so at most one stray record ever existed. After `ca187e5`, clearing
+the pointer means the *next* "Create → back out before a photo" cycle mints a fresh record instead of
+reusing the old one — repeating that cycle N times now left N permanent, unresolvable "Untitled world" cards
+in My Worlds (the reviewer measured 3 cycles → 3 stray drafts, vs. 1 before the fix).
+
+Fix, staying inside `src/App.tsx`/`routing`/`resume`/`storage` ownership — no edit to
+`CreationJourneyScreen.tsx` was needed or made:
+- `src/ui/creationFlow.ts`: new pure predicate `isUntouchedCreationRecord(record)` — true only for a record
+  that still matches exactly what `createCreationRecord()` minted (step `"photo"`, no photo, no job of any
+  kind, `crop`/`selection` still at their defaults, no title/preview/reviewed-asset/etc.). `crop` and
+  `selection` can only ever be edited once a photo exists (i.e. once `jobs.object` exists — both editing
+  screens sit downstream of choosing a photo), so the `jobs` check alone already implies them; the explicit
+  field comparisons just make that guarantee visible at the call site instead of relying on it silently.
+- `src/ui/creationStorage.ts`: new `removeCreationRecord(id, storage)` — deletes exactly one record by id
+  (mirrors `saveCreationRecord`'s filter-and-rewrite shape).
+- `src/App.tsx`: `handleCreationBack` now loads the active record first; if `isUntouchedCreationRecord`
+  says it's still pristine, `removeCreationRecord`s it before clearing the pointer. A record carrying any
+  real work (a photo, a job — e.g. left over from clicking "Replace" in `ReviewObjectScreen`, which resets
+  the step back to `"photo"` but does *not* clear `jobs` — or a customized `selection`/`crop`) is left alone
+  exactly as `ca187e5` already did, so it still resolves to a resumable "Draft"/"Resume" card in My Worlds.
+
+Verified independently, mirroring the reviewer's own method — exercised the real, unmodified functions
+against an in-memory `Storage`, not a mock of them:
+- `src/ui/creationFlow.test.ts`: new test asserts a freshly-minted record is untouched, and that a photo, a
+  job, an edited `selection`, an edited `crop`, or a changed `step` each independently flip it to "not
+  untouched."
+- `src/ui/creationStorage.test.ts`: two new tests — (1) replays the reviewer's exact "3 open+back cycles"
+  repro against the real `createCreationRecord`/`saveCreationRecord`/`setActiveCreationId`/
+  `isUntouchedCreationRecord`/`removeCreationRecord`/`clearActiveCreationId` functions and asserts **zero**
+  stray records survive (previously 3), (2) a companion check that a record carrying a photo + job is never
+  pruned and still resolves to exactly one My Worlds item.
+- `tests/e2e/browser/landing-resume.test.ts` (real Chrome): updated the existing single-cycle test's
+  assertion (an empty abandoned draft is now correctly pruned, not resumable — that's the point of this
+  fix) and added a new end-to-end test that repeats the actual UI cycle (click "Create my world", back out
+  via "← Back", 3 times) and confirms My Worlds shows zero "Resume" buttons and no "Untitled world" text
+  afterward — closes the loop from the pure-storage unit tests up through the real wired `App.tsx` handler.
+
+Regression pass (isolated temp port, sequential — not run concurrently with any other disposable Vite
+instance, so the previously-reported shared-cache collision does not apply; did not touch the shared/
+protected `vite.config.ts` or `tests/e2e/browser/playwright.config.ts` to add a dedicated cache dir, since
+neither is in this task's ownership and sequential unique ports already avoid the collision): both
+`landing-resume.test.ts` cases plus the new repeated-cycle case, and existing `B6`/`B10`/`B11`/both `B19`
+contracts — 8/8 pass. `B19`'s own "creation jobs" case seeds a `step: "customize"` draft record precisely to
+assert it still shows a "Resume" action; confirms this fix does not touch any record beyond a truly
+untouched `step: "photo"` one. `npx vitest run src/ui/creationFlow.test.ts src/ui/creationStorage.test.ts
+src/ui/routing.test.ts src/ui/jobStorage.test.ts` → 29/29 pass. `tsc --noEmit` (app + server) clean.
+
+Did not touch: `worker27653085`'s stash or any of its FinishScreen/capture-media files (per explicit
+instruction — clarification still pending on that side, untouched); the two live scale/material workers'
+dirty/untracked files (`src/game/render/SceneEntities.tsx`, `src/game/render/SceneLighting.tsx`,
+`src/scene/styleMaterial.ts`, `src/scene/materialRegions.ts`); brand files (already done, not reopened); any
+protected port or live/provider/publish path — this review and fix were pure client-side storage-shape
+logic, no network or provider calls.
+
+Commit: pending (staged next) — scoped to exactly `src/App.tsx`, `src/ui/creationFlow.ts`,
+`src/ui/creationFlow.test.ts`, `src/ui/creationStorage.ts`, `src/ui/creationStorage.test.ts`,
+`tests/e2e/browser/landing-resume.test.ts`, and this checkpoint file.
