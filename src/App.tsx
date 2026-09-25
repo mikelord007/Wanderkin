@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type {
   GenerationJob,
   PublishedChallenge,
@@ -6,6 +6,12 @@ import type {
   SceneManifest,
 } from "@shared/index.js";
 import { StartScreen } from "./ui/screens/StartScreen.js";
+import { DashboardShell, type DashboardSection } from "./ui/dashboard/DashboardShell.js";
+import { MyWorldsScreen } from "./ui/dashboard/MyWorldsScreen.js";
+import { BorrowScreen } from "./ui/dashboard/BorrowScreen.js";
+import { AccountScreen } from "./ui/dashboard/AccountScreen.js";
+import { useAuth } from "./auth/AuthContext.js";
+import { takeReturnTo } from "./auth/returnTo.js";
 import { PhotosScreen } from "./ui/screens/PhotosScreen.js";
 import { GenerationScreen } from "./ui/screens/GenerationScreen.js";
 import { PreparationScreen, type PreparationSource } from "./ui/screens/PreparationScreen.js";
@@ -21,9 +27,11 @@ import {
   pathForCreate,
   pathForEdit,
   pathForGenerating,
+  pathForAccount,
   pathForPlay,
   pathForPrepareAsset,
   pathForPrepareNew,
+  pathForSamples,
   pathForSharePlay,
   pathForStart,
   pathForWorlds,
@@ -54,7 +62,13 @@ import { downloadGameplayHighlight } from "./capture/recorder.js";
 
 type Screen =
   | { name: "resolving" }
-  | { name: "start"; scrollToWorlds?: boolean }
+  /** The public landing. `signInPrompt` asks a signed-out visitor to sign in
+   * for the account-only page they opened (kept in the URL as `returnTo`). */
+  | { name: "start"; signInPrompt?: SignInPrompt }
+  | { name: "worlds" }
+  | { name: "samples" }
+  | { name: "account" }
+  | { name: "auth-callback" }
   | { name: "friend"; shareId: string }
   | { name: "photos" }
   | { name: "generation"; jobId: string }
@@ -84,13 +98,46 @@ type Screen =
  * Race variant is derived from it). */
 type UnsavedOrigin = { kind: "sample" } | { kind: "draft"; manifest: SceneManifest };
 
+interface SignInPrompt {
+  returnTo: string;
+  /** What they tried to open, e.g. "your worlds". */
+  label: string;
+}
+
+/** Screens that need a signed-in account: the dashboard, creation, the
+ * editor, and any saved (private) world. Bundled samples, share links and
+ * the landing stay public. */
+function accountLabel(screen: Screen): string | null {
+  switch (screen.name) {
+    case "worlds": return "your worlds";
+    case "samples": return "the sample library";
+    case "account": return "your account";
+    case "photos":
+    case "generation": return "the world maker";
+    case "preparation": return "the course editor";
+    case "play":
+    case "finish": return screen.publishable || screen.unsaved?.kind === "draft" ? "this world" : null;
+    default: return null;
+  }
+}
 /** Every distinct top-level screen the router can restore from a URL alone
  * (start/worlds/create/generation resume from existing localStorage state,
  * exactly as before real routes existed) without any network round trip. */
-function resolveSyncScreen(route: ParsedRoute): Screen | null {
+function resolveSyncScreen(route: ParsedRoute, signedIn: boolean): Screen | null {
   switch (route.kind) {
     case "start":
+      // The legacy `/#my-worlds` link now means the dashboard.
+      if (typeof window !== "undefined" && window.location.hash === "#my-worlds") return { name: "worlds" };
+      return { name: "start" };
+    case "samples":
+      return { name: "samples" };
+    case "account":
+      return { name: "account" };
+    case "auth-callback":
+      return { name: "auth-callback" };
     case "worlds": {
+      // Only a signed-in visit may reopen in-progress creation work.
+      if (!signedIn) return { name: "worlds" };
       const resume = resolveResumeState();
       if (resume.screen === "generation") return { name: "generation", jobId: resume.jobId };
       if (resume.screen === "preparation") {
@@ -104,7 +151,7 @@ function resolveSyncScreen(route: ParsedRoute): Screen | null {
       if (resume.screen === "photos") return { name: "photos" };
       const creation = loadActiveCreation();
       if (creation && creation.step !== "ready") return { name: "photos" };
-      return { name: "start", scrollToWorlds: route.kind === "worlds" };
+      return { name: "worlds" };
     }
     case "create":
       return { name: "photos" };
@@ -150,14 +197,15 @@ async function findBundledSample(levelId: string): Promise<SceneManifest | null>
   }
 }
 
-async function resolvePlayRoute(levelId: string): Promise<Screen> {
+async function resolvePlayRoute(levelId: string, signedIn: boolean): Promise<Screen> {
   const sample = await findBundledSample(levelId);
   if (sample) return { name: "play", manifest: sample, publishable: false, unsaved: { kind: "sample" } };
+  if (!signedIn) return { name: "start", signInPrompt: { returnTo: pathForPlay(levelId), label: "this world" } };
   try {
     const manifest = await getLevel(levelId);
     return { name: "play", manifest, publishable: true };
   } catch {
-    return { name: "start" };
+    return { name: "worlds" };
   }
 }
 
@@ -165,16 +213,17 @@ async function resolvePlayRoute(levelId: string): Promise<Screen> {
  * persisted, so there is nothing to rebuild a Finish screen from on a cold
  * load — the useful fallback is the playable level itself, not a broken
  * completion screen. Finish is only ever reached in-app, from `onComplete`. */
-async function resolveFinishRoute(levelId: string): Promise<Screen> {
-  return resolvePlayRoute(levelId);
+async function resolveFinishRoute(levelId: string, signedIn: boolean): Promise<Screen> {
+  return resolvePlayRoute(levelId, signedIn);
 }
 
-async function resolveEditRoute(levelId: string): Promise<Screen> {
+async function resolveEditRoute(levelId: string, signedIn: boolean): Promise<Screen> {
+  if (!signedIn) return { name: "start", signInPrompt: { returnTo: pathForEdit(levelId), label: "the course editor" } };
   try {
     const manifest = await getLevel(levelId);
     return { name: "preparation", source: { kind: "manifest", manifest }, isNew: false };
   } catch {
-    return { name: "start" };
+    return { name: "worlds" };
   }
 }
 
@@ -190,19 +239,19 @@ async function resolveSharePlayRoute(shareId: string): Promise<Screen> {
 /** Single entry point for turning a URL into a `Screen`, used for the
  * initial load and for every `popstate` (back/forward). Synchronous where
  * possible; async only for routes that need a fresh fetch on a cold load. */
-function resolveScreen(pathname: string): Screen | Promise<Screen> {
+function resolveScreen(pathname: string, signedIn: boolean): Screen | Promise<Screen> {
   const route = parseRoute(pathname);
   switch (route.kind) {
     case "edit":
-      return resolveEditRoute(route.levelId);
+      return resolveEditRoute(route.levelId, signedIn);
     case "play":
-      return resolvePlayRoute(route.levelId);
+      return resolvePlayRoute(route.levelId, signedIn);
     case "finish":
-      return resolveFinishRoute(route.levelId);
+      return resolveFinishRoute(route.levelId, signedIn);
     case "share-play":
       return resolveSharePlayRoute(route.shareId);
     default:
-      return resolveSyncScreen(route) ?? { name: "start" };
+      return resolveSyncScreen(route, signedIn) ?? { name: "start" };
   }
 }
 
@@ -211,7 +260,15 @@ function pathForScreen(screen: Screen): string {
     case "resolving":
       return typeof window === "undefined" ? pathForStart() : window.location.pathname;
     case "start":
-      return screen.scrollToWorlds ? pathForWorlds() : pathForStart();
+      return screen.signInPrompt?.returnTo ?? pathForStart();
+    case "worlds":
+      return pathForWorlds();
+    case "samples":
+      return pathForSamples();
+    case "account":
+      return pathForAccount();
+    case "auth-callback":
+      return "/auth/callback";
     case "friend":
       return sharePath(screen.shareId);
     case "photos":
@@ -261,16 +318,15 @@ export function App() {
   // never reject, they resolve to a fallback `Screen` on failure) must never
   // be applied once superseded, whichever order the promises settle in.
   const navigationGuardRef = useRef(createNavigationGuard());
+  const auth = useAuth();
+  const signedIn = auth.status === "signed-in";
+  const signedInRef = useRef(signedIn);
+  signedInRef.current = signedIn;
+  const [signingIn, setSigningIn] = useState(false);
 
-  const initialResolutionRef = useRef<Screen | Promise<Screen> | null>(null);
-  const initialTokenRef = useRef(0);
-  if (initialResolutionRef.current === null) {
-    initialTokenRef.current = navigationGuardRef.current.begin();
-    initialResolutionRef.current = resolveScreen(window.location.pathname);
-  }
-  const [screen, setScreenState] = useState<Screen>(() =>
-    initialResolutionRef.current instanceof Promise ? { name: "resolving" } : (initialResolutionRef.current as Screen),
-  );
+  // Nothing resolves until sign-in has settled: a private route (edit, a
+  // saved world) needs to know whether to fetch or to ask for sign-in.
+  const [screen, setScreenState] = useState<Screen>({ name: "resolving" });
   // Every navigation (in-app `go`, back/forward, a route resolving) installs
   // a new `Screen` object, so identity with the screen an async action began
   // on is how that action knows the player hasn't moved on. Updated here,
@@ -322,58 +378,74 @@ export function App() {
     navigateTo(pathForScreen(next), options?.replace ?? false);
   }, []);
 
-  // Resolve whatever `resolveScreen` started during render (above), and
-  // normalize the URL once resolution finishes — a no-op when the URL
-  // already matches (see `navigateTo`), a redirect when it doesn't (e.g. an
-  // unresolvable `/edit/:id` falling back to `/`).
-  useEffect(() => {
-    const pending = initialResolutionRef.current;
-    if (pending instanceof Promise) {
-      const token = initialTokenRef.current;
-      void pending.then((resolved) => {
+  // Turns a URL into a screen (initial load, back/forward, a post-sign-in
+  // destination). Async routes show "resolving" and apply their result only
+  // if nothing else has navigated since; the URL is then normalised.
+  const openPath = useCallback((path: string, options: { replace: boolean; signedIn?: boolean }) => {
+    const token = navigationGuardRef.current.begin();
+    const result = resolveScreen(path, options.signedIn ?? signedInRef.current);
+    if (result instanceof Promise) {
+      setScreen({ name: "resolving" });
+      if (!options.replace) navigateTo(path);
+      void result.then((resolved) => {
         if (!navigationGuardRef.current.isCurrent(token)) return;
         setScreen(resolved);
         navigateTo(pathForScreen(resolved), true);
       });
-      return undefined;
+      return;
     }
-    navigateTo(pathForScreen(pending as Screen), true);
-    return undefined;
+    setScreen(result);
+    navigateTo(pathForScreen(result), options.replace);
   }, []);
+
+  const resolvedInitialRef = useRef(false);
+  useEffect(() => {
+    if (auth.status === "loading" || resolvedInitialRef.current) return;
+    resolvedInitialRef.current = true;
+    openPath(window.location.pathname, { replace: true });
+  }, [auth.status, openPath]);
 
   useEffect(() => {
     function onPopState() {
-      const token = navigationGuardRef.current.begin();
-      const result = resolveScreen(window.location.pathname);
-      if (result instanceof Promise) {
-        setScreen({ name: "resolving" });
-        void result.then((resolved) => {
-          if (!navigationGuardRef.current.isCurrent(token)) return;
-          setScreen(resolved);
-          navigateTo(pathForScreen(resolved), true);
-        });
-        return;
-      }
-      setScreen(result);
-      navigateTo(pathForScreen(result), true);
+      openPath(window.location.pathname, { replace: true });
     }
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, []);
+  }, [openPath]);
 
-  // The legacy `#my-worlds` link and the `/worlds` route both want the same
-  // scroll — done here (rather than inside StartScreen, owned elsewhere) so
-  // a cold SPA load, where the browser's own anchor-scroll runs before
-  // StartScreen has painted the target element, still lands correctly.
+  // Back from Google: once the session is in, continue to where they were
+  // going; if it failed or was cancelled, the landing shows why.
   useEffect(() => {
-    if (screen.name !== "start") return;
-    if (!screen.scrollToWorlds && window.location.hash !== "#my-worlds") return;
-    // No rAF deferral: by the time this effect runs, React has already
-    // committed StartScreen's DOM, so the target element's layout is
-    // already readable (and a deferred rAF is not guaranteed to fire
-    // promptly on a backgrounded/newly-opened tab).
-    document.getElementById("my-worlds")?.scrollIntoView({ behavior: "instant", block: "start" });
-  }, [screen]);
+    if (screen.name !== "auth-callback" || auth.status === "loading") return;
+    if (auth.status === "signed-in") openPath(takeReturnTo(), { replace: true, signedIn: true });
+    else go({ name: "start" }, { replace: true });
+  }, [auth.status, go, openPath, screen]);
+
+  /** Signs in (instantly with the local stub; via Google otherwise, which
+   * leaves the page and comes back through /auth/callback), then opens
+   * `returnTo`. */
+  const signInThen = useCallback(async (returnTo: string, then?: () => void) => {
+    setSigningIn(true);
+    try {
+      const destination = await auth.signIn(returnTo);
+      if (destination === null) return;
+      if (then) then();
+      else openPath(destination, { replace: false, signedIn: true });
+    } finally {
+      setSigningIn(false);
+    }
+  }, [auth, openPath]);
+
+  /** Runs an account-only action now, or after signing in. */
+  const withAccount = useCallback((returnTo: string, action: () => void) => {
+    if (signedInRef.current) action();
+    else void signInThen(returnTo, action);
+  }, [signInThen]);
+
+  const handleSignOut = useCallback(async () => {
+    await auth.signOut();
+    go({ name: "start" });
+  }, [auth, go]);
 
   const postcardLevelId = screen.name === "finish" && screen.publishable ? screen.manifest.levelId : null;
   const existingPostcard = screen.name === "finish"
@@ -385,13 +457,14 @@ export function App() {
     existingPostcard,
   );
 
-  const goStart = useCallback(() => go({ name: "start" }), [go]);
+  // "Home" is the dashboard once signed in, the landing otherwise.
+  const goStart = useCallback(() => go(signedInRef.current ? { name: "worlds" } : { name: "start" }), [go]);
 
   // The creation journey's only exit back to Start happens from its very
   // first step (CaptureScreen's Back), before any photo or job exists — so
   // nothing durable is ever lost here. But `persist()` already wrote this
   // still-empty record as the active creation, and nothing else clears that
-  // pointer: without this, `resolveSyncScreen`'s "start"/"worlds" case would
+  // pointer: without this, `resolveSyncScreen`'s "worlds" case would
   // find it on the very next visit to "/" and silently reopen Create instead
   // of showing the landing page the user just backed out to. Clearing only
   // the pointer (not the record) still leaves it resumable as a Draft card
@@ -469,17 +542,61 @@ export function App() {
     go({ name: "start" });
   }, [go]);
 
+  const landing = (prompt: SignInPrompt | null) => (
+    <StartScreen
+      onPlaySample={(manifest) => go({ name: "play", manifest, publishable: false, unsaved: { kind: "sample" } })}
+      onEditSample={(manifest) => withAccount(pathForSamples(), () =>
+        go({ name: "preparation", source: { kind: "manifest", manifest }, isNew: true, fromSample: true }))}
+      onCreateFromPhotos={() => withAccount(pathForCreate(), () => go({ name: "photos" }))}
+      signedIn={signedIn}
+      authMode={auth.mode}
+      onSignIn={() => { void signInThen(prompt?.returnTo ?? pathForWorlds()); }}
+      onOpenDashboard={() => go({ name: "worlds" })}
+      signingIn={signingIn}
+      signInPrompt={prompt?.label ?? null}
+      onDismissSignInPrompt={() => go({ name: "start" }, { replace: true })}
+      authError={auth.error}
+    />
+  );
+
+  // Account-only screens: wait for sign-in to settle, then either show the
+  // screen or the landing with a prompt (the URL keeps where they meant to go).
+  const needs = accountLabel(screen);
+  if (needs && !signedIn) {
+    if (auth.status === "loading") return <LoadingScreen stage="Loading…" />;
+    return landing({ returnTo: pathForScreen(screen), label: needs });
+  }
+
+  const shell = (active: DashboardSection, content: ReactNode) => (
+    <DashboardShell
+      active={active}
+      user={auth.user!}
+      onNavigate={(section) => go(
+        section === "worlds" ? { name: "worlds" }
+          : section === "create" ? { name: "photos" }
+          : section === "samples" ? { name: "samples" }
+          : { name: "account" },
+      )}
+      onHome={() => go({ name: "start" })}
+      onSignOut={() => { void handleSignOut(); }}
+    >
+      {content}
+    </DashboardShell>
+  );
+
   switch (screen.name) {
     case "resolving":
       return <LoadingScreen stage="Loading…" />;
 
+    case "auth-callback":
+      return <LoadingScreen stage="Signing you in…" />;
+
     case "start":
-      return (
-        <StartScreen
-          onPlaySample={(manifest) => go({ name: "play", manifest, publishable: false, unsaved: { kind: "sample" } })}
-          onEditSample={(manifest) =>
-            go({ name: "preparation", source: { kind: "manifest", manifest }, isNew: true, fromSample: true })
-          }
+      return landing(screen.signInPrompt ?? null);
+
+    case "worlds":
+      return shell("worlds", (
+        <MyWorldsScreen
           onPlaySavedLevel={(manifest) =>
             manifest.courseValidation.status === "failed"
               ? go({ name: "preparation", source: { kind: "manifest", manifest }, isNew: false })
@@ -492,6 +609,7 @@ export function App() {
             go({ name: "preparation", source: { kind: "manifest", manifest }, isNew: !isPersisted })
           }
           onCreateFromPhotos={() => go({ name: "photos" })}
+          onBrowseSamples={() => go({ name: "samples" })}
           onImportGlbReady={(assetId) => {
             saveActiveSource({ kind: "import", assetId });
             go({ name: "preparation", source: { kind: "asset", assetId }, isNew: true });
@@ -511,7 +629,21 @@ export function App() {
             go({ name: "photos" });
           }}
         />
-      );
+      ));
+
+    case "samples":
+      return shell("samples", (
+        <BorrowScreen
+          onPlaySample={(manifest) => go({ name: "play", manifest, publishable: false, unsaved: { kind: "sample" } })}
+          onEditSample={(manifest) =>
+            go({ name: "preparation", source: { kind: "manifest", manifest }, isNew: true, fromSample: true })
+          }
+          onCreateFromPhotos={() => go({ name: "photos" })}
+        />
+      ));
+
+    case "account":
+      return shell("account", <AccountScreen user={auth.user!} mode={auth.mode} onSignOut={() => { void handleSignOut(); }} />);
 
     case "friend":
       return (
@@ -530,12 +662,12 @@ export function App() {
       );
 
     case "photos":
-      return <PhotosScreen onJobStarted={handleJobStarted} onBack={handleCreationBack} />;
+      return shell("create", <PhotosScreen onJobStarted={handleJobStarted} onBack={handleCreationBack} />);
 
     case "generation":
-      return (
+      return shell("create", (
         <GenerationScreen jobId={screen.jobId} onReady={handleJobReady} onCancel={handleJobCancelled} />
-      );
+      ));
 
     case "preparation":
       return (

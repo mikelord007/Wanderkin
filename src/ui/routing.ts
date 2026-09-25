@@ -22,6 +22,9 @@ const SHARE_PLAY_RE = new RegExp(`^/share/(${SEGMENT})/play$`);
 export type ParsedRoute =
   | { kind: "start" }
   | { kind: "worlds" }
+  | { kind: "samples" }
+  | { kind: "account" }
+  | { kind: "auth-callback" }
   | { kind: "create" }
   | { kind: "create-generating"; jobId: string }
   | { kind: "create-prepare" }
@@ -52,6 +55,9 @@ export function parseRoute(pathname: string): ParsedRoute {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
   if (path === "" || path === "/") return { kind: "start" };
   if (path === "/worlds") return { kind: "worlds" };
+  if (path === "/samples") return { kind: "samples" };
+  if (path === "/account") return { kind: "account" };
+  if (path === "/auth/callback") return { kind: "auth-callback" };
   if (path === "/create") return { kind: "create" };
   if (path === "/create/prepare") return { kind: "create-prepare" };
 
@@ -81,6 +87,8 @@ export function parseRoute(pathname: string): ParsedRoute {
 
 export const pathForStart = (): string => "/";
 export const pathForWorlds = (): string => "/worlds";
+export const pathForSamples = (): string => "/samples";
+export const pathForAccount = (): string => "/account";
 export const pathForCreate = (): string => "/create";
 export const pathForGenerating = (jobId: string): string => `/create/generating/${encodeURIComponent(jobId)}`;
 export const pathForPrepareNew = (): string => "/create/prepare";

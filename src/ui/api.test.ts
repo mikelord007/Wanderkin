@@ -9,6 +9,7 @@ import {
   safeBundleFilename,
 } from "./api.js";
 import { BRAND_SLUG } from "../brand.js";
+import { installCredentialSource } from "../auth/credentials.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -115,5 +116,22 @@ describe("portable level bundle API", () => {
 
     await expect(exportLevelBundle("level / one")).resolves.toEqual(bundle);
     expect(fetchMock).toHaveBeenCalledWith("/api/levels/level%20%2F%20one/export", undefined);
+  });
+});
+
+describe("signed-in API calls", () => {
+  afterEach(() => installCredentialSource(null));
+
+  it("adds the active session's credential to every request without overriding explicit headers", async () => {
+    installCredentialSource(async () => ({ Authorization: "Bearer session-token" }));
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ shareId: "s" }), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await publishLevel("level-1", { kind: "completion" });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(headers.get("authorization")).toBe("Bearer session-token");
+    expect(headers.get("content-type")).toBe("application/json");
+    expect(init.method).toBe("POST");
   });
 });

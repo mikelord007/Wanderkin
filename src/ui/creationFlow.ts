@@ -65,6 +65,9 @@ export interface CreationRecord {
   jobs: Partial<Record<CreationAttentionStage, CreationJobRef>>;
   title?: string;
   questIntro?: string;
+  /** The signed-in account that started this creation on this device.
+   * Records from before sign-in have none and stay visible to everyone. */
+  ownerId?: string;
 }
 
 export const DEFAULT_CREATION_SELECTION: CreationSelection = {

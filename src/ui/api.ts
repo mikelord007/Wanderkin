@@ -11,6 +11,7 @@ import type {
   SceneManifest,
 } from "@shared/index.js";
 import { BRAND_BUNDLE_EXTENSION, BRAND_NAME, BRAND_SLUG } from "../brand.js";
+import { authHeaders } from "../auth/credentials.js";
 
 export interface GenerationEnvelope {
   request: GenerationRequest;
@@ -55,7 +56,16 @@ export class ApiError extends Error {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(path, init);
+    // Every API call says who is asking: a Supabase bearer token, the local
+    // stub's dev header, or nothing when signed out (see src/auth).
+    const credentials = Object.entries(await authHeaders());
+    if (credentials.length === 0) {
+      res = await fetch(path, init);
+    } else {
+      const headers = new Headers(init?.headers);
+      for (const [name, value] of credentials) if (!headers.has(name)) headers.set(name, value);
+      res = await fetch(path, { ...init, headers });
+    }
   } catch (cause) {
     throw new ApiError(
       `Could not reach the ${BRAND_NAME} server. Check your connection and try again.`,

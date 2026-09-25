@@ -30,6 +30,9 @@ describe("parseRoute", () => {
     expect(parseRoute("/")).toEqual({ kind: "start" });
     expect(parseRoute("")).toEqual({ kind: "start" });
     expect(parseRoute("/worlds")).toEqual({ kind: "worlds" });
+    expect(parseRoute("/samples")).toEqual({ kind: "samples" });
+    expect(parseRoute("/account")).toEqual({ kind: "account" });
+    expect(parseRoute("/auth/callback")).toEqual({ kind: "auth-callback" });
     expect(parseRoute("/create")).toEqual({ kind: "create" });
     expect(parseRoute("/create/prepare")).toEqual({ kind: "create-prepare" });
     expect(parseRoute("/create/generating/job_1")).toEqual({ kind: "create-generating", jobId: "job_1" });

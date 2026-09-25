@@ -48,6 +48,13 @@
   gap: var(--oq-space-4); padding-block: var(--oq-space-5);
 }
 .oq-welcome__nav .oq-welcome__nav-action { min-height: 40px; padding: 8px 18px; font-size: .9rem; }
+.oq-welcome__nav-actions { gap: 4px; }
+.wk-auth-error {
+  align-self: center; max-inline-size: 60ch; padding: 10px 16px; border-radius: var(--wk-r-inner);
+  border: 1px solid #f2c3bf; background: var(--oq-error-wash); color: var(--oq-error-ink); font-size: var(--wk-type-small);
+}
+.wk-signin-prompt { display: grid; gap: var(--wk-gap-sm); }
+.wk-signin-prompt p { color: var(--wk-text-2); max-inline-size: 46ch; }
 
 .oq-welcome__hero {
   flex: 1; display: flex; justify-content: center;
@@ -225,6 +232,17 @@
 .wk-library-empty__copy h3 { font-size: var(--wk-type-h2-product); font-weight: 400; letter-spacing: -.025em; line-height: 1.1; }
 .wk-library-empty__copy .oq-kit-button { margin-top: var(--oq-space-2); }
 
+/* Signed out (or in), the landing invites you to the library rather than
+   showing it: one white card, the lavender stage with the doorway. */
+.wk-library-invite {
+  display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); align-items: center; gap: var(--wk-gap-group);
+  padding: var(--wk-card-pad); background: var(--wk-surface); border: 1px solid var(--wk-border); border-radius: var(--wk-r-stage); box-shadow: var(--wk-shadow-sm);
+}
+.wk-library-invite__scene { position: relative; aspect-ratio: 16 / 10; border-radius: var(--wk-r-card); overflow: hidden; background: radial-gradient(ellipse 60% 30% at 50% 94%, var(--wk-glow), transparent 72%), linear-gradient(#fbf9ff, var(--wk-tint)); }
+.wk-library-invite__copy { display: grid; gap: var(--wk-gap-sm); justify-items: start; padding-right: var(--wk-card-pad); }
+.wk-library-invite__copy p { color: var(--wk-text-2); max-inline-size: 44ch; }
+.wk-library-invite__copy .oq-kit-row { margin-top: var(--oq-space-2); }
+
 /* === Final call to action (page) ======================================== */
 .wk-finale__inner { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: var(--wk-gap-group); align-items: center; }
 .wk-finale__copy { display: grid; gap: var(--wk-gap); justify-items: start; }
@@ -276,7 +294,8 @@
   .wk-steps__list { grid-template-columns: 1fr; gap: calc(var(--wk-grid-gap) + 16px); padding-top: 16px; }
   /* One column: the track runs down the left edge through each number. */
   .wk-steps__list::before { left: calc(var(--wk-card-pad) + 15px); right: auto; top: 16px; bottom: 0; border-top: 0; border-left: 2px dotted var(--wk-purple); }
-  .wk-library-empty { grid-template-columns: 1fr; }
+  .wk-library-empty, .wk-library-invite { grid-template-columns: 1fr; }
+  .wk-library-invite__copy { padding: 0 var(--oq-space-2) var(--oq-space-2); }
   .wk-library-empty__copy { padding: 0 var(--oq-space-2) var(--oq-space-2); }
   .wk-interlude { min-height: 0; padding-block: var(--wk-section-y) 0; align-items: start; }
   .wk-interlude__scene { position: relative; top: auto; right: auto; transform: none; --s: min(80vw, 380px); margin: var(--wk-gap) -14vw 0 auto; }
@@ -288,6 +307,7 @@
   .wk-worlds__grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 440px) {
+  .oq-welcome__nav .oq-welcome__nav-action { padding: 8px 14px; }
   .oq-welcome__nav .mh-logo__word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
 }
 @media (prefers-reduced-motion: reduce) {

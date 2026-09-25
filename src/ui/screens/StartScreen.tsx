@@ -1,238 +1,50 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Button, EmptyState, Icon, Logo, WorldStyleScope } from "../components/index.js";
+import { lazy, Suspense } from "react";
+import { Button, Icon, Logo, Modal, WorldStyleScope } from "../components/index.js";
 import { BRAND_NAME, BRAND_TAGLINE } from "../../brand.js";
 import "../theme/welcome.css";
 import type { SceneManifest } from "@shared/index.js";
-import { listDrafts } from "../../editor/draftStorage.js";
-import {
-  missingAssetUrls,
-  savedWorldOrigin,
-  savedWorldItems,
-  type WorldListItem,
-} from "../worlds.js";
-import {
-  describeApiError,
-  downloadLevelBundle,
-  importAsset,
-  importLevelBundle,
-  listLevels,
-} from "../api.js";
-import { WorldPostcardPanel } from "../../capture/MediaCards.js";
+import type { AuthMode } from "../../auth/types.js";
+import { SampleWorlds, useSampleLevels } from "../library/SampleWorlds.js";
 import { GiantButton, PortalArch, TinyExplorer } from "../components/Scenery.js";
 
 const SampleWorldPreview = lazy(() => import("../components/SampleWorldPreview.js"));
 
-/** Real in-game renders of each bundled sample (captured from the app, see
- * public/landing/README.md). Two are shown in a theme look, and say so. */
-const SAMPLE_ART: Record<string, { src: string; alt: string; look?: string }> = {
-  "sample-lost-colors-rodin": { src: "/landing/world-lost-colors.webp", alt: "In the game: the tiny explorer between the portal ring, a golden color fragment and a sofa leg as tall as a tower", look: "Tropical Island" },
-  "sample-explore-rodin": { src: "/landing/world-teacup-wander.webp", alt: "In the game: the explorer on a sandy shore under the sofa, among island shrubs and palms", look: "Tropical Island" },
-  "sample-rodin-room-corner": { src: "/landing/world-desk-sofa.webp", alt: "In the game: the explorer on desert sand beside a color fragment and a towering sofa leg", look: "Desert" },
-  "sample-tripo-room-corner": { src: "/landing/world-different-perspective.webp", alt: "In the game: the explorer on a green floor under the dark underside of a sofa" },
-};
-
-function sampleTitle(manifest: SceneManifest): string {
-  return manifest.levelId === "sample-lost-colors-rodin" ? "The Lost Colors of Teacup Island"
-    : manifest.levelId === "sample-explore-rodin" ? "Teacup Island Wander"
-    : manifest.levelId === "sample-rodin-room-corner" ? "The desk & sofa adventure"
-    : "A different perspective";
-}
-
-function sampleSummary(manifest: SceneManifest): string {
-  const mode = manifest.experience?.mode;
-  return mode?.kind === "collect" ? "Find 3 lost colors and bring this miniature world back"
-    : mode?.kind === "explore" ? `Wander ${mode.destinations.length} destinations, no timer`
-    : `${manifest.checkpoints.length} checkpoints through a miniature room`;
-}
-
-function sampleModeLabel(manifest: SceneManifest): string {
-  const kind = manifest.experience?.mode.kind;
-  return kind === "collect" ? "Lost Colors" : kind === "explore" ? "Explore" : kind === "race" ? "Race" : "Checkpoint course";
-}
-
-/**
- * The best picture a saved world already has, without generating anything:
- * its animated postcard's poster frame, else the photo it was made from, else
- * the source photo of the bundled sample it copies. Null means the tile draws
- * its own night scene instead.
- */
-function worldImage(manifest: SceneManifest): string | null {
-  const poster = manifest.media?.video.find((asset) => asset.kind === "animated-postcard")?.posterUrl;
-  if (poster) return poster;
-  const photo = [...manifest.photos].sort((a, b) => a.order - b.order)[0]?.url;
-  if (photo) return photo;
-  const sample = manifest.assets.find((asset) => asset.url.startsWith("/samples/"))?.url;
-  if (sample) return `/samples/photo-${sample.includes("rodin") ? 4 : 2}.jpg`;
-  return null;
-}
-
-type TileStatus = "ready" | "draft" | "pending" | "failed";
-
-/** One world in the library: a 16:9 picture with a status badge on it, then
- * its name and details, then one primary action and quiet secondary ones. */
-function WorldTile({ status, badge, title, image = null, meta, notice, actions, children }: {
-  status: TileStatus; badge: string; title: string; image?: string | null;
-  meta?: string; notice?: ReactNode; actions?: ReactNode; children?: ReactNode;
-}) {
-  return <article className="wk-tile" data-status={status}>
-    <div className="wk-tile__image">
-      {image ? <img src={image} alt="" loading="lazy" /> : <div className="wk-tile__scene" aria-hidden="true"><PortalArch className="wk-tile__arch" /><TinyExplorer className="wk-tile__explorer" /></div>}
-      <p className="wk-tile__badge">{badge}</p>
-    </div>
-    <div className="wk-tile__info">
-      <h3>{title}</h3>
-      {meta ? <p className="wk-tile__meta">{meta}</p> : null}
-      {notice}
-      {actions ? <div className="wk-tile__actions">{actions}</div> : null}
-      {children}
-    </div>
-  </article>;
-}
-
 interface StartScreenProps {
   onPlaySample: (manifest: SceneManifest) => void;
   onEditSample: (manifest: SceneManifest) => void;
-  onPlaySavedLevel: (manifest: SceneManifest) => void;
-  onEditSavedLevel: (manifest: SceneManifest) => void;
+  /** "Make my world" / "Get started": opens Create, signing in first if needed. */
   onCreateFromPhotos: () => void;
-  onImportGlbReady: (assetId: string) => void;
-  onImportLevelBundleReady: (manifest: SceneManifest) => void;
-  additionalWorldItems?: readonly Extract<WorldListItem, { kind: "pending" | "failed" }>[];
-  onResumeDraft?: (manifest: SceneManifest, isPersisted: boolean) => void;
-  onResumePendingWorld?: (jobId: string) => void;
-  onRetryFailedWorld?: (jobId: string) => void;
+  signedIn: boolean;
+  authMode: AuthMode;
+  /** Sign in, then land on the dashboard (or wherever the prompt pointed). */
+  onSignIn: () => void;
+  onOpenDashboard: () => void;
+  signingIn?: boolean;
+  /** Shown when a signed-out visitor opened a page that needs an account. */
+  signInPrompt?: string | null;
+  onDismissSignInPrompt?: () => void;
+  authError?: string | null;
 }
 
+/**
+ * The public landing. Anyone can read it and play the bundled samples; the
+ * worlds you make live behind sign-in, on the dashboard.
+ */
 export function StartScreen({
   onPlaySample,
   onEditSample,
-  onPlaySavedLevel,
-  onEditSavedLevel,
   onCreateFromPhotos,
-  onImportGlbReady,
-  onImportLevelBundleReady,
-  onResumeDraft,
-  additionalWorldItems = [],
-  onResumePendingWorld,
-  onRetryFailedWorld,
+  signedIn,
+  authMode,
+  onSignIn,
+  onOpenDashboard,
+  signingIn = false,
+  signInPrompt = null,
+  onDismissSignInPrompt,
+  authError = null,
 }: StartScreenProps) {
-  const [sampleLevels, setSampleLevels] = useState<SceneManifest[] | null>(null);
-  const [sampleError, setSampleError] = useState<string | null>(null);
-
-  const [savedLevels, setSavedLevels] = useState<SceneManifest[] | null>(null);
-  const [savedError, setSavedError] = useState<string | null>(null);
-  const [drafts] = useState(() => listDrafts());
-  const [checkingLevelId, setCheckingLevelId] = useState<string | null>(null);
-  const [assetIssues, setAssetIssues] = useState<Record<string, string>>({});
-
-  const [importingGlb, setImportingGlb] = useState(false);
-  const [glbImportError, setGlbImportError] = useState<string | null>(null);
-  const [importingBundle, setImportingBundle] = useState(false);
-  const [bundleImportError, setBundleImportError] = useState<string | null>(null);
-  const [exportingLevelId, setExportingLevelId] = useState<string | null>(null);
-  const [exportError, setExportError] = useState<string | null>(null);
-  const worldsRef = useRef<HTMLElement | null>(null);
-  const glbInputRef = useRef<HTMLInputElement | null>(null);
-  const bundleInputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    Promise.all([import("../../scene/samples.js"), import("../../game/bundledSamples.js")])
-      .then(([sceneSamples, gameSamples]) =>
-        setSampleLevels([gameSamples.LOST_COLORS_SAMPLE, gameSamples.EXPLORE_SAMPLE, ...sceneSamples.SAMPLE_LEVELS]),
-      )
-      .catch((error) =>
-        setSampleError(error instanceof Error ? error.message : "Bundled samples are unavailable."),
-      );
-  }, []);
-
-  const worldItems = useMemo(
-    () => (savedLevels ? [...additionalWorldItems, ...savedWorldItems(savedLevels, drafts)] : []),
-    [additionalWorldItems, drafts, savedLevels],
-  );
-
-  async function handlePlaySaved(manifest: SceneManifest) {
-    setCheckingLevelId(manifest.levelId);
-    setAssetIssues((current) => {
-      const next = { ...current };
-      delete next[manifest.levelId];
-      return next;
-    });
-    try {
-      const missing = await missingAssetUrls(manifest);
-      if (missing.length > 0) {
-        setAssetIssues((current) => ({
-          ...current,
-          [manifest.levelId]:
-            "A saved 3D asset is missing or expired. Edit this world to replace it, or retry after restoring the file.",
-        }));
-        return;
-      }
-      onPlaySavedLevel(manifest);
-    } finally {
-      setCheckingLevelId(null);
-    }
-  }
-
-  useEffect(() => {
-    let cancelled = false;
-    listLevels()
-      .then((levels) => {
-        if (!cancelled) setSavedLevels(levels);
-      })
-      .catch((error) => {
-        if (!cancelled) setSavedError(describeApiError(error));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function handleImportGlb(file: File | null) {
-    if (!file) return;
-    setImportingGlb(true);
-    setGlbImportError(null);
-    try {
-      const asset = await importAsset(file);
-      onImportGlbReady(asset.id);
-    } catch (error) {
-      setGlbImportError(describeApiError(error));
-    } finally {
-      setImportingGlb(false);
-      if (glbInputRef.current) glbInputRef.current.value = "";
-    }
-  }
-
-  async function handleImportBundle(file: File | null) {
-    if (!file) return;
-    setImportingBundle(true);
-    setBundleImportError(null);
-    try {
-      const imported = await importLevelBundle(file);
-      onImportLevelBundleReady(imported);
-    } catch (error) {
-      setBundleImportError(describeApiError(error));
-    } finally {
-      setImportingBundle(false);
-      if (bundleInputRef.current) bundleInputRef.current.value = "";
-    }
-  }
-
-  async function handleExport(manifest: SceneManifest) {
-    setExportingLevelId(manifest.levelId);
-    setExportError(null);
-    try {
-      await downloadLevelBundle(manifest.levelId, manifest.name);
-    } catch (error) {
-      setExportError(describeApiError(error));
-    } finally {
-      setExportingLevelId(null);
-    }
-  }
-
-  function showWorlds() {
-    worldsRef.current?.scrollIntoView({ behavior: "instant", block: "start" });
-    worldsRef.current?.focus({ preventScroll: true });
-  }
+  const { samples: sampleLevels, error: sampleError } = useSampleLevels();
+  const signInLabel = authMode === "supabase" ? "Continue with Google" : "Sign in";
 
   return (
     <WorldStyleScope className="oq-welcome">
@@ -242,8 +54,14 @@ export function StartScreen({
         <div className="oq-kit-container">
           <nav className="oq-welcome__nav" aria-label="Main navigation">
             <Logo size={34} />
-            <Button variant="secondary" className="oq-welcome__nav-action" onClick={showWorlds}>My worlds <Icon name="arrow" /></Button>
+            {signedIn
+              ? <Button variant="secondary" className="oq-welcome__nav-action" onClick={onOpenDashboard}>Open my worlds <Icon name="arrow" /></Button>
+              : <div className="oq-kit-row oq-welcome__nav-actions">
+                  <Button variant="ghost" className="oq-welcome__nav-action" onClick={onSignIn} loading={signingIn} loadingLabel="Signing in…">Sign in</Button>
+                  <Button className="oq-welcome__nav-action" onClick={onCreateFromPhotos} disabled={signingIn}>Get started</Button>
+                </div>}
           </nav>
+          {authError ? <p className="wk-auth-error" role="alert">Sign-in didn’t finish: {authError}. Try again.</p> : null}
           <section className="oq-welcome__hero" aria-labelledby="welcome-heading">
             <div className="oq-welcome__intro">
               <p className="wk-chip">{BRAND_TAGLINE}</p>
@@ -336,77 +154,30 @@ export function StartScreen({
               <h2 id="samples-heading">Worlds to borrow</h2>
               <p>Built in and ready to play, no photo needed. Keyboard and mouse controls.</p>
             </div>
-            {sampleError ? <p role="alert" className="oq-kit-error">The samples couldn’t load. Refresh to try again.</p>
-              : !sampleLevels ? <p role="status" className="oq-kit-muted">Opening the sample collection…</p>
-              : sampleLevels.length === 0 ? <EmptyState title="No samples available" description="You can still start a world from your own photo." action={<Button onClick={onCreateFromPhotos}>Create my world</Button>} />
-              : <div className="wk-worlds__grid">{sampleLevels.map((manifest, index) => {
-                const art = SAMPLE_ART[manifest.levelId];
-                return <article key={manifest.levelId} className={`wk-world${index === 0 ? " wk-world--featured" : ""}`}>
-                  <div className="wk-world__media">
-                    <img src={art?.src ?? `/samples/photo-${manifest.assets[0]?.url.includes("rodin") ? 4 : 2}.jpg`} alt={art?.alt ?? ""} loading="lazy" />
-                    <span className="wk-world__mode">{sampleModeLabel(manifest)}</span>
-                  </div>
-                  <div className="wk-world__body">
-                    <h3>{sampleTitle(manifest)}</h3>
-                    <p className="wk-world__meta">{sampleSummary(manifest)}{art?.look ? <span> · Shown in the {art.look} look</span> : null}</p>
-                    <div className="wk-world__actions"><Button onClick={() => onPlaySample(manifest)}><Icon name="play" />Play now</Button><Button variant="ghost" onClick={() => onEditSample(manifest)}>Edit course</Button></div>
-                  </div>
-                </article>;
-              })}</div>}
+            <SampleWorlds samples={sampleLevels} error={sampleError} onPlaySample={onPlaySample} onEditSample={onEditSample} onCreateFromPhotos={onCreateFromPhotos} />
           </div>
         </section>
-        {/* Product: the library. White cards on the tint; the picture leads,
-            status is a badge on it, one clear way in. */}
-        <section className="wk-section wk-section--tint wk-library" id="my-worlds" aria-labelledby="worlds-heading" ref={worldsRef} tabIndex={-1}>
+        {/* Product: your own worlds live on the dashboard, behind sign-in. */}
+        <section className="wk-section wk-section--tint wk-library" id="my-worlds" aria-labelledby="worlds-heading">
           <div className="oq-kit-container">
-            <div className="wk-section__head">
-              <h2 id="worlds-heading">Your worlds</h2>
-              <p>Everything you have made, saved on this machine.</p>
-            </div>
-            {savedError ? <p role="alert" className="oq-kit-error wk-library__notice">Your saved worlds couldn’t load. Check your connection and refresh to try again.</p>
-              : !savedLevels ? <p role="status" className="oq-kit-muted">Finding your saved worlds…</p>
-              : worldItems.length === 0 ? <div className="wk-library-empty">
-                <div className="wk-library-empty__scene" aria-hidden="true">
-                  <PortalArch className="wk-library-empty__arch" />
-                  <TinyExplorer className="wk-library-empty__explorer" />
-                </div>
-                <div className="wk-library-empty__copy">
-                  <h3>Your first world starts with a photo</h3>
-                  <p className="oq-kit-muted">Pick something familiar. Make somewhere new.</p>
-                  <Button onClick={onCreateFromPhotos}>Create my world</Button>
+            <div className="wk-library-invite">
+              <div className="wk-library-invite__scene" aria-hidden="true">
+                <PortalArch className="wk-library-empty__arch" />
+                <TinyExplorer className="wk-library-empty__explorer" />
+              </div>
+              <div className="wk-library-invite__copy">
+                <h2 id="worlds-heading">{signedIn ? "Your worlds are waiting" : "Keep every world you make"}</h2>
+                <p>{signedIn
+                  ? "Pick up where you left off, start something new, or borrow a sample."
+                  : "Sign in to save your worlds, come back to them on any visit, and share the finished ones."}</p>
+                <div className="oq-kit-row">
+                  {signedIn
+                    ? <Button onClick={onOpenDashboard}>Open my worlds <Icon name="arrow" /></Button>
+                    : <><Button onClick={onSignIn} loading={signingIn} loadingLabel="Signing in…">{signInLabel}</Button>
+                      <Button variant="ghost" onClick={onCreateFromPhotos} disabled={signingIn}>Make my world</Button></>}
                 </div>
               </div>
-              : <div className="wk-library__grid">{worldItems.map(item => {
-                if (item.kind === "pending") return <WorldTile key={`pending-${item.id}`} status="pending" badge="In progress" title={item.title || "Untitled world"}
-                  meta={item.statusText ?? `Generation is ${item.job.state}. Leaving this page does not cancel it.`}
-                  actions={onResumePendingWorld ? <Button onClick={() => onResumePendingWorld(item.job.id)}>{item.actionLabel ?? "Resume"}</Button> : null} />;
-                if (item.kind === "failed") return <WorldTile key={`failed-${item.id}`} status="failed" badge="Needs attention" title={item.title || "Untitled world"}
-                  notice={<p className="oq-kit-error">{item.statusText ?? item.job.uiMessage ?? "This generation stage needs another try."}</p>}
-                  actions={onRetryFailedWorld && (item.job.lastError?.retryable || item.actionLabel === "Review choices")
-                    ? <Button onClick={() => onRetryFailedWorld(item.job.id)}>{item.actionLabel ?? "Retry"}</Button>
-                    : <p className="oq-kit-muted">This stage can’t be retried automatically.</p>} />;
-                if (item.kind === "draft") return <WorldTile key={`draft-${item.id}`} status="draft" badge="Draft" title={item.draft.manifest.name || "Untitled world"}
-                  image={worldImage(item.draft.manifest)}
-                  meta={`Unsaved course edits · ${item.draft.manifest.experience?.mode.kind ?? "explore"}`}
-                  actions={<Button onClick={() => (onResumeDraft ?? ((next) => onEditSavedLevel(next)))(item.draft.manifest, false)}>Resume</Button>} />;
-                const { manifest, draft } = item;
-                return <WorldTile key={manifest.levelId} status={draft ? "draft" : "ready"}
-                  badge={draft ? "Draft changes" : savedWorldOrigin(manifest) === "generated" ? "Generated world" : savedWorldOrigin(manifest) === "sample-copy" ? "Bundled sample copy" : "Imported world"}
-                  title={manifest.name || "Untitled world"} image={worldImage(manifest)}
-                  meta={`${manifest.experience?.style.id ?? "cartoon"} · ${manifest.experience?.mode.kind ?? "explore"} · ${manifest.checkpoints.length} checkpoints`}
-                  notice={assetIssues[manifest.levelId] ? <p className="oq-kit-error" role="alert">{assetIssues[manifest.levelId]}</p> : null}
-                  actions={<>
-                    {draft ? <Button onClick={() => (onResumeDraft ?? ((next) => onEditSavedLevel(next)))(draft.manifest, true)}>Resume</Button> : <Button className="wk-tile__play" onClick={() => handlePlaySaved(manifest)} loading={checkingLevelId === manifest.levelId} loadingLabel="Checking assets…"><Icon name="play" />Play</Button>}
-                    <span className="wk-tile__more">
-                      {draft ? <Button variant="ghost" onClick={() => handlePlaySaved(manifest)} loading={checkingLevelId === manifest.levelId} loadingLabel="Checking assets…">Play saved</Button> : null}
-                      {!draft ? <Button variant="ghost" onClick={() => onEditSavedLevel(manifest)}>Edit</Button> : null}
-                      <Button variant="ghost" onClick={() => handleExport(manifest)} disabled={exportingLevelId !== null} loading={exportingLevelId === manifest.levelId} loadingLabel="Exporting…">Export</Button>
-                    </span>
-                  </>}>
-                  <WorldPostcardPanel manifest={manifest} />
-                </WorldTile>;
-              })}</div>}
-            {exportError && <p className="oq-kit-error" role="alert">We couldn’t export this world. Try Export again.</p>}
+            </div>
           </div>
         </section>
         {/* The close: back to the ordinary, with a lit doorway in it. */}
@@ -430,17 +201,18 @@ export function StartScreen({
           </div>
         </section>
         <div className="oq-kit-container wk-welcome-foot">
-          <details className="oq-welcome__imports"><summary>Already have a world? Import it here.</summary>
-            <div className="oq-kit-row"><Button variant="secondary" loading={importingGlb} loadingLabel="Importing 3D object…" disabled={importingBundle} onClick={() => glbInputRef.current?.click()}>Import a 3D object</Button><Button variant="secondary" loading={importingBundle} loadingLabel="Importing world…" disabled={importingGlb} onClick={() => bundleInputRef.current?.click()}>Import a world bundle</Button></div>
-            <p className="oq-kit-muted">3D objects use .glb files. World bundles use the .json files {BRAND_NAME} exports.</p>
-            <input hidden ref={glbInputRef} type="file" accept=".glb,model/gltf-binary" disabled={importingGlb || importingBundle} aria-label="Choose a 3D object" onChange={event => handleImportGlb(event.target.files?.[0] ?? null)} />
-            <input hidden ref={bundleInputRef} type="file" accept=".json,.objectquest.json,application/json,application/octet-stream" disabled={importingGlb || importingBundle} aria-label="Choose a world bundle" onChange={event => handleImportBundle(event.target.files?.[0] ?? null)} />
-            {glbImportError && <p className="oq-kit-error" role="alert">We couldn’t import this 3D object. Check the file and try again.</p>}
-            {bundleImportError && <p className="oq-kit-error" role="alert">We couldn’t import this world. Choose an exported {BRAND_NAME} bundle and try again.</p>}
-          </details>
           <footer className="oq-welcome__footer"><span>{BRAND_TAGLINE}</span>{import.meta.env.DEV && <a href="/design-kit/">Explore the design kit</a>}</footer>
         </div>
       </main>
+      <Modal open={signInPrompt !== null} onClose={() => onDismissSignInPrompt?.()} title="Sign in to continue">
+        <div className="wk-signin-prompt">
+          <p>Sign in to open {signInPrompt}. Worlds are private to the account that made them, and you’ll go straight there after signing in.</p>
+          <div className="oq-kit-row">
+            <Button onClick={onSignIn} loading={signingIn} loadingLabel="Signing in…">{signInLabel}</Button>
+            <Button variant="ghost" onClick={() => onDismissSignInPrompt?.()}>Not now</Button>
+          </div>
+        </div>
+      </Modal>
     </WorldStyleScope>
   );
 }

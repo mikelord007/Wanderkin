@@ -1,4 +1,5 @@
 import type { SceneManifest } from "@shared/index.js";
+import { currentOwnerId, visibleToCurrentOwner } from "../auth/credentials.js";
 
 /**
  * Preserves in-progress editor edits across a reload without ever
@@ -19,6 +20,9 @@ export interface EditorDraft {
   baseUpdatedAt: string;
   manifest: SceneManifest;
   savedAt: string;
+  /** The signed-in account that made these edits on this device. Drafts
+   * from before sign-in have none and stay visible to everyone. */
+  ownerId?: string;
 }
 
 const DRAFT_KEY_PREFIX = "objectquest:editorDraft:";
@@ -41,7 +45,9 @@ export function loadDraft(levelId: string): EditorDraft | null {
 
 export function saveDraft(draft: EditorDraft): void {
   try {
-    localStorage.setItem(keyFor(draft.levelId), JSON.stringify(draft));
+    const owner = currentOwnerId();
+    const tagged = owner && !draft.ownerId ? { ...draft, ownerId: owner } : draft;
+    localStorage.setItem(keyFor(draft.levelId), JSON.stringify(tagged));
   } catch {
     // Storage unavailable (private browsing, quota) — editing still works
     // for this session, it just won't survive a reload.
@@ -66,7 +72,7 @@ export function listDrafts(): EditorDraft[] {
       if (!key?.startsWith(DRAFT_KEY_PREFIX)) continue;
       const levelId = key.slice(DRAFT_KEY_PREFIX.length);
       const draft = loadDraft(levelId);
-      if (draft) drafts.push(draft);
+      if (draft && visibleToCurrentOwner(draft.ownerId)) drafts.push(draft);
     }
     return drafts.sort((left, right) => right.savedAt.localeCompare(left.savedAt));
   } catch {

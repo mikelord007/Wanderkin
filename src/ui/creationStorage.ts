@@ -1,6 +1,7 @@
 import type { GenerationJob } from "@shared/index.js";
 import { createCreationRecord, toPendingWorldItem, withCreationUpdate, type CreationRecord, type PendingWorldItem } from "./creationFlow.js";
 import type { WorldListItem } from "./worlds.js";
+import { currentOwnerId, visibleToCurrentOwner } from "../auth/credentials.js";
 
 const RECORDS_KEY = "objectquest:v2:creations";
 const ACTIVE_KEY = "objectquest:v2:active-creation";
@@ -27,7 +28,9 @@ export function loadCreationRecords(storage: Storage | null = storageOrNull()): 
 export function saveCreationRecord(record: CreationRecord, storage: Storage | null = storageOrNull()): void {
   if (!storage) return;
   const records = loadCreationRecords(storage).filter((candidate) => candidate.id !== record.id);
-  storage.setItem(RECORDS_KEY, JSON.stringify([record, ...records]));
+  const owner = currentOwnerId();
+  const tagged = owner && !record.ownerId ? { ...record, ownerId: owner } : record;
+  storage.setItem(RECORDS_KEY, JSON.stringify([tagged, ...records]));
 }
 
 /** Removes exactly one record by id — used to prune a record that turned
@@ -51,7 +54,8 @@ export function clearActiveCreationId(storage: Storage | null = storageOrNull())
 export function loadActiveCreation(storage: Storage | null = storageOrNull()): CreationRecord | null {
   if (!storage) return null;
   const id = storage.getItem(ACTIVE_KEY);
-  return id ? loadCreationRecords(storage).find((record) => record.id === id) ?? null : null;
+  const record = id ? loadCreationRecords(storage).find((candidate) => candidate.id === id) ?? null : null;
+  return record && visibleToCurrentOwner(record.ownerId) ? record : null;
 }
 
 export function createAndActivateCreation(
@@ -100,7 +104,8 @@ export function loadPendingWorlds(storage: Storage | null = storageOrNull()): Pe
 export function loadCreationWorldItems(
   storage: Storage | null = storageOrNull(),
 ): Extract<WorldListItem, { kind: "pending" | "failed" }>[] {
-  return loadCreationRecords(storage).flatMap<Extract<WorldListItem, { kind: "pending" | "failed" }>>((record) => {
+  const visible = loadCreationRecords(storage).filter((record) => visibleToCurrentOwner(record.ownerId));
+  return visible.flatMap<Extract<WorldListItem, { kind: "pending" | "failed" }>>((record) => {
     const item = toPendingWorldItem(record);
     if (!item) return [];
     const jobRef = item.attentionStage
