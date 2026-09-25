@@ -139,6 +139,8 @@ export interface GroundStyle {
   contactScale: number;
   /** Optional soil/sand patch colour under clusters. */
   patchColor?: string;
+  /** Share (0–1) of soil patches drawn as cracked, dried earth (default 0). */
+  cracks?: number;
 }
 
 /**

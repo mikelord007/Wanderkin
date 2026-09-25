@@ -185,6 +185,26 @@ describe("biome decoration layer", () => {
     }
   });
 
+  it("draws cracked-earth soil patches only when the art asks for them, in the same single draw", async () => {
+    const { createContactDecals } = await import("./contactDecals.js");
+    const { composeLayout } = await import("../assets/compose.js");
+    const { getBiomeArt } = await import("../assets/biomes/index.js");
+    const art = getBiomeArt("desert")!;
+    const layout = fixtureLayout("desert");
+    const clusters = composeLayout(art, layout.props.filter((p) => p.kind !== "windsock").map((placement) => ({ placement, height: placement.scale })), "cracks", "standard").clusters;
+    const kinds = (cracks: number) => {
+      const owned = createContactDecals(clusters, { ...art.ground, patchColor: "#c89a64", cracks }, "cracks")!;
+      const values = Array.from((owned.object.geometry.getAttribute("aPatch") as THREE.BufferAttribute).array);
+      owned.geometries.forEach((g) => g.dispose());
+      owned.materials.forEach((m) => m.dispose());
+      return values;
+    };
+    expect(kinds(0).some((k) => k === 2)).toBe(false);
+    const all = kinds(1);
+    expect(all.some((k) => k === 2)).toBe(true);
+    expect(all.some((k) => k === 1)).toBe(false);
+  });
+
   it("is non-colliding: no three.js raycast ever hits decoration", () => {
     const layer = createBiomeLayer({ definition: getBiomeDefinition("tropical"), layout: fixtureLayout("tropical"), quality: "standard", reducedMotion: false });
     layer.root.updateMatrixWorld(true);
