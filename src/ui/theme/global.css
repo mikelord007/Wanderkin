@@ -59,14 +59,28 @@
 .oq-kit-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .oq-kit-error { color: var(--oq-error-ink); }
 
-/* The Mousehold lockup. Sized from the mark so the wordmark always sits on the
-   same optical baseline as the arch, at any scale. */
-.mh-logo { display: inline-flex; align-items: center; gap: .55em; font-size: 1.25rem; }
+/* The Wanderkin lockup. Everything is in em so the wordmark and its button
+   tittle keep their proportions at any font size. */
+.mh-logo { display: inline-flex; align-items: center; gap: .5em; font-size: 1.25rem; }
 .mh-logo__mark { flex: none; }
 .mh-logo__word {
   font-family: var(--oq-font-display);
-  font-variation-settings: "SOFT" 40, "WONK" 1;
-  font-weight: 600; font-size: 1em; letter-spacing: -.02em; line-height: 1;
+  font-variation-settings: "SOFT" 100, "WONK" 1;
+  font-weight: 650; font-size: 1em; letter-spacing: -.015em; line-height: 1;
+}
+/* The plain name, for screen readers and copy-paste. The drawn letters beside it
+   carry the dotless i. */
+.mh-logo__name {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0,0,0,0); white-space: nowrap;
+}
+.mh-logo__i { position: relative; }
+/* The tittle is a small marigold button: the one the explorer stands on in the
+   mark. It sits where the typeface's own dot would. */
+.mh-logo__tittle {
+  position: absolute; left: 50%; bottom: .79em;
+  width: .22em; height: .22em; margin-left: -.11em;
+  border-radius: 50%; background: #e8a33d;
 }
 
 @media (max-width: 699px) { .oq-kit-container { padding-inline: 20px; } }

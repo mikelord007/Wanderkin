@@ -3,13 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Mousehold — tiny worlds from everyday things</title>
+    <title>Wanderkin — tiny worlds from everyday things</title>
     <meta
       name="description"
       content="Turn a photo of an everyday object into a tiny world you can run, climb, and jump around in."
     />
     <meta name="theme-color" content="#1d3a2e" />
-    <link rel="icon" href="/brand/mousehold-mark.svg" type="image/svg+xml" />
+    <!-- The favicon is the mark's small optical cut: bigger holes, no stitching,
+         a bigger and simpler figure. The full drawing turns to mush at 16px.
+         The boot mark below is the full drawing, copied from Logo.tsx. -->
+    <link rel="icon" href="/brand/wanderkin-favicon.svg" type="image/svg+xml" />
     <!-- The display face is the first thing a visitor reads, so it is fetched
          alongside the HTML rather than after the CSS that references it. -->
     <link
@@ -69,19 +72,8 @@
   <body>
     <div id="root">
       <div class="mh-boot" role="status" aria-live="polite">
-        <svg class="mh-boot__mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
-          <defs>
-            <clipPath id="mh-boot-arch"><path d="M13 48V27a11 11 0 0 1 22 0v21Z" /></clipPath>
-          </defs>
-          <rect x="0" y="0" width="48" height="48" rx="12" fill="#16291f" />
-          <g clip-path="url(#mh-boot-arch)">
-            <rect x="13" y="15" width="22" height="33" fill="#f2efe5" />
-            <circle cx="30" cy="25" r="3.4" fill="#e8a33d" />
-            <ellipse cx="17" cy="48" rx="14" ry="12" fill="#56997a" />
-            <ellipse cx="37" cy="47" rx="12" ry="9" fill="#2e6b4f" />
-          </g>
-        </svg>
-        <div class="mh-boot__word">Mousehold</div>
+        <svg class="mh-boot__mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="0" y="0" width="48" height="48" rx="12" fill="#1d3a2e"></rect><circle cx="22" cy="30.5" r="16" fill="#f2efe5"></circle><circle cx="22" cy="30.5" r="12" fill="#e2dac6"></circle><circle cx="18.3" cy="26.8" r="1.95" fill="#1d3a2e"></circle><circle cx="25.7" cy="26.8" r="1.95" fill="#1d3a2e"></circle><circle cx="18.3" cy="34.2" r="1.95" fill="#1d3a2e"></circle><circle cx="25.7" cy="34.2" r="1.95" fill="#1d3a2e"></circle><path d="M18.3 26.8 25.7 34.2M25.7 26.8 18.3 34.2" stroke="#e8a33d" stroke-width="1.5" stroke-linecap="round"></path><g transform="rotate(20 22 30.5) translate(22 14.5) scale(.92)"><path d="M-2.2-3.6h1.8v2.7a.9.9 0 0 1-1.8 0ZM.4-3.6h1.8v2.7a.9.9 0 0 1-1.8 0Z" fill="#e8a33d"></path><rect x="-2.6" y="-8.6" width="5.2" height="5.8" rx="2.2" fill="#e8a33d"></rect><path d="M1.8-7.4 4.4-10.6" stroke="#e8a33d" stroke-width="1.6" stroke-linecap="round"></path><circle cx="0" cy="-11.1" r="2.6" fill="#f2efe5"></circle><path d="M-2.8-11.2a2.8 2.8 0 0 1 5.6 0Z" fill="#3f9f92"></path><rect x="-3" y="-11.7" width="6" height="1.2" rx="0.6" fill="#2b7a70"></rect><circle cx="0" cy="-14.2" r="0.9" fill="#3f9f92"></circle></g></svg>
+        <div class="mh-boot__word">Wanderkin</div>
         <div class="mh-boot__bar" aria-hidden="true"></div>
         <p>Opening the little world…</p>
       </div>

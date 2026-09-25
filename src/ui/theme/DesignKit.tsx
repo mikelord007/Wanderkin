@@ -4,6 +4,7 @@ import {
   Logo, Modal, PlayFrame, ProgressPanel, Sheet, Stepper, STYLE_EXAMPLES, SubtitleBar, TextField,
   Toast, WORLD_STYLES, WorldStyleScope, type ProgressStage, type WorldStyle,
 } from "../components/index.js";
+import { BRAND_NAME } from "../../brand.js";
 import "./design-kit.css";
 
 const stages: ProgressStage[] = [
@@ -78,7 +79,7 @@ function StyleGallery({ style, label }: { style: WorldStyle; label: string }) {
 export function DesignKit() {
   return <WorldStyleScope className="oq-kit-docs"><main className="oq-kit-container oq-kit-stack">
     <header className="oq-kit-docs__header"><a href="/"><Logo size={30} /></a><span className="oq-kit-eyebrow">Design system · v2</span></header>
-    <div className="oq-kit-docs__intro"><p className="oq-kit-eyebrow">Pocket Wonder</p><h1>Small worlds.<br />A shared language.</h1><p className="oq-kit-muted">Every component, in every world style. A living kit for everyday adventures.</p></div>
+    <div className="oq-kit-docs__intro"><p className="oq-kit-eyebrow">{BRAND_NAME} design system</p><h1>Small worlds.<br />A shared language.</h1><p className="oq-kit-muted">Every component, in every world style. A living kit for everyday adventures.</p></div>
     <nav className="oq-kit-row" aria-label="World style galleries">{WORLD_STYLES.map(s => <a key={s.value} href={`#${s.value}`} className="oq-kit-button oq-kit-button--secondary">{s.label}</a>)}</nav>
     {WORLD_STYLES.map(s => <StyleGallery key={s.value} style={s.value} label={s.label} />)}
     <footer className="oq-kit-muted">System fonts. Local icons. Real sample photography. Built for keyboard, touch, and reduced motion.</footer>
