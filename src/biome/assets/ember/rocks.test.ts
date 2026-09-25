@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { EMBER_ART } from "../biomes/ember.js";
 import { variantMesh } from "../compose.js";
 import type { UnitMesh } from "../types.js";
-import { cinderCone, columnCluster, emberRocks, emberSpires, hexColumn, latticeCell, lavaLobes } from "./rocks.js";
+import { cinderCone, columnCluster, emberRocks, emberSpires, emberVents, hexColumn, latticeCell, lavaLobes } from "./rocks.js";
 
 const tones = EMBER_ART.tones;
 const luminance = (mesh: UnitMesh, i: number) => 0.2126 * mesh.colors[i * 3]! + 0.7152 * mesh.colors[i * 3 + 1]! + 0.0722 * mesh.colors[i * 3 + 2]!;
@@ -89,6 +89,19 @@ describe("cinder cones and lava", () => {
     // Inward-facing faces exist near the top (a real crater, not a cap).
     const crater = faces(hot).filter((f) => f.centre.y > 0.7 && f.normal.x * f.centre.x + f.normal.z * f.centre.z < 0);
     expect(crater.length).toBeGreaterThan(8);
+  });
+
+  it("low, size-fitted vents still glow in the throat, not on the flank", () => {
+    for (const builder of emberVents()) {
+      const mesh = builder(tones);
+      expect(mesh.maxY - mesh.minY).toBeLessThan(0.4); // wide and low
+      const all = faces(mesh);
+      const hot = all.filter((f) => f.lum > 0.05 && f.centre.distanceTo(new THREE.Vector3(0, f.centre.y, 0)) < mesh.radius * 0.45);
+      expect(hot.length).toBeGreaterThan(4);
+      // The outer flank stays dark scoria.
+      const flank = all.filter((f) => Math.hypot(f.centre.x, f.centre.z) > mesh.radius * 0.7);
+      expect(Math.max(...flank.map((f) => f.lum))).toBeLessThan(0.05);
+    }
   });
 
   it("molten toes glow at the ground only", () => {

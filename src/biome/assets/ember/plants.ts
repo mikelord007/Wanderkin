@@ -402,15 +402,21 @@ export function ashScrub(options: { stems: number; clumps: number; seed: number;
       );
       tips.push(end);
     }
-    // Overlapping round clumps pulled in toward the stems, so the crown reads
-    // as one notched cushion with bare twigs poking through, not caps on sticks.
+    // A low, dense mound: a dark base mass on the ground, then overlapping
+    // round clumps pulled in and down along the stems, so the bush reads as
+    // one notched cushion with bare twigs poking out of its top, never as
+    // caps on sticks.
+    kit.add(
+      lobe({ radius: [0.24 * (0.6 + spread), 0.2, 0.22 * (0.6 + spread)], detail: 1, jitter: 0.22, seed: options.seed * 5 + 99, floor: -0.35, center: [0, 0.07, 0] }),
+      { color: rampTone(leaves, { heightWeight: 0.5, bias: -0.35 }), sway: 0.3, smooth: true },
+    );
     for (let i = 0; i < options.clumps; i += 1) {
       const tip = tips[i % tips.length]!;
       const r = 0.12 + random() * 0.05;
-      const pull = 0.62 + random() * 0.14;
+      const pull = 0.55 + random() * 0.15;
       kit.add(
-        lobe({ radius: [r, r * 0.86, r * (0.9 + random() * 0.2)], detail: 1, jitter: 0.2, seed: options.seed * 5 + i, center: [tip.x * pull, tip.y * (0.78 + random() * 0.1), tip.z * pull] }),
-        { color: rampTone(leaves, { heightWeight: 0.4, bias: (random() - 0.5) * 0.3 }), sway: 0.7, smooth: true },
+        lobe({ radius: [r, r * 0.95, r * (0.9 + random() * 0.2)], detail: 1, jitter: 0.2, seed: options.seed * 5 + i, center: [tip.x * pull, tip.y * (0.52 + random() * 0.14), tip.z * pull] }),
+        { color: rampTone(leaves, { heightWeight: 0.45, bias: (random() - 0.5) * 0.3 - 0.05 }), sway: 0.7, smooth: true },
       );
     }
     return kit.finish({ groundAo: { height: 0.2, strength: 0.3 } });
@@ -464,7 +470,7 @@ export function emberStumps(): VariantBuilder[] {
 export function emberBushes(): VariantBuilder[] {
   return [
     ashScrub({ stems: 5, clumps: 4, seed: 1 }),
-    ashScrub({ stems: 6, clumps: 5, seed: 2, spread: 0.62 }),
+    ashScrub({ stems: 6, clumps: 4, seed: 2, spread: 0.62 }),
     ashScrub({ stems: 4, clumps: 3, seed: 3, spread: 0.4, leafRamp: "ashgrass" }),
     tussock({ blades: 18, length: 1, splay: 0.42, seed: 4 }),
     tussock({ blades: 14, length: 1.2, splay: 0.38, seed: 5, width: 0.04 }),

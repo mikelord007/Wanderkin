@@ -14,7 +14,7 @@
 import { tuft } from "../builders/foliage.js";
 import { lyingLog } from "../builders/trees.js";
 import { emberBushes, emberSnags, emberStumps, fireLily } from "../ember/plants.js";
-import { emberRocks, emberSpires } from "../ember/rocks.js";
+import { emberRocks, emberSpires, emberVents } from "../ember/rocks.js";
 import type { BiomeArt, BiomeTones } from "../types.js";
 
 const tones = {
@@ -44,7 +44,7 @@ const tones = {
   /** Charred wood: near-black, warm. */
   char: { dark: "#1e1a1a", base: "#2e2826", light: "#4c423e" },
   /** Grey-sage leaves of the hardy ash plants. */
-  ashleaf: { dark: "#4a4e46", base: "#686e62", light: "#8e9486" },
+  ashleaf: { dark: "#3c463e", base: "#56624f", light: "#7a8870" },
   /** Grey tussock and ash grass. */
   ashgrass: { dark: "#58564e", base: "#7a776c", light: "#a29e90" },
   /** Dark ember-fern fronds. */
@@ -94,6 +94,13 @@ export const EMBER_ART: BiomeArt = {
       category: "rock", role: "micro", shading: "faceted", castShadow: false, unitRadius: 0.5, triangleBudget: 60,
       mirror: true, embed: [0.05, 0.15], alignToNormal: 1,
       variants: rocks.dressing,
+    },
+    // Ember vents: low scoria rings round a glowing throat. Micro, so reduced
+    // effects drop them first (fewer glow points).
+    vent: {
+      category: "dressing", role: "micro", shading: "faceted", castShadow: false, unitRadius: 0.5, triangleBudget: 200,
+      mirror: true, embed: [0.02, 0.05], alignToNormal: 1,
+      variants: emberVents(),
     },
     // Ash scrub, grey tussocks and ember ferns.
     "ash-bush": {
@@ -182,6 +189,7 @@ export const EMBER_ART: BiomeArt = {
             { family: "rock-medium", count: [1, 2], ring: [0.55, 0.9], height: [0.28, 0.45] },
             { family: "cinder", count: [2, 3], ring: [0.35, 1], height: [0.08, 0.15] },
             { family: "ash-grass", count: [0, 1], ring: [0.4, 0.9], height: [0.18, 0.26] },
+            { family: "vent", count: [1, 1], ring: [0.5, 0.95], height: [0.22, 0.32], chance: 0.3 },
           ],
         },
       },
@@ -190,7 +198,10 @@ export const EMBER_ART: BiomeArt = {
         preset: {
           id: "lone-boulder",
           primary: "rock-large",
-          members: [{ family: "cinder", count: [1, 2], ring: [0.5, 1], height: [0.08, 0.14] }],
+          members: [
+            { family: "cinder", count: [1, 2], ring: [0.5, 1], height: [0.08, 0.14] },
+            { family: "vent", count: [1, 1], ring: [0.55, 0.95], height: [0.2, 0.3], chance: 0.25 },
+          ],
         },
       },
     ],
@@ -254,14 +265,16 @@ export const EMBER_ART: BiomeArt = {
     recess: "#16151a",
     rim: "#b3a69c",
   },
-  // Ash patches, most of them cracked and glowing like cooling lava.
+  // Dark scorched patches under some clusters; fewer than half of those are
+  // cracked, and their cracks glow deep red like cooling lava (redder than
+  // the character's orange suit, 180° from the cyan collectible).
   ground: {
     contactColor: "#141216",
     contactOpacity: 0.4,
     contactScale: 0.9,
     patchColor: "#2e2826",
-    cracks: 0.6,
-    crackGlow: "#ff6a1e",
+    cracks: 0.42,
+    crackGlow: "#ff4a2a",
     patches: { tints: [{ color: "#5a504c", weight: 2 }, { color: "#3e3634", weight: 1 }] },
   },
   variation: { toneJitter: 0.04, hueJitterDeg: 3 },

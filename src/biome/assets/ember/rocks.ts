@@ -274,6 +274,8 @@ export interface CinderConeOptions {
   /** Base radius relative to the rim height (≈ 0.6 steep … 0.85 low). */
   spread?: number;
   extras?: ColumnClusterOptions["extras"];
+  /** `height` for hero cones; `size` for low, wide vents used as dressing. */
+  fit?: "height" | "size";
 }
 
 /** A miniature volcano: gullied flanks, broken rim, crater. */
@@ -322,25 +324,44 @@ export function cinderCone(options: CinderConeOptions): VariantBuilder {
     const scoriaRamp = rampOf(tones, "scoria", "rock");
     const ash = rampOf(tones, "ash", "stoneTop");
     const magma = rampOf(tones, "magma", "accent");
+    // Colour rules read height relative to the fitted cone (1 = the rim),
+    // so a low, size-fitted vent colours like a tall hero cone.
+    g.computeBoundingBox();
+    const box = g.boundingBox!;
+    const nativeTop = box.max.y;
+    const nativeRadius = Math.max(box.max.x, -box.min.x, box.max.z, -box.min.z) + Math.abs(lean) * nativeTop;
+    const unitTop = options.fit === "size" ? nativeTop / Math.max(nativeTop, nativeRadius * 2) : 1;
     kit.add(g, {
       color: (p, n) => {
+        const y = p.y / unitTop;
         const radial = Math.hypot(p.x, p.z);
         const inward = radial > 1e-6 ? -(n.x * p.x + n.z * p.z) / radial : 1;
         // Crater wall and floor: faces turned in toward the axis, up high.
-        if (inward > 0.05 && p.y > 0.55) {
-          const depth = clamp01((1 - p.y) / 0.3);
+        if (inward > 0.05 && y > 0.55) {
+          const depth = clamp01((1 - y) / 0.3);
           return options.glow ? rampAt(magma, clamp01(0.25 + 0.75 * depth)) : rampAt(scoriaRamp, clamp01(0.12 - 0.1 * depth));
         }
         const a = Math.atan2(p.z, p.x);
         const valley = Math.cos(a * ridges + options.seed) * 0.5 + 0.5;
-        const base = rampAt(scoriaRamp, clamp01(0.14 + 0.42 * (n.y * 0.5 + 0.5) + 0.2 * p.y - 0.14 * (1 - valley)));
+        const base = rampAt(scoriaRamp, clamp01(0.14 + 0.42 * (n.y * 0.5 + 0.5) + 0.2 * y - 0.14 * (1 - valley)));
         // Pale ash settles on the upper flank and the rim.
-        return base.lerp(rampAt(ash, 0.4), 0.55 * smoothstep(0.62, 0.95, p.y) * clamp01(n.y + 0.2));
+        return base.lerp(rampAt(ash, 0.4), 0.55 * smoothstep(0.62, 0.95, y) * clamp01(n.y + 0.2));
       },
     });
     for (const extra of options.extras ?? []) extra(kit, tones);
-    return kit.finish({ sink: 0.03, groundAo: { height: 0.2, strength: 0.3 } });
+    return kit.finish({ fit: options.fit ?? "height", sink: 0.03, groundAo: { height: 0.2, strength: 0.3 } });
   };
+}
+
+/**
+ * Ember vent: a low scoria ring around a glowing throat, a pocket of heat
+ * among the rocks (dressing; dropped first under reduced effects).
+ */
+export function emberVents(): VariantBuilder[] {
+  return [
+    cinderCone({ seed: 31, glow: true, spread: 1.5, sides: 9, ridges: 4, breach: 0.1, fit: "size" }),
+    cinderCone({ seed: 37, glow: true, spread: 1.8, sides: 8, ridges: 3, breach: 0.18, fit: "size" }),
+  ];
 }
 
 // ---------------------------------------------------------------------------

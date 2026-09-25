@@ -21,7 +21,8 @@ export const EMBER: BiomeDefinition = {
     rock: "#3b3a40",
     wood: "#3a2a22",
     accent: "#ff6a2a",
-    water: "#ff7a2a",
+    // Lava ring (BiomeArt.atmosphere.water = "lava"): deep red-orange seams.
+    water: "#f0562a",
   },
   // Dusk over dark basalt: a low warm rim light, cool shadows.
   lighting: { sun: "#ffb27a", sky: "#8a7a9a", ground: "#5a4640", intensity: 2.4, ambient: 0.92, direction: [-5, 3.5, -2] },
