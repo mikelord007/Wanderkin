@@ -31,6 +31,34 @@ function seedNoise(i) {
   return x / 2147483648 - 1;
 }
 
+/** Gentle wind bed. The decorrelated noise is low-passed by two one-pole filters (~350 Hz),
+ * because unfiltered it is flat broadband static rather than a breeze, and it gets one
+ * slow gust per loop. The playback engine (src/audio/engine.ts) loops from 20 ms after
+ * the start to 20 ms before the end, so the bed repeats with exactly that period: the
+ * filter runs twice around one circular period and the file is tiled from it, with no
+ * fade in/out, so the looped bed is continuous at the seam and never dips. */
+function windBed(seconds, peak, rate = RATE) {
+  const count = Math.floor(rate * seconds);
+  const period = count - 2 * Math.round(rate * .02);
+  const smoothing = 1 - Math.exp(-2 * Math.PI * 350 / rate);
+  const cycle = new Float64Array(period);
+  let low = 0;
+  let lower = 0;
+  for (let pass = 0; pass < 2; pass += 1) {
+    for (let i = 0; i < period; i += 1) {
+      low += smoothing * (seedNoise(i) - low);
+      lower += smoothing * (low - lower);
+      cycle[i] = lower;
+    }
+  }
+  const loudest = cycle.reduce((max, value) => Math.max(max, Math.abs(value)), 0);
+  return Array.from({ length: count }, (_, i) => {
+    const phase = i % period;
+    return cycle[phase] / loudest * peak * (.7 + .3 * Math.sin(Math.PI * 2 * phase / period));
+  });
+}
+const breeze = windBed(4, .05);
+
 /** Short plucked/mallet note: fast attack, exponential decay, brighter fast-decaying 2nd
  * harmonic for a bell-like "ping" — deliberately no sustained tone, so notes leave silence
  * between them instead of blending into a drone. */
@@ -73,7 +101,7 @@ const files = new Map([
 
     return (melody + bass + percussion) * envelope(i, count, .03, .06, MUSIC_RATE) * 32767;
   }, MUSIC_RATE)],
-  ["gentle-breeze.wav", wav(4, (t, i, count) => seedNoise(i) * (.06 + .025 * Math.sin(Math.PI * 2 * .2 * t)) * envelope(i, count, .25, .25) * 32767)],
+  ["gentle-breeze.wav", wav(4, (t, i) => breeze[i] * 32767)],
   ["fragment-pickup.wav", wav(.45, (t, i, count) => (tone(660 + t * 500, t, .42) + tone(990 + t * 250, t, .18)) * envelope(i, count, .01, .2) * 32767)],
   ["portal-activate.wav", wav(1.2, (t, i, count) => (tone(220 + t * 360, t, .26) + tone(440 + t * 520, t, .16)) * envelope(i, count, .04, .32) * 32767)],
   ["checkpoint.wav", wav(.35, (t, i, count) => tone(t < .16 ? 523.25 : 783.99, t, .45) * envelope(i, count, .01, .12) * 32767)],

@@ -43,7 +43,7 @@ function audio(
 export const LOST_COLORS_BUNDLED_MEDIA: LevelMedia = {
   audio: [
     audio("bundled-music", "music", "lost-colors-loop.wav", "6261b557a54fe707bdbbc2e23adfba4d5b93e37307a912e1972c48ebc1c2da33", 176444, 4, true),
-    audio("bundled-ambience", "ambience", "gentle-breeze.wav", "bda376cd2e83bba8e306e314e6c256d8b58a5d988e3acaf298362379cf2db769", 64044, 4, true),
+    audio("bundled-ambience", "ambience", "gentle-breeze.wav", "e22bc997a51ae2b3a8c2cbe987732f0986034718d682ba80ff5609b96930b138", 64044, 4, true),
     audio("bundled-fragment-pickup", "sfx", "fragment-pickup.wav", "7a959727eddea2167dd56a1130c84cb17db43ae4a9d91dbaa5cb257cd97a6812", 7244, .45, false),
     audio("bundled-portal-activate", "sfx", "portal-activate.wav", "6a77a2b91078fe0e49e7fff42b90cefcde780f42af8fcf944368aa28b82f66e1", 19244, 1.2, false),
     audio("bundled-checkpoint", "sfx", "checkpoint.wav", "c25345079589413f5f3401d896931e0a97d9329fc434c9a29b39692c59ad2269", 5644, .35, false),
