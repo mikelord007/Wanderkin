@@ -23,8 +23,9 @@ const tones = {
   foliage: { dark: "#16372f", base: "#224c40", light: "#3a6e5b" },
   foliageAlt: { dark: "#1c3d36", base: "#2b574b", light: "#4b7d69" },
   trunk: { dark: "#4a3526", base: "#6b4d36", light: "#916f50" },
-  // Granite: cool blue-grey, dark enough that snow caps pop.
-  rock: { dark: "#4a515c", base: "#6d7581", light: "#98a0ab" },
+  // Granite: cool blue-grey, dark enough that snow caps pop under the
+  // strong low sun.
+  rock: { dark: "#3a414c", base: "#565e6b", light: "#7d8592" },
   soil: { dark: "#8e979f", base: "#aeb7bf", light: "#cdd5dc" },
   dry: { dark: "#80734f", base: "#a39672", light: "#c6ba96" },
   cactus: { dark: "#2f5a45", base: "#437660", light: "#6c9a80" },
