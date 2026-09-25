@@ -43,6 +43,10 @@ describe("legacy manifest compatibility", () => {
     expect(parsed.entities).toEqual(input.entities);
     expect(parsed.experience).toEqual(input.experience);
     expect(sceneManifestReaderSchema.safeParse({ ...input, biome: { id: "unknown", seed: "a" } }).success).toBe(false);
+    for (const id of ["alpine", "autumn", "ember"]) {
+      const themed = { ...lostColorsFixture, biome: { id, seed: "safe-seed" } };
+      expect(migrateSceneManifest(themed).biome).toEqual(themed.biome);
+    }
     expect(sceneManifestReaderSchema.safeParse({ ...input, biome: { id: "desert", seed: "a", assetUrl: "https://untrusted.test/a" } }).success).toBe(false);
   });
   it("round-trips the generated-adventure marker and rejects unknown templates or extra fields", () => {

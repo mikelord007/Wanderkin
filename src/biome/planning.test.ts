@@ -123,7 +123,7 @@ describe("buildAdventurePlanPrompt", () => {
     expect(scene.description.length).toBeLessThanOrEqual(PLAN_LIMITS.descriptionInput);
     expect(scene.labels).toEqual(["desk", "mug"]);
     expect(prompt).toContain("untrusted data");
-    expect(prompt).toContain('["original","tropical","desert"]');
+    expect(prompt).toContain('["original","tropical","desert","alpine","autumn","ember"]');
     expect(prompt).toContain('["restore-portal","reach-beacon"]');
   });
 

@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { getBiomeDefinition } from "../presets.js";
+import { BIOME_IDS, getBiomeDefinition } from "../presets.js";
 import { PROP_UNIT_RADIUS } from "../render/propGeometry.js";
 import type { BiomePropKind } from "../types.js";
 import { registeredBiomeArt } from "./biomes/index.js";
@@ -15,7 +15,13 @@ import type { AssetCategory } from "./types.js";
 /** Spec "Repetition reduction" minimums (per biome that uses the category). */
 const MIN_VARIANTS: Partial<Record<AssetCategory, number>> = { tree: 4, bush: 5, rock: 8, cactus: 5 };
 /** Categories each shipped biome must provide. */
-const REQUIRED: Record<string, AssetCategory[]> = { tropical: ["tree", "bush", "rock"], desert: ["cactus", "rock", "bush"] };
+const REQUIRED: Record<string, AssetCategory[]> = {
+  tropical: ["tree", "bush", "rock"],
+  desert: ["cactus", "rock", "bush"],
+  alpine: ["tree", "bush", "rock"],
+  autumn: ["tree", "bush", "rock"],
+  ember: ["rock", "bush"],
+};
 
 function luminance(hex: string): number {
   const c = new THREE.Color(hex); // linear
@@ -34,6 +40,10 @@ function hueGap(a: number, b: number): number {
 }
 
 const arts = registeredBiomeArt();
+
+it("every themed biome id has registered art (Original has none)", () => {
+  expect(arts.map((art) => art.id).sort()).toEqual(BIOME_IDS.filter((id) => id !== "original").sort());
+});
 
 describe.each(arts.map((art) => [art.id, art] as const))("art guardrails: %s", (_id, art) => {
   it("tone ramps are ordered, restrained and hue-coherent", () => {
@@ -122,6 +132,32 @@ describe.each(arts.map((art) => [art.id, art] as const))("art guardrails: %s", (
       within(l.sunElevation[0], 15, 65, "sunElevation[0]");
       within(l.sunElevation[1], 15, 65, "sunElevation[1]");
       expect(l.sunElevation[0]).toBeLessThanOrEqual(l.sunElevation[1]);
+    }
+  });
+
+  it("atmosphere and ground styles only restyle what the definition enables", () => {
+    const definition = getBiomeDefinition(art.id);
+    if (art.atmosphere?.water && art.atmosphere.water !== "liquid") expect(definition.ambient.water, "water style without water").toBe(true);
+    if (art.atmosphere?.particles) expect(definition.ambient.effect, "particle preset without particles").not.toBe("none");
+    const collectible = hsl(definition.mission.collectibleColor).h;
+    const { ground } = art;
+    if (ground.crackGlow) {
+      expect(ground.cracks ?? 0, "crackGlow needs cracks").toBeGreaterThan(0);
+      // A glowing crack must never read as a collectible.
+      expect(hueGap(hsl(ground.crackGlow).h, collectible), "crackGlow hue").toBeGreaterThanOrEqual(30);
+    }
+    if (ground.patches) {
+      expect(ground.patches.tints.length).toBeGreaterThan(0);
+      for (const tint of ground.patches.tints) {
+        expect(tint.weight).toBeGreaterThan(0);
+        expect(hsl(tint.color).s, `${tint.color} saturation`).toBeLessThanOrEqual(0.78);
+      }
+      const litter = ground.patches.litter ?? [];
+      expect(litter.length).toBeLessThanOrEqual(3);
+      for (const hex of litter) {
+        const c = hsl(hex);
+        if (c.s > 0.15) expect(hueGap(c.h, collectible), `${hex} litter hue`).toBeGreaterThanOrEqual(30);
+      }
     }
   });
 

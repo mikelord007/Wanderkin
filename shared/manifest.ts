@@ -121,7 +121,7 @@ export interface CourseValidation {
   uncertaintyNotes?: string;
 }
 
-export const SCENE_BIOME_IDS = ["original", "tropical", "desert"] as const;
+export const SCENE_BIOME_IDS = ["original", "tropical", "desert", "alpine", "autumn", "ember"] as const;
 export type SceneBiomeId = (typeof SCENE_BIOME_IDS)[number];
 export const ADVENTURE_TEMPLATE_IDS = ["restore-portal", "reach-beacon"] as const;
 export type AdventureTemplateId = (typeof ADVENTURE_TEMPLATE_IDS)[number];

@@ -122,7 +122,7 @@ describe("prepareAdventure", () => {
 
   it("never lets the theme change the layout", () => {
     const fixture = bedFixture();
-    const layouts = (["original", "tropical", "desert"] as const).map((id) => {
+    const layouts = (["original", "tropical", "desert", "alpine", "autumn", "ember"] as const).map((id) => {
       const outcome = prepareAdventure({
         manifest: fixture.manifest,
         assets: fixture.assets,

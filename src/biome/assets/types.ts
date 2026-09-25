@@ -141,6 +141,42 @@ export interface GroundStyle {
   patchColor?: string;
   /** Share (0–1) of soil patches drawn as cracked, dried earth (default 0). */
   cracks?: number;
+  /**
+   * Emissive tint of the crack lines (e.g. lava glow), sRGB hex. Same draw,
+   * unlit colour; only meaningful with `cracks` > 0.
+   */
+  crackGlow?: string;
+  /**
+   * Tints of the translucent support patches from geometry (one draw). When
+   * unset, the framework default applies (sand, plus vegetation on Tropical).
+   */
+  patches?: GroundPatchStyle;
+}
+
+export interface GroundPatchStyle {
+  /** Weighted patch tints, sRGB hex; one is picked per patch. */
+  tints: readonly { color: string; weight: number }[];
+  /**
+   * Leaf litter: 1–3 fleck colours scattered over the patch as small leaves
+   * (e.g. fallen autumn leaves, pine needles). Omit for plain drifts.
+   */
+  litter?: readonly string[];
+}
+
+/** Water surface styles for the geometry-approved water ring. */
+export type WaterStyle = "liquid" | "frozen" | "lava";
+/** Particle presets; each replaces the look of the definition's ambient effect. */
+export type ParticlePreset = "snow" | "embers";
+
+/**
+ * Renderer-only atmosphere choices. Both only restyle what the definition
+ * already enables (`ambient.water`, `ambient.effect`): they never add a draw.
+ */
+export interface AtmosphereStyle {
+  /** Default "liquid" (rippled, translucent). "frozen" is flat, pale, still; "lava" glows. */
+  water?: WaterStyle;
+  /** Restyles the ambient particles (count and budget unchanged). */
+  particles?: ParticlePreset;
 }
 
 /**
@@ -167,6 +203,8 @@ export interface BiomeArt {
   id: BiomeId;
   /** Optional lighting adjustments (see {@link LightingAdjust}). */
   lighting?: LightingAdjust;
+  /** Optional water/particle styles (see {@link AtmosphereStyle}). */
+  atmosphere?: AtmosphereStyle;
   tones: BiomeTones;
   families: Readonly<Record<string, AssetFamily>>;
   /** Cluster presets per geometry placement kind. Missing kind = not drawn. */

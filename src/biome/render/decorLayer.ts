@@ -267,7 +267,7 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
   // ---- Support patches -----------------------------------------------------
   const patches = selectSurfacePatches(definition, layout, quality);
   if (patches.length > 0 && canDraw("patches", 1)) {
-    const owned = createSupportPatches(patches, definition, layout.seed);
+    const owned = createSupportPatches(patches, definition, layout.seed, art?.ground.patches);
     if (owned) {
       geometries.push(...owned.geometries);
       materials.push(...owned.materials);
@@ -278,7 +278,7 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
 
   // ---- Water ring (only where geometry approved one) -----------------------
   if (definition.ambient.water && layout.water) {
-    const owned = createWaterRing(layout.water, definition, wind);
+    const owned = createWaterRing(layout.water, definition, wind, art?.atmosphere?.water);
     if (!owned) stats.skipped.push("water: invalid ring");
     else if (canDraw("water", 1)) {
       geometries.push(...owned.geometries);
@@ -292,10 +292,11 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
   }
 
   // ---- Particles -------------------------------------------------------------
+  // The art may restyle the definition's effect (snow, embers); never add one.
   const effect = definition.ambient.effect;
   const particleCount = Math.max(0, Math.floor(budget.particles));
   if (effect !== "none" && particleCount > 0 && canDraw(`particles:${effect}`, 1)) {
-    particles = createParticleField(effect, particleCount, layout, definition, wind);
+    particles = createParticleField(art?.atmosphere?.particles ?? effect, particleCount, layout, definition, wind);
     particles.object.visible = !reducedMotion;
     geometries.push(...particles.geometries);
     materials.push(...particles.materials);

@@ -2,7 +2,8 @@
  * Ground contact for clusters, in one instanced draw: a soft, dark contact
  * blob under every cluster (the ambient occlusion a prop throws on the
  * ground) and, under some clusters, a subtle soil/sand patch with a wobbly
- * edge, optionally cracked like dried earth (`ground.cracks`). All stay
+ * edge, optionally cracked like dried earth (`ground.cracks`), the cracks
+ * optionally glowing like cooling lava (`ground.crackGlow`). All stay
  * inside the cluster's footprint, lie on its support plane,
  * never write depth, and draw before gameplay rings (renderOrder 0), so they
  * can never hide a spawn, checkpoint or collectible marker.
@@ -52,7 +53,10 @@ export function createContactDecals(
     polygonOffsetFactor: -1,
     polygonOffsetUnits: -1,
   });
+  const glow = ground.crackGlow && crackShare > 0 ? new THREE.Color(ground.crackGlow) : null;
+  if (glow) material.defines = { OQ_CRACK_GLOW: "" };
   material.onBeforeCompile = (shader) => {
+    if (glow) shader.uniforms.uCrackGlow = { value: glow };
     shader.vertexShader = `attribute float aOpacity;\nattribute float aPatch;\nvarying float oqOpacity;\nvarying float oqPatch;\nvarying vec2 oqLocal;\nvarying float oqSeed;\n${shader.vertexShader}`.replace(
       "#include <begin_vertex>",
       `#include <begin_vertex>
@@ -66,6 +70,9 @@ export function createContactDecals(
       #endif`,
     );
     shader.fragmentShader = `varying float oqOpacity;\nvarying float oqPatch;\nvarying vec2 oqLocal;\nvarying float oqSeed;
+      #ifdef OQ_CRACK_GLOW
+        uniform vec3 uCrackGlow;
+      #endif
       float oqContactHash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
       // Distance to the nearest cell border (cell noise F2 - F1): crack lines.
       float oqCrackEdge(vec2 p) {
@@ -98,11 +105,18 @@ export function createContactDecals(
         float oqCrack = (1.0 - smoothstep(0.03, 0.09, oqCrackEdge(oqLocal * 3.2 + oqSeed))) * oqIsCrack;
         diffuseColor.rgb *= 1.0 - 0.45 * oqCrack;
         diffuseColor.a *= oqOpacity * mix(blob, oqPatchMask * (1.0 + 0.6 * oqCrack), oqIsPatch);
+        #ifdef OQ_CRACK_GLOW
+          // Unlit material: the crack colour itself is the glow, brightest
+          // at the patch centre and cooling toward its edge.
+          float oqGlow = oqCrack * oqPatchMask * (1.0 - smoothstep(0.2, 0.75, r));
+          diffuseColor.rgb = mix(diffuseColor.rgb, uCrackGlow, oqGlow);
+          diffuseColor.a = max(diffuseColor.a, 0.92 * oqGlow);
+        #endif
         if (diffuseColor.a < 0.01) discard;
       }`,
     );
   };
-  material.customProgramCacheKey = () => "objectquest-biome-contact-v2";
+  material.customProgramCacheKey = () => (glow ? "objectquest-biome-contact-glow-v1" : "objectquest-biome-contact-v2");
 
   const mesh = new THREE.InstancedMesh(geometry, material, decals.length);
   mesh.name = "biome-contact";

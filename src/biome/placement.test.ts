@@ -107,9 +107,9 @@ describe("prepareBiomeLayout", () => {
     expect(layout.water).toBeNull();
   });
 
-  it.each(FIXTURES.map((make) => [make().name, make] as const))("%s: tropical and desert props are supported, fitted and apart", (_name, make) => {
+  it.each(FIXTURES.map((make) => [make().name, make] as const))("%s: every themed look's props are supported, fitted and apart", (_name, make) => {
     const fixture = make();
-    for (const biome of ["tropical", "desert"] as const) {
+    for (const biome of ["tropical", "desert", "alpine", "autumn", "ember"] as const) {
       const layout = layoutFor(fixture, biome);
       expect(layout.props.length).toBeGreaterThan(0);
       assertPropsSafe(fixture, layout);
@@ -121,7 +121,7 @@ describe("prepareBiomeLayout", () => {
     for (const template of ["restore-portal", "reach-beacon"] as const) {
       const adventure = generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template, seed: "route" }, DEFAULT_ADVENTURE_BUDGET, unhurried());
       const played = { manifest: adventure.manifest, assets: fixture.assets };
-      for (const biome of ["tropical", "desert"] as const) {
+      for (const biome of ["tropical", "desert", "alpine", "autumn", "ember"] as const) {
         const layout = layoutFor(played, biome);
         expect(layout.props.length).toBeGreaterThan(0);
         assertPropsSafe(played, layout);

@@ -21,6 +21,9 @@ const DESTINATIONS: Readonly<Record<BiomeId, { portal: string; beacon: string }>
   original: { portal: "portal", beacon: "beacon" },
   tropical: { portal: "island gate", beacon: "lagoon beacon" },
   desert: { portal: "oasis gate", beacon: "oasis beacon" },
+  alpine: { portal: "summit gate", beacon: "summit beacon" },
+  autumn: { portal: "hollow gate", beacon: "hollow beacon" },
+  ember: { portal: "obsidian gate", beacon: "obsidian beacon" },
 };
 
 function sentence(text: string): string {

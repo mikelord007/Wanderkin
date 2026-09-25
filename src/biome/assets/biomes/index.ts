@@ -5,7 +5,10 @@
  */
 import type { BiomeId } from "../../types.js";
 import type { BiomeArt } from "../types.js";
+import { ALPINE_ART } from "./alpine.js";
+import { AUTUMN_ART } from "./autumn.js";
 import { DESERT_ART } from "./desert.js";
+import { EMBER_ART } from "./ember.js";
 import { TROPICAL_ART } from "./tropical.js";
 
 /**
@@ -15,6 +18,9 @@ import { TROPICAL_ART } from "./tropical.js";
 const FACTORIES: Partial<Record<BiomeId, () => BiomeArt>> = {
   tropical: () => TROPICAL_ART,
   desert: () => DESERT_ART,
+  alpine: () => ALPINE_ART,
+  autumn: () => AUTUMN_ART,
+  ember: () => EMBER_ART,
 };
 
 const cache = new Map<BiomeId, BiomeArt>();

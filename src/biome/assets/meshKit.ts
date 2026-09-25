@@ -13,7 +13,7 @@
  * bucket geometries, so templates can be cached freely.
  */
 import * as THREE from "three";
-import type { UnitMesh } from "./types.js";
+import type { BiomeTones, UnitMesh } from "./types.js";
 
 /** Per-vertex colour (linear): a constant, a function of the unit-space vertex, or the part's own attribute. */
 export type ColorSource = THREE.Color | ((position: THREE.Vector3, normal: THREE.Vector3) => THREE.Color) | "attribute";
@@ -257,4 +257,48 @@ export function linearRamp(ramp: { dark: string; base: string; light: string }) 
 function smooth(t: number): number {
   const x = Math.min(1, Math.max(0, t));
   return x * x * (3 - 2 * x);
+}
+
+// ---------------------------------------------------------------------------
+// Snow caps
+
+export interface SnowCapOptions {
+  /** Snow colour (sRGB hex). */
+  color: string;
+  /** Up-facing threshold: facets with normal.y above this start to whiten (0.35 … 0.8). */
+  threshold: number;
+  /** Extra coverage toward the top of the asset, 0..1 (snow settles on crowns and ledges). */
+  heightBias?: number;
+  /** Strongest blend, 0..1 (default 0.92). */
+  strength?: number;
+}
+
+/**
+ * Returns a copy of `mesh` with snow settled on its up-facing surfaces: a
+ * crisp band above `threshold` (faceted parts get snow per face, smooth parts
+ * a soft cap), more toward the top. Positions, normals and sway are shared,
+ * so the result costs nothing extra to draw.
+ */
+export function snowCap(mesh: UnitMesh, options: SnowCapOptions): UnitMesh {
+  const snow = new THREE.Color(options.color);
+  const strength = Math.min(1, Math.max(0, options.strength ?? 0.92));
+  const bias = Math.min(1, Math.max(0, options.heightBias ?? 0.3));
+  const height = Math.max(1e-6, mesh.maxY - mesh.minY);
+  const colors = new Float32Array(mesh.colors);
+  for (let i = 0; i < mesh.positions.length / 3; i += 1) {
+    const ny = mesh.normals[i * 3 + 1]!;
+    const y = (mesh.positions[i * 3 + 1]! - mesh.minY) / height;
+    const edge = options.threshold - bias * (y - 0.5) * 0.5;
+    const t = Math.min(1, Math.max(0, (ny - edge) / 0.12)) * strength;
+    if (t <= 0) continue;
+    colors[i * 3] = colors[i * 3]! + (snow.r - colors[i * 3]!) * t;
+    colors[i * 3 + 1] = colors[i * 3 + 1]! + (snow.g - colors[i * 3 + 1]!) * t;
+    colors[i * 3 + 2] = colors[i * 3 + 2]! + (snow.b - colors[i * 3 + 2]!) * t;
+  }
+  return { ...mesh, colors };
+}
+
+/** Wraps any variant builder so its output wears a snow cap. */
+export function withSnowCap(builder: (tones: BiomeTones) => UnitMesh, options: SnowCapOptions) {
+  return (tones: BiomeTones): UnitMesh => snowCap(builder(tones), options);
 }

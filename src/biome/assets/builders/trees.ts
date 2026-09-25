@@ -1,8 +1,9 @@
 /**
  * Tree builders: palms (curved, tapered, ring-segmented trunks; crowns of
- * folded, serrated, drooping fronds), a generic broad-leaf tree for future
- * biomes (tapered trunk, one or two branches, layered crown masses), and the
- * dressing that falls from them (fallen fronds, driftwood).
+ * folded, serrated, drooping fronds), a generic broad-leaf tree (tapered
+ * trunk, one or two branches, layered crown masses) with a default canopy
+ * set, layered-tier conifers (snow-cap friendly: faceted, upward tiers), and
+ * the dressing that falls from them (fallen fronds, driftwood).
  */
 import * as THREE from "three";
 import { linearRamp, MeshKit, rampAt, rampTone } from "../meshKit.js";
@@ -113,6 +114,8 @@ export interface BroadleafTreeOptions {
   crownWidth: number;
   seed: number;
   branches?: number;
+  /** Tone names for alternating crown masses (default foliage / foliageAlt). */
+  crown?: readonly [string, string];
 }
 
 /** Generic stylised tree: tapered trunk, branch stubs, layered crown masses. */
@@ -121,6 +124,8 @@ export function broadleafTree(options: BroadleafTreeOptions): VariantBuilder {
     const random = builderRandom(options.seed);
     const kit = new MeshKit();
     const trunkRamp = linearRamp(tones.trunk);
+    const crownA = tones[options.crown?.[0] ?? "foliage"] ?? tones.foliage;
+    const crownB = tones[options.crown?.[1] ?? "foliageAlt"] ?? tones.foliageAlt;
     const H = options.trunk;
     const spine = (t: number) => new THREE.Vector3(options.lean * t * t, H * t, 0);
     kit.add(
@@ -155,7 +160,7 @@ export function broadleafTree(options: BroadleafTreeOptions): VariantBuilder {
       const r = options.crownWidth * (0.22 + random() * 0.12);
       kit.add(
         lobe({ radius: [r, r * 0.8, r], detail: 1, jitter: 0.14, seed: options.seed * 7 + m, center: [anchor.x + Math.cos(a) * d, anchor.y + (random() - 0.3) * 0.12, anchor.z + Math.sin(a) * d] }),
-        { color: rampTone(m % 2 ? tones.foliageAlt : tones.foliage, { heightWeight: 0.5, bias: (random() - 0.5) * 0.3 }), sway: (p) => 0.3 + p.y * 0.5, smooth: true },
+        { color: rampTone(m % 2 ? crownB : crownA, { heightWeight: 0.5, bias: (random() - 0.5) * 0.3 }), sway: (p) => 0.3 + p.y * 0.5, smooth: true },
       );
     }
     return kit.finish({ groundAo: { height: 0.1, strength: 0.25 } });
@@ -213,4 +218,117 @@ export function lyingLog(options: { seed: number; ramp?: string; fork?: boolean 
     }
     return kit.finish({ fit: "size", sink: 0.03 });
   };
+}
+
+export interface ConiferOptions {
+  /** Stacked foliage tiers, 3–6. */
+  tiers: number;
+  /** Bottom tier radius relative to the tree height (≈ 0.3 slim … 0.5 wide). */
+  width: number;
+  /** How far tier tips hang below their base, relative to tier height. */
+  droop: number;
+  /** Bare trunk showing under the lowest tier, fraction of the height. */
+  trunk: number;
+  seed: number;
+  /** Serrations (branch tips) per tier ring (default 9). */
+  points?: number;
+}
+
+/**
+ * One conifer tier: a serrated, drooping skirt around an apex. Tips hang
+ * below the tier base and notches sit higher, so each tier reads as a layer
+ * of branches, not a smooth cone. Closed underneath so it never looks hollow.
+ */
+function coniferTier(radius: number, height: number, baseY: number, points: number, droop: number, seed: number): THREE.BufferGeometry {
+  const random = builderRandom(seed);
+  const positions: number[] = [0, baseY + height, 0];
+  const index: number[] = [];
+  const ring = points * 2;
+  const turn = random() * Math.PI;
+  for (let k = 0; k < ring; k += 1) {
+    const tip = k % 2 === 0;
+    const angle = turn + (k / ring) * Math.PI * 2 + (random() - 0.5) * 0.12;
+    const r = radius * (tip ? 1 - random() * 0.08 : 0.7);
+    const y = baseY + (tip ? -droop * height * (0.8 + random() * 0.4) : droop * height * 0.25);
+    positions.push(Math.cos(angle) * r, y, Math.sin(angle) * r);
+  }
+  const under = positions.length / 3;
+  positions.push(0, baseY + height * 0.18, 0);
+  for (let k = 0; k < ring; k += 1) {
+    const a = 1 + k;
+    const b = 1 + ((k + 1) % ring);
+    index.push(0, b, a);
+    index.push(under, a, b);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(index);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/** Stylised conifer: a short trunk under stacked, serrated, drooping tiers. */
+export function conifer(options: ConiferOptions): VariantBuilder {
+  return (tones: BiomeTones): UnitMesh => {
+    const random = builderRandom(options.seed);
+    const kit = new MeshKit();
+    const trunkRamp = linearRamp(tones.trunk);
+    const H = 1;
+    const trunkTop = options.trunk * H + 0.05;
+    kit.add(
+      tube({
+        spine: (t) => new THREE.Vector3(0, trunkTop * t, 0),
+        radius: (t) => 0.045 * (1 - 0.3 * t) * (1 + 0.5 * (1 - Math.min(1, t / 0.2)) ** 2),
+        rings: 2,
+        sides: 6,
+        cap: "open",
+        color: (t) => rampAt(trunkRamp, 0.3 + t * 0.2),
+      }),
+      { color: "attribute", smooth: true },
+    );
+    const tiers = Math.max(3, Math.min(6, Math.round(options.tiers)));
+    const span = H - options.trunk * H;
+    const tierHeight = (span / tiers) * 1.55; // tiers overlap
+    for (let i = 0; i < tiers; i += 1) {
+      const f = i / (tiers - 1);
+      const radius = options.width * (1 - 0.72 * f) * (0.94 + random() * 0.12);
+      const baseY = options.trunk * H + (span - tierHeight) * f;
+      const ramp = i % 2 === 0 ? tones.foliage : tones.foliageAlt;
+      kit.add(coniferTier(radius, tierHeight, baseY, options.points ?? 9, options.droop, options.seed * 31 + i), {
+        color: rampTone(ramp, { heightWeight: 0.35, bias: (f - 0.5) * 0.3 }),
+        sway: (p) => 0.2 + p.y * 0.6,
+      });
+    }
+    return kit.finish({ groundAo: { height: 0.12, strength: 0.3 } });
+  };
+}
+
+/** Default conifer spread: tall slim, classic, wide squat, young (≥ 4). */
+export function defaultConiferVariants() {
+  return [
+    conifer({ tiers: 5, width: 0.34, droop: 0.28, trunk: 0.08, seed: 1 }),
+    conifer({ tiers: 4, width: 0.44, droop: 0.32, trunk: 0.1, seed: 2 }),
+    conifer({ tiers: 3, width: 0.52, droop: 0.36, trunk: 0.12, seed: 3, points: 10 }),
+    conifer({ tiers: 4, width: 0.3, droop: 0.22, trunk: 0.14, seed: 4, points: 7 }),
+    conifer({ tiers: 6, width: 0.4, droop: 0.26, trunk: 0.06, seed: 5 }),
+  ];
+}
+
+/**
+ * Default broadleaf canopy spread: round, tall oval, spreading, young (≥ 4).
+ * `crowns` cycles crown tone pairs across the variants (e.g. autumn reds and
+ * golds); omitted = foliage / foliageAlt everywhere.
+ */
+export function defaultBroadleafVariants(crowns: readonly (readonly [string, string])[] = []) {
+  const shapes: Omit<BroadleafTreeOptions, "crown">[] = [
+    { trunk: 0.5, lean: 0.03, masses: 7, crownWidth: 0.55, seed: 1 },
+    { trunk: 0.62, lean: -0.02, masses: 6, crownWidth: 0.52, seed: 2, branches: 1 },
+    { trunk: 0.46, lean: 0.04, masses: 8, crownWidth: 0.5, seed: 3, branches: 3 },
+    { trunk: 0.4, lean: 0.02, masses: 4, crownWidth: 0.5, seed: 4, branches: 1 },
+    { trunk: 0.55, lean: -0.04, masses: 6, crownWidth: 0.53, seed: 5 },
+  ];
+  return shapes.map((shape, i) => {
+    const crown = crowns.length > 0 ? crowns[i % crowns.length] : undefined;
+    return broadleafTree(crown ? { ...shape, crown } : shape);
+  });
 }
