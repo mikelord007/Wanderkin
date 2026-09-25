@@ -1,7 +1,9 @@
 import * as THREE from "three";
 import { STYLE_DEFINITIONS } from "../../shared/style.js";
 import { describe, expect, it } from "vitest";
+import { getKnownMaterialProfile, MATERIAL_REGION_KIND_CODE } from "./materialRegions.js";
 import {
+  cartoonAssetBandColor,
   cloneStyledObject,
   createStyledHelperMaterial,
   disposeStyledObject,
@@ -9,9 +11,9 @@ import {
   setObjectColorRestoration,
 } from "./styleMaterial.js";
 
-/** Matches the exact material shape GLTFLoader produces for every shipped
- * Rodin/Tripo/storage-asset `.glb` (see `materialRegions.ts`): all colour in
- * `emissiveTexture`, black `baseColorFactor`, zero metalness. */
+/** Matches the baked material shape GLTFLoader produces for the Rodin sample
+ * and storage-asset `.glb`s: all colour in `emissiveTexture`, black
+ * `baseColorFactor`, zero metalness. (The Tripo sample is real PBR instead.) */
 function bakedEmissiveMaterial(): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     color: 0x000000,
@@ -321,6 +323,114 @@ describe("scene style materials", () => {
       disposeStyledObject(knownClone);
       plain.material.dispose();
       known.material.dispose();
+    });
+
+    it("passes the known profile's measured boxes to the shader as uniforms", () => {
+      const known = meshWithBakedMaterial();
+      const clone = cloneStyledObject(known.source, STYLE_DEFINITIONS.watercolor, 1, RODIN_SHA256);
+      const material = (clone.children[0] as THREE.Mesh).material as THREE.Material;
+      const shader = { uniforms: {} as Record<string, { value: unknown }>, vertexShader: "#include <begin_vertex>", fragmentShader: "#include <map_fragment>\n#include <roughnessmap_fragment>\n#include <normal_fragment_maps>\n#include <dithering_fragment>" };
+      material.onBeforeCompile(shader as never, {} as never);
+
+      const profile = getKnownMaterialProfile(RODIN_SHA256)!;
+      const mins = shader.uniforms.oqRegionMin?.value as THREE.Vector3[];
+      const kinds = shader.uniforms.oqRegionKind?.value as number[];
+      expect(mins.map((v) => v.toArray())).toEqual(profile.boxes.map((box) => [...box.min]));
+      expect(kinds).toEqual(profile.boxes.map((box) => MATERIAL_REGION_KIND_CODE[box.kind]));
+      expect(shader.fragmentShader).toContain(`#define OQ_REGION_BOXES ${profile.boxes.length}`);
+
+      disposeStyledObject(clone);
+      known.material.dispose();
+    });
+
+    it("fades surface detail by cycles per pixel, not radians", () => {
+      const known = meshWithBakedMaterial();
+      const clone = cloneStyledObject(known.source, STYLE_DEFINITIONS.cartoon, 1, RODIN_SHA256);
+      const material = (clone.children[0] as THREE.Mesh).material as THREE.Material;
+      const shader = { uniforms: {}, vertexShader: "#include <begin_vertex>", fragmentShader: "#include <map_fragment>\n#include <roughnessmap_fragment>\n#include <normal_fragment_maps>\n#include <dithering_fragment>" };
+      material.onBeforeCompile(shader as never, {} as never);
+
+      expect(shader.fragmentShader).toContain("radiansPerMetre * 0.15915494");
+
+      disposeStyledObject(clone);
+      known.material.dispose();
+    });
+  });
+
+  describe("cartoon banding on imported assets", () => {
+    const stub = () => ({
+      uniforms: {},
+      vertexShader: "#include <begin_vertex>",
+      fragmentShader: "#include <map_fragment>\n#include <roughnessmap_fragment>\n#include <normal_fragment_maps>\n#include <dithering_fragment>",
+    });
+
+    it("bands imported asset materials by luminance, in cartoon only", () => {
+      for (const [name, material] of [
+        ["baked", bakedEmissiveMaterial()],
+        ["pbr", new THREE.MeshStandardMaterial({ map: new THREE.Texture(), metalness: 0.5 })],
+      ] as const) {
+        const source = new THREE.Group();
+        source.add(new THREE.Mesh(new THREE.BoxGeometry(), material));
+        for (const style of [STYLE_DEFINITIONS.cartoon, STYLE_DEFINITIONS["hand-painted"], STYLE_DEFINITIONS.watercolor]) {
+          const clone = cloneStyledObject(source, style, 1);
+          const shader = stub();
+          ((clone.children[0] as THREE.Mesh).material as THREE.Material).onBeforeCompile(shader as never, {} as never);
+          expect(shader.fragmentShader.includes("oqBandLuma"), `${name}/${style.id}`).toBe(style.id === "cartoon");
+          expect(shader.fragmentShader).not.toContain("oqColor = floor(oqColor * oqColorSteps");
+          disposeStyledObject(clone);
+        }
+        material.dispose();
+      }
+    });
+
+    it("keeps authored helper, floor and marker colours on per-channel banding", () => {
+      for (const floor of [true, false]) {
+        const material = createStyledHelperMaterial("#6BCB77", STYLE_DEFINITIONS.cartoon, 1, { floor });
+        const shader = stub();
+        material.onBeforeCompile(shader as never, {} as never);
+        expect(shader.fragmentShader).toContain("oqColor = floor(oqColor * oqColorSteps + 0.5) / oqColorSteps;");
+        expect(shader.fragmentShader).not.toContain("oqBandLuma");
+        expect(material.customProgramCacheKey()).toContain(":helper");
+        material.dispose();
+      }
+    });
+
+    it("keeps a gloss gradient on one texture colour to one hue, where per-channel rounding broke it into false hues", () => {
+      // A warm brown seat with a specular sheen ramping across it.
+      const base = [0.36, 0.26, 0.18] as const;
+      const hue = (c: readonly number[]) => {
+        const [r, g, b] = c as [number, number, number];
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        if (max - min < 1e-6) return null;
+        const h = max === r ? ((g - b) / (max - min)) % 6 : max === g ? (b - r) / (max - min) + 2 : (r - g) / (max - min) + 4;
+        return (h * 60 + 360) % 360;
+      };
+      const perChannel = (c: readonly number[]) => c.map((v) => Math.floor(v * 5 + 0.5) / 5);
+      const sourceHue = hue(base)!;
+      let worstLumaDrift = 0;
+      let worstChannelDrift = 0;
+      for (let sheen = 0; sheen <= 0.5; sheen += 0.01) {
+        const lit = base.map((v) => Math.min(1, v + sheen)) as [number, number, number];
+        const banded = hue(cartoonAssetBandColor(lit));
+        worstLumaDrift = Math.max(worstLumaDrift, banded === null ? 180 : Math.abs(banded - sourceHue));
+        const channel = hue(perChannel(lit));
+        worstChannelDrift = Math.max(worstChannelDrift, channel === null ? 180 : Math.abs(channel - sourceHue));
+      }
+      // Per-channel rounding flips the brown to red, yellow and grey bands.
+      expect(worstChannelDrift).toBeGreaterThan(25);
+      // Luminance banding only brightens it (sheen desaturates the lit
+      // colour itself, so allow a little drift), never inventing a hue.
+      expect(worstLumaDrift).toBeLessThan(12);
+    });
+
+    it("never crushes a dark, non-black texture colour to black", () => {
+      for (const dark of [[0.08, 0.05, 0.03], [0.04, 0.03, 0.02], [0.02, 0.012, 0.008]] as const) {
+        const banded = cartoonAssetBandColor(dark);
+        const luma = 0.2126 * banded[0] + 0.7152 * banded[1] + 0.0722 * banded[2];
+        expect(luma).toBeGreaterThan(0.09);
+        expect(Math.floor(dark[0] * 5 + 0.5) / 5).toBe(0);
+      }
     });
   });
 });

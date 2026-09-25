@@ -190,17 +190,21 @@ const RODIN_TRANSFORM = {
   ] as Vec3,
 };
 
-/** Desk-height surface measured at y ≈ 1.286, spanning x −0.06…3.18,
- * z −0.37…1.07. This is the elevated furniture surface the course climbs. */
+/** Elevated surface measured at y ≈ 1.286, spanning x −0.06…3.18,
+ * z −0.37…1.07. This is the elevated furniture surface the course climbs. It
+ * is the sofa seat, not the desk: the desk (with the laptop) is the −X piece,
+ * its top at y ≈ 1.80 (see materialRegions.ts). The constant keeps its
+ * historical name. */
 const RODIN_DESK_Y = 1.286;
 
 /**
- * Three-step flight on the +Z side of the desk ledge (which ends at z ≈ 1.074).
+ * Three-step flight on the +Z side of the sofa seat's front ledge (which ends at
+ * z ≈ 1.074).
  *
  * Each step is a third of the climb — a 0.43 m mantle, comfortably inside the
- * 0.3–0.9 m mantle window — and the top step is a landing flush with the desk
- * surface rather than one more mantle. That last detail matters: the desk's
- * front edge slopes out past its top, and a step stopping below the desk
+ * 0.3–0.9 m mantle window — and the top step is a landing flush with the seat
+ * surface rather than one more mantle. That last detail matters: the seat's
+ * front edge slopes out past its top, and a step stopping below the seat
  * height leaves no headroom to stand on directly in front of it.
  */
 const RODIN_HELPERS: HelperEntity[] = [
@@ -255,7 +259,7 @@ const RODIN_SAMPLE: SceneManifest = {
       assetId: "rodin-glb",
       transform: RODIN_TRANSFORM,
       // Triangle mesh, not a bounding box: the player has to be able to stand
-      // on the desk and walk around the sofa, not on top of a crate.
+      // on the sofa seat and walk around the desk legs, not on top of a crate.
       collider: { kind: "triangle-mesh" },
     },
     // Extended 1.44 m on the +Z side only (centre pushed to z = 0.72) to make
@@ -270,13 +274,13 @@ const RODIN_SAMPLE: SceneManifest = {
     headingRadians: Math.PI / 2,
   },
   checkpoints: [
-    // Open floor beside the sofa end.
+    // Open floor in front of the desk's left end.
     checkpoint(0, [-4.02, 0, 2.154], 0),
     // Floor at the foot of the helper steps.
     checkpoint(1, [2.46, 0, 3.594], Math.PI),
-    // On the desk: the elevated furniture surface, reached by the step flight.
+    // On the sofa seat: the elevated furniture surface, reached by the step flight.
     checkpoint(2, [2.1, RODIN_DESK_Y, 0.354], Math.PI),
-    // Across the desk top to its far (−X) end.
+    // Across the seat to its far (−X) end, beside the sofa's left arm.
     checkpoint(3, [0.3, RODIN_DESK_Y, -0.006], Math.PI / 2),
     // Back down to the floor to finish.
     checkpoint(4, [-1.14, 0, -2.166], -Math.PI / 2),

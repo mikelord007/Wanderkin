@@ -1,7 +1,12 @@
 import * as THREE from "three";
 import type { StyleDefinition } from "../../shared/style.js";
 import { clampColorRestoration } from "./style.js";
-import { getKnownMaterialProfile, type MaterialRegionProfile } from "./materialRegions.js";
+import {
+  getKnownMaterialProfile,
+  MATERIAL_REGION_KIND_CODE,
+  MAX_MATERIAL_REGION_BOXES,
+  type MaterialRegionProfile,
+} from "./materialRegions.js";
 
 interface StyleUniformState {
   colorRestoration: { value: number };
@@ -23,9 +28,9 @@ const USER_DATA_KEY = "objectQuestStyleUniforms";
  *
  * `assetSha256` is the loaded asset's verified content hash (not its manifest
  * id or filename). When it matches a known bundled sample in
- * `materialRegions.ts`, submeshes get that sample's authored wood/fabric
- * region treatment; otherwise every mesh gets the conservative, uniformly-lit
- * treatment only (see `installStyleShader`).
+ * `materialRegions.ts`, the surfaces inside that sample's measured boxes get
+ * the authored wood/fabric treatment; otherwise every mesh gets the
+ * conservative, uniformly-lit treatment only (see `installStyleShader`).
  */
 export function cloneStyledObject(
   source: THREE.Object3D,
@@ -60,7 +65,7 @@ export function createStyledHelperMaterial(
     roughness: options.floor ? 0.94 : 0.76,
     metalness: 0.01,
   });
-  installStyleShader(material, style, colorRestoration, null, false);
+  installStyleShader(material, style, colorRestoration, null, false, false);
   return material;
 }
 
@@ -86,12 +91,13 @@ export function disposeStyledObject(object: THREE.Object3D): void {
 }
 
 /**
- * Detects the exact material shape our image-to-3D providers (Rodin, Tripo,
- * and the storage-asset regeneration pipeline) bake: every one of them puts
- * all visible colour in a single `emissiveTexture`, leaves `baseColorFactor`
- * black, and reports zero metalness (verified against every `.glb` shipped
- * in `public/samples/` and `storage/assets/`; see
- * `nimbalyst-local/playtest-checkpoints/material-lighting-refinement.md`).
+ * Detects the baked, unlit material shape Rodin-style image-to-3D output uses:
+ * all visible colour in a single `emissiveTexture`, a black
+ * `baseColorFactor`, and zero metalness (`public/samples/rodin.glb` and the
+ * storage-asset regenerations). Not every generated asset looks like this:
+ * `public/samples/tripo.glb` ships a real PBR material (base colour,
+ * metallic-roughness and normal textures), which this check rejects, so it
+ * is rendered exactly as imported.
  *
  * This is a structural check on the material's own already-decoded
  * properties, not a guess about what the mesh depicts. Deliberately
@@ -158,7 +164,7 @@ function cloneStyledMaterial(
   const material = source.clone();
   const wasRelit = isBakedEmissiveOnlyMaterial(material);
   if (wasRelit) relightBakedEmissiveMaterial(material);
-  installStyleShader(material, style, colorRestoration, regionProfile, wasRelit);
+  installStyleShader(material, style, colorRestoration, regionProfile, wasRelit, true);
   return material;
 }
 
@@ -198,6 +204,7 @@ function installStyleShader(
   colorRestoration: number,
   regionProfile: MaterialRegionProfile | null,
   wasRelit: boolean,
+  importedAsset: boolean,
 ): void {
   const state: StyleUniformState = {
     colorRestoration: { value: clampColorRestoration(colorRestoration) },
@@ -217,7 +224,9 @@ function installStyleShader(
 
   const previousCompile = material.onBeforeCompile;
   const styleFragment = style.id === "cartoon"
-    ? `
+    ? importedAsset
+      ? CARTOON_ASSET_LUMA_BANDS
+      : `
       if (oqColorSteps > 1.0) {
         oqColor = floor(oqColor * oqColorSteps + 0.5) / oqColorSteps;
       }`
@@ -250,10 +259,7 @@ function installStyleShader(
     }
 
     if (regionProfile) {
-      Object.assign(shader.uniforms, {
-        oqRegionDividerX: { value: regionProfile.dividerWorldX },
-        oqRegionBlendWidth: { value: regionProfile.blendWidth },
-      });
+      Object.assign(shader.uniforms, regionUniforms(regionProfile));
       shader.vertexShader = `
         varying vec3 oqWorldPos;
       ${shader.vertexShader}`.replace(
@@ -278,7 +284,7 @@ function installStyleShader(
         p3 += dot(p3, p3.yzx + 33.33);
         return fract((p3.x + p3.y) * p3.z);
       }
-    ${regionProfile ? REGION_SHADER_DECLARATIONS : ""}
+    ${regionProfile ? regionShaderDeclarations(regionProfile, style) : ""}
     ${shader.fragmentShader}`.replace(
       "#include <dithering_fragment>",
       `#include <dithering_fragment>
@@ -324,35 +330,121 @@ function installStyleShader(
     }
   };
   material.customProgramCacheKey = () =>
-    `objectquest-style-v1:${style.id}:${style.render.outline.enabled ? 1 : 0}:${
-      regionProfile ? `region-${regionProfile.dividerWorldX}-${regionProfile.blendWidth}` : "none"
-    }:${wasRelit ? "relit" : "unlit-passthrough"}`;
+    `objectquest-style-v2:${style.id}:${style.render.outline.enabled ? 1 : 0}:${
+      regionProfile ? `region-boxes-${regionProfile.boxes.length}` : "none"
+    }:${wasRelit ? "relit" : "unlit-passthrough"}:${importedAsset ? "asset" : "helper"}`;
   material.needsUpdate = true;
 }
 
 /**
- * Fragment-shader helpers for the two-region (wood/fabric) surface detail on
- * a known sample. `oqWorldPos` is a plain affine transform of the mesh's own
- * vertex positions (see the vertex-shader injection above), so the region
- * boundary and both noise fields stay anchored to the object and do not swim
- * as the camera moves.
+ * Cartoon banding for imported assets: quantize *luminance* into the style's
+ * steps and rescale the colour to it, instead of rounding R, G and B
+ * separately.
  *
- * Bump strength is applied via the surface-gradient method (Mikkelsen), which
- * derives a tangent-consistent perturbation directly from screen-space
- * derivatives of the actual view-space position and a scalar height field —
- * it works on curved/irregular surfaces facing any direction (the sofa's
- * cushions and legs), unlike a naive "bump along the vertical axis" hack that
- * only makes sense on a flat, upward-facing surface like a desktop.
- *
- * Frequencies are chosen for legibility at normal gameplay camera distance on
- * this style-quantized renderer, not for literal real-world thread/grain
- * pitch — the same restrained-scale trade-off already made by the renderer's
- * existing paper-grain and hand-painted stroke textures.
+ * Per-channel rounding is kept for helper, floor and marker materials, whose
+ * flat authored colours it was designed for. On an imported photo texture
+ * under real lighting it did two visible kinds of damage (same-camera A/B in
+ * nimbalyst-local/playtest-checkpoints/opus-visual-review.md, "F2"):
+ *  - the three channels round at different thresholds, so any smooth
+ *    gradient (a specular sheen, soft shading) became magenta/cyan/lavender
+ *    contour bands that are not in the source texture; and
+ *  - every channel under 0.1 rounded to zero, which crushed dark furniture
+ *    (the Tripo sample's sofa) to flat black.
+ * Rescaling the colour keeps the texture's own hue at every band, and the
+ * lowest band stays at half a step instead of black. Near-black texels are
+ * eased toward neutral grey at that lowest band, so rescaling cannot
+ * amplify noise hidden in an almost-black pixel into a saturated colour.
  */
+const CARTOON_ASSET_LUMA_BANDS = /* glsl */ `
+      if (oqColorSteps > 1.0) {
+        float oqBandLuma = dot(oqColor, vec3(0.2126, 0.7152, 0.0722));
+        float oqBand = max(floor(oqBandLuma * oqColorSteps + 0.5) / oqColorSteps, 0.5 / oqColorSteps);
+        vec3 oqHueKept = clamp(oqColor * (oqBand / max(oqBandLuma, 1e-4)), 0.0, 1.0);
+        oqColor = mix(vec3(oqBand), oqHueKept, smoothstep(0.0, 0.04, oqBandLuma));
+      }`;
+
+/** CPU mirror of {@link CARTOON_ASSET_LUMA_BANDS}, for tests. Input and output are display-space RGB in [0, 1]. */
+export function cartoonAssetBandColor(
+  color: readonly [number, number, number],
+  steps = 5,
+): [number, number, number] {
+  const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+  const luma = 0.2126 * color[0] + 0.7152 * color[1] + 0.0722 * color[2];
+  const band = Math.max(Math.floor(luma * steps + 0.5) / steps, 0.5 / steps);
+  const t = Math.min(1, Math.max(0, luma / 0.04));
+  const ease = t * t * (3 - 2 * t);
+  return color.map((channel) => {
+    const hueKept = clamp01(channel * (band / Math.max(luma, 1e-4)));
+    return band + (hueKept - band) * ease;
+  }) as [number, number, number];
+}
+
+function regionUniforms(profile: MaterialRegionProfile): Record<string, { value: unknown }> {
+  if (profile.boxes.length === 0 || profile.boxes.length > MAX_MATERIAL_REGION_BOXES) {
+    throw new Error(`Material region profiles need 1-${MAX_MATERIAL_REGION_BOXES} boxes`);
+  }
+  return {
+    oqRegionMin: { value: profile.boxes.map((box) => new THREE.Vector3(...box.min)) },
+    oqRegionMax: { value: profile.boxes.map((box) => new THREE.Vector3(...box.max)) },
+    oqRegionKind: { value: profile.boxes.map((box) => MATERIAL_REGION_KIND_CODE[box.kind]) },
+    oqRegionSoftness: { value: profile.edgeSoftness },
+  };
+}
+
+function regionShaderDeclarations(profile: MaterialRegionProfile, style: StyleDefinition): string {
+  return `
+  #define OQ_REGION_BOXES ${profile.boxes.length}
+  #define OQ_DETAIL_STRENGTH ${surfaceDetailStrength(style).toFixed(2)}
+  ${REGION_SHADER_DECLARATIONS}`;
+}
+
+/**
+ * Cartoon quantizes light into five flat bands, so fine relief cannot show as
+ * shading there: it only dithers the band edges into dotted, crawling
+ * contours. Keep just a trace of it in Cartoon; the painted styles show the
+ * full weave and grain.
+ */
+export function surfaceDetailStrength(style: StyleDefinition): number {
+  return style.id === "cartoon" ? CARTOON_DETAIL_STRENGTH : 1;
+}
+const CARTOON_DETAIL_STRENGTH = 0.25;
+
+/**
+ * Surface detail for the wood and fabric regions of a known sample.
+ *
+ * `oqWorldPos` is a plain affine transform of the mesh's own vertex
+ * positions (see the vertex-shader injection above), so the region boxes and
+ * both detail fields stay anchored to the object and do not swim as the
+ * camera moves. Outside every box (and inside `neutral` boxes) the surface
+ * keeps the plain relit treatment.
+ *
+ * Scale is chosen for the game's miniature camera, not literal thread or
+ * grain pitch: the world is roughly four times real size and the chase camera
+ * sits about a metre behind a 0.175 m explorer.
+ *  - Fabric: a woven ribbing with a 4.8 cm period (~1.2 cm at real scale,
+ *    a coarse upholstery weave).
+ *  - Wood: grain lines along the desk's long X axis, about 5 cm apart, that
+ *    wander and fade in and out so they read as grain, not ruled stripes.
+ * Amplitudes were set by same-camera close-ups and a moving-camera aliasing
+ * check in all three styles (opus-visual-review.md, "F6"): strong enough to
+ * be felt under the explorer's feet, faded out well before a pixel could
+ * alias the pattern.
+ */
+const FABRIC_WEAVE_RADIANS_PER_METRE = 130;
+const FABRIC_BUMP_AMPLITUDE = 0.008;
+const WOOD_GRAIN_RADIANS_PER_METRE = 120;
+const WOOD_BUMP_AMPLITUDE = 0.003;
+
 const REGION_SHADER_DECLARATIONS = /* glsl */ `
+  #define OQ_FABRIC_FREQ ${FABRIC_WEAVE_RADIANS_PER_METRE.toFixed(1)}
+  #define OQ_FABRIC_AMP ${FABRIC_BUMP_AMPLITUDE}
+  #define OQ_WOOD_FREQ ${WOOD_GRAIN_RADIANS_PER_METRE.toFixed(1)}
+  #define OQ_WOOD_AMP ${WOOD_BUMP_AMPLITUDE}
   varying vec3 oqWorldPos;
-  uniform float oqRegionDividerX;
-  uniform float oqRegionBlendWidth;
+  uniform vec3 oqRegionMin[OQ_REGION_BOXES];
+  uniform vec3 oqRegionMax[OQ_REGION_BOXES];
+  uniform float oqRegionKind[OQ_REGION_BOXES];
+  uniform float oqRegionSoftness;
 
   float oqValueNoise(vec2 p) {
     vec2 i = floor(p);
@@ -365,58 +457,61 @@ const REGION_SHADER_DECLARATIONS = /* glsl */ `
     return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
   }
 
+  /** (wood, fabric) weights; mirrors classifyMaterialPoint in materialRegions.ts. */
+  vec2 oqRegionWeights(vec3 p) {
+    float wood = 0.0;
+    float fabric = 0.0;
+    float neutral = 0.0;
+    for (int i = 0; i < OQ_REGION_BOXES; i++) {
+      vec3 d = max(oqRegionMin[i] - p, p - oqRegionMax[i]);
+      float outside = max(max(d.x, d.y), d.z);
+      float w = 1.0 - smoothstep(-oqRegionSoftness, oqRegionSoftness, outside);
+      if (oqRegionKind[i] < 0.5) fabric = max(fabric, w);
+      else if (oqRegionKind[i] < 1.5) wood = max(wood, w);
+      else neutral = max(neutral, w);
+    }
+    return vec2(wood, fabric) * (1.0 - neutral);
+  }
+
   float oqWoodHeight(vec3 p) {
-    float rings = sin(p.z * 28.0);
-    float fiber = oqValueNoise(p.xz * 8.0) - 0.5;
-    return rings * 0.5 + fiber * 0.5;
+    // Lines run along X and wander slowly across Z; their strength varies
+    // along the board so they fade in and out like real grain.
+    float drift = oqValueNoise(vec2(p.x * 0.8, p.z * 2.0)) * 6.0;
+    float wander = (oqValueNoise(vec2(p.x * 3.5, p.z * 9.0)) * 2.0 - 1.0) * 4.0;
+    float figure = 0.35 + 0.65 * oqValueNoise(vec2(p.x * 4.0, p.z * 14.0) + 7.0);
+    return sin(p.z * OQ_WOOD_FREQ + drift + wander) * figure;
   }
 
   float oqFabricHeight(vec3 p) {
-    float weave = sin(p.x * 130.0) * sin(p.y * 130.0 + 1.5708) * 0.4
-      + sin(p.z * 130.0) * 0.2;
+    float weave = sin(p.x * OQ_FABRIC_FREQ) * sin(p.y * OQ_FABRIC_FREQ + 1.5708) * 0.4
+      + sin(p.z * OQ_FABRIC_FREQ) * 0.2;
     float soft = oqValueNoise(p.xz * 14.0 + p.y * 6.0) - 0.5;
     return weave * 0.5 + soft * 0.7;
   }
 
-  float oqWoodRegionFactor(vec3 worldPos) {
-    return smoothstep(
-      oqRegionDividerX - oqRegionBlendWidth,
-      oqRegionDividerX + oqRegionBlendWidth,
-      worldPos.x
-    );
-  }
-
   /**
-   * The weave/grain height fields are fixed-frequency analytic functions with
-   * no mip chain, so as a surface recedes into the distance (or is viewed at
-   * a grazing angle) each screen pixel starts covering many noise cycles at
-   * once. Left alone, that under-sampling doesn't fade gracefully — the
-   * per-pixel derivative the bump math relies on grows with it, so distant
-   * or raking parts of a surface would show harsh, exaggerated banding
-   * instead of just quietly aliasing. Compare the noise frequency against
-   * how much world space one pixel actually spans (fwidth) and fade the
-   * detail out before that happens: once a pixel spans close to a full
-   * cycle, the pattern is unresolvable anyway, so removing it is strictly
-   * more correct than amplifying it.
+   * The detail fields are analytic functions with no mip chain, so a surface
+   * that recedes (or is seen at a grazing angle) would under-sample them and
+   * shimmer. Fade each one out, by its own frequency, before a pixel covers
+   * about half a cycle. The frequencies are in radians per metre, so they
+   * are converted to cycles before comparing (an earlier version skipped the
+   * 1/2π and faded the detail out roughly six times too early to ever see).
+   * \`fwidth\` summed over three axes overestimates a pixel's footprint, which
+   * errs toward fading early.
    */
-  float oqDetailFade(vec3 worldPos, float frequency) {
+  float oqDetailFade(vec3 worldPos, float radiansPerMetre) {
     float worldPerPixel = length(fwidth(worldPos));
-    float cyclesPerPixel = frequency * worldPerPixel;
-    return 1.0 - smoothstep(0.35, 1.2, cyclesPerPixel);
+    float cyclesPerPixel = radiansPerMetre * 0.15915494 * worldPerPixel;
+    return 1.0 - smoothstep(0.2, 0.45, cyclesPerPixel);
   }
 
   /**
    * Surface-gradient bump (Mikkelsen, "Bump Mapping Unparametrized Surfaces
-   * on the GPU"). Deliberately never divides by \`det\`: an earlier version
-   * of this function normalized by \`1/abs(det)\` before renormalizing, which
-   * is only equivalent to the correct formula when \`det\` stays comfortably
-   * away from zero and consistently signed. On this mesh — a single combined
-   * AI reconstruction with no guarantee of uniform triangle winding — \`det\`
-   * does cross zero and flip sign from one fragment to the next, and
-   * dividing by it there spiked the perturbation towards +/-infinity,
-   * producing hard alternating bright/dark bands instead of a subtle bump.
-   * Scaling the normal by \`abs(det)\` and the gradient by \`sign(det)\`
-   * instead keeps every term bounded, which is what removed the banding.
+   * on the GPU"). Deliberately never divides by \`det\`: on this mesh — a
+   * single combined AI reconstruction with no guarantee of uniform triangle
+   * winding — \`det\` crosses zero and flips sign between fragments, and
+   * dividing by it produced hard alternating bands. Scaling the normal by
+   * \`abs(det)\` and the gradient by \`sign(det)\` keeps every term bounded.
    */
   vec3 oqPerturbNormal(vec3 surfaceNormal, vec3 viewPos, float height) {
     vec3 dPosX = dFdx(viewPos);
@@ -432,19 +527,21 @@ const REGION_SHADER_DECLARATIONS = /* glsl */ `
 `;
 
 const REGION_ROUGHNESS_INJECTION = /* glsl */ `
-  float oqWoodFactor = oqWoodRegionFactor(oqWorldPos);
-  float oqDetailVisibility = oqDetailFade(oqWorldPos, 130.0);
-  float oqRoughNoise = (oqValueNoise(oqWorldPos.xz * 40.0 + oqWorldPos.y * 17.0) - 0.5) * oqDetailVisibility;
-  float oqFabricRoughness = clamp(0.82 + oqRoughNoise * 0.10, 0.55, 0.97);
-  float oqWoodRoughness = clamp(0.42 + oqRoughNoise * 0.12, 0.22, 0.62);
-  roughnessFactor = mix(oqFabricRoughness, oqWoodRoughness, oqWoodFactor);
+  vec2 oqRegion = oqRegionWeights(oqWorldPos);
+  float oqRoughNoise = oqValueNoise(oqWorldPos.xz * 9.0 + oqWorldPos.y * 5.0) - 0.5;
+  roughnessFactor = mix(roughnessFactor, clamp(0.92 + oqRoughNoise * 0.08, 0.84, 1.0), oqRegion.y);
+  roughnessFactor = mix(roughnessFactor, clamp(0.62 + oqRoughNoise * 0.14, 0.52, 0.72), oqRegion.x);
 `;
 
+/* Each field is bumped on its own and the normals are blended by region
+ * weight, so a box edge never turns into a height step (and a false ridge). */
 const REGION_NORMAL_INJECTION = /* glsl */ `
   {
-    float oqHeight = mix(oqFabricHeight(oqWorldPos), oqWoodHeight(oqWorldPos), oqWoodFactor)
-      * 0.0035 * oqDetailVisibility;
-    normal = oqPerturbNormal(normal, -vViewPosition, oqHeight);
+    vec3 oqFabricNormal = oqPerturbNormal(normal, -vViewPosition,
+      oqFabricHeight(oqWorldPos) * OQ_FABRIC_AMP * OQ_DETAIL_STRENGTH * oqDetailFade(oqWorldPos, OQ_FABRIC_FREQ));
+    vec3 oqWoodNormal = oqPerturbNormal(normal, -vViewPosition,
+      oqWoodHeight(oqWorldPos) * OQ_WOOD_AMP * OQ_DETAIL_STRENGTH * oqDetailFade(oqWorldPos, OQ_WOOD_FREQ));
+    normal = normalize(normal + (oqFabricNormal - normal) * oqRegion.y + (oqWoodNormal - normal) * oqRegion.x);
   }
 `;
 
