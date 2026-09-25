@@ -438,3 +438,191 @@ delivered "after" image. Neither blocks approval on its own, but both are real,
 independently-verified gaps that should not be waved through as "fully proven" on this
 checkpoint's evidence alone. The residual "no true GPU-capability fallback for the shadow
 cost" point (finding 4) is an honest, already-disclosed limitation, not a new defect.
+
+---
+
+# Fourth pass — FINAL: material source freeze at `7ec73b2` (`28fa5d2` + `7ec73b2` on the approved base)
+
+- Reviewer: fresh Claude Sonnet worker, same coordinator. Runtime model: **Sonnet 5**
+  (`claude-sonnet-5`), from this session's own environment block. No subagents.
+- Confirmed frozen tip before reviewing anything: `git log` → HEAD `7ec73b2`, parent
+  `28fa5d2`, parent of that `b012dd2` (my third-pass base). `git status --short` and
+  `git diff --stat` both empty except pre-existing untracked scratch from other workers —
+  material owner genuinely idle, nothing moving. Read-only; no source edits.
+- Did not touch the paused Finish/share stash — `git stash list` only (4 entries, same as
+  every prior pass, none applied/dropped/inspected).
+
+## Delta review
+
+### `28fa5d2` — dark-tone/crush fix: real regression, real fix, correctly scoped
+
+Read the diff directly (`styleMaterial.ts`, `styleMaterial.test.ts`). Confirms this is the
+proper fix for the exact issue the scale/camera owner and coordinator flagged (furniture
+undersides reading near-black): captures each relit material's own raw baked colour
+(`diffuseColor.rgb` right after `#include <map_fragment>`, in linear space) and floors the
+*final*, tonemapped/graded colour at 45% of that colour's own re-encoded (`pow(x, 1/2.2)`)
+display brightness, via a per-channel `max()` — so it can only ever brighten a pixel lighting
+pushed below that floor, never darken one above it. Gated correctly behind `wasRelit` (the
+same flag `isBakedEmissiveOnlyMaterial` already computed), so it only ever touches materials
+this pipeline actually relit — confirmed by the two new tests, which check the shader
+plumbing (`oqRelitFloor` uniform, `oqBakedAlbedo` capture) is present for a relit material and
+completely absent for an untouched one.
+
+**Verified the visual evidence directly, not just the filenames**: viewed all four
+`underfurniture-crush-fix/` screenshots. `2-relit-before-fix-crushed-black.png` genuinely
+shows a flat, near-featureless black underside; `3-relit-after-floor-fix.png` (identical
+camera/HUD state) shows a clearly visible warm dark-brown surface with real detail — a real,
+visible fix, not a placebo. `4-desk-top-unaffected-by-floor.png` still shows the
+directly-lit, previously-verified wood grain looking exactly as before — confirms the floor
+does not wash out already-well-lit surfaces, as claimed.
+
+**Math sanity-checked, not blindly trusted**: the gamma round-trip
+(`pow(clamp(oqBakedAlbedo,0,1), vec3(1/2.2))`) is a reasonable approximation for undoing sRGB
+texture decode without replicating the renderer's full ACES tonemapping — the checkpoint
+itself flags this as intentionally approximate ("a reasonable perceptual floor, not an exact
+reproduction"), which I agree is an honest characterization: a hand-derived expected pixel
+value from this formula alone doesn't land exactly on the measured RGB(36,30,22) (ambient/fill
+lighting and a small non-albedo-tinted specular term also contribute to the final colour, which
+the floor's own approximation doesn't model), but the *actual, empirically measured* result —
+verified independently below via a live re-render, not just the checkpoint's own screenshots —
+is real and matches the qualitative claim ("visibly distinct, still shadowed, no longer
+crushed").
+
+### `7ec73b2` — loader-hash propagation: correctly closes my third-pass finding #1
+
+This is exactly the minimal, correctly-scoped fix for the gap I raised last pass. Read the
+diff directly:
+- `src/scene/runtime.ts`: `LoadedSceneAsset` gains `sha256: string | null`, populated in
+  `loadSceneAsset()` straight from `loadAsset()`'s own `LoadedAsset.sha256` (the real hash of
+  downloaded bytes, computed in `loader.ts` via `hashBytes(bytes)`) — never recomputed, never
+  substituted.
+- `src/game/render/SceneEntities.tsx`: now reads `asset.sha256` (from the `assets` map, i.e.
+  the loader-computed value) directly. The `manifest.assets.map((asset) => [asset.id,
+  asset.sha256])` lookup I flagged is gone entirely — the manifest's declared hash is no
+  longer consulted anywhere in material-region selection.
+- `src/game/assets/loadSceneAsset.ts`: `ParsedSceneAsset` (offline fixture-only parser) sets
+  `sha256: null` — correctly honest, since that path never touches the network loader's
+  hashing step. One mechanical line, no new behavior, exactly as the checkpoint describes.
+- `src/scene/runtime.test.ts`: the new tests are genuinely end-to-end, not shortcuts — they
+  stub `fetch` to serve the **actual bundled `rodin.glb`/`tripo.glb` bytes** (`readFileSync`
+  from `public/samples/`) through the real `loadSceneAsset()` → real `loadAsset()` → real
+  `hashBytes()` path, and assert: real Rodin bytes hash to the exact constant
+  `materialRegions.ts` keys on; real Tripo bytes served at a "declared-Rodin-shaped" URL hash
+  to something else entirely. This is the precise regression test my finding asked for —
+  proof that bytes, not any declared/URL identity, drive the result. Ran the exact reasoning
+  through independently rather than taking the checkpoint's word: traced every line of the
+  diff against the actual `loader.ts`/`runtime.ts` source, confirms it does what it says.
+- Cache/collision semantics: `loadAsset`'s cache is keyed by URL (unchanged, not touched by
+  this diff); `sha256` is a passthrough field added to the returned shape, not a cache key —
+  confirmed by reading `loader.ts`'s cache implementation was untouched in this diff (only
+  `runtime.ts`'s adapter function and `SceneEntities.tsx`'s consumption changed). Collision
+  building (`buildManifestCollision`) reads `LoadedAsset.triangles`, an entirely separate
+  field, untouched.
+
+**This closes my third-pass finding #1 correctly and completely.** The doc-comment/mechanism
+mismatch I flagged is gone: the hash actually used for region gating is now, in fact, computed
+from the fetched bytes at load time, exactly as `materialRegions.ts` always claimed.
+
+### Matched-underside evidence (`after-sofa-underside-relit-floor-fixed.png`) — one precision note, not a defect
+
+The new "after" screenshot **is** captured at the exact documented spawn coordinates
+(`[-4.02, 0.09, -1.086]`, cross-checked against my own live diagnostics below: real spawn
+reads `[-4.02, 0.1075, -1.086]` — same x/z exactly, y differs by ~2 cm, consistent with normal
+skin/settling variance, not a different point). However, viewing
+`before-sofa-underside-baked-flat.png` and the new `after-sofa-underside-relit-floor-fixed.png`
+side by side, the apparent field of view and boom distance visibly differ between the two
+(more terrain and a shifted sun-icon position in the "after" shot) — because the "before" shot
+was captured when `fc121b1` first landed, **before** the scale/camera owner's `13caa6b`
+(wider FOV, longer pull-back boom) existed, while the "after" shot was captured at the current
+tip, **after** `13caa6b`. So this specific pair is same-world-position but not
+same-camera-parameters — it closes the "no after image existed at all" gap I raised, but isn't
+quite the single-variable comparison its framing implies. This does not undermine the fix
+itself: the `underfurniture-crush-fix/` set (reviewed above) *is* a genuinely
+camera-frozen, single-variable comparison and independently proves the same fix. Noting this
+precisely rather than either rejecting the new evidence or accepting the "matched" framing at
+face value.
+
+## Final combined verification (this session, at the frozen `7ec73b2` tip)
+
+- **Typecheck**: `npx tsc -p tsconfig.json --noEmit` and `npx tsc -p server/tsconfig.json
+  --noEmit` → both exit 0, zero errors.
+- **Full unit suite**: `npx vitest run` (whole repo, appropriate now that the material owner
+  is confirmed idle and nothing is moving) → **71 files / 505 tests pass**, zero failures.
+  (Includes the 3 GLTFLoader "Couldn't load texture blob" stderr lines from
+  `runtime.test.ts`'s real-bytes hash test — expected noise from Node's lack of image
+  decoding, not a failure; the test still passes since it only needs the byte hash, not pixel
+  decode.)
+- **Production build**: `npm run build` (`tsc && vite build && tsc -p server/tsconfig.json`)
+  → succeeds end to end, exit 0. `dist/assets/styleMaterial-*.js` and `dist/assets/runtime-*.js`
+  chunks present and correctly bundled; `dist-server/server/` emitted. No new build warnings
+  beyond the pre-existing large-chunk notices (`GLTFLoader`, `rapier.es`), unrelated to this
+  work.
+- **Bounded real-Chrome smoke** (Playwright `channel: "chrome"`, **not** the nimbalyst-browser
+  MCP tool — that tool's headless session could not get the WebGL canvas past a 300×150
+  placeholder after 35+ seconds with zero errors thrown, which reads as a limitation of that
+  particular automation surface in this environment rather than a product regression, since
+  the identical build renders correctly under real Chrome below; noting this rather than
+  silently switching tools):
+  - Disposable Vite server, **private `cacheDir`** under `os.tmpdir()`
+    (`nimbalyst-local/tmp-final-smoke/vite.disposable.config.mjs`, deleted after use along
+    with its cache dir), port 5196 — clear of protected 5173/8787/15173/18799.
+  - Loaded `/`, clicked through to "The desk & sofa adventure" → `/play/sample-rodin-room-corner`
+    (the actual Rodin sample with the region/floor treatment), waited for
+    `window.__objectquest.get()` to report a running frame.
+  - **Zero console errors, zero page errors** (both smoke scripts, ~2 real page loads).
+  - Live diagnostics confirm the frozen camera change is real and active:
+    `cameraDistance: 1` (matches the checkpoint's stated 0.175 m × pull-back result exactly),
+    spawn `playerPosition: [-4.02, 0.1075, -1.086]` (matches the documented deterministic spawn
+    within expected skin tolerance), `collisionTriangles: 50000`, canvas correctly sized
+    1280×720.
+  - Screenshots (`rodin-smoke-clear.png`, `rodin-smoke-walked.png`, viewed directly, not just
+    generated): first frame shows the same wide, pulled-back framing as the checkpoint's own
+    "after" evidence; after walking forward under the desk overhang, the underside is
+    **visibly warm brown with real detail, not crushed black** — a live, independent
+    re-confirmation of the `28fa5d2` fix working in the actual running build at this exact
+    tip, not just in the checkpoint's own captured evidence.
+  - Disposable server killed (Windows `taskkill` by PID, `pkill` unavailable in this shell),
+    its private cache dir removed, scratch directory deleted. `git status` afterward shows no
+    residue from this pass.
+- **Protected services, read-only, before and after** — no restart, no cache/service change:
+  `localhost:5173` → 200, `127.0.0.1:15173` → 200, `localhost:8787/api/capabilities` → 200,
+  `localhost:18799/api/capabilities` → 200 (`18799/` root alone 404s, expected for an API-only
+  server with no static index route — not a health signal).
+- Did not re-run `tests/e2e/browser`'s full Playwright suite or any paid/provider/user-world
+  path — the bounded smoke above covers "new framing/material shaders/controls render without
+  error at this tip," which was the actual ask; the full Rodin finish-to-completion path was
+  already proven 3/3 by the scale/camera checkpoint before this material-only delta, and
+  nothing in `28fa5d2`/`7ec73b2` touches gameplay/physics/checkpoint logic.
+
+## Outstanding, honestly summarized (nothing here is "all done")
+
+- **Tripo sample, checkpoint-5 mantle rejection**: still open, still pre-existing, still
+  unrelated to any material/lighting/camera work across all four passes of this review
+  (confirmed again this pass: neither `28fa5d2` nor `7ec73b2` touches `checkpoints.ts`,
+  `mantle.ts`, or `samples.ts`). Not investigated further this pass — out of scope, not caused
+  or fixed by anything reviewed here.
+- **Finish/share**: still paused on an explicit user stop; its stash still untouched across
+  all four review passes. Not part of this review's scope and not touched.
+- **Shadow-map reduced-motion fallback** (third-pass finding 4): unchanged, still an honest,
+  disclosed limitation — an accessibility signal reused for cost reduction, not a genuine
+  GPU-capability check. Not revisited or re-litigated this pass.
+- **One remaining precision note** (not a blocking defect): the new matched
+  sofa-underside screenshot pair is position-matched but spans a camera-parameter change from
+  an unrelated commit (`13caa6b`), so it is weaker evidence than its "matched" framing implies
+  — though the fix's correctness is independently proven by both the properly camera-frozen
+  `underfurniture-crush-fix/` set and my own live re-render above.
+
+## Final verdict
+
+`fc121b1`, `b012dd2`, `28fa5d2`, and `7ec73b2` together are approved as the complete,
+frozen material/lighting/region-identity work. Both concrete gaps raised in my third pass
+(the hash-gating doc/implementation mismatch, and the missing underside evidence) are now
+correctly closed by `7ec73b2` and `28fa5d2`/`7ec73b2` respectively, verified by reading the
+actual diffs and re-deriving the reasoning rather than trusting the checkpoint prose, plus one
+live, independent real-Chrome re-render at the exact frozen tip showing both the new camera
+framing and the no-longer-crushed underside working correctly with zero console/page errors.
+Full typecheck, full unit suite (505/505), and a full production build all pass cleanly at
+this tip. This is not a blanket "everything in the project is done" — it is a scoped approval
+of exactly the material/lighting/camera-identity commits reviewed across these four passes;
+the Tripo flake and the paused Finish/share work remain open, exactly as already and honestly
+disclosed.
