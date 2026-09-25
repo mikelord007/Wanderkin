@@ -3,6 +3,11 @@
 - Session: Nimbalyst Claude Code worker, coordinator `30e37344-f303-4b8a-80c8-ee9f8fd5f3d6`.
 - Observed runtime model (from the environment block, not inferred): **Opus 5.5**,
   exact model ID `claude-opus-5-5`. Matches the required selector. No subagents.
+- Re-verified from runtime response metadata, not the UI alias: the session transcript
+  `~/.claude/projects/C--Users-manuj-code-barely-runs-Objectquest/d6363776-afa6-478d-8af3-97fde940169d.jsonl`
+  has 214 assistant responses, and every one records `"model":"claude-opus-5-5"`,
+  including the one that produced every edit and commit. The "claude-code:opus" shown
+  after spawn is the UI's display alias; no other model appears in the metadata.
 - Baseline: MAIN at `a8ebc7a`. Dirty and NOT mine at start: `src/App.tsx`,
   `tests/e2e/browser/landing-resume.test.ts` (finish/landing owners), untracked
   `nimbalyst-local/*` scratch.
