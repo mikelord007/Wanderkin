@@ -6,10 +6,15 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { MINIATURE_CAPSULE_HEIGHT } from "../../core/characterScale.js";
 import {
   CharacterAnimator,
   LAND_RECOVERY_SECONDS,
   MANTLE_POSE_SECONDS,
+  REFERENCE_STRIDE_RADIANS_PER_METRE,
+  STRIDE_REFERENCE_HEIGHT,
+  gaitTempoForHeight,
+  strideRadiansPerMetre,
   createPoseLayer,
   poseLand,
   poseMantle,
@@ -304,6 +309,15 @@ describe("CharacterAnimator", () => {
     expect(worstPose).toBeLessThan(0.32);
   });
 
+  it("keeps the original tuning when no body height is given", () => {
+    const animator = new CharacterAnimator();
+    expect(animator.gaitTempo).toBe(1);
+    expect(animator.strideRadiansPerMetre).toBe(REFERENCE_STRIDE_RADIANS_PER_METRE);
+    expect(new CharacterAnimator({ bodyHeight: STRIDE_REFERENCE_HEIGHT }).strideRadiansPerMetre).toBe(
+      REFERENCE_STRIDE_RADIANS_PER_METRE,
+    );
+  });
+
   it("resets cleanly for a respawn", () => {
     const animator = new CharacterAnimator();
     run(animator, 200, { speed: WALK_SPEED, grounded: false, verticalVelocity: -8 });
@@ -311,5 +325,166 @@ describe("CharacterAnimator", () => {
     const pose = animator.update(input({ speed: 0 }));
     for (const value of pose.euler) expect(Number.isFinite(value)).toBe(true);
     expect(Number.isFinite(pose.squash)).toBe(true);
+  });
+});
+
+describe("gait paced to body size", () => {
+  // Measured full-run ground speed in the shipped game (opus-visual-review.md).
+  const RUN_SPEED = 1.9;
+  const TINY = MINIATURE_CAPSULE_HEIGHT;
+
+  /** Ground covered per footfall (two per stride cycle), in metres. */
+  function footfallLength(height: number): number {
+    return Math.PI / strideRadiansPerMetre(height);
+  }
+
+  /** Peak |hip swing| over the last second of a two-second run. */
+  function peakHipSwing(animator: CharacterAnimator): number {
+    run(animator, 60, { speed: WALK_SPEED });
+    let peak = 0;
+    for (let frame = 0; frame < 60; frame += 1) {
+      const pose = animator.update(input({ speed: WALK_SPEED }));
+      peak = Math.max(peak, Math.abs(channel(pose.euler, "hip.L", 0)));
+    }
+    return peak;
+  }
+
+  it("takes more, shorter steps as the body shrinks, sub-linearly", () => {
+    expect(gaitTempoForHeight(STRIDE_REFERENCE_HEIGHT)).toBe(1);
+    expect(gaitTempoForHeight(0.35)).toBeCloseTo(Math.SQRT2, 9);
+    expect(gaitTempoForHeight(TINY)).toBeCloseTo(2, 9);
+    expect(gaitTempoForHeight(1.4)).toBeCloseTo(Math.SQRT1_2, 9);
+
+    // Linear scaling would keep the reference footfall in body heights; the
+    // chosen curve lets each footfall grow to about one body height instead.
+    const tinyFootfall = footfallLength(TINY);
+    expect(tinyFootfall / TINY).toBeGreaterThan(0.9);
+    expect(tinyFootfall / TINY).toBeLessThan(1.2);
+    expect(footfallLength(STRIDE_REFERENCE_HEIGHT)).toBeCloseTo(0.374, 3);
+
+    // A scurry, not a blur: roughly 10 footfalls a second at a full run,
+    // against ~5 unscaled and ~20 if scaled linearly.
+    const stepsPerSecond = RUN_SPEED / tinyFootfall;
+    expect(stepsPerSecond).toBeGreaterThan(8);
+    expect(stepsPerSecond).toBeLessThan(13);
+  });
+
+  it("falls back to the reference for nonsense heights and bounds extremes", () => {
+    for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(gaitTempoForHeight(bad)).toBe(1);
+    }
+    expect(gaitTempoForHeight(0.001)).toBe(3);
+    expect(gaitTempoForHeight(100)).toBe(0.5);
+  });
+
+  it("advances by distance at a fixed per-metre rate, never compounding", () => {
+    const tiny = new CharacterAnimator({ bodyHeight: TINY });
+    const reference = new CharacterAnimator();
+    run(tiny, 120, { speed: 1.5 });
+    run(reference, 120, { speed: 1.5 });
+    // Exactly the tempo ratio after two seconds, so nothing is re-applied per
+    // frame or per update.
+    expect(tiny.stridePhaseRadians / reference.stridePhaseRadians).toBeCloseTo(2, 6);
+
+    const firstSecond = new CharacterAnimator({ bodyHeight: TINY });
+    run(firstSecond, 60, { speed: 1.5 });
+    const afterOne = firstSecond.stridePhaseRadians;
+    run(firstSecond, 60, { speed: 1.5 });
+    expect(firstSecond.stridePhaseRadians - afterOne).toBeCloseTo(afterOne, 6);
+    expect(afterOne).toBeCloseTo(1.5 * strideRadiansPerMetre(TINY), 4);
+
+    // Same height, same input, same result: construction is deterministic.
+    const again = new CharacterAnimator({ bodyHeight: TINY });
+    run(again, 120, { speed: 1.5 });
+    expect(again.stridePhaseRadians).toBe(tiny.stridePhaseRadians);
+
+    // And still frame-rate independent at the miniature size.
+    const fast = new CharacterAnimator({ bodyHeight: TINY });
+    run(fast, 240, { speed: 1.5, deltaSeconds: 1 / 120 });
+    expect(fast.stridePhaseRadians).toBeCloseTo(tiny.stridePhaseRadians, 5);
+  });
+
+  it("keeps the legs swinging fully at the faster cadence", () => {
+    // Springs tuned for the reference cadence would filter a doubled cycle
+    // down to a shuffle; the gait springs speed up with it.
+    const reference = peakHipSwing(new CharacterAnimator());
+    for (const height of [0.35, TINY, 0.12]) {
+      const peak = peakHipSwing(new CharacterAnimator({ bodyHeight: height }));
+      expect(peak).toBeGreaterThan(reference * 0.85);
+      expect(peak).toBeLessThan(reference * 1.25);
+    }
+  });
+
+  it("still blends run, jump, landing and mantle smoothly at miniature size", () => {
+    /** Largest single-frame joint move in each window of a run → jump →
+     * land → mantle → run sequence with hard state cuts. */
+    function transitionJumps(bodyHeight?: number) {
+      const animator = new CharacterAnimator(bodyHeight ? { bodyHeight } : {});
+      run(animator, 120, { speed: WALK_SPEED });
+      let previous = Float32Array.from(animator.update(input({ speed: WALK_SPEED })).euler);
+      const worst = { air: 0, landing: 0, mantle: 0, all: 0 };
+      for (let frame = 0; frame < 200; frame += 1) {
+        const airborne = frame > 20 && frame < 70;
+        const mantling = frame >= 120 && frame < 140;
+        const pose = animator.update(
+          input({
+            speed: mantling ? 0 : WALK_SPEED,
+            grounded: !airborne && !mantling,
+            mantling,
+            verticalVelocity: airborne ? 3 - frame * 0.1 : 0,
+          }),
+        );
+        let step = 0;
+        for (let i = 0; i < pose.euler.length; i += 1) {
+          expect(Number.isFinite(pose.euler[i]!)).toBe(true);
+          step = Math.max(step, Math.abs(pose.euler[i]! - previous[i]!));
+        }
+        if (airborne) worst.air = Math.max(worst.air, step);
+        if (frame >= 70 && frame < 90) worst.landing = Math.max(worst.landing, step);
+        if (mantling) worst.mantle = Math.max(worst.mantle, step);
+        worst.all = Math.max(worst.all, step);
+        if (frame === 132) expect(channel(pose.euler, "shoulder.L", 0)).toBeLessThan(-1.4);
+        previous = Float32Array.from(pose.euler);
+      }
+      return worst;
+    }
+
+    const reference = transitionJumps();
+    const tiny = transitionJumps(TINY);
+    // Air and mantle run on the authored springs at every size.
+    expect(tiny.air).toBeLessThan(reference.air * 1.05 + 1e-3);
+    expect(tiny.mantle).toBeLessThan(reference.mantle * 1.05 + 1e-3);
+    // Touching down into a run eases the faster springs in, not snaps them.
+    expect(tiny.landing).toBeLessThan(reference.landing * 1.35);
+    expect(tiny.all).toBeLessThan(reference.all * 1.35);
+
+    const landing = new CharacterAnimator({ bodyHeight: TINY });
+    run(landing, 30, { grounded: false, verticalVelocity: -5, speed: 0 });
+    expect(run(landing, 6, { grounded: true, speed: 0 }).squash).toBeLessThan(0.97);
+    const recovered = run(landing, Math.round((LAND_RECOVERY_SECONDS + 0.6) * 60), { grounded: true, speed: 0 });
+    expect(recovered.squash).toBeGreaterThan(0.99);
+  });
+
+  it("stays finite at the fastest bounded tempo under violent input", () => {
+    const animator = new CharacterAnimator({ bodyHeight: 0.01 });
+    expect(animator.gaitTempo).toBe(3);
+    for (let frame = 0; frame < 2000; frame += 1) {
+      const pose = animator.update(
+        input({
+          speed: frame % 7 < 3 ? WALK_SPEED : 0,
+          grounded: frame % 11 < 6,
+          mantling: frame % 37 < 5,
+          verticalVelocity: Math.sin(frame) * 6,
+          yaw: Math.sin(frame * 0.31) * 3,
+          deltaSeconds: frame % 5 === 0 ? 0.1 : 1 / 240,
+        }),
+      );
+      for (const value of pose.euler) {
+        expect(Number.isFinite(value)).toBe(true);
+        expect(Math.abs(value)).toBeLessThan(4);
+      }
+      expect(pose.squash).toBeGreaterThan(0.5);
+      expect(pose.squash).toBeLessThan(1.6);
+    }
   });
 });

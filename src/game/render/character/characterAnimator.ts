@@ -8,7 +8,9 @@
  *
  * 1. **Distance-driven stride.** The walk/run cycle advances with ground
  *    covered, never with wall-clock time, so the feet stop the instant the
- *    character stops and never skate against a wall.
+ *    character stops and never skate against a wall. The rate per metre is
+ *    scaled to the body's real height, so a miniature body takes more,
+ *    shorter steps over the same ground.
  * 2. **Continuous blending.** Idle/walk/run are a weighted blend on speed
  *    rather than discrete states, and air/land/mantle layer on top. Nothing
  *    "snaps" between animations because nothing ever switches.
@@ -91,6 +93,49 @@ export const FULL_IMPACT_SPEED = 4;
 /** Duration the mantle pose plays over; matches `core/constants.ts`. */
 export const MANTLE_POSE_SECONDS = 0.3;
 
+/**
+ * Body height, metres, the stride rate and spring tunings below were authored
+ * against: the original 0.70 m capsule.
+ */
+export const STRIDE_REFERENCE_HEIGHT = 0.7;
+/** Stride radians per metre of ground at {@link STRIDE_REFERENCE_HEIGHT}:
+ * one footfall every ~0.37 m, about half a body height. */
+export const REFERENCE_STRIDE_RADIANS_PER_METRE = 8.4;
+/**
+ * How strongly cadence follows body size. The world-space speed is fixed by
+ * the movement config at every scale, so a smaller body has to cycle its legs
+ * faster to cover it. Linear (1) would keep the reference step length in body
+ * heights, but at 0.175 m that is ~20 steps a second, which reads as a blur.
+ * Square root gives about 10 steps a second at a full run, with each footfall
+ * about one body height: a toy's scurry. That is a stylised compromise, not
+ * foot-locked contact.
+ */
+export const STRIDE_SIZE_EXPONENT = 0.5;
+const MIN_GAIT_TEMPO = 0.5;
+const MAX_GAIT_TEMPO = 3;
+
+/**
+ * How much faster a body of `bodyHeight` metres cycles its gait than the
+ * reference body. 1 at the reference height; 2 at 0.175 m.
+ */
+export function gaitTempoForHeight(bodyHeight: number): number {
+  const height = Number.isFinite(bodyHeight) && bodyHeight > 0 ? bodyHeight : STRIDE_REFERENCE_HEIGHT;
+  // Bounded so the stiffened springs stay well inside the stable range of the
+  // fixed 1/120 s integration sub-step, whatever height a config asks for.
+  return clamp((STRIDE_REFERENCE_HEIGHT / height) ** STRIDE_SIZE_EXPONENT, MIN_GAIT_TEMPO, MAX_GAIT_TEMPO);
+}
+
+/** Stride radians advanced per metre of ground for a body of `bodyHeight`. */
+export function strideRadiansPerMetre(bodyHeight: number): number {
+  return REFERENCE_STRIDE_RADIANS_PER_METRE * gaitTempoForHeight(bodyHeight);
+}
+
+export interface CharacterAnimatorOptions {
+  /** The runtime capsule's standing height, metres. Defaults to the
+   * reference height, which reproduces the original tuning exactly. */
+  bodyHeight?: number;
+}
+
 interface SpringTuning {
   /** Natural frequency, rad/s. Higher is crisper. */
   omega: number;
@@ -114,13 +159,24 @@ function tuningFor(name: string): SpringTuning {
   return CORE;
 }
 
+/**
+ * Legs, arms and torso swing once per stride, so their springs must speed up
+ * with the gait or they filter a faster cycle down to a shuffle. Head and scarf
+ * are follow-through and keep their authored looseness at every size.
+ */
+function followsGait(tuning: SpringTuning): boolean {
+  return tuning === LEG || tuning === ARM || tuning === CORE;
+}
+
 const CHANNEL_OMEGA = new Float32Array(CHANNELS);
 const CHANNEL_ZETA = new Float32Array(CHANNELS);
+const CHANNEL_FOLLOWS_GAIT = new Uint8Array(CHANNELS);
 for (let b = 0; b < BONE_COUNT; b += 1) {
   const tuning = tuningFor(BONE_NAMES[b]!);
   for (let c = 0; c < 3; c += 1) {
     CHANNEL_OMEGA[b * 3 + c] = tuning.omega;
     CHANNEL_ZETA[b * 3 + c] = tuning.zeta;
+    CHANNEL_FOLLOWS_GAIT[b * 3 + c] = followsGait(tuning) ? 1 : 0;
   }
 }
 
@@ -399,6 +455,13 @@ export class CharacterAnimator {
   private extraCurrent = new Float32Array(4); // bobY, leanX, leanZ, squash
   private extraVelocity = new Float32Array(4);
 
+  /** Gait speed-up for this body's size; fixed for the animator's lifetime. */
+  readonly gaitTempo: number;
+  private readonly strideRate: number;
+  /** Spring speed-up for this frame: the full gait tempo while walking or
+   * running on the ground, 1 when idle, airborne or mantling. */
+  private springTempo = 1;
+
   private stridePhase = 0;
   private clock = 0;
   private airTime = 0;
@@ -419,8 +482,16 @@ export class CharacterAnimator {
     lanternPulse: 0,
   };
 
-  constructor() {
+  constructor(options: CharacterAnimatorOptions = {}) {
     this.extraCurrent[3] = 1;
+    const bodyHeight = options.bodyHeight ?? STRIDE_REFERENCE_HEIGHT;
+    this.gaitTempo = gaitTempoForHeight(bodyHeight);
+    this.strideRate = REFERENCE_STRIDE_RADIANS_PER_METRE * this.gaitTempo;
+  }
+
+  /** Stride radians advanced per metre of ground at this body size. */
+  get strideRadiansPerMetre(): number {
+    return this.strideRate;
   }
 
   /** Stride angle accumulated so far. Advances with distance covered, never
@@ -448,6 +519,7 @@ export class CharacterAnimator {
     this.wasGrounded = true;
     this.previousYaw = null;
     this.yawRate = 0;
+    this.springTempo = 1;
   }
 
   update(input: AnimatorInput): CharacterPose {
@@ -484,11 +556,11 @@ export class CharacterAnimator {
     this.yawRate += (instantYawRate - this.yawRate) * clamp(dt * 9, 0, 1);
 
     // --- stride ------------------------------------------------------------
-    // Advanced by distance covered, so the feet never skate.
+    // Advanced by distance covered, so the cycle stops the instant the body
+    // does. The rate per metre grows as the body shrinks (see
+    // `STRIDE_SIZE_EXPONENT`), so a tiny body scurries instead of gliding.
     if (!input.reducedMotion && !airborne) {
-      // 2.6 stride radians per metre keeps the step length a believable
-      // fraction of the character's own leg length at every speed.
-      this.stridePhase += input.speed * dt * 8.4;
+      this.stridePhase += input.speed * dt * this.strideRate;
     } else if (!input.reducedMotion) {
       this.stridePhase += dt * 1.5;
     }
@@ -501,6 +573,16 @@ export class CharacterAnimator {
     const idleWeight = (1 - moveWeight) * groundWeight;
     const walkWeight = moveWeight * (1 - runWeight) * groundWeight;
     const runW = moveWeight * runWeight * groundWeight;
+    // Only the stride cycle needs faster springs. Jump, landing, mantle and
+    // idle keep the authored response, so their blends feel the same at
+    // every body size. The speed-up drops away at once on leaving the ground
+    // but eases back in over ~0.15 s, so touching down into a run is still
+    // absorbed by the authored springs rather than snapped through.
+    const springTempoTarget = 1 + (this.gaitTempo - 1) * (walkWeight + runW);
+    this.springTempo =
+      springTempoTarget < this.springTempo
+        ? springTempoTarget
+        : this.springTempo + (springTempoTarget - this.springTempo) * clamp(dt * 7, 0, 1);
 
     // Rise → fall crossfades on vertical velocity rather than on a state
     // change, so the apex of a jump is a real in-between pose.
@@ -632,7 +714,7 @@ export class CharacterAnimator {
       guard += 1;
 
       for (let i = 0; i < CHANNELS; i += 1) {
-        const omega = CHANNEL_OMEGA[i]!;
+        const omega = CHANNEL_FOLLOWS_GAIT[i] ? CHANNEL_OMEGA[i]! * this.springTempo : CHANNEL_OMEGA[i]!;
         const zeta = CHANNEL_ZETA[i]!;
         const x = this.current[i]!;
         const v = this.velocity[i]!;
@@ -641,10 +723,12 @@ export class CharacterAnimator {
         this.current[i] = x + nextV * h;
       }
 
-      this.stepExtra(0, this.target.bobY, 24, 0.85, h);
+      // Bob and squash pulse twice per stride, so they keep pace with the
+      // gait; the leans are slow posture and keep their authored feel.
+      this.stepExtra(0, this.target.bobY, 24 * this.springTempo, 0.85, h);
       this.stepExtra(1, this.target.leanX, 11, 0.7, h);
       this.stepExtra(2, this.target.leanZ, 9, 0.6, h);
-      this.stepExtra(3, this.target.squash, 26, 0.72, h);
+      this.stepExtra(3, this.target.squash, 26 * this.springTempo, 0.72, h);
     }
   }
 

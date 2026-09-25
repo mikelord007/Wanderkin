@@ -55,8 +55,12 @@ export const PlayerAvatar = forwardRef<
   const tilt = useRef<THREE.Group>(null);
   const shadow = useRef<THREE.Mesh>(null);
 
+  const height = characterHeight(config);
+
   const model = useMemo(() => buildCharacter(), []);
-  const animator = useMemo(() => new CharacterAnimator(), []);
+  // The gait is paced from the body's real height; a new height means a new
+  // animator rather than rescaling a live one.
+  const animator = useMemo(() => new CharacterAnimator({ bodyHeight: height }), [height]);
 
   const shadowMaterial = useMemo(
     () =>
@@ -76,8 +80,6 @@ export const PlayerAvatar = forwardRef<
     },
     [model, shadowMaterial],
   );
-
-  const height = characterHeight(config);
 
   // A point light's range and intensity are world-space and ignore the group's
   // scale, so they have to be derived from the character's real height or the
