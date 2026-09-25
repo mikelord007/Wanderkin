@@ -10,9 +10,10 @@
  */
 import { post, signpost } from "../builders/dry.js";
 import { bush, flowers, tuft } from "../builders/foliage.js";
-import { defaultRockVariants } from "../builders/rocks.js";
 import { lyingLog } from "../builders/trees.js";
 import { alpineConiferVariants, youngConiferVariants } from "../alpine/conifer.js";
+import { alpineRocks } from "../alpine/rocks.js";
+import { ALPINE_WALL } from "../alpine/wall.js";
 import { type SnowCapOptions, withSnowCap } from "../meshKit.js";
 import type { BiomeArt, BiomeTones, VariantBuilder } from "../types.js";
 
@@ -21,7 +22,8 @@ const tones = {
   foliage: { dark: "#16372f", base: "#224c40", light: "#3a6e5b" },
   foliageAlt: { dark: "#1c3d36", base: "#2b574b", light: "#4b7d69" },
   trunk: { dark: "#4a3526", base: "#6b4d36", light: "#916f50" },
-  rock: { dark: "#5d646e", base: "#808792", light: "#a8aeb7" },
+  // Granite: cool blue-grey, dark enough that snow caps pop.
+  rock: { dark: "#4a515c", base: "#6d7581", light: "#98a0ab" },
   soil: { dark: "#8e979f", base: "#aeb7bf", light: "#cdd5dc" },
   dry: { dark: "#80734f", base: "#a39672", light: "#c6ba96" },
   cactus: { dark: "#2f5a45", base: "#437660", light: "#6c9a80" },
@@ -31,6 +33,8 @@ const tones = {
   stoneRecess: { dark: "#3b4047", base: "#474c54", light: "#555b63" },
   // Snow pads on trees and rocks: shaded blue snow → lit snow.
   snow: { dark: "#a7bacb", base: "#c6d4e0", light: "#d5e1eb" },
+  // Slate: darker, bluer bedding for layered rock.
+  slate: { dark: "#343a45", base: "#4b5261", light: "#6c7483" },
   // Conifer bark: dark, warm red-brown.
   bark: { dark: "#3b2a22", base: "#5a4032", light: "#7d5c47" },
 } satisfies BiomeTones;
@@ -39,7 +43,7 @@ const tones = {
 const SNOW: SnowCapOptions = { color: "#eef4f8", threshold: 0.55, heightBias: 0.6 };
 const LIGHT_SNOW: SnowCapOptions = { ...SNOW, threshold: 0.7, strength: 0.75 };
 
-const rocks = defaultRockVariants("rock");
+const rocks = alpineRocks();
 const snowy = (list: readonly VariantBuilder[], options = SNOW) => list.map((builder) => withSnowCap(builder, options));
 
 export const ALPINE_ART: BiomeArt = {
@@ -74,17 +78,17 @@ export const ALPINE_ART: BiomeArt = {
     "rock-large": {
       category: "rock", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.9, triangleBudget: 400,
       mirror: true, embed: [0.02, 0.05], alignToNormal: 0.4,
-      variants: snowy([...rocks.large, ...rocks.clustered]),
+      variants: rocks.hero,
     },
     "rock-medium": {
       category: "rock", role: "supporting", shading: "faceted", castShadow: true, unitRadius: 0.5, triangleBudget: 300,
       mirror: true, embed: [0.03, 0.08], alignToNormal: 0.6,
-      variants: snowy([...rocks.medium, ...rocks.layered], LIGHT_SNOW),
+      variants: rocks.supporting,
     },
     pebble: {
       category: "rock", role: "micro", shading: "faceted", castShadow: false, unitRadius: 0.5, triangleBudget: 60,
       mirror: true, embed: [0.05, 0.15], alignToNormal: 1,
-      variants: rocks.small,
+      variants: rocks.dressing,
     },
     "alpine-grass": {
       category: "grass", role: "micro", shading: "smooth", castShadow: false, unitRadius: 1.1, triangleBudget: 220,
@@ -185,17 +189,7 @@ export const ALPINE_ART: BiomeArt = {
       },
     ],
   },
-  wall: {
-    // Granite: few, heavy strata; snow on every walkable top.
-    strata: [2, 4],
-    stepping: 0.55,
-    rounding: 0.4,
-    notches: [0, 2],
-    top: tones.stoneTop,
-    side: tones.stoneSide,
-    recess: "#434850",
-    rim: "#f0f5f9",
-  },
+  wall: ALPINE_WALL,
   // Cool blue-grey contact; fresh and wind-packed snow drifts.
   ground: {
     contactColor: "#3c4a5a",
