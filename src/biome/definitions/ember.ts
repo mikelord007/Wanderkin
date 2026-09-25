@@ -27,7 +27,8 @@ export const EMBER: BiomeDefinition = {
   lighting: { sun: "#ffb27a", sky: "#8a7a9a", ground: "#5a4640", intensity: 2.4, ambient: 0.92, direction: [-5, 3.5, -2] },
   sky: { zenith: "#4a4a6e", horizon: "#e7a37a", fogNear: 1.6, fogFar: 6.8 },
   surface: { color: "#6a5650", blend: 0.45, upwardNormalMin: 0.8, patchCoverage: 0.55 },
-  props: { kinds: ["cactus", "rock", "dry-plant", "wood"], density: 0.4, scaleRange: [0.7, 2.8] },
+  // `palm` = charred snags (tall tree class), `cactus` = basalt/obsidian spires.
+  props: { kinds: ["palm", "cactus", "rock", "dry-plant", "wood"], density: 0.4, scaleRange: [0.7, 2.8] },
   wind: { direction: [0.6, 0.8], strength: 0.35 },
   ambient: { effect: "dust", water: true },
   mission: {
