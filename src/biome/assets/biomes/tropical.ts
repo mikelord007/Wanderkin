@@ -8,10 +8,11 @@
  * Tropical worker from hand-off (see ENVIRONMENT_ARCHITECTURE.md §10).
  */
 import { leafRosette } from "../builders/foliage.js";
-import { post, signpost } from "../builders/dry.js";
+import { signpost } from "../builders/dry.js";
 import { lyingLog } from "../builders/trees.js";
 import { broadleafClump, leafyBush, tropicalFlowers, tropicalGrass } from "../tropical/bush.js";
 import { fallenPalmFrond, palmSprout, tropicalPalm } from "../tropical/palm.js";
+import { bambooPoles } from "../tropical/marker.js";
 import { fallenCoconuts, TROPICAL_ROCK_SHAPES, tropicalRock } from "../tropical/rocks.js";
 import type { BiomeArt, BiomeTones } from "../types.js";
 
@@ -21,7 +22,7 @@ const tones = {
   trunk: { dark: "#6a4a30", base: "#98704a", light: "#c9a172" },
   // Pale weathered limestone; rockDark is the cool coastal basalt.
   rock: { dark: "#7a7468", base: "#a39b8b", light: "#d3cab5" },
-  rockDark: { dark: "#3d4447", base: "#5b6468", light: "#88908f" },
+  rockDark: { dark: "#454c4f", base: "#677074", light: "#979f9d" },
   soil: { dark: "#b98f5e", base: "#d8b27f", light: "#efd4a4" },
   dry: { dark: "#8c7545", base: "#b69a5b", light: "#dcc68c" },
   cactus: { dark: "#3c6e3a", base: "#55924a", light: "#88b86a" },
@@ -31,6 +32,7 @@ const tones = {
   stoneRecess: { dark: "#5f574d", base: "#766c60", light: "#8c8274" },
   driftwood: { dark: "#9a8b76", base: "#c2b39b", light: "#e3d8c4" },
   foliageDeep: { dark: "#1f5e3a", base: "#2f7f4a", light: "#5aa55f" },
+  bamboo: { dark: "#6f7d34", base: "#9aa954", light: "#cbd28c" },
   // Young green coconuts: well clear of the orange collectible hue.
   nut: { dark: "#3f5226", base: "#5e7536", light: "#8aa052" },
 } satisfies BiomeTones;
@@ -128,7 +130,7 @@ const ROUND_ROCKS = [
 // Angular, dark coastal rock: crags and tilted slabs leaning together.
 const COASTAL_ROCKS = [
   tropicalRock({ ramp: "rockDark", bodies: [{ shape: S.crag }, { shape: { ...S.crag, seed: 141 }, at: [0.42, 0.2], size: 0.58, tilt: [0.25, -0.3] }, { shape: S.chip, at: [-0.4, 0.4], size: 0.2 }] }),
-  tropicalRock({ ramp: "rockDark", bodies: [{ shape: S.slab, tilt: [0.08, 0.62] }, { shape: { ...S.slab, seed: 143 }, at: [-0.2, 0.32], size: 0.8, tilt: [0.12, 0.7], yaw: 0.35 }, { shape: S.chip, at: [0.5, -0.3], size: 0.18 }] }),
+  tropicalRock({ ramp: "rockDark", bodies: [{ shape: { ...S.slab, scale: [0.85, 0.55, 0.7] }, tilt: [0.08, 0.8] }, { shape: { ...S.slab, seed: 143, scale: [0.85, 0.55, 0.7] }, at: [-0.22, 0.28], size: 0.8, tilt: [0.12, 0.9], yaw: 0.35 }, { shape: S.chip, at: [0.42, -0.3], size: 0.2 }] }),
   tropicalRock({ ramp: "rockDark", moss: 0.9, bodies: [{ shape: { ...S.crag, scale: [0.8, 0.9, 0.62], seed: 145 }, tilt: [0.15, 0.3] }, { shape: S.slab, at: [0.5, -0.1], size: 0.45, tilt: [0, 0.4] }] }),
 ];
 
@@ -238,7 +240,12 @@ export const TROPICAL_ART: BiomeArt = {
     marker: {
       category: "marker", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.36, triangleBudget: 300,
       mirror: true, embed: [0.03, 0.05],
-      variants: [signpost({ planks: 2, seed: 1 }), signpost({ planks: 1, seed: 2, lean: -0.05 }), post({ seed: 3 })],
+      variants: [
+        signpost({ planks: 2, seed: 1 }),
+        signpost({ planks: 1, seed: 2, lean: -0.05 }),
+        bambooPoles({ poles: [[0, 0, 0.95, 0.02], [0.07, 0.04, 0.72, 0.05], [-0.05, 0.06, 0.58, 0.06]], seed: 1 }),
+        bambooPoles({ poles: [[0, 0, 0.9, 0.04], [0.06, -0.05, 0.8, 0.03]], lash: 0.8, seed: 2 }),
+      ],
     },
   },
   compositions: {

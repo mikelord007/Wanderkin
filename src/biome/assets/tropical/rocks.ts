@@ -100,7 +100,7 @@ export function fallenCoconuts(options: { count: number; seed: number }): Varian
       const [x, z, r] = spots[i]!;
       kit.add(
         lobe({ radius: [r, r * 0.92, r * 1.05], detail: 0, jitter: 0.08, seed: options.seed + i, floor: -0.3, center: [x, r * 0.3, z] }),
-        { color: (_p, n) => rampAt(nut, 0.25 + (n.y * 0.5 + 0.5) * 0.6) },
+        { color: (_p, n) => rampAt(nut, 0.25 + (n.y * 0.5 + 0.5) * 0.6), smooth: true },
       );
     }
     return kit.finish({ fit: "size", sink: 0.08 });

@@ -32,5 +32,7 @@ export const TROPICAL: BiomeDefinition = {
     fragmentName: "sun fragment",
     collectibleColor: "#ffb347",
   },
-  budget: { props: 140, patches: 20, particles: 90, drawCalls: 14 },
+  // Real surfaces are space-limited below this; the cap keeps very large
+  // surfaces from crowding, and reduced effects get 56 clusters, not 70.
+  budget: { props: 112, patches: 20, particles: 90, drawCalls: 14 },
 };

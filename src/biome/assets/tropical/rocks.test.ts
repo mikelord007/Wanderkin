@@ -57,4 +57,12 @@ describe("tropical rocks", () => {
     const nuts = fallenCoconuts({ count: 3, seed: 1 })(tones);
     expect(nuts.maxY - nuts.minY).toBeLessThan(0.45);
   });
+
+  it("bamboo markers stay slim and within the marker budget", async () => {
+    const { bambooPoles } = await import("./marker.js");
+    const mesh = bambooPoles({ poles: [[0, 0, 0.95, 0.02], [0.07, 0.04, 0.72, 0.05]], seed: 1 })(tones);
+    expect(mesh.maxY).toBeCloseTo(1, 5);
+    expect(mesh.radius).toBeLessThan(0.36);
+    expect(mesh.triangles).toBeLessThanOrEqual(300);
+  });
 });
