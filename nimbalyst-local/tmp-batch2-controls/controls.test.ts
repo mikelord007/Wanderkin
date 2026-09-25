@@ -87,6 +87,14 @@ async function proveLockIsLive(page: Page, before: Diagnostics): Promise<void> {
   console.log("LOCK IS LIVE: WASD moved the player and raw mouse motion turned the camera while locked");
 }
 
+async function stayUnlocked(page: Page, ms: number): Promise<void> {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) {
+    expect(await locked(page)).toBe(false);
+    await page.waitForTimeout(100);
+  }
+}
+
 async function stayLocked(page: Page, ms: number): Promise<void> {
   const deadline = Date.now() + ms;
   while (Date.now() < deadline) {
@@ -130,25 +138,23 @@ test.describe("item 13 — controls usable while pointer-locked", () => {
       expect(await locked(page)).toBe(true);
       console.log("PASS C(stop): highlight produced in-page while locked (kept in memory, not downloaded)");
     } else {
-      // Headless Chrome cannot encode canvas.captureStream, so this exercises
-      // the product's *error* path instead. Recorded, not asserted as success.
-      const ready = page.getByText("Gameplay highlight ready");
-      const stuck = page.getByText("Finishing gameplay highlight…");
-      await expect(ready.or(stuck)).toBeVisible({ timeout: 30_000 });
-      const failed = await stuck.isVisible();
-      console.log(
-        failed
-          ? `OBSERVED (headless-only): capture stop ended in error — "${await page.getByRole("alert").innerText()}"`
-          : "PASS C(stop): highlight produced in-page while locked",
-      );
-      if (failed) {
-        // Does the product recover? Press C again and see.
+      // Headless Chrome cannot encode canvas.captureStream, so the REAL
+      // MediaRecorder fails here — an unfaked exercise of the error path.
+      // Post-fix contract: error shown, control retryable, repeatedly, under lock.
+      const start = page.getByRole("button", { name: "Start gameplay capture" });
+      const stop = page.getByRole("button", { name: "Stop gameplay capture" });
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        await expect(page.getByRole("alert")).toHaveText(/empty gameplay recording/i, { timeout: 30_000 });
+        await expect(page.getByText("Finishing gameplay highlight…")).toHaveCount(0);
+        await expect(start).toBeVisible();
+        expect(await locked(page)).toBe(true);
+        console.log(`PASS real-recorder failure #${attempt}: alert shown, Start returned, lock held`);
         await page.keyboard.press("c");
-        await page.waitForTimeout(1_000);
-        console.log(
-          `FOLLOW-UP after capture error: still showing "Finishing gameplay highlight…" = ${await stuck.isVisible()}; ` +
-            `"Start gameplay capture" offered again = ${await page.getByRole("button", { name: "Start gameplay capture" }).isVisible()}`,
-        );
+        await expect(stop).toBeVisible();
+        await expect(page.getByRole("alert")).toHaveCount(0);
+        expect(await locked(page)).toBe(true);
+        console.log(`PASS retry #${attempt} via C while locked: recording restarted, stale alert cleared`);
+        await page.keyboard.press("c");
       }
     }
 
@@ -203,9 +209,22 @@ test.describe("item 13 — controls usable while pointer-locked", () => {
     await page.screenshot({ path: testInfo.outputPath("sound-panel-open-unlocked.png"), fullPage: true });
 
     const mute = page.getByRole("button", { name: /^(Mute|Unmute) sound$/ });
+    const mutedBefore = await mutedFlag(page);
     await mute.click();
-    await expect.poll(() => mutedFlag(page)).not.toBeNull();
-    console.log("PASS HUD (lock released): Sound panel opens, mute button operable, no silent re-lock");
+    await expect.poll(() => mutedFlag(page)).not.toBe(mutedBefore);
+    const slider = page.getByRole("group", { name: "Sound" }).getByRole("slider").first();
+    if (await slider.isVisible()) {
+      await slider.focus();
+      await page.keyboard.press("ArrowLeft");
+    }
+    await stayUnlocked(page, 1_000);
+    console.log("PASS HUD (lock released): Sound panel opens, mute + slider operable, lock stays released for 1 s");
+
+    await page.getByRole("button", { name: "Resume" }).click();
+    await expect.poll(() => locked(page)).toBe(true);
+    console.log("PASS Resume-only relock: lock re-acquired only on explicit Resume");
+    await page.keyboard.press("Escape");
+    await expect.poll(() => locked(page)).toBe(false);
 
     const start = page.getByRole("button", { name: "Start gameplay capture" });
     if (await start.isVisible()) {

@@ -1,5 +1,47 @@
 # Batch-2 checkpoint — item 13 live pointer-lock verification
 
+## FINAL INDEPENDENT VERIFICATION — APPROVED (2026-09-25 ~03:55 IST)
+
+Product tip **`d0c9215`** (on `24d395f`). Tracked product source confirmed clean before testing.
+Runtime model for this pass: **Opus 5.5** (`claude-opus-5-5`), from this runtime's own system
+context. Read-only on product code; no paid calls; protected ports 5173/8787/15173/18799 intact
+before and after; disposable ports 15941–15943 shut down; no live storage touched.
+
+**Code review of the exact product diff** (`git diff 259669d d0c9215 -- src/`, 3 files):
+- `hud.css` — `.oq-hud__top-actions[data-paused="true"] { z-index: 4; }` only.
+- `Hud.tsx` — `data-paused={paused && !completed}` on the top-actions row. This mirrors the pause
+  overlay's own condition (`ready && paused && !completed`); the invite overlay requires `!paused`
+  and completion requires `completed`, so the elevation can never apply under either. Correct scope.
+- `PlayScreen.tsx` — `setCaptureState("idle")` in the recorder `"error"` branch. `startCapture`
+  already clears `captureError`, so retry starts clean.
+
+**Real-Chrome results** (headless, `channel: "chrome"`, real lock, nothing faked unless noted):
+
+| Check | Result |
+| --- | --- |
+| Paused: Sound is the topmost hit target | PASS — stack `button › top-actions › overlay › canvas` (was overlay-first) |
+| Paused: raw mouse click opens Sound panel | PASS (was `false`) |
+| Panel controls operate (mute + slider) | PASS — mute flag flips, slider takes input |
+| Resume-only relock | PASS — lock stays null for a sustained 1 s after panel use; re-acquired only on Resume |
+| Locked: HUD clicks still cannot relock or act | PASS — browser routes to canvas, as expected |
+| Failed capture retryable, **real** MediaRecorder | PASS — 2 consecutive failures, each: alert, Start returns, `C` restarts under lock, stale alert cleared |
+| Failed capture retryable, fake-recorder fixture (C and button) | PASS — fix worker's 2 tests rerun independently |
+| Invite ("Click to play") overlay semantics | PASS — `data-paused="false"`, overlay topmost over Sound, click falls through to start the game |
+| M / C / Escape / Resume under lock, movement + look | PASS, console/network clean |
+| Untouched baseline `tests/e2e/browser/gameplay.test.ts` | PASS 2/2 (41.4 s) |
+
+Totals: `regression-fixes.test.ts` 4/4, `paused-hittest.test.ts` 2/2, `controls.test.ts` 2/2,
+baseline 2/2. My pre-fix `controls.test.ts` probe (which expected the old stuck state) was converted
+to hard post-fix assertions; that is the only harness change.
+
+**Not claimed:** headed capture success path was not rerun (the fix touches only the error branch,
+and headed results depend on window occlusion); no full unit/HTTP/build rerun, per brief; no
+subjective gameplay acceptance — that remains the user's.
+
+---
+
+*Original investigation follows (pre-fix, at `837a720`).*
+
 Worker: fresh batch-2 Claude worker, coordinator `30e37344-f303-4b8a-80c8-ee9f8fd5f3d6`.
 Runtime model: **Opus 5** (`claude-opus-5`), recorded verbatim from this runtime's own system
 context — not inferred, and not externally verified against a newer alias.
