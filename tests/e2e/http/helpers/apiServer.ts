@@ -64,6 +64,9 @@ export async function startApiServer(opts: {
         : storageDir,
       LIVEPEER_MCP_ENDPOINT: opts.mcpEndpoint,
       LIVEPEER_API_KEY: "",
+      // These suites exercise the anonymous owner-token boundary, so they run
+      // with sign-in off (refused in production). auth.test.ts opts back in.
+      WANDERKIN_AUTH_MODE: "off",
       ...opts.env,
     },
     stdio: ["ignore", "pipe", "pipe"],

@@ -2,6 +2,8 @@ import { createHash, randomBytes } from "node:crypto";
 import type { Request, Response } from "express";
 import { join } from "node:path";
 import { JsonFileStore } from "../persistence/jsonStore.js";
+import type { LegacyOwnerPolicy } from "../auth/accounts.js";
+import { ownerIdFor, principalOf } from "../auth/principal.js";
 
 export const OWNER_HEADER = "X-ObjectQuest-Owner";
 export const OWNER_COOKIE = "objectquest_owner";
@@ -51,9 +53,14 @@ function resourceKey(kind: OwnedResourceKind, id: string): string {
 }
 
 /**
- * Minimal owner-token boundary for the single-instance API. Raw bearer
- * tokens never reach disk. In legacy-open mode, unowned records remain open
- * and new records intentionally stay unowned to support controlled migration.
+ * Owner boundary for the single-instance API.
+ *
+ * With sign-in on (`legacy` supplied), the owner is the signed-in account
+ * (`user:<id>`, set by server/auth), every new record is claimed for it, and
+ * records from before sign-in (no owner) open only for the legacy owner.
+ * Without sign-in, the older anonymous owner token applies: raw tokens never
+ * reach disk, and in legacy-open mode unowned records remain open and new
+ * records intentionally stay unowned to support controlled migration.
  */
 export class OwnerSecurity {
   private readonly ownership: JsonFileStore<Record<string, string[]>>;
@@ -62,11 +69,14 @@ export class OwnerSecurity {
     storageDir: string,
     readonly legacyOpen: boolean,
     private readonly secureCookie: boolean,
+    private readonly legacy?: LegacyOwnerPolicy,
   ) {
     this.ownership = new JsonFileStore(join(storageDir, "ownership.json"), () => ({}));
   }
 
   current(req: Request): OwnerContext | undefined {
+    const principal = principalOf(req);
+    if (principal) return { token: "", ownerId: ownerIdFor(principal.id) };
     const token = suppliedToken(req);
     return token ? { token, ownerId: hashToken(token) } : undefined;
   }
@@ -111,9 +121,13 @@ export class OwnerSecurity {
   async canAccess(kind: OwnedResourceKind, id: string, req: Request): Promise<boolean> {
     const owners = await this.owners(kind, id);
     if (owners.includes(PUBLIC_OWNER)) return true;
-    if (owners.length === 0) return this.legacyOpen;
+    if (owners.length === 0) return this.legacy ? this.legacy.isLegacyOwner(principalOf(req)) : this.legacyOpen;
     const context = this.current(req);
-    return context !== undefined && owners.includes(context.ownerId);
+    if (context !== undefined && owners.includes(context.ownerId)) return true;
+    // Records the stub user made before real sign-in follow the legacy owner.
+    const pool = this.legacy?.legacyPoolOwners() ?? [];
+    if (this.legacy && owners.some((owner) => pool.includes(owner))) return this.legacy.isLegacyOwner(principalOf(req));
+    return false;
   }
 
   async makePublic(kind: OwnedResourceKind, id: string): Promise<void> {

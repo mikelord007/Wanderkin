@@ -29,6 +29,7 @@ import { createRateLimiter, isBillableRoute, isUploadRoute } from "./security/ra
 import { createDiagnosticsRouter } from "./security/diagnostics.js";
 import { OwnerSecurity } from "./security/owner.js";
 import { ImageDecodeBudget } from "./security/imageDimensions.js";
+import { createAuthRuntime, describeAuth, installAuth } from "./auth/index.js";
 
 /**
  * Foundation API shell plus the Livepeer provider/job/asset routes (owned by
@@ -59,7 +60,18 @@ const generatedAssetStore = new GeneratedAssetStore(env.storageDir);
 const jobStore = new JobStore(env.storageDir);
 const spendLedger = new SpendLedger(env.storageDir);
 const previewCache = new PreviewCacheStore(env.storageDir);
-const ownerSecurity = new OwnerSecurity(env.storageDir, env.legacyOpen, env.secureOwnerCookie);
+// Sign-in (server/auth): resolves stub / Supabase / off / unconfigured from
+// the environment. With sign-in on, records belong to the signed-in account
+// and pre-sign-in records to the legacy owner, so the anonymous legacy-open
+// mode no longer applies.
+const auth = createAuthRuntime(env.storageDir);
+const authOn = auth.config.mode !== "off";
+const ownerSecurity = new OwnerSecurity(
+  env.storageDir,
+  authOn ? false : env.legacyOpen,
+  env.secureOwnerCookie,
+  authOn ? auth.legacy : undefined,
+);
 const imageDecodeBudget = new ImageDecodeBudget(env.uploadDecodeBudgetBytes);
 const levelStore = new LevelStore(env.storageDir, assetStore, photoStore);
 const postcardCache = new PostcardCacheStore(env.storageDir);
@@ -85,6 +97,8 @@ const jobManager = new JobManager(jobStore, adapter, assetStore, photoStore, {
 });
 const questOrchestrator = new QuestOrchestrator(questGatewayFromManager(jobManager), levelStore);
 const audioOrchestrator = new AudioOrchestrator(audioGatewayFromManager(jobManager), levelStore);
+
+installAuth(app, auth);
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
@@ -183,4 +197,6 @@ await jobManager.resumeOnBoot();
 app.listen(env.port, () => {
   // eslint-disable-next-line no-console
   console.log(`ObjectQuest API listening on http://localhost:${env.port}`);
+  // eslint-disable-next-line no-console
+  console.log(describeAuth(auth.config));
 });
