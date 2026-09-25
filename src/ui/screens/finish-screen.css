@@ -1,13 +1,16 @@
 .oq-finish {
+  /* Vertical padding follows the window's height, not its width, so a wide
+     but short desktop window doesn't spend its height on empty margin. */
+  --oq-finish-pad: clamp(16px, 4dvh, 40px);
   position: relative;
   height: max-content;
   min-height: 100dvh;
   display: grid;
   grid-template-columns: minmax(280px, 1.05fr) minmax(320px, .95fr);
   align-items: center;
-  gap: clamp(32px, 7vw, 96px);
+  gap: clamp(24px, 5vw, 64px);
   overflow: visible;
-  padding: clamp(28px, 6vw, 88px);
+  padding: var(--oq-finish-pad) clamp(20px, 4vw, 56px);
   color: var(--oq-ink);
   /* Late afternoon through a window: plaster, warmed, settling into the same
      green the rest of the app is built on. The old lilac middle stop was left
@@ -25,19 +28,28 @@
 .oq-finish__fragment--red { left: 18%; top: 33%; color: #ff4d6d; background: currentColor; }
 .oq-finish__fragment--yellow { left: 46%; top: 15%; color: #ffd93d; background: currentColor; }
 .oq-finish__fragment--blue { left: 48%; bottom: 18%; color: #4d96ff; background: currentColor; }
-.oq-finish__card { width: min(520px, 100%); padding: clamp(28px, 5vw, 52px); border: 1px solid #ffffffc4; border-radius: var(--oq-round-xl); background: #fbf9f3dc; box-shadow: 0 28px 80px #1d3a2e26; backdrop-filter: blur(18px); }
+/* Bounded to the viewport (accounting for .oq-finish's own padding, so the
+   two together can't exceed 100dvh) and internally scrollable, so a tall
+   stack of optional media cards can't push the primary actions off-screen. */
+.oq-finish__card { width: min(560px, 100%); max-height: calc(100dvh - (2 * var(--oq-finish-pad))); overflow-y: auto; padding: clamp(18px, 3vw, 30px); border: 1px solid #ffffffc4; border-radius: var(--oq-round-xl); background: #fbf9f3dc; box-shadow: 0 28px 80px #1d3a2e26; backdrop-filter: blur(18px); }
 /* Sentence case, like every other label in the app now — a tracked-out
    uppercase eyebrow was the one shouting thing left on this screen. */
-.oq-finish__eyebrow { margin: 0 0 10px; color: var(--oq-accent-ink); font-size: .8125rem; font-weight: 700; }
-.oq-finish__card h1 { margin: 0; max-width: 12ch; font-family: var(--oq-font-display); font-variation-settings: var(--oq-display-variation); font-weight: 600; letter-spacing: -.02em; font-size: clamp(2.6rem, 5.4vw, 4.4rem); line-height: 1; }
-.oq-finish__copy { margin: 20px 0 26px; max-width: 44ch; color: var(--oq-muted); font-size: 1.05rem; line-height: 1.65; }
-.oq-finish__results { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: -8px 0 24px; }
-.oq-finish__results div { padding: 12px; border-radius: var(--oq-round-sm); background: var(--oq-wash); }
+.oq-finish__eyebrow { margin: 0 0 8px; color: var(--oq-accent-ink); font-size: .8125rem; font-weight: 700; }
+/* Was clamp(2.6rem, 5.4vw, 4.4rem) — a card meant to fit one screen can't
+   spend ~140px of height on a two-line display headline. */
+.oq-finish__card h1 { margin: 0; max-width: 16ch; font-family: var(--oq-font-display); font-variation-settings: var(--oq-display-variation); font-weight: 600; letter-spacing: -.02em; font-size: clamp(1.6rem, 3vw, 2.25rem); line-height: 1.1; }
+.oq-finish__copy { margin: 10px 0 16px; max-width: 44ch; color: var(--oq-muted); font-size: .95rem; line-height: 1.55; }
+.oq-finish__results { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: -4px 0 16px; }
+.oq-finish__results div { padding: 10px 12px; border-radius: var(--oq-round-sm); background: var(--oq-wash); }
 .oq-finish__results dt { color: var(--oq-muted); font-size: .75rem; }
-.oq-finish__results dd { margin: 4px 0 0; font-size: 1.35rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-.oq-finish__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.oq-finish__results dd { margin: 2px 0 0; font-size: 1.2rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.oq-finish__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .oq-finish__actions .oq-kit-button:first-child { grid-column: 1 / -1; }
-.oq-finish__note { margin: 15px 0 0; color: var(--oq-muted); font-size: .78rem; line-height: 1.45; }
-@media (max-width: 760px) { .oq-finish { grid-template-columns: 1fr; padding: 28px 18px 48px; } .oq-finish__world { min-height: 280px; } .oq-finish__card { margin: 0 auto; border-radius: 24px; } }
+.oq-finish__note { margin: 10px 0 0; color: var(--oq-muted); font-size: .76rem; line-height: 1.4; }
+/* Stacked layout: the hero and card are two rows, not side-by-side columns,
+   so capping the card to "100dvh minus the page padding" (the desktop
+   formula) would still let hero + card together run well past one screen.
+   70dvh keeps the card's own scroll-to-reach-actions bounded regardless. */
+@media (max-width: 760px) { .oq-finish { grid-template-columns: 1fr; padding: 28px 18px 48px; } .oq-finish__world { min-height: 280px; } .oq-finish__card { margin: 0 auto; max-height: 70dvh; border-radius: 24px; } }
 @media (max-width: 440px) { .oq-finish__actions { grid-template-columns: 1fr; } .oq-finish__actions .oq-kit-button:first-child { grid-column: auto; } }
 @media (prefers-reduced-motion: reduce) { .oq-finish__island { transform: none; } }

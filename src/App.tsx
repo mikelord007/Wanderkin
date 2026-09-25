@@ -58,16 +58,31 @@ type Screen =
   | { name: "friend"; shareId: string }
   | { name: "photos" }
   | { name: "generation"; jobId: string }
-  | { name: "preparation"; source: PreparationSource; isNew: boolean }
-  | { name: "play"; manifest: SceneManifest; publishable: boolean; publication?: PublishedLevelVersion }
+  | { name: "preparation"; source: PreparationSource; isNew: boolean; fromSample?: true }
+  | {
+      name: "play";
+      manifest: SceneManifest;
+      publishable: boolean;
+      unsaved?: UnsavedOrigin;
+      publication?: PublishedLevelVersion;
+    }
   | {
       name: "finish";
       manifest: SceneManifest;
       result: GameCompletionResult;
       media: CompletedRunMedia;
       publishable: boolean;
+      unsaved?: UnsavedOrigin;
       publication?: PublishedLevelVersion;
     };
+
+/** Why a non-publishable run has no stored level behind it, recorded where
+ * the run starts. `publishable: false` alone can't tell Finish whether
+ * Share should explain "bundled example" or offer to save the user's own
+ * unsaved world first — and a sample must never be saved by accident.
+ * `manifest` is the draft exactly as Preparation would save it (before any
+ * Race variant is derived from it). */
+type UnsavedOrigin = { kind: "sample" } | { kind: "draft"; manifest: SceneManifest };
 
 /** Every distinct top-level screen the router can restore from a URL alone
  * (start/worlds/create/generation resume from existing localStorage state,
@@ -137,7 +152,7 @@ async function findBundledSample(levelId: string): Promise<SceneManifest | null>
 
 async function resolvePlayRoute(levelId: string): Promise<Screen> {
   const sample = await findBundledSample(levelId);
-  if (sample) return { name: "play", manifest: sample, publishable: false };
+  if (sample) return { name: "play", manifest: sample, publishable: false, unsaved: { kind: "sample" } };
   try {
     const manifest = await getLevel(levelId);
     return { name: "play", manifest, publishable: true };
@@ -419,9 +434,9 @@ export function App() {
     case "start":
       return (
         <StartScreen
-          onPlaySample={(manifest) => go({ name: "play", manifest, publishable: false })}
+          onPlaySample={(manifest) => go({ name: "play", manifest, publishable: false, unsaved: { kind: "sample" } })}
           onEditSample={(manifest) =>
-            go({ name: "preparation", source: { kind: "manifest", manifest }, isNew: true })
+            go({ name: "preparation", source: { kind: "manifest", manifest }, isNew: true, fromSample: true })
           }
           onPlaySavedLevel={(manifest) =>
             manifest.courseValidation.status === "failed"
@@ -485,7 +500,18 @@ export function App() {
         <PreparationScreen
           source={screen.source}
           isNew={screen.isNew}
-          onPlay={(manifest) => go({ name: "play", manifest, publishable: !screen.isNew })}
+          onPlay={(manifest) =>
+            go(
+              screen.isNew
+                ? {
+                    name: "play",
+                    manifest,
+                    publishable: false,
+                    unsaved: screen.fromSample ? { kind: "sample" } : { kind: "draft", manifest },
+                  }
+                : { name: "play", manifest, publishable: true },
+            )
+          }
           onSave={handleSavePreparedLevel}
           onExport={(manifest) => downloadLevelBundle(manifest.levelId, manifest.name)}
           onBack={handlePreparationBack}
@@ -518,6 +544,7 @@ export function App() {
                     result,
                     media,
                     publishable: screen.publishable,
+                    ...(screen.unsaved ? { unsaved: screen.unsaved } : {}),
                   },
             )
           }
@@ -525,7 +552,9 @@ export function App() {
         />
       );
 
-    case "finish":
+    case "finish": {
+      const unsaved = screen.unsaved ? { unsaved: screen.unsaved } : {};
+      const draft = screen.unsaved?.kind === "draft" ? screen.unsaved.manifest : null;
       return (
         <FinishScreen
           manifest={screen.manifest}
@@ -539,7 +568,7 @@ export function App() {
                     publishable: false,
                     publication: screen.publication,
                   }
-                : { name: "play", manifest: screen.manifest, publishable: screen.publishable },
+                : { name: "play", manifest: screen.manifest, publishable: screen.publishable, ...unsaved },
             )
           }
           {...(!screen.publication
@@ -549,14 +578,39 @@ export function App() {
                     name: "play",
                     manifest: createRaceVariant(screen.manifest),
                     publishable: screen.publishable,
+                    ...unsaved,
                   }),
               }
             : {})}
-          {...(screen.publishable
-            ? {
-                onShare: () => publishLevel(screen.manifest.levelId, challengeFor(screen.result), false),
-              }
-            : {})}
+          {...(screen.publication
+            ? { existingShareUrl: new URL(sharePath(screen.publication.shareId), window.location.origin).toString() }
+            : screen.publishable
+              ? { onShare: () => publishLevel(screen.manifest.levelId, challengeFor(screen.result), false) }
+              : draft
+                ? {
+                    shareUnavailableReason: "unsaved-draft" as const,
+                    // Only on the player's explicit click: the same create
+                    // call Preparation's Save makes, then the ordinary
+                    // publish. Finish becomes a normal publishable run as
+                    // soon as the save lands, so a failed publish is retried
+                    // with plain Share rather than saving a second copy.
+                    onSaveAndShare: async () => {
+                      const saved = await createLevel(draft);
+                      clearActiveSource();
+                      go(
+                        {
+                          name: "finish",
+                          manifest: screen.manifest === draft ? saved : createRaceVariant(saved),
+                          result: screen.result,
+                          media: screen.media,
+                          publishable: true,
+                        },
+                        { replace: true },
+                      );
+                      return publishLevel(saved.levelId, challengeFor(screen.result), false);
+                    },
+                  }
+                : { shareUnavailableReason: screen.unsaved?.kind === "sample" ? "sample-world" as const : "unknown" as const })}
           onCreateAnother={screen.publication ? goStart : () => go({ name: "photos" })}
           postcardState={postcard.state}
           postcardVideo={postcard.video ?? existingPostcard}
@@ -573,6 +627,7 @@ export function App() {
             : {})}
         />
       );
+    }
 
     default:
       return null;

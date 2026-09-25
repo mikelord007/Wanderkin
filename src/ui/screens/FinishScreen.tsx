@@ -9,12 +9,26 @@ import type { GameplayHighlight } from "../../capture/recorder.js";
 import type { PostcardViewState } from "../../capture/usePostcard.js";
 import "./finish-screen.css";
 
+/**
+ * Why the Share button has no `onShare` handler, so the disabled state can
+ * explain itself instead of just reading "unavailable". Omitted entirely
+ * (and `onSaveAndShare` unset) falls back to the pre-existing generic
+ * message — additive, not a required prop.
+ */
+export type ShareUnavailableReason = "sample-world" | "unsaved-draft" | "unknown";
+
 interface FinishScreenProps {
   manifest: SceneManifest;
   result: GameCompletionResult;
   onReplay: () => void;
   onTryRace?: () => void;
   onShare?: () => Promise<PublishedLevelVersion>;
+  shareUnavailableReason?: ShareUnavailableReason;
+  /** Save-then-share path for a freshly created, never-persisted draft. */
+  onSaveAndShare?: () => Promise<PublishedLevelVersion>;
+  /** Already has a live share link (e.g. replaying a published world) —
+   * shown immediately instead of a disabled button with no explanation. */
+  existingShareUrl?: string | null;
   onCreateAnother: () => void;
   postcardState?: PostcardViewState;
   postcardVideo?: VideoAssetReference | null;
@@ -35,7 +49,8 @@ function formatTime(milliseconds: number): string {
 }
 
 export function FinishScreen({
-  manifest, result, onReplay, onTryRace, onShare, onCreateAnother,
+  manifest, result, onReplay, onTryRace, onShare, shareUnavailableReason = "unknown",
+  onSaveAndShare, existingShareUrl = null, onCreateAnother,
   postcardState = "none", postcardVideo = null, postcardError = null,
   onCreateAnimatedPostcard, onRetryAnimatedPostcard,
   gameplayHighlight = null, recordingSupported = false, recordingError = null,
@@ -44,24 +59,42 @@ export function FinishScreen({
   const isCollect = manifest.experience?.mode.kind === "collect";
   const isRace = result.mode === "race";
   const [sharing, setSharing] = useState(false);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [savingAndSharing, setSavingAndSharing] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(existingShareUrl);
   const [shareError, setShareError] = useState<string | null>(null);
 
-  async function handleShare() {
-    if (!onShare) return;
-    setSharing(true);
+  async function publishAndStore(publish: () => Promise<PublishedLevelVersion>, setBusy: (busy: boolean) => void) {
+    setBusy(true);
     setShareError(null);
     try {
-      const publication = await onShare();
+      const publication = await publish();
       const url = new URL(sharePath(publication.shareId), window.location.origin).toString();
       setShareUrl(url);
       await navigator.clipboard?.writeText(url).catch(() => undefined);
     } catch (error) {
       setShareError(error instanceof Error ? error.message : "Could not publish this world.");
     } finally {
-      setSharing(false);
+      setBusy(false);
     }
   }
+
+  async function handleShare() {
+    if (!onShare) return;
+    await publishAndStore(onShare, setSharing);
+  }
+
+  async function handleSaveAndShare() {
+    if (!onSaveAndShare) return;
+    await publishAndStore(onSaveAndShare, setSavingAndSharing);
+  }
+
+  async function handleCopyExistingLink() {
+    if (!shareUrl) return;
+    await navigator.clipboard?.writeText(shareUrl).catch(() => undefined);
+  }
+
+  const canShareAction = Boolean(onShare) || Boolean(shareUrl);
+  const publishing = sharing || savingAndSharing;
   return (
     <main className="oq-finish" aria-labelledby="completion-title">
       <div className="oq-finish__glow" aria-hidden="true" />
@@ -95,11 +128,23 @@ export function FinishScreen({
           {onTryRace ? <Button variant="secondary" onClick={onTryRace}>Try Race mode</Button> : null}
           <Button
             variant="secondary"
-            onClick={handleShare}
-            disabled={!onShare || sharing}
-            title={onShare ? undefined : "Publish this world before sharing it"}
+            onClick={onShare ? handleShare : shareUrl ? handleCopyExistingLink : undefined}
+            // A save-and-share hands Finish a real `onShare` the moment the
+            // save lands, while its publish is still running — stay locked
+            // until that finishes so one click can't publish twice.
+            disabled={!canShareAction || publishing}
+            aria-describedby={canShareAction ? undefined : "finish-share-reason"}
+            title={
+              onShare || shareUrl
+                ? undefined
+                : shareUnavailableReason === "sample-world"
+                  ? "Bundled sample worlds can't be shared"
+                  : shareUnavailableReason === "unsaved-draft"
+                    ? "Save this world first to get a share link"
+                    : "Publish this world before sharing it"
+            }
           >
-            {sharing ? "Publishing…" : shareUrl ? "Copy share link again" : "Share this world"}
+            {publishing && canShareAction ? "Publishing…" : shareUrl ? "Copy share link again" : "Share this world"}
           </Button>
           <Button variant="ghost" onClick={onCreateAnother}>Create another world</Button>
         </div>
@@ -109,7 +154,22 @@ export function FinishScreen({
           </p>
         ) : null}
         {shareError ? <p className="oq-error-text" role="alert">{shareError}</p> : null}
-        {!onShare ? <p className="oq-finish__note">Publish this world to unlock a playable sharing link.</p> : null}
+        {!canShareAction ? (
+          shareUnavailableReason === "sample-world" ? (
+            <p className="oq-finish__note" id="finish-share-reason">This is a bundled example world, so it can’t be shared. Create your own world to get a link.</p>
+          ) : shareUnavailableReason === "unsaved-draft" ? (
+            <>
+              <p className="oq-finish__note" id="finish-share-reason">This world hasn’t been saved yet, so there’s no link to share.</p>
+              {onSaveAndShare ? (
+                <Button variant="ghost" onClick={handleSaveAndShare} loading={savingAndSharing} loadingLabel="Saving & publishing…">
+                  Save &amp; share this world
+                </Button>
+              ) : null}
+            </>
+          ) : (
+            <p className="oq-finish__note" id="finish-share-reason">Publish this world to unlock a playable sharing link.</p>
+          )
+        ) : null}
         <p className="oq-finish__note">Replay and Race reuse this world’s existing assets — no new generation is started.</p>
         <CompletionMediaCards
           postcardState={postcardState}
