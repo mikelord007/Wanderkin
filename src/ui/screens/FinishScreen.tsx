@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { PublishedLevelVersion, SceneManifest, VideoAssetReference } from "@shared/index.js";
 import { Button } from "../components/Button.js";
 import { Icon } from "../components/Icon.js";
+import { PortalArch } from "../components/Scenery.js";
 import type { GameCompletionResult } from "../../game/types.js";
 import { sharePath } from "../shareRouting.js";
 import { CompletionMediaCards } from "../../capture/MediaCards.js";
@@ -39,6 +40,9 @@ interface FinishScreenProps {
   recordingSupported?: boolean;
   recordingError?: string | null;
   onDownloadGameplayHighlight?: () => void;
+  /** The postcard frame captured the moment the run finished, shown as the
+   * picture of the restored world. Absent: the illustrated island. */
+  worldPostcard?: Blob | null;
 }
 
 function formatTime(milliseconds: number): string {
@@ -54,8 +58,15 @@ export function FinishScreen({
   postcardState = "none", postcardVideo = null, postcardError = null,
   onCreateAnimatedPostcard, onRetryAnimatedPostcard,
   gameplayHighlight = null, recordingSupported = false, recordingError = null,
-  onDownloadGameplayHighlight,
+  onDownloadGameplayHighlight, worldPostcard = null,
 }: FinishScreenProps) {
+  const [postcardUrl, setPostcardUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!worldPostcard) return;
+    const url = URL.createObjectURL(worldPostcard);
+    setPostcardUrl(url);
+    return () => { URL.revokeObjectURL(url); setPostcardUrl(null); };
+  }, [worldPostcard]);
   const isCollect = manifest.experience?.mode.kind === "collect";
   const isRace = result.mode === "race";
   const [sharing, setSharing] = useState(false);
@@ -99,12 +110,19 @@ export function FinishScreen({
     <main className="oq-finish" aria-labelledby="completion-title">
       <div className="oq-finish__glow" aria-hidden="true" />
       <section className="oq-finish__world" aria-label={`${manifest.name}, fully restored`}>
-        <div className="oq-finish__island" aria-hidden="true">
-          <span className="oq-finish__fragment oq-finish__fragment--red" />
-          <span className="oq-finish__fragment oq-finish__fragment--yellow" />
-          <span className="oq-finish__fragment oq-finish__fragment--blue" />
-          <span className="oq-finish__portal" />
-        </div>
+        {postcardUrl ? (
+          <figure className="oq-finish__postcard">
+            <PortalArch className="oq-finish__arch" />
+            <img src={postcardUrl} alt={`${manifest.name}, the moment you finished`} />
+          </figure>
+        ) : (
+          <div className="oq-finish__island" aria-hidden="true">
+            <span className="oq-finish__fragment oq-finish__fragment--red" />
+            <span className="oq-finish__fragment oq-finish__fragment--yellow" />
+            <span className="oq-finish__fragment oq-finish__fragment--blue" />
+            <span className="oq-finish__portal" />
+          </div>
+        )}
         <p><Icon name="spark" /> World fully restored</p>
         <strong>{manifest.name}</strong>
       </section>

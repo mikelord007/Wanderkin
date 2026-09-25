@@ -1,3 +1,9 @@
+/*
+ * Finish (v3, light). The celebration is the world itself: the postcard
+ * captured the moment you finished, framed like a print in front of a soft
+ * lavender horizon and the portal. The result and actions sit on one white
+ * card beside it. All values are tokens.
+ */
 .oq-finish {
   /* Vertical padding follows the window's height, not its width, so a wide
      but short desktop window doesn't spend its height on empty margin. */
@@ -9,68 +15,69 @@
   display: grid;
   grid-template-columns: minmax(280px, 1.05fr) minmax(320px, .95fr);
   align-items: center;
-  gap: clamp(24px, 5vw, 64px);
+  gap: var(--wk-gap-group);
   overflow: visible;
-  padding: var(--oq-finish-pad) clamp(20px, 4vw, 56px);
-  color: var(--oq-ink);
+  padding: var(--oq-finish-pad) var(--wk-page-x);
+  color: var(--wk-text);
   font-family: var(--oq-font-body);
   letter-spacing: .006em;
-  background: var(--wk-night);
+  background: var(--wk-page);
 }
-/* The restored world gets the planetrise: it rises behind the island on the
-   left, so the island reads as standing on the lit rim of its own planet. */
+/* A soft lavender horizon behind the world, the landing's planetrise in
+   miniature. Gradients only. */
 .oq-finish__glow {
   position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background:
-    radial-gradient(ellipse 22% 40% at 27% 100%, var(--wk-night) 0%, var(--wk-night) 82%, #12072600 100%),
-    radial-gradient(ellipse 70% 50% at 27% 104%, #ffffff 0%, #f3edff 16%, #cdb9ff 28%, #8b6cff 42%, #4a2bb8 58%, #24115e 74%, #12072600 90%),
-    radial-gradient(ellipse 50% 60% at 27% 55%, #2a1570 0%, #12072600 70%);
+    radial-gradient(ellipse 22% 36% at 27% 100%, #fbf9ff 0%, #f3edff 76%, #f3edff00 100%),
+    radial-gradient(ellipse 60% 44% at 27% 102%, rgba(123, 92, 250, .55) 0%, rgba(154, 128, 251, .38) 24%, rgba(201, 184, 253, .22) 44%, rgba(250, 247, 255, 0) 76%);
 }
 .oq-finish__world, .oq-finish__card { position: relative; z-index: 1; }
-.oq-finish__world { min-height: 420px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; }
-.oq-finish__world p { display: flex; align-items: center; gap: 8px; margin: 22px 0 0; color: var(--oq-accent-ink); font-weight: 500; }
-.oq-finish__world p svg { color: var(--wk-marigold); }
+.oq-finish__world { min-height: 420px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--oq-space-2); text-align: center; }
+.oq-finish__world p { display: flex; align-items: center; gap: 8px; margin: var(--oq-space-5) 0 0; color: var(--wk-purple-ink); font-weight: 600; }
+.oq-finish__world p svg { color: var(--wk-purple); }
 .oq-finish__world strong { font-family: var(--oq-font-display); font-weight: 300; letter-spacing: -.03em; font-size: clamp(1.6rem, 3.2vw, 2.4rem); line-height: 1.1; }
-/* The island is an illustration of the finished world, so it keeps its own
-   colours; only its shadow picks up the night's violet. */
-.oq-finish__island { position: relative; width: min(360px, 76vw); aspect-ratio: 1.35; border-radius: 50% 50% 42% 42%; background: radial-gradient(circle at 30% 25%, #ffe783 0 5%, transparent 6%), linear-gradient(155deg, #78d99a 0 45%, #4ba977 46% 58%, #8c684d 59% 100%); box-shadow: 0 34px 70px #05010fcc, 0 0 80px -10px #8b6cff66, inset 0 8px 0 #ffffff54; transform: perspective(700px) rotateX(16deg) rotateZ(-3deg); }
-.oq-finish__portal { position: absolute; width: 76px; height: 112px; right: 16%; top: 10%; border: 12px solid #9b5de5; border-bottom-width: 18px; border-radius: 50% 50% 16px 16px; background: #d8b8ff80; box-shadow: 0 0 28px #9b5de5aa; }
+/* The finished world, captured at the moment you finished, held up as a print
+   in front of the doorway. */
+.oq-finish__postcard { position: relative; margin: 0; width: min(560px, 92%); display: grid; place-items: center; }
+.oq-finish__postcard img { position: relative; z-index: 1; width: 100%; height: auto; padding: 10px; border-radius: var(--wk-r-card); background: var(--wk-surface); border: 1px solid var(--wk-border); transform: rotate(-2deg); box-shadow: var(--wk-shadow-lg); }
+.oq-finish__arch { position: absolute; z-index: 0; left: 50%; bottom: 16%; height: 140%; width: auto; transform: translateX(-50%); }
+/* The illustrated island, used when no postcard was captured. It keeps its
+   own colours; only its shadow picks up the plum. */
+.oq-finish__island { position: relative; width: min(360px, 76vw); aspect-ratio: 1.35; border-radius: 50% 50% 42% 42%; background: radial-gradient(circle at 30% 25%, #ffe783 0 5%, transparent 6%), linear-gradient(155deg, #78d99a 0 45%, #4ba977 46% 58%, #8c684d 59% 100%); box-shadow: 0 34px 60px rgba(36, 20, 61, .22), 0 0 70px -10px rgba(123, 92, 250, .45), inset 0 8px 0 #ffffff54; transform: perspective(700px) rotateX(16deg) rotateZ(-3deg); }
+.oq-finish__portal { position: absolute; width: 76px; height: 112px; right: 16%; top: 10%; border: 12px solid #7b5cfa; border-bottom-width: 18px; border-radius: 50% 50% 16px 16px; background: #d8ccfe99; box-shadow: 0 0 28px #7b5cfa88; }
 .oq-finish__fragment { position: absolute; width: 22px; height: 22px; rotate: 45deg; box-shadow: 0 0 18px currentColor; }
 .oq-finish__fragment--red { left: 18%; top: 33%; color: #ff4d6d; background: currentColor; }
 .oq-finish__fragment--yellow { left: 46%; top: 15%; color: #ffd93d; background: currentColor; }
 .oq-finish__fragment--blue { left: 48%; bottom: 18%; color: #4d96ff; background: currentColor; }
-/* Bounded to the viewport (accounting for .oq-finish's own padding, so the
-   two together can't exceed 100dvh) and internally scrollable, so a tall
-   stack of optional media cards can't push the primary actions off-screen.
-   Opaque dusk rather than blurred glass: nothing behind it needs to show. */
-.oq-finish__card { width: min(560px, 100%); max-height: calc(100dvh - (2 * var(--oq-finish-pad))); overflow-y: auto; padding: clamp(20px, 3vw, 32px); border: 1px solid var(--wk-rim); border-radius: var(--oq-round-xl); background: var(--wk-dusk); box-shadow: var(--wk-highlight), 0 30px 80px #05010fb3; scrollbar-color: var(--oq-control-line) transparent; }
+/* Bounded to the viewport (accounting for .oq-finish's own padding) and
+   internally scrollable, so a tall stack of optional media cards can't push
+   the primary actions off-screen. */
+.oq-finish__card { width: min(560px, 100%); max-height: calc(100dvh - (2 * var(--oq-finish-pad))); overflow-y: auto; padding: clamp(24px, 3vw, 36px); border: 1px solid var(--wk-border); border-radius: var(--wk-r-stage); background: var(--wk-surface); box-shadow: var(--wk-shadow-lg); scrollbar-color: #cbbcf9 transparent; }
 /* The eyebrow wears the shared chip (.wk-chip); this only sets its spacing. */
-.oq-finish__eyebrow { margin: 0 0 14px; }
-/* A card meant to fit one screen can't spend ~140px of height on a two-line
-   display headline. */
+.oq-finish__eyebrow { margin: 0 0 var(--wk-gap-sm); }
 .oq-finish__card h1 { margin: 0; max-width: 16ch; font-family: var(--oq-font-display); font-weight: 300; letter-spacing: -.035em; font-size: clamp(1.9rem, 3.4vw, 2.6rem); line-height: 1.04; }
-.oq-finish__copy { margin: 12px 0 18px; max-width: 44ch; color: var(--oq-muted); font-size: .98rem; line-height: 1.55; }
-.oq-finish__results { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: -4px 0 18px; }
-.oq-finish__results div { padding: 10px 14px; border-radius: var(--oq-round-md); background: var(--wk-veil); border: 1px solid var(--oq-line); }
-.oq-finish__results dt { color: var(--oq-muted); font-size: .78rem; }
+.oq-finish__copy { margin: var(--oq-space-3) 0 var(--oq-space-5); max-width: 44ch; color: var(--wk-text-2); font-size: .98rem; line-height: 1.55; }
+.oq-finish__results { display: grid; grid-template-columns: 1fr 1fr; gap: var(--oq-space-2); margin: -4px 0 var(--oq-space-5); }
+.oq-finish__results div { padding: 10px 14px; border-radius: var(--wk-r-inner); background: var(--wk-tint); }
+.oq-finish__results dt { color: var(--wk-text-2); font-size: .78rem; }
 .oq-finish__results dd { margin: 2px 0 0; font-size: 1.5rem; font-weight: 300; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .oq-finish__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .oq-finish__actions .oq-kit-button:first-child { grid-column: 1 / -1; }
-.oq-finish__note { margin: 12px 0 0; color: var(--oq-muted); font-size: .8rem; line-height: 1.45; }
-.oq-finish__note a { color: var(--oq-accent-ink); overflow-wrap: anywhere; }
-/* Stacked layout: the hero and card are two rows, not side-by-side columns,
-   so capping the card to "100dvh minus the page padding" (the desktop
-   formula) would still let hero + card together run well past one screen.
-   70dvh keeps the card's own scroll-to-reach-actions bounded regardless. */
+.oq-finish__note { margin: var(--oq-space-3) 0 0; color: var(--wk-text-3); font-size: .8rem; line-height: 1.45; }
+.oq-finish__note a { color: var(--wk-purple-ink); overflow-wrap: anywhere; }
+/* Stacked layout: world then card. 70dvh keeps the card's own
+   scroll-to-reach-actions bounded. */
 @media (max-width: 760px) {
-  .oq-finish { grid-template-columns: 1fr; padding: 28px 18px 48px; }
+  .oq-finish { grid-template-columns: 1fr; padding: 28px var(--wk-page-x) 48px; }
   .oq-finish__glow {
     background:
-      radial-gradient(ellipse 34% 16% at 50% 38%, var(--wk-night) 0%, var(--wk-night) 80%, #12072600 100%),
-      radial-gradient(ellipse 110% 20% at 50% 40%, #f3edff 0%, #cdb9ff 20%, #8b6cff 38%, #4a2bb8 56%, #12072600 86%);
+      radial-gradient(ellipse 36% 16% at 50% 40%, #fbf9ff 0%, #f3edff 76%, #f3edff00 100%),
+      radial-gradient(ellipse 110% 20% at 50% 42%, rgba(123, 92, 250, .5) 0%, rgba(154, 128, 251, .32) 26%, rgba(250, 247, 255, 0) 76%);
   }
   .oq-finish__world { min-height: 280px; }
-  .oq-finish__card { margin: 0 auto; max-height: 70dvh; border-radius: 24px; }
+  .oq-finish__card { margin: 0 auto; max-height: 70dvh; }
+  .oq-finish__postcard { width: 100%; }
+  .oq-finish__arch { height: 120%; }
 }
 @media (max-width: 440px) { .oq-finish__actions { grid-template-columns: 1fr; } .oq-finish__actions .oq-kit-button:first-child { grid-column: auto; } }
 @media (prefers-reduced-motion: reduce) { .oq-finish__island { transform: none; } }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { CropSettings } from "../creationFlow.js";
 import { Button, Card } from "../components/index.js";
 import { CreationFrame } from "./CreationFrame.js";
+import { TinyExplorer } from "../components/Scenery.js";
 
 export type ObjectReviewState = "loading" | "ready" | "broken";
 
@@ -45,6 +46,8 @@ export function ReviewObjectScreen({
             <button type="button" aria-pressed={showOriginal} onClick={() => setShowOriginal(true)}>Original photo</button>
           </div>
           <div className="oq-review__stage" aria-busy={state === "loading"}>
+            {/* A scale cue: the explorer beside your object, for size. */}
+            <TinyExplorer className="oq-review__explorer" />
             <img
               src={visibleUrl}
               alt={showOriginal ? "Original object photo" : "Isolated object preview"}

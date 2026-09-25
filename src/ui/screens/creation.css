@@ -1,179 +1,212 @@
-.oq-creation { align-self: flex-start; width: 100%; min-height: 100vh; background: var(--oq-paper); }
-/* The creation steps read as one continuous journey: the same night, the same
-   dim horizon (styles.css), and a step rail of small pills. */
-.oq-creation__container { width: min(100%, 980px); margin-inline: auto; padding: var(--oq-space-5) clamp(20px, 4vw, 40px) var(--oq-space-9); }
-.oq-creation__header { display: grid; gap: var(--oq-space-6); margin-bottom: var(--oq-space-7); }
+/*
+ * Creation flow (v3, light product system). Product screens: tighter headings
+ * than the landing, white frames on the page, one visual per step that carries
+ * it (the capture stage with its doorway, the object on a lavender floor with
+ * the explorer for scale, image-led look tiles, the preview beside the photo,
+ * the doorway filling while the world is built). All values are tokens.
+ */
+.oq-creation { align-self: flex-start; width: 100%; min-height: 100vh; background: var(--wk-page); }
+.oq-creation__container { width: min(100%, calc(1040px + 2 * var(--wk-page-x))); margin-inline: auto; padding: var(--oq-space-5) var(--wk-page-x) var(--wk-section-y); }
+.oq-creation__header { display: grid; gap: var(--wk-gap); margin-bottom: var(--wk-gap-group); }
 .oq-creation__topline { display: flex; align-items: center; gap: var(--oq-space-5); flex-wrap: wrap; }
-.oq-creation__progress { flex: 1 1 320px; display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; list-style: none; margin: 0; padding: 0; font-size: .875rem; color: var(--oq-muted); }
-.oq-creation__progress li { display: flex; align-items: center; gap: 7px; min-width: 0; }
-.oq-creation__progress li::after { content: ""; height: 1px; flex: 1; background: linear-gradient(90deg, var(--oq-control-line), var(--oq-line)); }
+
+/* The step rail: small numbered pills joined by a hairline. */
+.oq-creation__progress { flex: 1 1 320px; display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; list-style: none; margin: 0; padding: 0; font-size: var(--wk-type-small); color: var(--wk-text-3); }
+.oq-creation__progress li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.oq-creation__progress li::after { content: ""; height: 1px; flex: 1; background: var(--wk-border); }
 .oq-creation__progress li:last-child::after { display: none; }
-.oq-creation__progress span { display: grid; place-items: center; flex: 0 0 28px; height: 28px; border: 1px solid var(--oq-control-line); border-radius: 50%; background: transparent; font-weight: 500; font-variant-numeric: tabular-nums; }
-.oq-creation__progress [aria-current="step"] { color: var(--oq-ink); font-weight: 500; }
-.oq-creation__progress [aria-current="step"] span { color: var(--oq-ink); background: var(--oq-action-fill); border-color: var(--oq-action); box-shadow: 0 0 0 4px color-mix(in srgb, var(--oq-action) 18%, transparent); }
-.oq-creation__progress [data-complete="true"] span { color: var(--oq-success-ink); background: var(--oq-success-wash); border-color: var(--oq-success-ink); }
-.oq-creation__heading { display: grid; gap: var(--oq-space-3); }
-/* Measured in `ch` of the heading's own size, not the container's — capping
-   the wrapper in body-sized ch squeezed a 3.9rem headline into four lines. */
-.oq-creation__heading h1 { max-inline-size: 17ch; }
-.oq-creation__heading .oq-kit-eyebrow + h1 { margin-top: var(--oq-space-2); }
-.oq-capture { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(260px,.8fr); gap: 24px; align-items: start; }
-.oq-capture__card { display: grid; gap: 20px; }
-.oq-capture__drop { min-height: 380px; display: grid; place-items: center; align-content: center; gap: 12px; padding: 32px; text-align: center; border: 1.5px dashed var(--oq-control-line); border-radius: var(--oq-round-lg); background: radial-gradient(ellipse 80% 55% at 50% 118%, #3a2096 0%, #22115a 45%, transparent 75%), var(--wk-dusk); transition: border-color var(--oq-duration) var(--oq-ease), background var(--oq-duration) var(--oq-ease); }
-.oq-capture__drop--active { border-color: var(--oq-action); background: var(--oq-wash); }
-/* The drop zone's own heading answers the page heading; sizing it like a
-   second h1 made the two argue for the same attention. */
-.oq-capture__drop :is(h2, h3) { font-size: clamp(1.3rem, 1.15rem + .6vw, 1.6rem); }
-.oq-capture__drop p { color: var(--oq-muted); max-inline-size: 40ch; }
-.oq-capture__icon { display: grid; place-items: center; width: 68px; height: 68px; color: var(--oq-ink); background: var(--wk-veil); border: 1px solid var(--wk-rim); border-radius: 50%; box-shadow: 0 0 0 8px #8b6cff14; }
+.oq-creation__progress span { display: grid; place-items: center; flex: 0 0 28px; height: 28px; border: 1px solid var(--wk-border); border-radius: 50%; background: var(--wk-surface); font-weight: 600; font-variant-numeric: tabular-nums; }
+.oq-creation__progress [aria-current="step"] { color: var(--wk-text); font-weight: 600; }
+.oq-creation__progress [aria-current="step"] span { color: #ffffff; background: var(--oq-action); border-color: var(--oq-action); box-shadow: 0 0 0 4px var(--wk-glow); }
+.oq-creation__progress [data-complete="true"] span { color: var(--oq-success-ink); background: var(--oq-success-wash); border-color: #b9e2cc; }
+
+.oq-creation__heading { display: grid; gap: var(--wk-gap-sm); }
+/* Product headings: tighter than the landing's marketing type. Measured in ch
+   of the heading's own size so it wraps where the words want to. */
+.oq-creation__heading h1 { max-inline-size: 18ch; font-size: clamp(2rem, 1.45rem + 2vw, 3rem); font-weight: 300; letter-spacing: -.035em; line-height: 1.02; }
+.oq-creation__heading .oq-kit-eyebrow + h1 { margin-top: var(--oq-space-1); }
+
+/* --- Step 1: capture ---------------------------------------------------- */
+.oq-capture { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(260px,.8fr); gap: var(--wk-gap-group); align-items: start; }
+.oq-capture__card { display: grid; gap: var(--wk-gap-sm); }
+/* The drop zone is a pale stage with the doorway standing in it and a blank
+   print waiting for the photo. */
+.oq-capture__drop {
+  position: relative; isolation: isolate; overflow: hidden;
+  min-height: 420px; display: grid; place-items: center; align-content: center; gap: var(--wk-gap-sm);
+  padding: var(--wk-gap); text-align: center;
+  border: 1.5px dashed #cbbcf9; border-radius: var(--wk-r-card);
+  background: radial-gradient(ellipse 60% 22% at 50% 94%, var(--wk-glow), transparent 72%), linear-gradient(#fdfcff, var(--wk-tint));
+  transition: border-color var(--oq-duration) var(--oq-ease), background var(--oq-duration) var(--oq-ease);
+}
+.oq-capture__drop--active { border-color: var(--oq-action); background: radial-gradient(ellipse 64% 26% at 50% 94%, rgba(123, 92, 250, .28), transparent 72%), linear-gradient(#fbf9ff, #ebe1ff); }
+.oq-capture__arch { position: absolute; z-index: -1; left: 50%; bottom: 5%; height: 86%; width: auto; transform: translateX(-50%); opacity: .3; }
+/* The drop zone's heading answers the page heading, one step down. */
+.oq-capture__drop :is(h2, h3) { font-size: clamp(1.3rem, 1.15rem + .6vw, 1.6rem); font-weight: 400; }
+.oq-capture__drop p { color: var(--wk-text-2); max-inline-size: 40ch; }
+.oq-capture__icon { display: grid; place-items: center; width: 96px; height: 74px; border-radius: 8px; color: var(--wk-purple-ink); background: var(--wk-surface); border: 1px solid var(--wk-border); box-shadow: var(--wk-shadow-md); transform: rotate(-4deg); }
 .oq-capture__icon svg { width: 30px; height: 30px; }
 .oq-capture__actions, .oq-capture__confirm { justify-content: center; }
-.oq-capture__preview { display: grid; gap: 8px; }
-.oq-capture__preview img { width: 100%; aspect-ratio: 4/3; object-fit: contain; image-orientation: from-image; border-radius: 16px; background: var(--oq-inset); }
-.oq-capture__preview figcaption { color: var(--oq-success-ink); font-weight: 500; }
-.oq-capture__tips { display: grid; gap: 16px; padding: 28px 8px; }
-.oq-capture__tips ol { display: grid; gap: 20px; list-style: none; margin: 0; padding: 0; }
-.oq-capture__tips li { display: flex; gap: 12px; }
-.oq-capture__tips li > span { display: grid; place-items: center; flex: 0 0 32px; height: 32px; border-radius: 50%; color: var(--oq-ink); border: 1px solid var(--oq-control-line); font-weight: 500; }
-.oq-capture__tips li p { margin-top: 2px; color: var(--oq-muted); font-size: .875rem; }
-.oq-capture__video { width: 100%; max-height: 58vh; object-fit: cover; border-radius: 16px; background: var(--oq-inset); }
+/* The chosen photo, framed as a print on the same stage. */
+.oq-capture__preview { display: grid; gap: var(--oq-space-2); padding: var(--wk-gap) var(--wk-gap) var(--oq-space-4); border-radius: var(--wk-r-card); background: radial-gradient(ellipse 60% 22% at 50% 96%, var(--wk-glow), transparent 72%), linear-gradient(#fdfcff, var(--wk-tint)); }
+.oq-capture__preview img { width: 100%; aspect-ratio: 4/3; object-fit: contain; image-orientation: from-image; padding: 8px; border-radius: var(--wk-r-inner); background: var(--wk-surface); border: 1px solid var(--wk-border); box-shadow: var(--wk-shadow-md); }
+.oq-capture__preview figcaption { color: var(--oq-success-ink); font-weight: 600; text-align: center; }
+.oq-capture__tips { display: grid; gap: var(--wk-gap-sm); padding: var(--oq-space-2) 0; }
+.oq-capture__tips h2 { font-size: var(--wk-type-h3); font-weight: 500; }
+.oq-capture__tips ol { display: grid; gap: var(--oq-space-5); list-style: none; margin: var(--oq-space-2) 0 0; padding: 0; }
+.oq-capture__tips li { display: flex; gap: var(--oq-space-3); }
+.oq-capture__tips li > span { display: grid; place-items: center; flex: 0 0 30px; height: 30px; border-radius: 50%; color: var(--wk-purple-ink); border: 2px solid var(--wk-purple); background: var(--wk-surface); font-size: .8125rem; font-weight: 600; }
+.oq-capture__tips li p { margin-top: 2px; color: var(--wk-text-2); font-size: var(--wk-type-small); }
+.oq-capture__video { width: 100%; max-height: 58vh; object-fit: cover; border-radius: var(--wk-r-card); background: var(--wk-cinema); }
+
+/* --- Step 1b: review the object ----------------------------------------- */
+.oq-review { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(280px,.8fr); gap: var(--wk-gap-group); align-items: start; }
+.oq-review__visual { display: grid; gap: var(--wk-gap-sm); }
+.oq-review__toolbar { display: inline-flex; align-items: center; width: fit-content; padding: 4px; border-radius: 999px; background: var(--wk-surface); border: 1px solid var(--wk-border); box-shadow: var(--wk-shadow-sm); }
+.oq-review__toolbar button { min-height: 40px; padding: 8px 16px; border: 0; border-radius: 999px; color: var(--wk-text-2); background: transparent; cursor: pointer; font-weight: 500; }
+.oq-review__toolbar button[aria-pressed="true"] { color: #ffffff; background: var(--oq-action); }
+.oq-review__toolbar button:disabled { opacity: .5; cursor: not-allowed; }
+/* The object on a lavender floor, with the explorer beside it for size. */
+.oq-review__stage {
+  position: relative; display: grid; place-items: center; overflow: hidden; min-height: 440px; aspect-ratio: 1.1;
+  border-radius: var(--wk-r-stage); border: 1px solid var(--wk-border); box-shadow: var(--wk-shadow-md);
+  background: radial-gradient(ellipse 56% 16% at 50% 88%, rgba(123, 92, 250, .22), transparent 72%), linear-gradient(#ffffff, var(--wk-tint));
+}
+.oq-review__stage::before { content: ""; position: absolute; inset: 0; opacity: .6; background: radial-gradient(circle at center, #cbbcf9 0 1px, transparent 1.5px) 0 0/18px 18px; }
+.oq-review__stage img { position: relative; z-index: 1; width: 82%; height: 82%; object-fit: contain; image-orientation: from-image; transform-origin: center; transition: transform var(--oq-duration) var(--oq-ease); }
+.oq-review__explorer { position: absolute; z-index: 2; left: 9%; bottom: 9%; width: 84px; height: auto; }
+.oq-review__loading { position: absolute; z-index: 3; inset: auto 16px 16px; display: flex; justify-content: center; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 999px; color: var(--wk-text); background: #ffffffeb; border: 1px solid var(--wk-border); box-shadow: var(--wk-shadow-sm); }
+.oq-review__crop { display: grid; gap: var(--wk-gap-sm); margin: 0; padding: var(--wk-card-pad); border: 1px solid var(--wk-border); border-radius: var(--wk-r-card); background: var(--wk-surface); }
+.oq-review__crop legend { padding-inline: 6px; font-weight: 600; }
+.oq-review__crop label { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-weight: 500; }
+.oq-review__crop input { grid-column: 1 / -1; width: 100%; min-height: 44px; accent-color: var(--oq-action); }
+.oq-review__crop output { color: var(--wk-text-2); font-variant-numeric: tabular-nums; }
+.oq-review__panel { display: grid; gap: var(--wk-gap-sm); }
+.oq-review__checklist { display: grid; gap: 10px; margin: 0; padding-left: 22px; color: var(--wk-text-2); }
+.oq-review__notice { display: grid; gap: 4px; padding: 14px 16px; border-radius: var(--wk-r-inner); border: 1px solid #f2c3bf; background: var(--oq-error-wash); }
+.oq-review__actions { display: grid; gap: 10px; }
+
+/* --- Step 2: look and adventure ----------------------------------------
+   Three decisions, each a plain section divided by a rule. The look tiles
+   lead with their real example pictures. */
+.oq-customize { max-width: 960px; display: grid; gap: var(--wk-gap-group); }
+.oq-customize__group { display: grid; gap: var(--wk-gap-sm); }
+.oq-customize__group + .oq-customize__group { padding-top: var(--wk-gap-group); border-top: 1px solid var(--wk-border); }
+.oq-customize__group--atmosphere { gap: var(--oq-space-1); }
+.oq-customize__group--atmosphere > * { max-width: 34rem; }
+.oq-customize .oq-kit-choice__image { aspect-ratio: 4 / 3; border-radius: var(--wk-r-inner); }
+.oq-customize .oq-kit-choice input:checked + .oq-kit-choice__body { box-shadow: 0 0 0 4px var(--wk-glow); }
+
+/* The fixed illustrative example: a reference plate, not a choice. Neutral on
+   purpose, so it never retints with the chosen look. */
+.oq-style-example {
+  display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+  gap: var(--wk-gap); align-items: center;
+  padding: var(--oq-space-3); border: 1px solid var(--wk-border);
+  border-radius: var(--wk-r-card); background: var(--wk-surface); box-shadow: var(--wk-shadow-sm);
+}
+/* `height: auto` is load-bearing: the img carries width/height attributes, and
+   without it the intrinsic height wins over aspect-ratio. */
+.oq-style-example img { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; border-radius: var(--wk-r-inner); }
+.oq-style-example figcaption { display: grid; gap: var(--oq-space-2); padding-right: var(--oq-space-2); }
+.oq-style-example strong { font-weight: 600; }
+.oq-style-example span { color: var(--wk-text-2); font-size: .9375rem; max-inline-size: 46ch; }
+.oq-customize__count { text-align: right; color: var(--wk-text-3); font-size: var(--wk-type-small); font-variant-numeric: tabular-nums; }
+.oq-customize__error { display: grid; gap: 4px; padding: 14px 16px; border: 1px solid #f2c3bf; border-radius: var(--wk-r-inner); background: var(--oq-error-wash); }
+/* Primary action last, so the eye lands on it after reading the choices. */
+.oq-customize__actions { justify-content: flex-end; }
+
+/* --- Step 3: style preview ---------------------------------------------
+   The same transformation language as the landing: two equal frames, the
+   photo and the look, then the decision on a white card. */
+.oq-style-preview { display: grid; gap: var(--wk-gap-group); }
+.oq-style-preview__compare { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--wk-grid-gap); }
+.oq-style-preview__compare .oq-kit-card { padding: 12px; box-shadow: var(--wk-shadow-md); }
+.oq-style-preview__compare .oq-kit-card:last-child { box-shadow: var(--wk-shadow-md), var(--wk-shadow-glow); border-color: #d6c9f8; }
+.oq-style-preview__compare figure { display: grid; gap: 10px; }
+.oq-style-preview__image { position: relative; overflow: hidden; aspect-ratio: 4/3; border-radius: var(--wk-r-inner); background: var(--wk-tint); }
+.oq-style-preview__image img { width: 100%; height: 100%; object-fit: contain; image-orientation: from-image; }
+.oq-style-preview__placeholder { width: 100%; height: 100%; background: linear-gradient(110deg, var(--wk-tint) 25%, #ffffff 45%, var(--wk-tint) 65%); background-size: 220% 100%; animation: oq-preview-wait 1.5s ease-in-out infinite; }
+@keyframes oq-preview-wait { to { background-position: -220% 0; } }
+.oq-style-preview__loading { position: absolute; inset: auto 12px 12px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 16px; border-radius: 999px; color: var(--wk-text); background: #ffffffeb; border: 1px solid var(--wk-border); box-shadow: var(--wk-shadow-sm); }
+.oq-style-preview__compare figcaption { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding-inline: 4px; color: var(--wk-text-2); }
+.oq-style-preview__compare figcaption strong { color: var(--oq-success-ink); font-weight: 600; }
+.oq-style-preview__decision { max-width: 720px; margin-inline: auto; width: 100%; }
+.oq-style-preview__error { display: grid; gap: 4px; padding: 14px 16px; border: 1px solid #f2c3bf; border-radius: var(--wk-r-inner); background: var(--oq-error-wash); }
+.oq-style-preview__actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* --- Step 4: the world is being built ----------------------------------
+   The approved look inside a doorway frame; the progress beside it. */
+.oq-world-progress { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(320px,.9fr); gap: var(--wk-gap-group); align-items: start; }
+.oq-world-progress__preview { display: grid; gap: var(--wk-gap-sm); }
+.oq-world-progress__preview > img, .oq-world-progress__placeholder {
+  width: 100%; aspect-ratio: 4 / 4.2; object-fit: cover;
+  border-radius: 999px 999px var(--wk-r-card) var(--wk-r-card);
+  border: 1px solid #d6c9f8; background: var(--wk-tint); box-shadow: var(--wk-shadow-md), var(--wk-shadow-glow);
+}
+.oq-world-progress__placeholder { background: radial-gradient(ellipse 60% 30% at 50% 100%, rgba(123, 92, 250, .22), transparent 72%), linear-gradient(#ffffff, var(--wk-tint)); }
+.oq-world-progress__preview > img { animation: oq-world-breathe 5s ease-in-out infinite; }
+@keyframes oq-world-breathe { 50% { transform: scale(1.01); } }
+.oq-world-progress__audio { display: grid; gap: 12px; padding-top: 16px; border-top: 1px solid var(--wk-border); }
+.oq-world-progress__audio label { display: grid; gap: 6px; font-weight: 500; }
+.oq-world-progress__audio audio { width: 100%; }
+.oq-world-progress__optional-error { display: grid; gap: 8px; margin-top: 20px; border-color: #efd9a6; }
+.oq-world-progress__notice, .oq-world-progress__leave-note { margin-top: 16px; color: var(--wk-text-2); }
+
+/* --- World ready -------------------------------------------------------
+   The live world leads, framed in white; the mission sits beside it. */
+.oq-world-ready { display: grid; grid-template-columns: minmax(0,2fr) minmax(300px,1fr); gap: var(--wk-gap-group); align-items: start; }
+.oq-world-ready__scene { min-height: 560px; padding: 0; overflow: hidden; border-radius: var(--wk-r-stage); background: var(--wk-tint); box-shadow: var(--wk-shadow-md); }
+.oq-world-ready__scene > div, .oq-world-ready__scene canvas { min-height: 560px; }
+.oq-world-ready__loading, .oq-world-ready__missing { min-height: 560px; display: grid; place-items: center; align-content: center; gap: 12px; padding: 28px; text-align: center; }
+.oq-world-ready__mission { position: sticky; top: 24px; }
+/* The mission is a sentence, not a title: a step down from display size. */
+.oq-world-ready__mission h2 { margin-top: var(--oq-space-3); font-size: clamp(1.35rem, 1.2rem + .5vw, 1.625rem); line-height: 1.2; }
+.oq-world-ready__badge { width: fit-content; padding: 5px 12px; border: 1px solid currentColor; border-radius: 999px; font-size: .8125rem; font-weight: 600; }
+.oq-world-ready__badge[data-kind="checked"] { color: var(--oq-success-ink); background: var(--oq-success-wash); }
+.oq-world-ready__badge[data-kind="needs"] { color: var(--oq-error-ink); background: var(--oq-error-wash); }
+.oq-world-ready__badge[data-kind="prepared"] { color: var(--oq-warning-ink); background: var(--oq-warning-wash); }
+.oq-world-ready__issue { display: grid; gap: 5px; padding: 14px 16px; border: 1px solid #f2c3bf; border-radius: var(--wk-r-inner); background: var(--oq-error-wash); }
+.oq-world-ready__actions { display: grid; gap: 10px; }
+.oq-world-ready__toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; font-weight: 500; }
+.oq-world-ready__toggle input { width: 20px; height: 20px; }
+
+/* --- Widths -------------------------------------------------------------- */
+@media (max-width: 760px) {
+  .oq-style-example { grid-template-columns: 1fr; }
+  .oq-style-example figcaption { padding: 0 var(--oq-space-2) var(--oq-space-2); }
+}
 @media (max-width: 699px) {
-  .oq-creation__container { padding: var(--oq-space-3) 20px var(--oq-space-8); }
+  .oq-creation__container { padding: var(--oq-space-3) var(--wk-page-x) var(--oq-space-8); }
   .oq-creation__topline { align-items: flex-start; gap: var(--oq-space-3); }
-  /* Back first, then the rail on its own line — at this width the rail needs
-     the full measure to keep all four step names readable. */
+  /* Back first, then the rail on its own line, so all four names stay readable. */
   .oq-creation__progress { flex-basis: 100%; order: 2; font-size: .75rem; }
   .oq-creation__progress li { flex-direction: column; align-items: flex-start; gap: 4px; }
   .oq-creation__progress li::after { display: none; }
   .oq-creation__progress span { flex-basis: 26px; width: 26px; height: 26px; }
   .oq-capture { grid-template-columns: 1fr; }
-  .oq-capture__drop { min-height: 300px; padding: 24px 16px; }
+  .oq-capture__drop { min-height: 320px; padding: 24px 16px; }
   .oq-capture__actions, .oq-capture__confirm { align-items: stretch; flex-direction: column; }
   .oq-capture__actions .oq-kit-button, .oq-capture__confirm .oq-kit-button { width: 100%; }
-  .oq-capture__tips { padding-inline: 4px; }
-}
-.oq-style-preview { display: grid; gap: 24px; }
-.oq-style-preview__compare { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
-.oq-style-preview__compare .oq-kit-card { padding: 14px; }
-.oq-style-preview__compare figure { display: grid; gap: 10px; }
-.oq-style-preview__image { position: relative; overflow: hidden; aspect-ratio: 4/3; border-radius: 14px; background: var(--oq-inset); }
-.oq-style-preview__image img { width: 100%; height: 100%; object-fit: contain; image-orientation: from-image; }
-.oq-style-preview__placeholder { width: 100%; height: 100%; background: linear-gradient(110deg,var(--oq-inset) 25%,var(--oq-wash) 45%,var(--oq-inset) 65%); background-size: 220% 100%; animation: oq-preview-wait 1.5s ease-in-out infinite; }
-@keyframes oq-preview-wait { to { background-position: -220% 0; } }
-.oq-style-preview__loading { position: absolute; inset: auto 12px 12px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 16px; border-radius: var(--oq-round-pill); color: var(--oq-ink); background: #120726e6; border: 1px solid var(--wk-rim); }
-.oq-style-preview__compare figcaption { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; color: var(--oq-muted); }
-.oq-style-preview__compare figcaption strong { color: var(--oq-success-ink); font-weight: 500; }
-.oq-style-preview__decision { max-width: 680px; margin-inline: auto; }
-.oq-style-preview__error { display: grid; gap: 4px; padding: 14px 16px; border-left: 4px solid var(--oq-error-ink); border-radius: 10px; background: var(--oq-error-wash); }
-.oq-style-preview__actions { display: flex; flex-wrap: wrap; gap: 10px; }
-@media (max-width: 699px) {
-  .oq-style-preview__compare { grid-template-columns: 1fr; }
-  .oq-style-preview__actions { align-items: stretch; flex-direction: column; }
-  .oq-style-preview__actions .oq-kit-button { width: 100%; }
-}
-@media (prefers-reduced-motion: reduce) { .oq-style-preview__placeholder { animation: none; } }
-.oq-world-progress { display: grid; grid-template-columns: minmax(0,1.25fr) minmax(320px,.85fr); gap: 24px; align-items: start; }
-.oq-world-progress__preview { display: grid; gap: 20px; }
-.oq-world-progress__preview > img, .oq-world-progress__placeholder { width: 100%; aspect-ratio: 4/3; object-fit: contain; border-radius: 16px; background: var(--oq-inset); }
-.oq-world-progress__preview > img { animation: oq-world-breathe 5s ease-in-out infinite; }
-@keyframes oq-world-breathe { 50% { transform: scale(1.012) rotate(.3deg); } }
-.oq-world-progress__audio { display: grid; gap: 12px; padding-top: 16px; border-top: 1px solid var(--oq-line); }
-.oq-world-progress__audio label { display: grid; gap: 6px; font-weight: 500; }
-.oq-world-progress__audio audio { width: 100%; }
-.oq-world-progress__optional-error { display: grid; gap: 8px; margin-top: 20px; border-left: 4px solid var(--oq-warning-ink); }
-.oq-world-progress__notice, .oq-world-progress__leave-note { margin-top: 16px; color: var(--oq-muted); }
-@media (max-width: 699px) { .oq-world-progress { grid-template-columns: 1fr; } }
-@media (prefers-reduced-motion: reduce) { .oq-world-progress__preview > img { animation: none; } }
-.oq-world-ready { display: grid; grid-template-columns: minmax(0,2fr) minmax(300px,1fr); gap: 24px; align-items: start; }
-.oq-world-ready__scene { min-height: 560px; padding: 0; overflow: hidden; background: var(--oq-inset); }
-.oq-world-ready__scene > div, .oq-world-ready__scene canvas { min-height: 560px; }
-.oq-world-ready__loading, .oq-world-ready__missing { min-height: 560px; display: grid; place-items: center; align-content: center; gap: 12px; padding: 28px; text-align: center; }
-.oq-world-ready__mission { position: sticky; top: 24px; }
-/* The mission is a sentence, not a title: set it a step down so it reads in
-   a narrow card instead of stacking five display-size lines. */
-.oq-world-ready__mission h2 { margin-top: var(--oq-space-3); font-size: clamp(1.35rem, 1.2rem + .5vw, 1.625rem); line-height: 1.2; }
-.oq-world-ready__badge { width: fit-content; padding: 5px 12px; border: 1px solid currentColor; border-radius: 999px; font-size: .8125rem; font-weight: 500; }
-.oq-world-ready__badge[data-kind="checked"] { color: var(--oq-success-ink); background: var(--oq-success-wash); }
-.oq-world-ready__badge[data-kind="needs"] { color: var(--oq-error-ink); background: var(--oq-error-wash); }
-.oq-world-ready__badge[data-kind="prepared"] { color: var(--oq-warning-ink); background: var(--oq-warning-wash); }
-.oq-world-ready__issue { display: grid; gap: 5px; padding: 14px 16px; border-left: 4px solid var(--oq-error-ink); border-radius: 10px; background: var(--oq-error-wash); }
-.oq-world-ready__actions { display: grid; gap: 10px; }
-.oq-world-ready__toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; font-weight: 500; }
-.oq-world-ready__toggle input { width: 20px; height: 20px; }
-@media (max-width: 699px) {
-  .oq-world-ready { grid-template-columns: 1fr; }
-  .oq-world-ready__scene, .oq-world-ready__scene > div, .oq-world-ready__scene canvas { min-height: 360px; }
-  .oq-world-ready__mission { position: static; }
-}
-@media (prefers-reduced-motion: reduce) { .oq-capture__drop { transition: none; } }
-.oq-review { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(280px,.8fr); gap: 24px; align-items: start; }
-.oq-review__visual { display: grid; gap: 16px; }
-.oq-review__toolbar { display: inline-flex; align-items: center; width: fit-content; padding: 4px; border-radius: 999px; background: var(--wk-dusk); border: 1px solid var(--wk-rim); }
-.oq-review__toolbar button { min-height: 40px; padding: 8px 14px; border: 0; border-radius: 999px; color: var(--oq-muted); background: transparent; cursor: pointer; }
-.oq-review__toolbar button[aria-pressed="true"] { color: var(--oq-ink); background: var(--oq-action-fill); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--oq-action) 60%, transparent); }
-.oq-review__toolbar button:disabled { opacity: .5; cursor: not-allowed; }
-.oq-review__stage { position: relative; display: grid; place-items: center; overflow: hidden; min-height: 440px; aspect-ratio: 1.1; border-radius: var(--oq-round-xl); border: 1px solid var(--wk-rim); background: radial-gradient(ellipse 70% 45% at 50% 108%, #5a3bd0 0%, #2d1878 45%, transparent 80%), var(--wk-dusk); }
-.oq-review__stage::before { content: ""; position: absolute; inset: 0; opacity: .5; background: radial-gradient(circle at center,#c9b8ff33 0 1px,transparent 1.5px) 0 0/18px 18px; }
-.oq-review__stage img { position: relative; z-index: 1; width: 82%; height: 82%; object-fit: contain; image-orientation: from-image; transform-origin: center; transition: transform var(--oq-duration) var(--oq-ease); }
-.oq-review__loading { position: absolute; z-index: 2; inset: auto 16px 16px; display: flex; justify-content: center; align-items: center; gap: 10px; padding: 10px 16px; border-radius: var(--oq-round-pill); color: var(--oq-ink); background: #120726e6; border: 1px solid var(--wk-rim); }
-.oq-review__crop { display: grid; gap: 14px; margin: 0; padding: 16px 18px; border: 1px solid var(--wk-rim); border-radius: var(--oq-round-lg); background: var(--wk-dusk); }
-.oq-review__crop legend { padding-inline: 6px; font-weight: 500; }
-.oq-review__crop label { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-weight: 500; }
-.oq-review__crop input { grid-column: 1 / -1; width: 100%; min-height: 44px; accent-color: var(--oq-action); }
-.oq-review__crop output { color: var(--oq-muted); font-variant-numeric: tabular-nums; }
-.oq-review__panel { display: grid; gap: 18px; padding-block: 16px; }
-.oq-review__checklist { display: grid; gap: 10px; margin: 0; padding-left: 22px; }
-.oq-review__notice { display: grid; gap: 4px; padding: 14px 16px; border-left: 4px solid var(--oq-error-ink); border-radius: 10px; background: var(--oq-error-wash); }
-.oq-review__actions { display: grid; gap: 10px; }
-@media (max-width: 699px) {
   .oq-review { grid-template-columns: 1fr; }
   .oq-review__stage { min-height: 300px; }
   .oq-review__toolbar { width: 100%; }
   .oq-review__toolbar button { flex: 1; }
   .oq-review__actions .oq-kit-button { width: 100%; }
-}
-@media (prefers-reduced-motion: reduce) { .oq-review__stage img { transition: none; } }
-/* --- Step 2: Look and Adventure ----------------------------------------
-   Three decisions in a row, each one a plain section divided by a rule and a
-   lot of air. The previous version wrapped every group in its own shadowed
-   card, which stacked three competing boxes down the page and left the two
-   group headings looking like stray bold text between them. */
-.oq-customize { max-width: 920px; display: grid; gap: var(--oq-space-7); }
-.oq-customize__group { display: grid; gap: var(--oq-space-4); }
-.oq-customize__group + .oq-customize__group { padding-top: var(--oq-space-7); border-top: 1px solid var(--oq-line); }
-/* The divider stays full width so the three groups read as one column; only
-   the field itself is capped, because a 900px-wide single-line input invites
-   an essay. */
-.oq-customize__group--atmosphere { gap: var(--oq-space-1); }
-.oq-customize__group--atmosphere > * { max-width: 34rem; }
-
-/* The fixed illustrative example. Wide and low so it reads as a reference
-   plate rather than as one more thing to click. */
-.oq-style-example {
-  display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
-  gap: var(--oq-space-4); align-items: center;
-  padding: var(--oq-space-3); border: 1px solid var(--oq-line);
-  /* Neutral on purpose: this plate is the control sample, so it must not
-     retint when the chosen look changes the accent colour. */
-  border-radius: var(--oq-round-lg); background: var(--oq-surface);
-}
-/* `height: auto` is load-bearing — the img carries width/height attributes so
-   the layout does not jump while it loads, and without this the intrinsic
-   height wins over aspect-ratio and the picture comes out as a tall crop. */
-.oq-style-example img { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; border-radius: var(--oq-round-md); }
-.oq-style-example figcaption { display: grid; gap: var(--oq-space-2); padding-right: var(--oq-space-2); }
-.oq-style-example strong { font-weight: 500; }
-.oq-style-example span { color: var(--oq-muted); font-size: .9375rem; max-inline-size: 46ch; }
-
-.oq-customize__count { text-align: right; color: var(--oq-muted); font-size: .875rem; font-variant-numeric: tabular-nums; }
-.oq-customize__error { display: grid; gap: 4px; padding: 14px 16px; border-left: 4px solid var(--oq-error-ink); border-radius: var(--oq-round-sm); background: var(--oq-error-wash); }
-/* Primary action last, so the eye lands on it after reading the choices. */
-.oq-customize__actions { justify-content: flex-end; }
-@media (max-width: 760px) {
-  .oq-style-example { grid-template-columns: 1fr; }
-  .oq-style-example figcaption { padding: 0 var(--oq-space-2) var(--oq-space-2); }
+  .oq-review__explorer { width: 60px; }
+  .oq-style-preview__compare { grid-template-columns: 1fr; }
+  .oq-style-preview__actions { align-items: stretch; flex-direction: column; }
+  .oq-style-preview__actions .oq-kit-button { width: 100%; }
+  .oq-world-progress { grid-template-columns: 1fr; }
+  .oq-world-ready { grid-template-columns: 1fr; }
+  .oq-world-ready__scene, .oq-world-ready__scene > div, .oq-world-ready__scene canvas { min-height: 360px; }
+  .oq-world-ready__mission { position: static; }
 }
 @media (max-width: 599px) {
   .oq-customize__actions { flex-direction: column-reverse; align-items: stretch; }
   .oq-customize__actions .oq-kit-button { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .oq-capture__drop, .oq-review__stage img { transition: none; }
+  .oq-style-preview__placeholder, .oq-world-progress__preview > img { animation: none; }
 }

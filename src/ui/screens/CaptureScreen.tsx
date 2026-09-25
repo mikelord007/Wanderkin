@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type DragEvent } from "react";
 import { Button, Card, Icon, Modal } from "../components/index.js";
 import { validateImageFile } from "../imageValidation.js";
 import { CreationFrame } from "./CreationFrame.js";
+import { PortalArch } from "../components/Scenery.js";
 
 export interface CaptureScreenProps {
   initialPhotoUrl?: string;
@@ -127,6 +128,7 @@ export function CaptureScreen({ initialPhotoUrl, onUsePhoto, onBack }: CaptureSc
               onDragLeave={() => setDragging(false)}
               onDrop={handleDrop}
             >
+              <PortalArch className="oq-capture__arch" />
               <span className="oq-capture__icon"><Icon name="photo" /></span>
               <h2>Choose one clear photo</h2>
               <p className="oq-kit-muted">Drop a photo here, or pick one from your device.</p>

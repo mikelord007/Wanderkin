@@ -613,6 +613,7 @@ export function App() {
         <FinishScreen
           manifest={screen.manifest}
           result={screen.result}
+          worldPostcard={screen.media.screenshot?.blob ?? null}
           onReplay={() =>
             go(
               screen.publication

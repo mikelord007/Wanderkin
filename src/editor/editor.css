@@ -1,7 +1,7 @@
 /*
  * World editor.
  *
- * The editor shares the planetrise tokens with everything else, so moving
+ * The editor shares the light product tokens with everything else, so moving
  * from "Edit" into the editor never feels like leaving the product.
  *
  * Two things deliberately stay dark: the 3D stage and the notes that float on
@@ -120,7 +120,7 @@
 }
 
 .oq-editor__placement-hint .oq-error-text {
-  color: var(--oq-error-ink);
+  color: #ffaaa4;
 }
 
 .oq-editor__preview-note {
@@ -149,9 +149,21 @@
 /* Compounded with `.oq-panel` on purpose: these override the shared panel's
    padding and gap, and equal specificity would leave the winner up to
    whichever stylesheet the bundler happened to emit last. */
+/* The stage is the hero of the editor; the panels beside it are quiet
+   grouped sections divided by a rule, not a stack of boxes. */
 .oq-panel.oq-editor-panel {
-  padding: var(--oq-space-4);
+  padding: var(--oq-space-4) 0;
   gap: var(--oq-space-3);
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--oq-line);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.oq-panel.oq-editor-panel:first-child {
+  border-top: 0;
+  padding-top: 0;
 }
 
 .oq-editor-panel h2 {
@@ -295,7 +307,7 @@
 }
 
 .oq-editor__checkpoint-item {
-  background: #ffffff06;
+  background: var(--wk-tint);
   border: 1px solid var(--oq-line);
   border-radius: var(--oq-round-sm);
   padding: var(--oq-space-3);
