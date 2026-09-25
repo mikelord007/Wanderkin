@@ -100,7 +100,7 @@ No actionable code defect was found in the three commits. The residuals below ar
 - **Protected services afterwards:** 5173 → 200, 15173 → 200, 8787 `/api/capabilities` → 200, 18799 `/api/capabilities` → 200.
 - **Left untouched:** storage, the saved world, `private-world-10`, audio, the 4 stashes, and Finish/App/share.
 
-## Disclosure: concurrent working-tree edits appeared during this review (not mine)
+## Disclosure: concurrent, authorized Finish edits during this review (not mine, not in `13ed712`)
 
 Between 09:22:50 and 09:26:33, `src/App.tsx`, `src/capture/media.css`, `src/ui/screens/FinishScreen.tsx` and `src/ui/screens/finish-screen.css` became modified in the working tree. That is 171+/42−, the Finish/App/share area. I did not create, stage or touch them.
 
@@ -108,7 +108,14 @@ Between 09:22:50 and 09:26:33, `src/App.tsx`, `src/capture/media.css`, `src/ui/s
 - The build is re-proven on the exact `13ed712` export.
 - My in-game captures only exercise gameplay rendering.
 
-**Resolved attribution.** The coordinator confirmed a new user approval (1790308309791) to resume the preserved Finish fix. It is owned by the fresh Opus session `000bc7bc-659f-4f51-b170-a21bbcde8b9c`. That uncommitted Finish/App work is **not** part of `13ed712`, and nothing in this review attributes it there.
+**Resolution: confirmed authorized and owned.**
+
+- These edits are the resumed, preserved Finish fix. The user actually answered "Resume the fix" at 1790308309791.
+- The work is owned by the fresh Opus session `000bc7bc-659f-4f51-b170-a21bbcde8b9c`: `FinishScreen`, `finish-screen.css`, `capture/media.css`, the narrow App share state, and focused tests.
+- The coordinator queued the handoff as a report before those edits began. It reached this session only after my checks.
+- This is a separate, active, authorized task, not stray or unowned modifications.
+- None of that uncommitted work is part of `13ed712`, and nothing in this review attributes it there.
+- The `13ed712` product approval stands on the snapshots below.
 
 ### Snapshot each check actually ran on
 
