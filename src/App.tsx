@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
   GenerationJob,
   PublishedChallenge,
@@ -268,9 +268,51 @@ export function App() {
     initialTokenRef.current = navigationGuardRef.current.begin();
     initialResolutionRef.current = resolveScreen(window.location.pathname);
   }
-  const [screen, setScreen] = useState<Screen>(() =>
+  const [screen, setScreenState] = useState<Screen>(() =>
     initialResolutionRef.current instanceof Promise ? { name: "resolving" } : (initialResolutionRef.current as Screen),
   );
+  // Every navigation (in-app `go`, back/forward, a route resolving) installs
+  // a new `Screen` object, so identity with the screen an async action began
+  // on is how that action knows the player hasn't moved on. Updated here,
+  // synchronously, rather than after React re-renders, so there's no window
+  // where a navigation has happened but the ref still says otherwise.
+  const currentScreenRef = useRef(screen);
+  const setScreen = useCallback((next: Screen) => {
+    currentScreenRef.current = next;
+    setScreenState(next);
+  }, []);
+  // Also follow whatever screen React actually committed, so the ref can
+  // never be left pointing at a screen the player is no longer on.
+  useLayoutEffect(() => {
+    currentScreenRef.current = screen;
+  }, [screen]);
+  // A draft saved from Finish, keyed by the draft manifest object that
+  // `unsaved` carries through Replay and Race. The pending save is shared so
+  // a later Finish of the same draft (e.g. the player replayed while it was
+  // saving) reuses it instead of creating a second stored copy.
+  const draftSavesRef = useRef(new WeakMap<SceneManifest, Promise<SceneManifest>>());
+  const savedDraftsRef = useRef(new WeakMap<SceneManifest, SceneManifest>());
+  const saveDraftOnce = useCallback((draft: SceneManifest): Promise<SceneManifest> => {
+    const pending = draftSavesRef.current.get(draft);
+    if (pending) return pending;
+    // The reload-recovery record belongs to this draft only if nothing has
+    // replaced it by the time the save lands — a new creation started in
+    // the meantime must keep its own.
+    const sourceAtSave = JSON.stringify(loadActiveSource());
+    const save = createLevel(draft).then(
+      (saved) => {
+        savedDraftsRef.current.set(draft, saved);
+        if (JSON.stringify(loadActiveSource()) === sourceAtSave) clearActiveSource();
+        return saved;
+      },
+      (error: unknown) => {
+        draftSavesRef.current.delete(draft);
+        throw error;
+      },
+    );
+    draftSavesRef.current.set(draft, save);
+    return save;
+  }, []);
 
   const go = useCallback((next: Screen, options?: { replace?: boolean }) => {
     // Supersede any still-pending async resolution from an earlier
@@ -555,6 +597,7 @@ export function App() {
     case "finish": {
       const unsaved = screen.unsaved ? { unsaved: screen.unsaved } : {};
       const draft = screen.unsaved?.kind === "draft" ? screen.unsaved.manifest : null;
+      const savedDraft = draft ? savedDraftsRef.current.get(draft) ?? null : null;
       return (
         <FinishScreen
           manifest={screen.manifest}
@@ -586,7 +629,11 @@ export function App() {
             ? { existingShareUrl: new URL(sharePath(screen.publication.shareId), window.location.origin).toString() }
             : screen.publishable
               ? { onShare: () => publishLevel(screen.manifest.levelId, challengeFor(screen.result), false) }
-              : draft
+              : savedDraft
+                // Saved from an earlier Finish of this same draft (the player
+                // left while it was saving): share the stored copy.
+                ? { onShare: () => publishLevel(savedDraft.levelId, challengeFor(screen.result), false) }
+                : draft
                 ? {
                     shareUnavailableReason: "unsaved-draft" as const,
                     // Only on the player's explicit click: the same create
@@ -595,18 +642,23 @@ export function App() {
                     // soon as the save lands, so a failed publish is retried
                     // with plain Share rather than saving a second copy.
                     onSaveAndShare: async () => {
-                      const saved = await createLevel(draft);
-                      clearActiveSource();
-                      go(
-                        {
-                          name: "finish",
-                          manifest: screen.manifest === draft ? saved : createRaceVariant(saved),
-                          result: screen.result,
-                          media: screen.media,
-                          publishable: true,
-                        },
-                        { replace: true },
-                      );
+                      const saved = await saveDraftOnce(draft);
+                      // Only if the player is still on this Finish: if they
+                      // left (Play again, Race, Back, anything) while it
+                      // saved, don't pull them back or rewrite their
+                      // history — the publish they asked for still runs.
+                      if (currentScreenRef.current === screen) {
+                        go(
+                          {
+                            name: "finish",
+                            manifest: screen.manifest === draft ? saved : createRaceVariant(saved),
+                            result: screen.result,
+                            media: screen.media,
+                            publishable: true,
+                          },
+                          { replace: true },
+                        );
+                      }
                       return publishLevel(saved.levelId, challengeFor(screen.result), false);
                     },
                   }

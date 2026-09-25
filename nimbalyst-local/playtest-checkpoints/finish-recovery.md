@@ -2,7 +2,7 @@
 
 Owner: the recovery worker, model `claude-opus-5-5` (Claude Code). No fallback models, no subagents.
 Scope: `src/ui/screens/FinishScreen.tsx`, `src/ui/screens/finish-screen.css`, `src/capture/media.css`, and the Finish share state in `src/App.tsx`.
-**Landed as `e83f8b1` (frozen).** The independent Opus reviewer `2d3b34b6` owns the narrow review of the 4-file Finish/App change, including the real App state hand-off.
+**Landed as `e83f8b1`. F-1 follow-up is in the commit after `d2855ce` (see "Reopened" below). Frozen.** The independent Opus reviewer `2d3b34b6` owns the narrow review of the 4-file Finish/App change, including the real App state hand-off.
 Source base: main `ce8f3be`. The final visual review's frozen source `13ed712` doesn't include these files. This is a separate finish scope.
 
 ## Recovery
@@ -60,7 +60,36 @@ Cases covered:
 
 `tsc -p tsconfig.json --noEmit` exits 0.
 
+## Reopened: reviewer F-1 (stale Save & share navigation), fixed in `src/App.tsx` only
+The reviewer's finding is in `visual-final-opus-review.md` at `d2855ce`. If the player left Finish while the save was pending, the post-save `go(finish, {replace: true})` pulled them back to Finish and replaced their history entry. The link was lost, and the save also cleared whatever active source existed by then.
+
+Fix, App-local, with no new API and no navigation rewrite:
+- **Is the player still on this Finish?**
+  - `currentScreenRef` holds the current `Screen` object. Every navigation installs a new one: `go`, popstate and route resolution.
+  - The ref is set synchronously by a thin `setScreen` wrapper that every existing call site already uses. It is also synced from the committed screen in a layout effect.
+  - After the save, the swap to a publishable Finish runs only if `currentScreenRef.current === screen`. Otherwise nothing navigates, and the publish the player explicitly asked for still completes.
+- **No double save:** `saveDraftOnce` keys the pending create on the draft object that `unsaved` carries through Replay and Race. If the create fails, the key is dropped so a retry is possible. A later Finish of an already-saved draft offers plain Share of the stored copy.
+- **Recovery record:** `clearActiveSource` runs only if the active source is unchanged since the save started, so a newer creation's record survives.
+
+Real-App regression: `nimbalyst-local/tmp-finish-followup/finish-app-race.mjs` with `vite.app.config.mjs` (port 5261, private cacheDir, no HMR or watch).
+- It is adapted from the reviewer's S5. Their harness wasn't edited.
+- All /api calls are mocked and delayed, and foreign hosts are blocked.
+
+| Scenario | Checks |
+|---|---|
+| A: Play again during a 1500 ms save, while a newer creation sets the active source | Stays on `/play/race-a` with the same history length. 1 create, 1 publish. The newer active source is kept. |
+| A2: that replay's Finish | Plain Share, and publish only, with 0 extra creates |
+| B: browser Back during the save | Stays on `/`. 1 create, 1 publish. |
+| C: control, player stays on Finish | "Publishing…" is locked mid-flight. The URL is replaced in place as `/finish/saved-race-c` with the same history length. The link is shown. 1 create, 1 publish of the saved id. |
+
+Results:
+- **Fixed: 11/11 PASS.**
+- **Pre-fix falsification:** the same harness with `OQ_APP_AT=e83f8b1` (git show, nothing on disk changed) got 2/6 passing before a timeout. The failures reproduce F-1: the player was yanked to `/finish/saved-race-a`, history was rewritten, and the newer active source was cleared.
+- Logs are in `evidence/app-race/`.
+- `tsc -p tsconfig.json --noEmit` exits 0.
+
 ## Limits
-- The App mapping is verified by typecheck and review. The fixture drives FinishScreen and a mirror of App's swap, not a full gameplay run to completion.
+- The fixture drives FinishScreen. The real-App harness drives App's own screen state through the React fiber, not a full gameplay run to completion.
+- Leaving Finish and then clicking Save & share again on a later Finish while the first save is still pending reuses that save, but it can publish a second publication version. Both are explicit clicks, and no duplicate saved copy is made.
 - I didn't run the full unit, build or e2e suite, because the final reviewer owns that gate.
 - At 1366x768 and shorter, the optional media section still scrolls inside the card.
