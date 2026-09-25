@@ -60,7 +60,7 @@ export function createStyledHelperMaterial(
     roughness: options.floor ? 0.94 : 0.76,
     metalness: 0.01,
   });
-  installStyleShader(material, style, colorRestoration, null);
+  installStyleShader(material, style, colorRestoration, null, false);
   return material;
 }
 
@@ -156,16 +156,48 @@ function cloneStyledMaterial(
   regionProfile: MaterialRegionProfile | null,
 ): THREE.Material {
   const material = source.clone();
-  if (isBakedEmissiveOnlyMaterial(material)) relightBakedEmissiveMaterial(material);
-  installStyleShader(material, style, colorRestoration, regionProfile);
+  const wasRelit = isBakedEmissiveOnlyMaterial(material);
+  if (wasRelit) relightBakedEmissiveMaterial(material);
+  installStyleShader(material, style, colorRestoration, regionProfile, wasRelit);
   return material;
 }
+
+/**
+ * Fraction of a relit material's own original baked brightness that its
+ * final on-screen colour is never allowed to fall below.
+ *
+ * Found by controlled, pixel-measured A/B comparison at the identical camera
+ * position (same frame, only this file's relight logic reverted vs not —
+ * see nimbalyst-local/playtest-checkpoints/material-lighting-refinement.md,
+ * "Follow-up: honest limitation found by controlled comparison"): a region
+ * of the Rodin mesh that reads as a clearly visible dark olive/brown,
+ * RGB(51,51,0), in the original unlit render was crushed to a barely
+ * perceptible near-black, RGB(6,4,2), once real multiplicative lighting and
+ * Cartoon's posterization ran on top of it — roughly an 8x reduction, not
+ * just "moodier" shading. That is a real regression this relight introduced
+ * for already-dark baked pixels: the original unlit render preserved a hint
+ * of colour and gradient there; the relit one did not.
+ *
+ * Floors the *final* graded colour at a fraction of what the material's own
+ * baked texture would show *displayed directly* (its sRGB-encoded form, not
+ * its raw linear working-space value — `diffuseColor` is captured in linear
+ * space right after `map_fragment`, before lighting/tonemapping, while the
+ * floor is applied after tonemapping + colour-space conversion, so it must
+ * be re-encoded with the same ~2.2 gamma approximation to compare like with
+ * like; the first version of this fix compared the two directly and the
+ * floor came out far darker than intended for exactly this reason). ACES
+ * tonemapping is deliberately not replicated for the floor value — it is
+ * near-identity for shadow-range values, and this only needs to be a
+ * reasonable perceptual floor, not an exact reproduction of the unlit path.
+ */
+const RELIT_MINIMUM_BRIGHTNESS_FRACTION = 0.45;
 
 function installStyleShader(
   material: THREE.Material,
   style: StyleDefinition,
   colorRestoration: number,
   regionProfile: MaterialRegionProfile | null,
+  wasRelit: boolean,
 ): void {
   const state: StyleUniformState = {
     colorRestoration: { value: clampColorRestoration(colorRestoration) },
@@ -211,6 +243,12 @@ function installStyleShader(
       oqWatercolorWash: state.watercolorWash,
     });
 
+    if (wasRelit) {
+      Object.assign(shader.uniforms, {
+        oqRelitFloor: { value: RELIT_MINIMUM_BRIGHTNESS_FRACTION },
+      });
+    }
+
     if (regionProfile) {
       Object.assign(shader.uniforms, {
         oqRegionDividerX: { value: regionProfile.dividerWorldX },
@@ -234,6 +272,7 @@ function installStyleShader(
       uniform vec3 oqEdgeColor;
       uniform float oqPaperTexture;
       uniform float oqWatercolorWash;
+      ${wasRelit ? "uniform float oqRelitFloor;\n      vec3 oqBakedAlbedo = vec3(0.0);" : ""}
       float oqHash(vec2 p) {
         vec3 p3 = fract(vec3(p.xyx) * 0.1031);
         p3 += dot(p3, p3.yzx + 33.33);
@@ -249,8 +288,26 @@ function installStyleShader(
       oqColor = clamp((oqColor - 0.5) * oqContrast + 0.5, 0.0, 1.0);
       ${styleFragment}
       float oqStyledLuma = dot(oqColor, vec3(0.2126, 0.7152, 0.0722));
-      gl_FragColor.rgb = mix(vec3(oqStyledLuma), oqColor, oqColorRestoration);`,
+      gl_FragColor.rgb = mix(vec3(oqStyledLuma), oqColor, oqColorRestoration);
+      ${wasRelit
+        ? `{
+        // oqBakedAlbedo is linear (captured pre-lighting/tonemap); gl_FragColor
+        // here is already tonemapped and sRGB-encoded, so approximate the same
+        // ~2.2 gamma encoding before comparing, or this floor reads far darker
+        // than the unlit render it is meant to match (see RELIT_MINIMUM_BRIGHTNESS_FRACTION).
+        vec3 oqBakedDisplay = pow(clamp(oqBakedAlbedo, 0.0, 1.0), vec3(1.0 / 2.2));
+        gl_FragColor.rgb = max(gl_FragColor.rgb, oqBakedDisplay * oqRelitFloor);
+      }`
+        : ""}`,
     );
+
+    if (wasRelit) {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <map_fragment>",
+        `#include <map_fragment>
+        oqBakedAlbedo = diffuseColor.rgb;`,
+      );
+    }
 
     if (regionProfile) {
       shader.fragmentShader = shader.fragmentShader
@@ -269,7 +326,7 @@ function installStyleShader(
   material.customProgramCacheKey = () =>
     `objectquest-style-v1:${style.id}:${style.render.outline.enabled ? 1 : 0}:${
       regionProfile ? `region-${regionProfile.dividerWorldX}-${regionProfile.blendWidth}` : "none"
-    }`;
+    }:${wasRelit ? "relit" : "unlit-passthrough"}`;
   material.needsUpdate = true;
 }
 

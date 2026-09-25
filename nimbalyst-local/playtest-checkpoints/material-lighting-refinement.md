@@ -348,3 +348,99 @@ Staged and committed via `developer_git_commit_proposal`: `src/scene/styleMateri
 5 new screenshots under `nimbalyst-local/screenshots/materials/style-verification/`. No other
 files touched; no saved-world, provider, or paid calls of any kind were made by the verification
 fixtures.
+
+## Follow-up: honest limitation found by controlled comparison (do not call this an unqualified improvement)
+
+The scale/camera owner flagged (and the coordinator independently confirmed by comparing
+`h035-before-01-spawn.png` against `h0175-pullback-fov72-01-spawn.png` in
+`nimbalyst-local/screenshots/scale-refinement-kept/`) that furniture undersides read as much
+darker/near-black under the final frozen camera than they did earlier — and correctly flagged
+that those two screenshots straddle *two* concurrent changes (this worker's material relight,
+commit `fc121b1`, and the scale owner's camera/FOV/pullback freeze, commit `13caa6b`, which landed
+*after* `fc121b1`), so they are not a controlled comparison and the cause could not be attributed
+from them alone. This section is that controlled comparison, done properly, plus a real fix.
+
+**Method.** Held the current frozen camera/scale exactly as committed (`GameStage.tsx` and every
+other scale-owned file were never touched, read, or reverted for this). Reverted only this
+worker's own four files (`styleMaterial.ts`, `SceneLighting.tsx`, `SceneEntities.tsx`,
+`materialRegions.ts`) to their exact state immediately before `fc121b1` (the parent commit,
+`9297528`), drove the real production game to the identical measured world position
+(x ≈ -0.93 to -0.97, walking forward from spawn under the sofa) both before and after restoring
+this worker's current code, and read back exact pixel values (via `canvas.drawImage` +
+`getImageData`, not eyeballed) at four fixed screen coordinates landing on the same dark region in
+both renders. Files were restored and re-verified (typecheck + focused tests, byte-identical
+`git status`) immediately after each capture; the "reverted" state was never committed.
+
+**Result — this is a real regression, not just baked-dark albedo or normal "moodier" shading.**
+
+| Render | Sampled pixel (top-strip, ×3 points) |
+| --- | --- |
+| Original unlit (pre-`fc121b1`, current camera) | RGB(51, 51, 0) — a clearly visible dark olive/brown |
+| This worker's relit material (`fc121b1`/`b012dd2`, before this fix) | RGB(6, 4, 2) — flat, barely-perceptible near-black |
+
+That is roughly an 8x brightness reduction, and — critically — a loss of essentially all colour
+and gradient, not just added shadow. Root cause, confirmed by the numbers, is compounding, not a
+single bug: (1) the underlying baked pixel there genuinely is dark (supporting the scale owner's
+"baked-dark" hypothesis in part — it was never a bright surface), and (2) real multiplicative
+lighting on top of that already-dark albedo, for a downward/backward-facing surface receiving
+minimal direct light, pushes the result low enough that Cartoon's 5-step posterization
+(`floor(color * 5 + 0.5) / 5`) snaps it to the lowest bin, literal zero — a real crush this
+relight introduced, exactly the "newly crushed shadow tones" the coordinator asked to be
+distinguished from baked-dark albedo. Both explanations are partially right; neither alone is the
+full story, which is why the pixel-level, code-reverted comparison was necessary instead of
+inferring from timestamps or a single screenshot.
+
+**Fix implemented** in `styleMaterial.ts` (`RELIT_MINIMUM_BRIGHTNESS_FRACTION`, applied only to
+materials this file actually relit): captures each relit material's own raw baked colour
+(`diffuseColor.rgb` right after `#include <map_fragment>`, before any lighting/tonemapping) into
+`oqBakedAlbedo`, then floors the *final* graded colour at 45% of that colour's own ~2.2-gamma
+display encoding. The gamma re-encoding step mattered and was verified needed: a first attempt
+compared the linear-space baked colour directly against the already-tonemapped/sRGB-encoded final
+colour, which is a colour-space mismatch that produced almost no visible improvement
+(RGB(6,4,2) → RGB(6,4,2), unchanged within noise) until corrected. After the fix, the identical
+pixel location reads **RGB(36, 30, 22)** — roughly 6x brighter than the crushed version, warm-toned
+(not grey), and visibly distinct from both the near-black regression and the brighter original,
+which is the intended outcome: still noticeably darker/shadowed than the unlit render (real
+shading is still happening — this is not simply reverting to "always fully lit"), but no longer
+crushed to flat, featureless black. Verified this does not wash out already-well-lit surfaces: the
+desk's directly-lit top surface (`4-desk-top-unaffected-by-floor.png`) is visually unchanged from
+prior verification, because the floor only ever raises a pixel that lighting has pushed *below*
+it — it can only ever brighten, never darken, and only when the graded result would otherwise sit
+under ~45% of the surface's own baked brightness.
+
+Evidence saved to `nimbalyst-local/screenshots/materials/underfurniture-crush-fix/`:
+`1-original-unlit-visible-gradient.png`, `2-relit-before-fix-crushed-black.png`,
+`3-relit-after-floor-fix.png`, `4-desk-top-unaffected-by-floor.png`.
+
+**What this does and does not claim.** This is a real, measured, partial mitigation — it raises a
+hard floor under the darkest crushed pixels; it does not re-tune the scene's overall lighting
+balance (ambient/hemisphere/key intensities are untouched, still the values verified across all
+three styles earlier in this checkpoint), and it does not claim the underside now looks identical
+to, or better than, the original unlit render in every respect — it is still meaningfully darker
+than the pre-relight baseline by design (that darkening is the real shading this whole change set
+to deliver), only no longer crushed past legibility. Per the coordinator's instruction, this
+finding is not described as an unqualified visual improvement: the relight, as first shipped,
+measurably made this specific class of surface (already-dark baked pixels under Cartoon
+posterization) worse before this fix, and the fix is a floor, not a redesign — a surface that was
+merely moderately dim (not already near the crush threshold) sees no change at all, and the 45%
+floor value is a judgement call verified against this one measured case, not derived from a
+broader sweep of every dark region in the scene.
+
+**Verification for this fix.** `npx tsc -p tsconfig.json --noEmit` → exit 0.
+`npx vitest run src/scene` → 5 files, **28 tests pass** (was 26; +2 floor-plumbing tests: present
+only on relit materials, absent on a genuine-PBR-style untouched material). Real Chrome, private
+per-investigation Vite cacheDir (deleted after use), pixel-level `getImageData` readback (not
+eyeballed) at the identical world position across three code states (original/crushed/fixed).
+Re-verified protected 5173/15173/8787/18799 healthy after teardown. Did not re-run the full unit
+suite or the three-style browser sweep for this narrowly-scoped fix, per the same "focused
+verification, no unnecessary re-run" guidance as the prior follow-up — the change is additive
+(new `if (wasRelit)` branches only) and does not touch the region/style code paths already
+verified across all three styles.
+
+### Commit (this fix)
+
+Staged and committed via `developer_git_commit_proposal`: `src/scene/styleMaterial.ts`,
+`src/scene/styleMaterial.test.ts`, this checkpoint, and the 4 new screenshots under
+`nimbalyst-local/screenshots/materials/underfurniture-crush-fix/`. `GameStage.tsx` and every other
+scale-owned file were not read for editing purposes and not modified — only played through as a
+normal user of the already-frozen build to capture evidence.

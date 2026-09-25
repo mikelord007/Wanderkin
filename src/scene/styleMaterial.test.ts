@@ -208,6 +208,65 @@ describe("scene style materials", () => {
     });
   });
 
+  describe("relit-material minimum-brightness floor", () => {
+    /** Found by pixel-measured A/B comparison: a region of the Rodin mesh
+     * that read as a clearly-visible dark olive/brown, RGB(51,51,0), in the
+     * original unlit render was crushed to a barely-visible near-black,
+     * RGB(6,4,2), once real lighting and Cartoon quantization ran on top of
+     * it. This suite checks the shader plumbing that fixes it is present
+     * for relit materials and absent everywhere else — the actual on-screen
+     * brightness floor can only be verified by rendering (see the
+     * before/after evidence in
+     * nimbalyst-local/playtest-checkpoints/material-lighting-refinement.md). */
+    function shaderStub() {
+      return {
+        uniforms: {} as Record<string, { value: unknown }>,
+        vertexShader: "#include <begin_vertex>",
+        fragmentShader:
+          "#include <map_fragment>\n#include <roughnessmap_fragment>\n#include <normal_fragment_maps>\n#include <dithering_fragment>",
+      };
+    }
+
+    it("adds the baked-albedo capture and brightness floor for a relit material", () => {
+      const source = new THREE.Group();
+      const material = bakedEmissiveMaterial();
+      source.add(new THREE.Mesh(new THREE.BoxGeometry(), material));
+
+      const clone = cloneStyledObject(source, STYLE_DEFINITIONS.cartoon, 1);
+      const relit = (clone.children[0] as THREE.Mesh).material as THREE.Material;
+
+      const shader = shaderStub();
+      relit.onBeforeCompile(shader as never, {} as never);
+
+      expect(shader.uniforms.oqRelitFloor).toBeDefined();
+      expect(shader.uniforms.oqRelitFloor?.value).toBeGreaterThan(0);
+      expect(shader.fragmentShader).toContain("oqBakedAlbedo = diffuseColor.rgb");
+      expect(shader.fragmentShader).toContain("oqRelitFloor");
+
+      disposeStyledObject(clone);
+      material.dispose();
+    });
+
+    it("never adds the brightness floor to a material that was not relit", () => {
+      const albedo = new THREE.Texture();
+      const source = new THREE.Group();
+      const material = new THREE.MeshStandardMaterial({ color: 0x808080, map: albedo, metalness: 0.9, roughness: 0.3 });
+      source.add(new THREE.Mesh(new THREE.BoxGeometry(), material));
+
+      const clone = cloneStyledObject(source, STYLE_DEFINITIONS.cartoon, 1);
+      const untouched = (clone.children[0] as THREE.Mesh).material as THREE.Material;
+
+      const shader = shaderStub();
+      untouched.onBeforeCompile(shader as never, {} as never);
+
+      expect(shader.uniforms.oqRelitFloor).toBeUndefined();
+      expect(shader.fragmentShader).not.toContain("oqBakedAlbedo");
+
+      disposeStyledObject(clone);
+      material.dispose();
+    });
+  });
+
   describe("known-sample material regions", () => {
     function meshWithBakedMaterial(): { source: THREE.Group; material: THREE.MeshStandardMaterial } {
       const material = bakedEmissiveMaterial();
