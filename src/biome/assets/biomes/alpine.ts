@@ -47,9 +47,10 @@ const rocks = alpineRocks();
 export const ALPINE_ART: BiomeArt = {
   id: "alpine",
   tones,
-  // Low, warm winter sun over bright snow: less flat ambient, more sky fill,
-  // slightly longer fog for crisp distance.
-  lighting: { ambientKeep: 0.56, hemisphereShare: 0.55, sunElevation: [20, 44], fogScale: 1.08, contactStrength: 0.95 },
+  // Low, warm winter sun over bright snow (22–40°, long shadows): less flat
+  // ambient, more blue sky fill in the shade, slightly longer fog for crisp
+  // distance.
+  lighting: { ambientKeep: 0.56, hemisphereShare: 0.55, sunElevation: [22, 40], fogScale: 1.08, contactStrength: 0.95 },
   atmosphere: { water: "frozen", particles: "snow" },
   families: {
     conifer: {
@@ -208,8 +209,10 @@ export const ALPINE_ART: BiomeArt = {
     contactColor: "#3c4a5a",
     contactOpacity: 0.34,
     contactScale: 0.9,
-    patchColor: "#dfe7ee",
-    patches: { tints: [{ color: "#eef3f7", weight: 3 }, { color: "#cfd9e1", weight: 1 }] },
+    patchColor: "#e9f0f6",
+    // Wind-packed snow: bright and cool, so under a warm sun it never reads
+    // as a grey smudge on the white snowfield; a faint blue crust now and then.
+    patches: { tints: [{ color: "#f8fbfe", weight: 3 }, { color: "#e3edf7", weight: 1 }] },
   },
   variation: { toneJitter: 0.04, hueJitterDeg: 3 },
   budgets: { triangles: { standard: 80_000, reduced: 35_000 }, membersPerCluster: { standard: 5, reduced: 3 } },

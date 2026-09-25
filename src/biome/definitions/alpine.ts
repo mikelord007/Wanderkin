@@ -16,15 +16,21 @@ export const ALPINE: BiomeDefinition = {
   id: "alpine",
   name: "Snowy Alpine",
   palette: {
-    sand: "#e9eef3",
+    // Snow floor: a cool tint so shade reads blue, not grey.
+    sand: "#e8f1ff",
     vegetation: "#3f6b56",
     rock: "#8a8f98",
     wood: "#7a5a40",
     accent: "#d9534f",
-    water: "#b9dcef",
+    // Frozen water ring (lerped toward white by the frozen style): ice blue.
+    water: "#8cc6e6",
   },
-  // Cool blue-white world under a warm, low winter sun.
-  lighting: { sun: "#ffe0b8", sky: "#cfe3f5", ground: "#e8eef5", intensity: 2.3, ambient: 0.8, direction: [5, 4.5, 3] },
+  // Cool blue-white world under a warm, low winter sun. The Cartoon grade
+  // bands floor luminance, so the sun is strong enough to lift sunlit snow
+  // (helper floor and scan floor alike) into the top band: white snow in
+  // sun, icy blue snow in shade. The sun sits low and behind the camera, so
+  // furniture throws long blue shadows away from the player.
+  lighting: { sun: "#ffe0b8", sky: "#cfe3f5", ground: "#e8eef5", intensity: 3.4, ambient: 1.0, direction: [-3, 3.4, 5] },
   sky: { zenith: "#6fa8dc", horizon: "#e8f1f8", fogNear: 1.9, fogFar: 7.4 },
   surface: { color: "#f2f6fa", blend: 0.45, upwardNormalMin: 0.8, patchCoverage: 0.6 },
   props: { kinds: ["palm", "shrub", "rock", "wood"], density: 0.5, scaleRange: [0.7, 2.4] },
