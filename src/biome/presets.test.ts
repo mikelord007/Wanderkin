@@ -61,4 +61,15 @@ describe("biome presets", () => {
       expect(reduced.drawCalls).toBeLessThan(d.budget.drawCalls);
     }
   });
+
+  it("themed budgets stay inside the architecture caps (ENVIRONMENT_ARCHITECTURE.md §8)", () => {
+    for (const id of ["tropical", "desert"] as const) {
+      const { budget, props } = getBiomeDefinition(id);
+      expect(budget.drawCalls).toBeLessThanOrEqual(14);
+      expect(budget.props).toBeLessThanOrEqual(160);
+      expect(budget.patches).toBeLessThanOrEqual(24);
+      expect(budget.particles).toBeLessThanOrEqual(300);
+      expect(props.density).toBeLessThanOrEqual(1);
+    }
+  });
 });

@@ -14,8 +14,13 @@
  *  - `props.scaleRange` is relative to the character height, for geometry.
  *  - `budget` is the standard-quality ceiling; reduced quality lowers it
  *    further via {@link effectiveBudget}.
+ *
+ * Each themed biome's definition lives in `./definitions/<id>.ts` (one owner
+ * per file); its renderer-only art direction in `./assets/biomes/<id>.ts`.
  */
 import type { BiomeDefinition, BiomeId, EffectsQuality } from "./types.js";
+import { DESERT } from "./definitions/desert.js";
+import { TROPICAL } from "./definitions/tropical.js";
 
 const ORIGINAL: BiomeDefinition = {
   id: "original",
@@ -43,57 +48,7 @@ const ORIGINAL: BiomeDefinition = {
   budget: { props: 0, patches: 0, particles: 0, drawCalls: 0 },
 };
 
-const TROPICAL: BiomeDefinition = {
-  id: "tropical",
-  name: "Tropical Island",
-  palette: {
-    sand: "#f3cda2",
-    vegetation: "#3fae5a",
-    rock: "#8f8a80",
-    wood: "#9a6b3f",
-    accent: "#ffb347",
-    water: "#2fb6c9",
-  },
-  lighting: { sun: "#ffe2a6", sky: "#d6ecee", ground: "#f0d9a8", intensity: 2.35, ambient: 0.78, direction: [4, 7, 5] },
-  sky: { zenith: "#4fb4f5", horizon: "#d9f3ff", fogNear: 2.3, fogFar: 9.5 },
-  surface: { color: "#f0d59a", blend: 0.42, upwardNormalMin: 0.82, patchCoverage: 0.55 },
-  props: { kinds: ["palm", "shrub", "rock", "wood"], density: 0.6, scaleRange: [0.8, 3.2] },
-  wind: { direction: [0.8, 0.6], strength: 0.35 },
-  ambient: { effect: "motes", water: true },
-  mission: {
-    portalTitle: "Wake the island gate",
-    beaconTitle: "Light the lagoon beacon",
-    fragmentName: "sun fragment",
-    collectibleColor: "#ffb347",
-  },
-  budget: { props: 140, patches: 20, particles: 90, drawCalls: 14 },
-};
 
-const DESERT: BiomeDefinition = {
-  id: "desert",
-  name: "Desert",
-  palette: {
-    sand: "#e3bf85",
-    vegetation: "#6f9a4e",
-    rock: "#a9774f",
-    wood: "#7d5a3a",
-    accent: "#ff7a3d",
-    water: "#3aa3b8",
-  },
-  lighting: { sun: "#ffd89a", sky: "#e9dccb", ground: "#e8c08c", intensity: 2.5, ambient: 0.72, direction: [-3, 7, 4] },
-  sky: { zenith: "#3f97e0", horizon: "#f4e2c4", fogNear: 1.9, fogFar: 7.8 },
-  surface: { color: "#e6c089", blend: 0.48, upwardNormalMin: 0.8, patchCoverage: 0.65 },
-  props: { kinds: ["rock", "cactus", "dry-plant", "wood", "windsock"], density: 0.45, scaleRange: [0.6, 2.6] },
-  wind: { direction: [-0.6, 0.8], strength: 0.6 },
-  ambient: { effect: "dust", water: false },
-  mission: {
-    portalTitle: "Awaken the oasis gate",
-    beaconTitle: "Reach the oasis beacon",
-    fragmentName: "relic fragment",
-    collectibleColor: "#ff7a3d",
-  },
-  budget: { props: 110, patches: 24, particles: 260, drawCalls: 14 },
-};
 
 const DEFINITIONS: Readonly<Record<BiomeId, BiomeDefinition>> = {
   original: ORIGINAL,
