@@ -101,11 +101,11 @@ const BUSHES = [
   }),
   // Flowering (hibiscus-like), used sparingly.
   leafyBush({
-    masses: [{ c: [0, 0.28, 0], r: 0.28 }, { c: [-0.16, 0.18, 0.08], r: 0.2, ramp: "foliage" }, { c: [0.15, 0.2, -0.07], r: 0.21 }],
-    leaves: 26, leafSize: 1.05, seed: 4, flowers: 5,
+    masses: [{ c: [0, 0.28, 0], r: 0.28 }, { c: [-0.13, 0.18, 0.07], r: 0.19, ramp: "foliage" }, { c: [0.12, 0.2, -0.06], r: 0.2 }],
+    leaves: 26, leafSize: 1.0, seed: 4, flowers: 5,
   }),
   // Elephant-ear clump: big heart-shaped leaves on arching stems.
-  broadleafClump({ leaves: 7, leafLength: 0.46, leafWidth: 0.42, seed: 5 }),
+  broadleafClump({ leaves: 7, leafLength: 0.4, leafWidth: 0.42, seed: 5 }),
   // Dense, dark leafy dome with pale new growth on top.
   leafyBush({
     masses: [{ c: [0, 0.32, 0], r: 0.3 }, { c: [0.16, 0.2, 0.14], r: 0.2 }, { c: [-0.16, 0.2, 0.12], r: 0.2 }, { c: [0.0, 0.52, -0.02], r: 0.17, ramp: "foliageAlt", bias: 0.1 }],
@@ -164,7 +164,7 @@ export const TROPICAL_ART: BiomeArt = {
       variants: YOUNG_PALMS,
     },
     bush: {
-      category: "bush", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.86, triangleBudget: 900,
+      category: "bush", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.8, triangleBudget: 900,
       mirror: true, embed: [0.02, 0.04],
       variants: BUSHES,
       weights: [1, 1, 1, 0.6, 0.8, 0.8],
@@ -398,7 +398,7 @@ export const TROPICAL_ART: BiomeArt = {
     recess: "#6f665a",
     rim: "#f5ead0",
   },
-  ground: { contactColor: "#5a4a32", contactOpacity: 0.42, contactScale: 0.95, patchColor: "#caa877" },
+  ground: { contactColor: "#5a4a32", contactOpacity: 0.42, contactScale: 0.95, patchColor: "#a8875a" },
   variation: { toneJitter: 0.05, hueJitterDeg: 5 },
   budgets: { triangles: { standard: 110_000, reduced: 45_000 }, membersPerCluster: { standard: 8, reduced: 4 } },
 };
