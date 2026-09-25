@@ -91,29 +91,81 @@ export function SceneLighting({ bounds, style }: SceneLightingProps) {
   const sunDistance = size.radius * 2.4;
   const key = style.lighting.keyPosition;
 
+  /**
+   * The authored `keyPosition` is a steep, near-overhead sun angle (e.g. the
+   * Cartoon style's [5, 8, 4] sits ~50° above the horizon). That reads fine
+   * for an outdoor course, but for these room-corner furniture sets a lower,
+   * more raking angle sells "small object in a room lit through a window"
+   * much better: shadows fall further and stay legible under furniture,
+   * which is exactly the depth cue tilt-shift/miniature photography relies
+   * on. Only the *elevation* is lowered here, in this scene-local light
+   * placement — the per-style horizontal direction, all colours, and every
+   * `StyleLighting` intensity/softness number are still read unchanged from
+   * `shared/style.ts`, so the three styles keep their own lighting mood.
+   */
+  const keyHorizontal = useMemo(() => Math.hypot(key[0], key[2]) || 1, [key]);
+  const keyDirX = key[0] / keyHorizontal;
+  const keyDirZ = key[2] / keyHorizontal;
+  const WINDOW_KEY_ELEVATION = 0.85;
+  const keyPosition: [number, number, number] = [
+    centre.x + keyDirX * sunDistance * 0.9,
+    centre.y + WINDOW_KEY_ELEVATION * sunDistance * 0.48,
+    centre.z + keyDirZ * sunDistance * 0.9,
+  ];
+
+  /** A soft warm bounce mixed into the cool fill light, standing in for the
+   * warm light a real window key would bounce back off nearby surfaces.
+   * There is no environment map/IBL in this renderer, so the existing
+   * hemisphere light remains the sky/ground fill term; this only nudges the
+   * secondary directional fill's colour, not its intensity or direction. */
+  const fillColor = useMemo(
+    () => new THREE.Color(style.sceneColors.fillLight).lerp(new THREE.Color(style.sceneColors.keyLight), 0.22),
+    [style],
+  );
+
+  /**
+   * `style.sceneColors.surfaces[3]` is an outdoor terrain swatch (grass green
+   * in every current style) reused here as the hemisphere light's "ground"
+   * term. That is fine for the floor itself, but once generated furniture
+   * actually responds to lighting (see `styleMaterial.ts`'s baked-material
+   * relight), every downward-facing surface — a desk's underside, a sofa's
+   * frame — picks up that same raw grass tint as its only upward bounce
+   * light, which reads as a muddy, thematically-wrong green instead of a
+   * plausible room bounce. Blending it toward the warm fill colour keeps the
+   * floor's own lit-from-above look unchanged (this only affects surfaces
+   * facing away from the sky) while keeping undersides legible with a
+   * neutral bounce instead of an outdoor-grass one.
+   */
+  const hemisphereGroundColor = useMemo(
+    () =>
+      new THREE.Color(style.sceneColors.surfaces[3] ?? style.sceneColors.fog).lerp(
+        new THREE.Color(style.sceneColors.fillLight),
+        0.55,
+      ),
+    [style],
+  );
+
+  /** Doubled from the previous 1024: this is still a single shadow-casting
+   * light (the fill light below never casts), so the extra resolution buys
+   * noticeably crisper contact shadows under furniture at a fixed, modest
+   * cost rather than adding a second shadow pass or a global effect. */
+  const keyShadowMapSize = 2048;
+
   return (
     <>
       <GradientBackdrop radius={Math.max(size.radius * 8, 60)} style={style} />
       <fog attach="fog" args={[style.sceneColors.fog, size.radius * 1.7, size.radius * 7.2]} />
       <ambientLight intensity={style.lighting.ambientIntensity} color={style.sceneColors.ambientLight} />
       <hemisphereLight
-        args={[
-          style.sceneColors.fillLight,
-          style.sceneColors.surfaces[3] ?? style.sceneColors.fog,
-          style.lighting.fillIntensity,
-        ]}
+        args={[style.sceneColors.fillLight, hemisphereGroundColor, style.lighting.fillIntensity]}
       />
       <directionalLight
-        position={[
-          centre.x + key[0] * sunDistance * 0.12,
-          centre.y + key[1] * sunDistance * 0.12,
-          centre.z + key[2] * sunDistance * 0.12,
-        ]}
+        position={keyPosition}
         intensity={style.lighting.keyIntensity}
         color={style.sceneColors.keyLight}
         castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        shadow-mapSize-width={keyShadowMapSize}
+        shadow-mapSize-height={keyShadowMapSize}
         shadow-camera-near={0.1}
         shadow-camera-far={sunDistance * 3}
         shadow-camera-left={-shadowExtent}
@@ -127,7 +179,7 @@ export function SceneLighting({ bounds, style }: SceneLightingProps) {
       <directionalLight
         position={[centre.x - sunDistance * 0.7, centre.y + sunDistance * 0.4, centre.z - sunDistance * 0.6]}
         intensity={style.lighting.fillIntensity}
-        color={style.sceneColors.fillLight}
+        color={fillColor}
       />
     </>
   );

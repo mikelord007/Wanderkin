@@ -91,12 +91,16 @@ export function SceneEntities({
   colorRestoration,
 }: SceneEntitiesProps) {
   const clones = useMemo(() => {
+    const assetHashes = new Map(manifest.assets.map((asset) => [asset.id, asset.sha256]));
     const map = new Map<string, THREE.Object3D>();
     for (const [assetId, asset] of assets) {
-      map.set(assetId, cloneStyledObject(asset.scene, style, colorRestoration));
+      map.set(
+        assetId,
+        cloneStyledObject(asset.scene, style, colorRestoration, assetHashes.get(assetId)),
+      );
     }
     return map;
-  }, [assets, style]);
+  }, [assets, style, manifest]);
 
   useEffect(() => {
     for (const object of clones.values()) setObjectColorRestoration(object, colorRestoration);
