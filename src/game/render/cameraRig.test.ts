@@ -15,7 +15,7 @@ import { DEFAULT_MOVEMENT_CONFIG } from "@shared/index.js";
 import { GameSimulation, NEUTRAL_INPUT } from "../core/simulation.js";
 import { initRapier, type RapierModule } from "../core/physicsWorld.js";
 import { boxEntity, floorEntity, makeManifest } from "../core/fixtures.js";
-import { capsuleHeight } from "../core/characterScale.js";
+import { CAMERA_MINIATURE_PULLBACK_RATIO, capsuleHeight } from "../core/characterScale.js";
 import { CAMERA_MIN_DISTANCE_RATIO, CAMERA_TARGET_LIFT_RATIO } from "../core/constants.js";
 import { CameraRig } from "./cameraRig.js";
 
@@ -115,10 +115,15 @@ describe("camera framing under furniture at miniature scale", () => {
     }
   }, 30_000);
 
-  it("frames the character the same way it framed the larger one", async () => {
-    // Framing is a ratio, not a distance: the boom and the look-at lift both
-    // scale with the capsule, so the character subtends the same angle and the
-    // furniture around it is what changes size on screen.
+  it("intentionally frames the character smaller than the larger one, by the pull-back ratio", async () => {
+    // The look-at lift and the minimum boom (both sized from characterRadius
+    // directly, not from camera.distance) still scale as a plain ratio — only
+    // the *nominal* boom gets the extra CAMERA_MINIATURE_PULLBACK_RATIO, on
+    // top of the body-height factor, so the miniature camera sits further
+    // back in character-heights than the authored one. That is deliberate:
+    // a plain ratio-preserving boom left the character an identical size on
+    // screen at every scale, which is why shrinking the body alone did not
+    // visibly change the real chase-camera view (see scale-refinement.md).
     const miniature = await underTheSofa(true);
     const authored = await underTheSofa(false);
     try {
@@ -130,7 +135,7 @@ describe("camera framing under furniture at miniature scale", () => {
       });
       const small = ratio(miniature.config);
       const large = ratio(authored.config);
-      expect(small.boomInHeights).toBeCloseTo(large.boomInHeights, 9);
+      expect(small.boomInHeights).toBeCloseTo(large.boomInHeights * CAMERA_MINIATURE_PULLBACK_RATIO, 9);
       expect(small.liftInHeights).toBeCloseTo(large.liftInHeights, 9);
       expect(small.minBoomInHeights).toBeCloseTo(large.minBoomInHeights, 9);
     } finally {
@@ -139,10 +144,13 @@ describe("camera framing under furniture at miniature scale", () => {
     }
   }, 30_000);
 
-  it("fits its boom into a gap that the authored camera could not have used", async () => {
-    // The concrete camera win from the smaller scale: at 2.5 m the boom is
-    // longer than the sofa is deep, so the old camera was permanently shoved
-    // against geometry underneath furniture. At 1.25 m it has room.
+  it("still fits its boom into a gap that the authored camera could not have used", async () => {
+    // The concrete camera win from the smaller scale survives the extra
+    // pull-back: the nominal boom is still shorter than the authored one (so
+    // there is still more room to work with under low furniture), and
+    // CameraRig's own occlusion handling — unaffected by any of this, it
+    // only reads collider geometry and the configured distance/padding —
+    // still keeps it out of the sofa above.
     const miniature = await underTheSofa(true);
     const authored = await underTheSofa(false);
     try {
@@ -151,9 +159,14 @@ describe("camera framing under furniture at miniature scale", () => {
         authored.config.camera.collisionPadding,
       );
 
+      // Framing is intentionally *wider* (smaller ratio) at miniature scale
+      // now, by exactly the pull-back factor — see the previous test.
       const framedHeight = (config: typeof AUTHORED) =>
         capsuleHeight(config) / config.camera.distance;
-      expect(framedHeight(miniature.config)).toBeCloseTo(framedHeight(authored.config), 9);
+      expect(framedHeight(miniature.config)).toBeCloseTo(
+        framedHeight(authored.config) / CAMERA_MINIATURE_PULLBACK_RATIO,
+        9,
+      );
     } finally {
       miniature.dispose();
       authored.dispose();

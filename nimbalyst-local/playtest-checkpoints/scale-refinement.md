@@ -9,6 +9,11 @@
 - No subagents, no nested agents, no provider/publish/upload/generation calls, no new deps.
 - Committed: `6f142b1c6b6c40ef99b32647feabfacecc7a275a` — `src/game/core/characterScale.ts`,
   `nimbalyst-local/character-preview.ts`, this checkpoint file. Nothing else staged.
+- **Reopened** by the coordinator: the first pass's own evidence showed real in-game spawn
+  screenshots were near pixel-identical across every scale explored, and said the external
+  sofa-comparison render was "the correct way to judge" — correctly rejected as not satisfying
+  "when character spawns, environment looks bigger" in the actual production camera. See the new
+  section below for what changed as a result.
 
 ### Addendum: disposable-Vite cache isolation (coordinator-flagged, test-infra only)
 
@@ -228,33 +233,183 @@ as an explicit, quantified trade-off for the user's own playtest to weigh in on,
 
 ## Limitations, stated plainly
 
-- Subjective feel ("does 0.175 m *look* and *play* right") is the user's own playtest to make, per
-  `user-does-manual-browser-testing.md`; this checkpoint provides quantified evidence and
-  screenshots, not an acceptance claim.
-- The `elevated.maxY > 1.4` assertion in `tests/e2e/browser/gameplay.test.ts` needs a one-line
-  update by that file's owner (or explicit coordinator sign-off to extend my ownership to it) —
-  otherwise that test will read as a regression on a future full-suite run at this scale, even
-  though the underlying mechanic (reaching the elevated surface via mantle) is intact.
-- The Tripo sample's `checkpoint-5` approach is broken independently of this change (confirmed at
-  the current 0.35 m baseline too) and was not investigated further — out of scope for a
-  character-scale pass.
-- I did not run the full repository test suite (`npm test`), per the brief's instruction to avoid
-  repeated full-suite runs while peers are moving in the shared tree; the six focused files above
-  cover everything that reads `characterScale.ts`/`cameraRig.ts` directly.
-- No new npm dependency, no provider/publish/upload/generation call of any kind.
+- Subjective feel ("does 0.175 m, at this camera framing, *look* and *play* right") is the user's
+  own playtest to make, per `user-does-manual-browser-testing.md`; this checkpoint provides
+  quantified evidence, a same-world before/after screenshot pair, and passing gameplay tests, not
+  an acceptance claim.
+- **Resolved in the reopen, superseding the line that used to be here**: the `elevated.maxY > 1.4`
+  assertion is fixed (derived from checkpoint-authored data, not a re-tuned magic number — see
+  above), and the Rodin sample now runs 3/3 all the way to `finishAndReplay`, not just to
+  checkpoint 3.
+- The Tripo sample's `checkpoint-5` approach is broken independently of this change, confirmed
+  pre-existing at the unmodified 0.35 m baseline, and observed **intermittent** across this
+  session (2 failures, 1 pass, identical signature each time) — not investigated or fixed, out of
+  scope for a character-scale/camera pass.
+- One pre-existing rendering artifact (an unlit black underside when standing directly beneath the
+  desk overhang) is more visually prominent with the wider FOV; not a clipping bug, not fixed here
+  (`SceneLighting`/`styleMaterial`, out of ownership) — see the reopen section for the exact
+  evidence that rules out a collision regression.
+- Checkpoint *trigger* positions are not re-seated by scale the way spawn/respawn positions are —
+  found while fixing the test assertion, does not currently break anything, not fixed (out of the
+  narrow test-only grant) — flagged above for whoever owns `checkpoints.ts`/`samples.ts`.
+- I did not run the full repository test suite (`npm test`) at any point in either pass, per the
+  brief's instruction to avoid repeated full-suite runs while peers are moving in the shared tree;
+  the focused files covered above exercise everything that reads `characterScale.ts` / `cameraRig.
+  ts` / `GameStage.tsx` / `constants.ts` directly, plus the real end-to-end browser gameplay test.
+- No new npm dependency, no provider/publish/upload/generation call of any kind, in either pass.
+
+## REOPEN — visible in-game camera framing, plus a real full Rodin pass through finish
+
+The first pass's own screenshots proved the problem it then excused: a real spawn/gameplay
+screenshot looked the same at 0.35 m and at 0.175 m. That is a real defect in the *camera*, not an
+acceptable property of "how chase cameras work" — the coordinator correctly rejected treating the
+external studio render as a substitute for the actual production view. This section is the fix,
+entirely inside owned camera paths, plus the narrowly-granted test fix.
+
+### What changed, and why it is bounded
+
+`cameraRig.ts`'s boom and target-lift were plain ratios of the capsule's own height, so the
+character's apparent screen size — and therefore how much of the room fits around it — never
+changed with scale; only the external, non-production sofa-comparison render showed the shrink.
+Two changes, both pure camera/projection, neither touching physics, the collider, or any world/
+spawn data:
+
+1. **`CAMERA_MINIATURE_PULLBACK_RATIO = 1.6`**, in `characterScale.ts`. Applied only to the
+   *nominal* (unoccluded) `camera.distance` inside `toMiniatureScale()` — `collisionPadding` still
+   gets the plain body-height factor, since it sizes the occlusion sweep's own clearance ball and
+   widening it would make the camera duck away from furniture earlier than it needs to. Bounded by
+   construction: `CameraRig.update()`'s existing occlusion sweep (unmodified) still shortens the
+   boom the instant this longer nominal length would clip through anything, so this can only widen
+   the *open* framing — it cannot introduce a new clipping path. At 0.175 m this raises
+   `camera.distance` from 0.625 m to 1.0 m (authored is 2.5 m; still clearly the smaller boom).
+2. **`GAMEPLAY_CAMERA_FOV_DEGREES = 72`**, in `constants.ts`, applied once in `GameStage.tsx` via a
+   `useEffect` that sets `camera.fov` (guarded to `PerspectiveCamera` instances) and calls
+   `updateProjectionMatrix()`. The Canvas's own declarative `fov: 55` in `GameView.tsx` (not my
+   file) is left as the initial mount value; this overrides it a frame later, inside my own
+   assigned camera path, without touching that file. FOV is a pure projection parameter — it does
+   not appear anywhere in `CameraRig.update()`'s occlusion/minimum-distance math, so that behaviour
+   is provably unaffected.
+
+Initial camera **yaw** was left alone: it is set from `manifest.spawn.headingRadians` in
+`GameView.tsx`/`InputController` (not mine), and it drives movement-relative-to-camera as well as
+the view — decoupling it from movement to chase a framing win would be a much larger, riskier
+change than the two above, and was not needed once the boom/FOV combination gave a clear result.
+
+### Test evidence for "bounded, not fake, not clipping"
+
+- `characterScale.test.ts` (14/14) and `cameraRig.test.ts` (4/4) rewritten to assert the new,
+  intentional relationship instead of the old (now-wrong) "framing is unchanged" one: the boom
+  ratio at miniature scale is exactly `CAMERA_MINIATURE_PULLBACK_RATIO` times the authored one; the
+  look-at lift and minimum-distance ratios (both sized straight from `characterRadius`, not from
+  `camera.distance`) are untouched; the miniature boom is still shorter than the authored one in
+  absolute metres; occlusion under a 0.55 m sofa gap still holds (same test, unmodified physics).
+- `tsc -p tsconfig.json --noEmit` — clean, zero errors, after these edits.
+- Full focused suite — `characterScale.test.ts`, `cameraRig.test.ts`, `authoredCourse.test.ts`,
+  `mantle.test.ts`, `simulation.test.ts`, `placementValidation.test.ts`, plus the character
+  render/rig/animator tests (nothing here touches character geometry, but re-ran them since
+  `GameStage.tsx` was edited) — **93/93 pass**.
+
+### Real production before/after, same world, same spawn, same camera code path
+
+Real Chrome (`channel: "chrome"`), the actual bundled "The desk & sofa adventure" sample, disposable
+port, isolated `cacheDir` (see addendum above) — `nimbalyst-local/tmp-scale-refinement/spawn-views.test.ts`:
+
+- **Before**: `nimbalyst-local/screenshots/scale-refinement-kept/h035-before-01-spawn.png` — the
+  originally-rejected 0.35 m capsule, FOV 55°, boom 1.25 m. Character fills a large fraction of
+  the frame; the desk overhang crops out of view almost immediately above it.
+- **After**: `nimbalyst-local/screenshots/scale-refinement-kept/h0175-pullback-fov72-01-spawn.png` —
+  0.175 m capsule, FOV 72°, boom 1.0 m (`CAMERA_MINIATURE_PULLBACK_RATIO` applied). The character
+  is visibly and substantially smaller on screen (roughly 40% of its previous pixel height at the
+  same viewport), the full desk overhang and its legs are in frame, and a wide extra area of floor
+  (including a second floor patch to the right, previously entirely out of frame) is now visible.
+  This is the same spawn point, same manifest, same camera code path — not the external
+  sofa-comparison render.
+- Two intermediate captures exist for anyone auditing the delta:
+  `h0175-fov72-01-spawn.png` (FOV widened, pull-back not yet applied — a smaller, partial effect)
+  and `h0175-after-01-spawn.png` (the pre-reopen state: pull-back and FOV both still at the old
+  values, confirming the "near-identical" finding that triggered the reopen was accurate at the
+  time).
+
+**One pre-existing rendering artifact, not caused by this change**: walking forward from spawn
+until standing directly under the desk overhang shows a large, unlit black region where its
+underside is in frame (`…-02-mid-walk.png`, `…-03-near-jump-apex.png`, both before and after).
+Confirmed present, just smaller, in the pre-reopen `h0175-after-02-mid-walk.png` too — this is a
+lighting/material characteristic of that mesh's underside (`SceneLighting`/`styleMaterial`, not my
+files), not a camera-collision bug: `cameraOccluded` and `cameraDistance` at that moment are
+consistent with the boom correctly sitting in open air below the desk, looking up at an unlit
+back-face, not clipped into geometry. The wider FOV does make it occupy more of the frame in that
+one specific spot. Flagging for whoever next touches that mesh's material/lighting; not fixed here
+(out of ownership), and not disqualifying — a player is not stationary directly under a low
+overhang for most of a level, and the framing win at spawn and in open areas is the point of this
+change.
+
+### Narrow `tests/e2e/browser/gameplay.test.ts` fix — full Rodin course to finish, not 3/5
+
+Per the coordinator's explicit, narrow grant: replaced `expect(elevated.maxY).toBeGreaterThan(1.4)`
+— a hardcoded absolute world-Y that was implicitly calibrated to the *previous* 0.35 m capsule's
+standing height on the desk (diagnosed exactly in the pre-reopen section above) — with an
+assertion derived from the checkpoint's own authored data, not a re-tuned magic number:
+
+- The next checkpoint's `position` is a capsule *centre*, stored by `standOn()` in
+  `src/scene/samples.ts` as `surfaceY + DEFAULT_MOVEMENT_CONFIG.characterHalfHeight +
+  characterRadius + 0.02`, always against the authored config regardless of which scale is
+  actually running. Recovering `surfaceY = nextCheckpointPosition[1] - 0.37` before the approach
+  gives the real, scale-independent support-surface height the mantle has to land on (it comes out
+  to `1.286` for this checkpoint — exactly `RODIN_DESK_Y` in `samples.ts`, an independent
+  cross-check that the recovery is correct).
+- The new assertion bounds `elevated.maxY` between `surfaceY - 0.05` (must have actually reached
+  the surface, not stalled below it) and `surfaceY + AUTHORED_STANDING_OFFSET + 0.05` (must not be
+  implausibly far above it — using the *authored* capsule's own standing offset as the ceiling,
+  since every miniature scale this game ships is shorter than authored, never taller). This is
+  correct at whatever capsule height is running, not just today's 0.175 m.
+- Also documented, **found but not touched, out of the narrow grant**: checkpoint *trigger*
+  positions (used by `updateCheckpoints` in `src/game/core/checkpoints.ts` for the actual 3D-radius
+  collection test) are never re-seated by scale the way spawn/respawn positions are by
+  `reseatCapsuleCentre()` — they stay at the authored-scale capsule-centre height forever. This
+  does not currently break anything (the 0.4 m trigger radius comfortably absorbs the up-to-~0.3 m
+  vertical gap this creates at 0.175 m), so it was not in scope to fix, but it is the same category
+  of bug class `reseatCapsuleCentre` exists to prevent and is worth someone owning
+  `checkpoints.ts`/`samples.ts` picking up.
+
+**Full course verified to finish, not just to the elevated checkpoint**: ran the fixed test three
+times end to end at the final camera settings (0.175 m, pull-back + FOV) through a cache-isolated
+disposable harness (`nimbalyst-local/tmp-scale-refinement/playwright.gameplay.config.ts`, not
+committed — points at the product's real, unmodified `tests/e2e/browser/gameplay.test.ts` via
+`testDir`, with its own `--config vite.disposable.config.mjs` webServer) — **3/3 pass**, all the
+way through pause/resume, manual respawn, jump, fall+auto-respawn, all 5 checkpoints including the
+mantled one, `finishAndReplay`.
+
+### Tripo sample — retained exact baseline evidence, not expanded into
+
+Per the explicit instruction, this was not investigated or fixed. Ran it three times across this
+session at the current settings: **2 failures, 1 pass**, all with the identical signature
+(`mantleRejection: "top-not-standable"`, stuck near the same position approaching checkpoint 5,
+`checkpointsCollected: 4`). It fails identically at the unmodified 0.35 m baseline (confirmed in
+the pre-reopen section). Conclusion: this is a **pre-existing, intermittent/flaky** failure on that
+sample, unrelated to character scale or camera changes (camera framing does not touch mantle
+probing or physics), present before this session and not caused or fixed by it. Retained here as
+the exact, honest evidence rather than a single cherry-picked run.
 
 ## Reproduce
 
 ```
 npx vitest run src/game/core/characterScale.test.ts src/game/render/cameraRig.test.ts \
   src/game/core/authoredCourse.test.ts src/game/core/mantle.test.ts \
-  src/game/core/simulation.test.ts src/game/placementValidation.test.ts
+  src/game/core/simulation.test.ts src/game/placementValidation.test.ts \
+  src/game/render/character
 
-OBJECTQUEST_E2E_PORT=15991 npx playwright test \
-  --config tests/e2e/browser/playwright.config.ts tests/e2e/browser/gameplay.test.ts
+npx tsc -p tsconfig.json --noEmit
+
+# Full product gameplay e2e through a cache-isolated disposable harness (see addendum):
+OQ_SCALE_PORT=16010 npx playwright test \
+  --config nimbalyst-local/tmp-scale-refinement/playwright.gameplay.config.ts
 
 # Sofa-scale comparison harness (nimbalyst-local/character-preview.ts, committed):
-npx vite --port 15981 --strictPort
+npx vite --config nimbalyst-local/tmp-scale-refinement/vite.disposable.config.mjs --port 15981 --strictPort
 #   /nimbalyst-local/character-preview.html?scene=sofa&heights=0.7,0.35,0.2,0.175,0.15
 #   /nimbalyst-local/character-preview.html?scene=sofa&under=1&cam=closeup&heights=0.35,0.2,0.175,0.15
+
+# Real production spawn/camera evidence (before/after, isolated cache):
+OQ_SCALE_LABEL=my-label OQ_SCALE_PORT=16011 npx playwright test \
+  --config nimbalyst-local/tmp-scale-refinement/playwright.config.ts
 ```

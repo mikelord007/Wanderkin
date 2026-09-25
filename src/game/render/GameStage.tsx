@@ -10,12 +10,14 @@
 
 import { useEffect, useMemo, useRef, type MutableRefObject, type RefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
+import { PerspectiveCamera } from "three";
 import type { MovementConfig, SceneManifest, StyleDefinition } from "@shared/index.js";
 import type { LoadedSceneAsset } from "../assets/loadSceneAsset.js";
 import type { RapierModule } from "../core/physicsWorld.js";
 import type { GameSimulation, SimulationEvent } from "../core/simulation.js";
 import type { InputController } from "../input/inputController.js";
 import type { GameDiagnostics } from "../diagnostics.js";
+import { GAMEPLAY_CAMERA_FOV_DEGREES } from "../core/constants.js";
 import { headingForward, headingRight } from "../core/vec.js";
 import { CameraRig } from "./cameraRig.js";
 import { PlayerAvatar, type PlayerAvatarHandle } from "./PlayerAvatar.js";
@@ -97,6 +99,19 @@ export function GameStage({
   const config = simulation.config;
 
   const rig = useMemo(() => new CameraRig(rapier, config), [rapier, config]);
+
+  // Widen the field of view for gameplay, so more of the room is visible
+  // around the now much-smaller character instead of the character simply
+  // filling the same fraction of frame it always has. This is a pure
+  // projection change: it does not touch `CameraRig`'s boom, occlusion or
+  // minimum-distance math (`cameraRig.ts`), so collision avoidance and
+  // near-clip behaviour are unaffected.
+  useEffect(() => {
+    if (!(camera instanceof PerspectiveCamera)) return;
+    if (camera.fov === GAMEPLAY_CAMERA_FOV_DEGREES) return;
+    camera.fov = GAMEPLAY_CAMERA_FOV_DEGREES;
+    camera.updateProjectionMatrix();
+  }, [camera]);
 
   // Respawning re-aims the camera to the checkpoint's heading, so the
   // player is looking the right way instead of at wherever they fell from.

@@ -265,9 +265,36 @@ test.describe("real browser gameplay input", () => {
     await verifyFallRespawn(page, [-4.02, 7.5], 1);
 
     await collectNextCheckpoint(page, 2, { timeoutMs: 20_000 });
+
+    // The next checkpoint's authored `position` is a capsule CENTRE, stored
+    // as `surfaceY + AUTHORED_STANDING_OFFSET` by `standOn()` in
+    // src/scene/samples.ts — always against the *authored* 0.70 m capsule
+    // (DEFAULT_MOVEMENT_CONFIG.characterHalfHeight 0.17 + characterRadius
+    // 0.18 + a 0.02 landing skin), regardless of which scale is actually
+    // running. Recovering the real support-surface height this way, instead
+    // of hardcoding an absolute world-Y, is what lets the assertion below
+    // stay correct at whatever capsule height the game ships next, rather
+    // than being silently calibrated to one.
+    const AUTHORED_STANDING_OFFSET = 0.17 + 0.18 + 0.02;
+    const beforeElevated = await readDiagnostics(page);
+    const nextY = beforeElevated?.nextCheckpointPosition?.[1];
+    if (nextY === undefined) throw new Error("No elevated checkpoint position published before the mantle approach");
+    const surfaceY = nextY - AUTHORED_STANDING_OFFSET;
+
     const elevated = await collectNextCheckpoint(page, 3, { mantle: true, timeoutMs: 25_000 });
     expect(elevated.mantleObserved).toBe(true);
-    expect(elevated.maxY).toBeGreaterThan(1.4);
+    // Feet (and therefore capsule centre) must have reached the support
+    // surface, not just passed near it horizontally: centre-above-surface is
+    // always `characterHalfHeight + characterRadius + a small landing skin`
+    // for the capsule that is *actually running* — strictly positive, and
+    // never taller than the authored capsule's own standing offset (every
+    // miniature scale shrinks the body, never grows it). Bounding both
+    // sides this way catches "never actually got up" (maxY stuck near the
+    // floor, at or below `surfaceY`) and "stopped somewhere else entirely"
+    // (maxY far above even the authored capsule's standing height), without
+    // hardcoding which capsule height is currently running.
+    expect(elevated.maxY).toBeGreaterThan(surfaceY - 0.05);
+    expect(elevated.maxY).toBeLessThan(surfaceY + AUTHORED_STANDING_OFFSET + 0.05);
     await collectNextCheckpoint(page, 4, { timeoutMs: 15_000 });
     await collectNextCheckpoint(page, 5, { timeoutMs: 20_000 });
     await finishAndReplay(page, testInfo);

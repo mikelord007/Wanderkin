@@ -13,6 +13,7 @@ import { deriveMovementLimits } from "../../scene/route.js";
 import { defaultSurfaceOptions } from "../../scene/surfaces.js";
 import { capsuleCenterYAboveSurface } from "../../editor/geometry.js";
 import {
+  CAMERA_MINIATURE_PULLBACK_RATIO,
   MINIATURE_CAPSULE_HEIGHT,
   capsuleHeight,
   isMiniatureScale,
@@ -77,16 +78,28 @@ describe("toMiniatureScale", () => {
     );
   });
 
-  it("pulls the camera in by the same factor, so framing is unchanged", () => {
+  it("scales collision padding by the body factor, but pulls the boom back further still", () => {
+    // `collisionPadding` sizes the occlusion sweep's own clearance ball, and
+    // stays on the plain body-height factor.
     const factor = capsuleHeight(MINIATURE) / capsuleHeight(AUTHORED);
-    expect(MINIATURE.camera.distance).toBeCloseTo(AUTHORED.camera.distance * factor, 9);
     expect(MINIATURE.camera.collisionPadding).toBeCloseTo(
       AUTHORED.camera.collisionPadding * factor,
       9,
     );
-    // Camera boom measured in character heights is identical.
+    // `camera.distance` (the nominal, unoccluded boom) gets the same body
+    // factor *and* CAMERA_MINIATURE_PULLBACK_RATIO on top — this is the
+    // deliberate framing change: the miniature boom is now longer, in
+    // character-heights, than the authored one, which is what makes the
+    // character read smaller and more of the room fit in frame at the real
+    // chase camera (not just in the external studio-comparison render).
+    // `CameraRig`'s own occlusion handling (unaffected by this) still pulls
+    // it in near furniture, so this can only widen the *open* framing.
+    expect(MINIATURE.camera.distance).toBeCloseTo(
+      AUTHORED.camera.distance * factor * CAMERA_MINIATURE_PULLBACK_RATIO,
+      9,
+    );
     expect(MINIATURE.camera.distance / capsuleHeight(MINIATURE)).toBeCloseTo(
-      AUTHORED.camera.distance / capsuleHeight(AUTHORED),
+      (AUTHORED.camera.distance / capsuleHeight(AUTHORED)) * CAMERA_MINIATURE_PULLBACK_RATIO,
       9,
     );
   });

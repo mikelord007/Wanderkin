@@ -59,12 +59,18 @@
  *  - It is a clean second halving of the previous 0.35 m pass (0.70 → 0.35 →
  *    0.175), which is easy to reason about and keeps the walkMaxSpan/jump-range
  *    margin comfortably away from the tighter end of the explored range.
- *  - The third-person camera's boom and target-lift are ratios of the
- *    capsule's own height ({@link "./cameraRig.js" CameraRig}), so the
- *    character's *apparent size on screen* is framing-invariant across this
- *    whole range — confirmed in real Chrome spawn screenshots at 0.35 / 0.20 /
- *    0.175 / 0.15 m, which are visually near-identical. Going smaller does not
- *    buy extra on-screen legibility, only a bigger jump in the walk-speed and
+ *  - The third-person camera's boom and target-lift were originally kept as
+ *    plain ratios of the capsule's own height ({@link "./cameraRig.js"
+ *    CameraRig}), which made the character's on-screen size framing-invariant
+ *    across every scale — confirmed, and rejected, by real Chrome spawn
+ *    screenshots at 0.35 / 0.20 / 0.175 / 0.15 m that were all visually
+ *    near-identical despite the collider genuinely shrinking. That is fixed
+ *    below by {@link CAMERA_MINIATURE_PULLBACK_RATIO}: the boom is now
+ *    deliberately longer, in character-heights, than the plain ratio would
+ *    give, so the real chase camera — not just the external studio-comparison
+ *    render — visibly shows a smaller character and more of the room. Going
+ *    smaller than 0.175 m would still not buy anything past what the pull-back
+ *    already buys here; it would only buy a bigger jump in the walk-speed and
  *    jump-height-in-body-heights ratios below.
  *  - `walkSpeed` and `jumpHeight` stay authored (unchanged in metres) at every
  *    scale, by design (see above) — so as the body shrinks, the same absolute
@@ -82,6 +88,31 @@ import type { Vec3Like } from "./vec.js";
 
 /** Standing height of the miniature capsule, in metres. */
 export const MINIATURE_CAPSULE_HEIGHT = 0.175;
+
+/**
+ * Extra pull-back on the camera boom at miniature scale, beyond the plain
+ * body-height ratio.
+ *
+ * Scaling the boom by exactly the same factor as the body keeps the
+ * character framed at an identical apparent size on screen at every scale —
+ * which is also exactly why shrinking the body alone did not visibly change
+ * anything about the *in-game camera view*: a real spawn/gameplay screenshot
+ * at 0.35 m and at 0.175 m are near pixel-identical (see
+ * `scale-refinement.md`), even though the sofa-comparison studio render two
+ * screens over shows the character plainly shrinking. This factor breaks
+ * that framing-invariance on purpose: the boom (and so the visible field of
+ * the room) is now longer, in body-heights, than it is at the authored
+ * scale, so the character reads as smaller on screen and more of the room
+ * is actually in frame — the effect the studio render already showed, now
+ * also true of the real chase camera.
+ *
+ * Bounded, not unlimited: `CameraRig`'s existing occlusion handling
+ * (`cameraRig.ts`) still pulls the boom in the instant this longer nominal
+ * length would clip through anything, so this can only ever make the *open*
+ * framing wider — it cannot make the camera clip through furniture it
+ * previously avoided.
+ */
+export const CAMERA_MINIATURE_PULLBACK_RATIO = 1.6;
 
 /** Total standing height of the capsule described by a config. */
 export function capsuleHeight(config: MovementConfig): number {
@@ -123,7 +154,12 @@ export function toMiniatureScale(base: MovementConfig): MovementConfig {
     },
     camera: {
       ...base.camera,
-      distance: base.camera.distance * factor,
+      // The extra pull-back only widens the *nominal* (unoccluded) framing —
+      // see CAMERA_MINIATURE_PULLBACK_RATIO. `collisionPadding` stays on the
+      // plain body-height factor: it sizes the small clearance ball the
+      // occlusion sweep itself uses, and widening that too would make the
+      // camera duck away from furniture earlier than it needs to.
+      distance: base.camera.distance * factor * CAMERA_MINIATURE_PULLBACK_RATIO,
       collisionPadding: base.camera.collisionPadding * factor,
     },
   };

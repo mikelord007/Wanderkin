@@ -71,6 +71,16 @@ export const HORIZONTAL_BOUNDS_MARGIN_METERS = 10;
  */
 export const MAX_FRAME_DELTA_SECONDS = 0.25;
 
+/**
+ * Gameplay camera field of view, in degrees. Wider than the Canvas's default
+ * (55°, still used by anything that reads the camera before this mounts) so
+ * more of the room is in frame around the now much-smaller character,
+ * without changing the boom/collision math at all: FOV is a pure projection
+ * parameter, so `CameraRig`'s occlusion, minimum-distance and near-clip
+ * behaviour (all in `cameraRig.ts`) are completely unaffected by it.
+ */
+export const GAMEPLAY_CAMERA_FOV_DEGREES = 72;
+
 /** Closest the third-person camera may be pulled in by collision. */
 export const CAMERA_MIN_DISTANCE_RATIO = 1.6;
 
