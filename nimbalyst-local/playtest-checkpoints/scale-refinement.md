@@ -7,6 +7,8 @@
   against an external source. Nimbalyst session for coordinator `30e37344-f303-4b8a-80c8-ee9f8fd5f3d6`.
 - Started 2026-09-25. Baseline MAIN `3174932`.
 - No subagents, no nested agents, no provider/publish/upload/generation calls, no new deps.
+- Committed: `6f142b1c6b6c40ef99b32647feabfacecc7a275a` — `src/game/core/characterScale.ts`,
+  `nimbalyst-local/character-preview.ts`, this checkpoint file. Nothing else staged.
 
 ## Task
 
