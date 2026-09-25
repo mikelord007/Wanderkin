@@ -134,6 +134,13 @@ export interface WallStyle {
    * furniture shade, where tone bands alone flatten.
    */
   seam?: number;
+  /**
+   * Target course (stratum) height in world units. When set, a structure
+   * gets about `height / courseHeight` courses (at least `strata[0]`, at
+   * most 12), so tall steps and platforms get proportionally more courses
+   * instead of a few huge ones. Unset: `strata` decides alone, as before.
+   */
+  courseHeight?: number;
   /** Tones: `top` is the walkable face, `rim` the collision edge highlight. */
   top: ToneRamp;
   side: ToneRamp;

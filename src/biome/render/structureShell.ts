@@ -27,6 +27,9 @@ export function shellTolerance(worldWidth: number, worldDepth: number): number {
   return Math.min(0.012, 0.04 * Math.min(worldWidth, worldDepth));
 }
 
+/** Most courses a course-height wall may use on any structure. */
+export const MAX_COURSES = 12;
+
 /** How far the shell reaches below the collider bottom, world units. */
 export const SHELL_SINK = 0.02;
 
@@ -123,7 +126,12 @@ export function createStructureShell({ dimensions, scale, style, seed }: Structu
 
   // ---- Strata ----------------------------------------------------------------
   const [strataLow, strataHigh] = style.strata;
-  const strata = Math.max(1, Math.round(strataLow + (strataHigh - strataLow) * random()));
+  // Always drawn, so the random stream (and every shell without a course
+  // height) stays exactly as before.
+  const drawnStrata = Math.max(1, Math.round(strataLow + (strataHigh - strataLow) * random()));
+  const strata = style.courseHeight && style.courseHeight > 0
+    ? Math.max(1, strataLow, Math.min(MAX_COURSES, Math.round((h * sy) / style.courseHeight)))
+    : drawnStrata;
   const rimDrop = Math.min((tauWorld * 1.2) / sy, h * 0.12);
   const sideTop = hy - rimDrop;
   const sideBottom = -hy - SHELL_SINK / sy;

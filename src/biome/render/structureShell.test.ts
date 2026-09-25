@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { registeredBiomeArt } from "../assets/biomes/index.js";
-import { createStructureShell, SHELL_SINK, shellTolerance } from "./structureShell.js";
+import { createStructureShell, MAX_COURSES, SHELL_SINK, shellTolerance } from "./structureShell.js";
 
 const CASES: { dimensions: [number, number, number]; scale: [number, number, number] }[] = [
   { dimensions: [0.36, 0.42, 0.36], scale: [1, 1, 1] }, // a generated stair step
@@ -108,6 +108,32 @@ describe("structure shells", () => {
     // Seams push the darkest side tone well below the bands (linear luma ratio).
     expect(seamed.contrast).toBeGreaterThan(plain.contrast * 1.3);
     expect(seamed.contrast).toBeGreaterThan(4);
+  });
+
+  it("course height: tall structures get proportionally more courses; unset stays byte-identical", () => {
+    const base = registeredBiomeArt().find((art) => art.id === "autumn")!.wall;
+    const { courseHeight: _unused, ...plain } = base;
+    const style = { ...plain, strata: [3, 4] as const };
+    const levels = (dimensions: [number, number, number], s: typeof style & { courseHeight?: number }) => {
+      const shell = createStructureShell({ dimensions, scale: [1, 1, 1], style: s, seed: "course" });
+      const pos = shell.mesh.geometry.getAttribute("position");
+      const ys = new Set<string>();
+      for (let i = 0; i < pos.count; i += 1) ys.add(pos.getY(i).toFixed(5));
+      const array = Array.from(pos.array as Float32Array);
+      shell.dispose();
+      return { count: ys.size, array };
+    };
+    // Unset (or 0): exactly the old geometry and random stream.
+    expect(levels([1, 2, 0.6], { ...style, courseHeight: 0 }).array).toEqual(levels([1, 2, 0.6], style).array);
+    // Set: a tall step gets many more courses than a short one, within the cap.
+    const short = levels([1, 0.4, 0.6], { ...style, courseHeight: 0.2 });
+    const tall = levels([1, 2.1, 0.6], { ...style, courseHeight: 0.2 });
+    const plainTall = levels([1, 2.1, 0.6], style);
+    expect(tall.count).toBeGreaterThan(plainTall.count + 6);
+    expect(tall.count).toBeGreaterThan(short.count);
+    const capped = levels([1, 20, 0.6], { ...style, courseHeight: 0.2 });
+    // At most MAX_COURSES courses: each course adds at most 2 distinct heights (seam + cut), plus top/rim/base.
+    expect(capped.count).toBeLessThanOrEqual(MAX_COURSES * 2 + 4);
   });
 
   it("dispose releases its geometry and material exactly once, and it is never raycast", () => {

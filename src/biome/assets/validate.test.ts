@@ -137,6 +137,25 @@ describe.each(arts.map((art) => [art.id, art] as const))("art guardrails: %s", (
     }
   });
 
+  it("wall (structure shell) ramps follow the same tone rules, and a course height is positive", () => {
+    for (const name of ["top", "side"] as const) {
+      const ramp = art.wall[name];
+      const [d, b, l] = [ramp.dark, ramp.base, ramp.light].map(luminance) as [number, number, number];
+      expect(d, `wall.${name} dark < base`).toBeLessThan(b);
+      expect(b, `wall.${name} base < light`).toBeLessThan(l);
+      for (const hex of [ramp.dark, ramp.base, ramp.light]) {
+        const { s, l: light } = hsl(hex);
+        expect(s, `wall.${name} ${hex} saturation`).toBeLessThanOrEqual(0.78);
+        expect(light, `wall.${name} ${hex} lightness`).toBeGreaterThanOrEqual(0.1);
+        expect(light, `wall.${name} ${hex} lightness`).toBeLessThanOrEqual(0.88);
+      }
+      const hues = [ramp.dark, ramp.base, ramp.light].map(hsl).filter((c) => c.s > 0.15).map((c) => c.h);
+      for (const h of hues) expect(hueGap(h, hues[0]!), `wall.${name} hue drift`).toBeLessThanOrEqual(40);
+    }
+    for (const hex of [art.wall.recess, art.wall.rim]) expect(hex).toMatch(/^#[0-9a-f]{6}$/i);
+    if (art.wall.courseHeight !== undefined) expect(art.wall.courseHeight).toBeGreaterThan(0);
+  });
+
   it("contact shadows stay within the readability cap (§9) after the lighting multiplier", () => {
     const strength = resolveBiomeLighting(art.lighting).contactStrength;
     expect(art.ground.contactOpacity * strength).toBeLessThanOrEqual(MAX_CONTACT_OPACITY + 1e-9);
