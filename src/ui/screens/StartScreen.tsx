@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Card, EmptyState, Icon, Logo, WorldStyleScope } from "../components/index.js";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Button, EmptyState, Icon, Logo, WorldStyleScope } from "../components/index.js";
 import { BRAND_NAME, BRAND_TAGLINE } from "../../brand.js";
 import "../theme/welcome.css";
 import type { SceneManifest } from "@shared/index.js";
@@ -48,6 +48,45 @@ function sampleSummary(manifest: SceneManifest): string {
 function sampleModeLabel(manifest: SceneManifest): string {
   const kind = manifest.experience?.mode.kind;
   return kind === "collect" ? "Lost Colors" : kind === "explore" ? "Explore" : kind === "race" ? "Race" : "Checkpoint course";
+}
+
+/**
+ * The best picture a saved world already has, without generating anything:
+ * its animated postcard's poster frame, else the photo it was made from, else
+ * the source photo of the bundled sample it copies. Null means the tile draws
+ * its own night scene instead.
+ */
+function worldImage(manifest: SceneManifest): string | null {
+  const poster = manifest.media?.video.find((asset) => asset.kind === "animated-postcard")?.posterUrl;
+  if (poster) return poster;
+  const photo = [...manifest.photos].sort((a, b) => a.order - b.order)[0]?.url;
+  if (photo) return photo;
+  const sample = manifest.assets.find((asset) => asset.url.startsWith("/samples/"))?.url;
+  if (sample) return `/samples/photo-${sample.includes("rodin") ? 4 : 2}.jpg`;
+  return null;
+}
+
+type TileStatus = "ready" | "draft" | "pending" | "failed";
+
+/** One world in the library: a 16:9 picture with a status badge on it, then
+ * its name and details, then one primary action and quiet secondary ones. */
+function WorldTile({ status, badge, title, image = null, meta, notice, actions, children }: {
+  status: TileStatus; badge: string; title: string; image?: string | null;
+  meta?: string; notice?: ReactNode; actions?: ReactNode; children?: ReactNode;
+}) {
+  return <article className="wk-tile" data-status={status}>
+    <div className="wk-tile__image">
+      {image ? <img src={image} alt="" loading="lazy" /> : <div className="wk-tile__scene" aria-hidden="true"><PortalArch className="wk-tile__arch" /><TinyExplorer className="wk-tile__explorer" /></div>}
+      <p className="wk-tile__badge">{badge}</p>
+    </div>
+    <div className="wk-tile__info">
+      <h3>{title}</h3>
+      {meta ? <p className="wk-tile__meta">{meta}</p> : null}
+      {notice}
+      {actions ? <div className="wk-tile__actions">{actions}</div> : null}
+      {children}
+    </div>
+  </article>;
 }
 
 interface StartScreenProps {
@@ -292,43 +331,54 @@ export function StartScreen({
             })}</div>}
         </section>
         <div className="oq-kit-container">
-        <section className="oq-welcome__section" id="my-worlds" aria-labelledby="worlds-heading" ref={worldsRef} tabIndex={-1}>
-          <div className="oq-welcome__section-heading"><h2 id="worlds-heading">Your worlds</h2><p>Everything you have made, saved on this machine.</p></div>
-          {savedError ? <Card><p role="alert" className="oq-kit-error">Your saved worlds couldn’t load. Check your connection and refresh to try again.</p></Card>
+        {/* The library: each world is its picture first, then its name, then
+            one clear way in. Status is a badge and a rim colour, never a
+            different layout. */}
+        <section className="wk-library" id="my-worlds" aria-labelledby="worlds-heading" ref={worldsRef} tabIndex={-1}>
+          <div className="wk-section-head"><h2 id="worlds-heading">Your worlds</h2><p>Everything you have made, saved on this machine.</p></div>
+          {savedError ? <p role="alert" className="oq-kit-error wk-library__notice">Your saved worlds couldn’t load. Check your connection and refresh to try again.</p>
             : !savedLevels ? <p role="status" className="oq-kit-muted">Finding your saved worlds…</p>
-            : worldItems.length === 0 ? <EmptyState icon={<Icon name="photo" />} title="Your first world starts with a photo" description="Pick something familiar. Make somewhere new." action={<Button onClick={onCreateFromPhotos}>Create my world</Button>} />
-            : <div className="oq-kit-grid">{worldItems.map(item => {
-              if (item.kind === "pending") return <Card key={`pending-${item.id}`} className="oq-kit-stack">
-                <p className="oq-kit-eyebrow">In progress</p><h3>{item.title || "Untitled world"}</h3>
-                <p className="oq-kit-muted">{item.statusText ?? `Generation is ${item.job.state}. Leaving this page does not cancel it.`}</p>
-                {onResumePendingWorld ? <Button onClick={() => onResumePendingWorld(item.job.id)}>{item.actionLabel ?? "Resume"}</Button> : null}
-              </Card>;
-              if (item.kind === "failed") return <Card key={`failed-${item.id}`} className="oq-kit-stack">
-                <p className="oq-kit-eyebrow">Needs attention</p><h3>{item.title || "Untitled world"}</h3>
-                <p className="oq-kit-error">{item.statusText ?? item.job.uiMessage ?? "This generation stage needs another try."}</p>
-                {onRetryFailedWorld && (item.job.lastError?.retryable || item.actionLabel === "Review choices")
+            : worldItems.length === 0 ? <div className="wk-library-empty">
+              <div className="wk-library-empty__scene" aria-hidden="true">
+                <img src="/samples/photo-3.jpg" alt="" loading="lazy" />
+                <PortalArch className="wk-library-empty__arch" />
+                <TinyExplorer className="wk-library-empty__explorer" />
+              </div>
+              <div className="wk-library-empty__copy">
+                <h3>Your first world starts with a photo</h3>
+                <p className="oq-kit-muted">Pick something familiar. Make somewhere new.</p>
+                <Button onClick={onCreateFromPhotos}>Create my world</Button>
+              </div>
+            </div>
+            : <div className="wk-library__grid">{worldItems.map(item => {
+              if (item.kind === "pending") return <WorldTile key={`pending-${item.id}`} status="pending" badge="In progress" title={item.title || "Untitled world"}
+                meta={item.statusText ?? `Generation is ${item.job.state}. Leaving this page does not cancel it.`}
+                actions={onResumePendingWorld ? <Button onClick={() => onResumePendingWorld(item.job.id)}>{item.actionLabel ?? "Resume"}</Button> : null} />;
+              if (item.kind === "failed") return <WorldTile key={`failed-${item.id}`} status="failed" badge="Needs attention" title={item.title || "Untitled world"}
+                notice={<p className="oq-kit-error">{item.statusText ?? item.job.uiMessage ?? "This generation stage needs another try."}</p>}
+                actions={onRetryFailedWorld && (item.job.lastError?.retryable || item.actionLabel === "Review choices")
                   ? <Button onClick={() => onRetryFailedWorld(item.job.id)}>{item.actionLabel ?? "Retry"}</Button>
-                  : <p className="oq-kit-muted">This stage can’t be retried automatically.</p>}
-              </Card>;
-              if (item.kind === "draft") return <Card key={`draft-${item.id}`} className="oq-kit-stack">
-                <p className="oq-kit-eyebrow">Draft</p><h3>{item.draft.manifest.name || "Untitled world"}</h3>
-                <p className="oq-kit-muted">Unsaved course edits · {item.draft.manifest.experience?.mode.kind ?? "explore"}</p>
-                <Button onClick={() => (onResumeDraft ?? ((next) => onEditSavedLevel(next)))(item.draft.manifest, false)}>Resume</Button>
-              </Card>;
+                  : <p className="oq-kit-muted">This stage can’t be retried automatically.</p>} />;
+              if (item.kind === "draft") return <WorldTile key={`draft-${item.id}`} status="draft" badge="Draft" title={item.draft.manifest.name || "Untitled world"}
+                image={worldImage(item.draft.manifest)}
+                meta={`Unsaved course edits · ${item.draft.manifest.experience?.mode.kind ?? "explore"}`}
+                actions={<Button onClick={() => (onResumeDraft ?? ((next) => onEditSavedLevel(next)))(item.draft.manifest, false)}>Resume</Button>} />;
               const { manifest, draft } = item;
-              return <Card key={manifest.levelId} className="oq-kit-stack">
-                <p className="oq-kit-eyebrow">{draft ? "Draft changes" : savedWorldOrigin(manifest) === "generated" ? "Generated world" : savedWorldOrigin(manifest) === "sample-copy" ? "Bundled sample copy" : "Imported world"}</p>
-                <h3>{manifest.name || "Untitled world"}</h3>
-                <p className="oq-kit-muted">{manifest.experience?.style.id ?? "cartoon"} · {manifest.experience?.mode.kind ?? "explore"} · {manifest.checkpoints.length} checkpoints</p>
-                {assetIssues[manifest.levelId] ? <p className="oq-kit-error" role="alert">{assetIssues[manifest.levelId]}</p> : null}
-                <div className="oq-kit-row">
-                  {draft ? <Button onClick={() => (onResumeDraft ?? ((next) => onEditSavedLevel(next)))(draft.manifest, true)}>Resume</Button> : <Button onClick={() => handlePlaySaved(manifest)} loading={checkingLevelId === manifest.levelId} loadingLabel="Checking assets…">Play</Button>}
-                  {draft ? <Button variant="secondary" onClick={() => handlePlaySaved(manifest)} loading={checkingLevelId === manifest.levelId} loadingLabel="Checking assets…">Play saved</Button> : null}
-                  {!draft ? <Button variant="secondary" onClick={() => onEditSavedLevel(manifest)}>Edit</Button> : null}
-                  <Button variant="ghost" onClick={() => handleExport(manifest)} disabled={exportingLevelId !== null} loading={exportingLevelId === manifest.levelId} loadingLabel="Exporting…">Export</Button>
-                </div>
+              return <WorldTile key={manifest.levelId} status={draft ? "draft" : "ready"}
+                badge={draft ? "Draft changes" : savedWorldOrigin(manifest) === "generated" ? "Generated world" : savedWorldOrigin(manifest) === "sample-copy" ? "Bundled sample copy" : "Imported world"}
+                title={manifest.name || "Untitled world"} image={worldImage(manifest)}
+                meta={`${manifest.experience?.style.id ?? "cartoon"} · ${manifest.experience?.mode.kind ?? "explore"} · ${manifest.checkpoints.length} checkpoints`}
+                notice={assetIssues[manifest.levelId] ? <p className="oq-kit-error" role="alert">{assetIssues[manifest.levelId]}</p> : null}
+                actions={<>
+                  {draft ? <Button onClick={() => (onResumeDraft ?? ((next) => onEditSavedLevel(next)))(draft.manifest, true)}>Resume</Button> : <Button className="wk-tile__play" onClick={() => handlePlaySaved(manifest)} loading={checkingLevelId === manifest.levelId} loadingLabel="Checking assets…"><Icon name="play" />Play</Button>}
+                  <span className="wk-tile__more">
+                    {draft ? <Button variant="ghost" onClick={() => handlePlaySaved(manifest)} loading={checkingLevelId === manifest.levelId} loadingLabel="Checking assets…">Play saved</Button> : null}
+                    {!draft ? <Button variant="ghost" onClick={() => onEditSavedLevel(manifest)}>Edit</Button> : null}
+                    <Button variant="ghost" onClick={() => handleExport(manifest)} disabled={exportingLevelId !== null} loading={exportingLevelId === manifest.levelId} loadingLabel="Exporting…">Export</Button>
+                  </span>
+                </>}>
                 <WorldPostcardPanel manifest={manifest} />
-              </Card>;
+              </WorldTile>;
             })}</div>}
           {exportError && <p className="oq-kit-error" role="alert">We couldn’t export this world. Try Export again.</p>}
         </section>

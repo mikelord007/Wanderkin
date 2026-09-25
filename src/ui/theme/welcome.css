@@ -212,16 +212,65 @@
 .wk-finale__arch { position: absolute; z-index: 2; left: 50%; bottom: 13%; height: 46%; width: auto; transform: translateX(-50%); }
 .wk-finale__explorer { position: absolute; z-index: 3; width: 58px; height: auto; left: calc(50% - 16px); bottom: calc(13% - 4px); }
 
-/* --- Your worlds (library) --------------------------------------------- */
-
-/* --- Page sections ----------------------------------------------------- */
-.oq-welcome__section {
-  display: flex; flex-direction: column; gap: var(--oq-space-5);
-  padding-bottom: var(--oq-section); scroll-margin-top: var(--oq-space-5);
+/* --- Your worlds (library) ---------------------------------------------
+   Functional, but the worlds are the content: a shelf of 16:9 pictures, not
+   a stack of records. No card box; the picture has the rim, the text sits
+   under it on the page. */
+.wk-library { padding-block: var(--oq-space-7) var(--oq-section); scroll-margin-top: var(--oq-space-5); }
+.wk-library__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: clamp(28px, 3vw, 44px) clamp(18px, 2vw, 28px); }
+.wk-tile { --tile-rim: #c9b8ff33; display: grid; gap: 14px; align-content: start; min-width: 0; }
+.wk-tile__image {
+  position: relative; overflow: hidden; aspect-ratio: 16 / 9; border-radius: 18px;
+  background: var(--wk-dusk); border: 1px solid var(--tile-rim);
+  box-shadow: 0 28px 50px -30px #05010fe6;
+  transition: border-color 220ms var(--oq-ease), box-shadow 220ms var(--oq-ease);
 }
-.oq-welcome__section-heading { display: flex; justify-content: space-between; align-items: baseline; gap: var(--oq-space-3); flex-wrap: wrap; }
-.oq-welcome__section-heading p { color: var(--oq-muted); font-size: .9375rem; }
+.wk-tile__image img { width: 100%; height: 100%; object-fit: cover; transition: transform 600ms var(--oq-ease); }
+/* A world without a picture yet gets a small night scene of its own: the
+   doorway, a pool of light, and the explorer, instead of an empty box. */
+.wk-tile__scene { position: absolute; inset: 0; background: radial-gradient(ellipse 60% 34% at 50% 100%, #5a3bd066, transparent 70%), linear-gradient(#1a0d36, #0e061f); }
+.wk-tile__arch { position: absolute; left: 50%; bottom: 10%; height: 74%; width: auto; transform: translateX(-50%); }
+.wk-tile__explorer { position: absolute; width: 48px; height: auto; left: calc(50% - 13px); bottom: calc(10% - 3px); }
+/* Status is a small badge and a rim colour; the layout never changes. */
+.wk-tile__badge {
+  position: absolute; left: 12px; top: 12px; display: inline-flex; align-items: center; gap: 7px;
+  padding: 4px 11px 4px 9px; border-radius: 999px; background: #120726d9; border: 1px solid #c9b8ff38;
+  font-size: .78rem; font-weight: 500; color: var(--wk-ink);
+}
+.wk-tile__badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--tile-light, #8fe3b8); }
+.wk-tile[data-status="ready"] { --tile-light: #8fe3b8; }
+.wk-tile[data-status="draft"] { --tile-rim: #f2b24d66; --tile-light: var(--wk-marigold); }
+.wk-tile[data-status="draft"] .wk-tile__image { border-style: dashed; }
+.wk-tile[data-status="pending"] { --tile-rim: #b79cff73; --tile-light: #b79cff; }
+.wk-tile[data-status="failed"] { --tile-rim: #ffaaa466; --tile-light: var(--oq-error-ink); }
+.wk-tile:hover .wk-tile__image, .wk-tile:focus-within .wk-tile__image { border-color: #d9ccffb3; box-shadow: inset 0 2px 0 #f4eeffaa, 0 30px 60px -30px #8b6cffcc; }
+.wk-tile:hover .wk-tile__image img, .wk-tile:focus-within .wk-tile__image img { transform: scale(1.04); }
+/* A world still being built: its doorway glows a little brighter. */
+.wk-tile[data-status="pending"] .wk-tile__arch { filter: drop-shadow(0 0 10px #b79cff); }
+.wk-tile__info { display: grid; gap: 4px; padding-inline: 2px; }
+.wk-tile__info h3 { font-size: 1.25rem; font-weight: 400; letter-spacing: -.015em; line-height: 1.2; }
+.wk-tile__meta { font-size: .875rem; color: var(--oq-muted); text-transform: none; }
+.wk-tile__info .oq-kit-error, .wk-tile__info .oq-kit-muted { font-size: .875rem; }
+/* One way in, clearly first; the rest are quiet and to the side. */
+.wk-tile__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 4px; margin-top: 10px; }
+.wk-tile__actions > .oq-kit-button:first-child { min-width: 118px; }
+.wk-tile__more { display: inline-flex; flex-wrap: wrap; gap: 2px; margin-left: auto; }
+.wk-tile__more .oq-kit-button { min-height: 40px; padding: 8px 14px; font-size: .875rem; color: var(--wk-mist); }
+.wk-tile__more .oq-kit-button:not(:disabled):hover { color: var(--wk-ink); }
+.wk-tile .oq-saved-postcard { margin-top: 6px; }
+.wk-library__notice { padding: 14px 18px; border-radius: 16px; border: 1px solid #ffaaa459; background: var(--oq-error-wash); }
 
+/* The empty library: a photo on the floor with a doorway in it. */
+.wk-library-empty { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(24px, 4vw, 56px); align-items: center; }
+.wk-library-empty__scene { position: relative; aspect-ratio: 16 / 10; border-radius: 22px; overflow: hidden; box-shadow: 0 40px 70px -40px #05010f, 0 0 0 1px #c9b8ff26; }
+.wk-library-empty__scene img { width: 100%; height: 100%; object-fit: cover; filter: saturate(.5) brightness(.45); }
+.wk-library-empty__scene::before { content: ""; position: absolute; inset: 0; z-index: 1; background: #2a1470; mix-blend-mode: multiply; opacity: .5; }
+.wk-library-empty__scene::after { content: ""; position: absolute; z-index: 1; left: 22%; right: 22%; bottom: 3%; height: 24%; border-radius: 50%; background: radial-gradient(closest-side, #e9e0ffa6, #8b6cff4d 45%, transparent); }
+.wk-library-empty__arch { position: absolute; z-index: 2; left: 50%; bottom: 12%; height: 62%; width: auto; transform: translateX(-50%); }
+.wk-library-empty__explorer { position: absolute; z-index: 3; width: 52px; height: auto; left: calc(50% - 14px); bottom: calc(12% - 4px); }
+.wk-library-empty__copy { display: grid; gap: var(--oq-space-3); justify-items: start; }
+.wk-library-empty__copy h3 { font-size: clamp(1.6rem, 1.2rem + 1.4vw, 2.4rem); font-weight: 300; letter-spacing: -.03em; line-height: 1.05; }
+.wk-library-empty__copy .oq-kit-button { margin-top: var(--oq-space-2); }
 /* --- Import + footer. Quiet by design; these are not the point. -------- */
 .oq-welcome__imports { border-top: 1px solid var(--oq-line); padding-top: var(--oq-space-5); }
 .oq-welcome__imports summary {
@@ -274,6 +323,7 @@
   .wk-world--wide .wk-world__image::after { background: linear-gradient(to top, #120726f7 0%, #120726d9 30%, #12072600 70%); }
   .wk-world--wide .wk-world__body { width: auto; margin-left: 0; align-self: stretch; }
   .wk-finale__inner { grid-template-columns: 1fr; }
+  .wk-library-empty { grid-template-columns: 1fr; }
   .wk-finale__scene { width: min(100%, 380px); }
   .wk-interlude { min-height: 0; padding-block: var(--oq-space-7) 0; align-items: start; }
   .wk-interlude__scene { position: relative; top: auto; right: auto; transform: none; --s: min(92vw, 420px); margin: var(--oq-space-5) -18vw 0 auto; }
@@ -283,6 +333,8 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .oq-welcome__band::before { animation: none; }
+  .wk-tile__image img { transition: none; }
+  .wk-tile:hover .wk-tile__image img, .wk-tile:focus-within .wk-tile__image img { transform: none; }
   .wk-world__image img { transition: none; }
   .wk-world:hover .wk-world__image img, .wk-world:focus-within .wk-world__image img { transform: none; }
 }
