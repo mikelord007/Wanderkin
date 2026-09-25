@@ -11,29 +11,36 @@
  */
 import { post, scrub, signpost } from "../builders/dry.js";
 import { tuft } from "../builders/foliage.js";
-import { defaultRockVariants, rock, ROCK_SHAPES, type RockShape } from "../builders/rocks.js";
 import { lyingLog } from "../builders/trees.js";
+import { emberRocks, emberSpires } from "../ember/rocks.js";
 import type { BiomeArt, BiomeTones } from "../types.js";
 
 const tones = {
   foliage: { dark: "#4a5238", base: "#66704c", light: "#8a9468" },
   foliageAlt: { dark: "#50584a", base: "#6c7664", light: "#929a88" },
   trunk: { dark: "#2c231e", base: "#40322a", light: "#5c483c" },
-  rock: { dark: "#2a282e", base: "#3e3c44", light: "#5c5a64" },
+  // Basalt: dark, faintly violet so shade reads cool under the warm dusk sun.
+  rock: { dark: "#26242b", base: "#3b3842", light: "#625d68" },
   soil: { dark: "#3a3230", base: "#524846", light: "#6e6460" },
   dry: { dark: "#6a5a44", base: "#8a7858", light: "#ad9a78" },
   cactus: { dark: "#3e5040", base: "#566a56", light: "#7a8e78" },
   accent: { dark: "#a8401a", base: "#d8602a", light: "#e8966a" },
-  stoneTop: { dark: "#403c40", base: "#56525a", light: "#6e6a72" },
-  stoneSide: { dark: "#2e2c32", base: "#403e46", light: "#58565e" },
-  stoneRecess: { dark: "#1e1d22", base: "#252429", light: "#2e2d33" },
+  stoneTop: { dark: "#5c5756", base: "#77716e", light: "#9a9390" },
+  stoneSide: { dark: "#28262d", base: "#3a3740", light: "#57525c" },
+  stoneRecess: { dark: "#1a191e", base: "#222126", light: "#2c2a30" },
+  /** Pale ash settled on column tops, rims and ledges. */
+  ash: { dark: "#5e5958", base: "#7c7674", light: "#a49d98" },
+  /** Volcanic glass: near-black, violet sheen. */
+  obsidian: { dark: "#1c1a24", base: "#2c283a", light: "#5e5676" },
+  /** Porous rust-brown cinder and scoria. */
+  scoria: { dark: "#3a2420", base: "#5a3428", light: "#86503a" },
+  /** Cooled lava crust. */
+  crust: { dark: "#221d20", base: "#332c2e", light: "#564a48" },
+  /** Still-molten rock (crater floors, lobe toes): deep red, never the collectible's cyan. */
+  magma: { dark: "#94261a", base: "#d0402a", light: "#e88466" },
 } satisfies BiomeTones;
 
-const rocks = defaultRockVariants("rock");
-const up = (x: number, y: number, z: number, offset: number) => ({ normal: [x, y, z] as const, offset });
-
-/** Tall, narrow volcanic glass: steep sheared faces, sharp crown. */
-const SPIRE: RockShape = { scale: [0.42, 1.5, 0.38], detail: 0, jitter: 0.1, seed: 81, floor: -0.55, cuts: [up(0.5, 1, 0.2, 0.9), up(-0.8, 0.3, 0.4, 0.62)] };
+const rocks = emberRocks();
 
 export const EMBER_ART: BiomeArt = {
   id: "ember",
@@ -43,30 +50,27 @@ export const EMBER_ART: BiomeArt = {
   lighting: { ambientKeep: 0.72, hemisphereShare: 0.7, sunElevation: [18, 40], fogScale: 0.9, contactStrength: 1.1 },
   atmosphere: { water: "lava", particles: "embers" },
   families: {
+    // Basalt column stacks and obsidian spires (tall, narrow footprint).
     spire: {
-      category: "rock", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.34, triangleBudget: 300,
-      leanMax: 0.05, mirror: true, embed: [0.02, 0.05],
-      variants: [
-        rock(SPIRE, { companions: [[ROCK_SHAPES.chip, 0.32, 0.2, 0.3]] }),
-        rock({ ...SPIRE, seed: 83, scale: [0.46, 1.4, 0.4] }, { companions: [[{ ...SPIRE, seed: 85 }, -0.28, 0.1, 0.55]] }),
-        rock({ ...SPIRE, seed: 87, scale: [0.38, 1.6, 0.36], cuts: [up(-0.3, 1, 0.6, 0.85)] }),
-        rock({ ...ROCK_SHAPES.crag, seed: 89, scale: [0.4, 1.3, 0.38] }, { companions: [[ROCK_SHAPES.pebble, 0.22, -0.18, 0.22]] }),
-      ],
+      category: "rock", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.34, triangleBudget: 400,
+      leanMax: 0.04, mirror: true, embed: [0.01, 0.03],
+      variants: emberSpires(),
     },
+    // Causeway packs, cinder cones, crust lobes, obsidian outcrop, scoria.
     "rock-large": {
       category: "rock", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.9, triangleBudget: 400,
-      mirror: true, embed: [0.02, 0.05], alignToNormal: 0.4,
-      variants: [...rocks.large, ...rocks.clustered],
+      mirror: true, embed: [0.01, 0.04], alignToNormal: 0.4,
+      variants: rocks.hero,
     },
     "rock-medium": {
       category: "rock", role: "supporting", shading: "faceted", castShadow: true, unitRadius: 0.5, triangleBudget: 300,
-      mirror: true, embed: [0.03, 0.08], alignToNormal: 0.6,
-      variants: [...rocks.medium, ...rocks.layered],
+      mirror: true, embed: [0.02, 0.06], alignToNormal: 0.6,
+      variants: rocks.supporting,
     },
     cinder: {
       category: "rock", role: "micro", shading: "faceted", castShadow: false, unitRadius: 0.5, triangleBudget: 60,
       mirror: true, embed: [0.05, 0.15], alignToNormal: 1,
-      variants: rocks.small,
+      variants: rocks.dressing,
     },
     scrub: {
       category: "bush", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.68, triangleBudget: 900,
@@ -170,18 +174,23 @@ export const EMBER_ART: BiomeArt = {
     ],
   },
   wall: {
-    // Columnar basalt: few strata, sharp corners, deep notches.
-    strata: [2, 3],
-    stepping: 0.4,
-    rounding: 0.2,
-    notches: [1, 3],
-    // Columnar basalt: many vertical joints.
-    joints: [5, 8],
-    seam: 0.8,
+    // Columnar basalt: one or two tall courses (the columns run the full
+    // height), every perimeter column pushed in or out on its own, sharp
+    // corners, dark vertical joints, and many shadowed "crack" columns so
+    // the faces break into a rhythm of uneven prisms rather than planks.
+    // Pale ash-dusted tops, a warm-lit rim.
+    strata: [1, 2],
+    // Stepping 0.8 / rounding 0.3: the chamfer clears the column jitter at
+    // the corners (stepping 1 turns corner faces inside out on some seeds).
+    stepping: 0.8,
+    rounding: 0.3,
+    notches: [4, 7],
+    joints: [8, 12],
+    seam: 0.9,
     top: tones.stoneTop,
     side: tones.stoneSide,
-    recess: "#1c1b20",
-    rim: "#8a8590",
+    recess: "#16151a",
+    rim: "#b3a69c",
   },
   // Ash patches, most of them cracked and glowing like cooling lava.
   ground: {
