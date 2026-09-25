@@ -11,6 +11,7 @@ import { post, scrub, signpost } from "../builders/dry.js";
 import { tuft } from "../builders/foliage.js";
 import { agave, barrel, echeveria, organPipe, pricklyPear, saguaro } from "../desert/cacti.js";
 import { desertRocks } from "../desert/rocks.js";
+import { tumbleweed } from "../desert/dressing.js";
 import { lyingLog } from "../builders/trees.js";
 import type { BiomeArt, BiomeTones } from "../types.js";
 
@@ -99,6 +100,11 @@ export const DESERT_ART: BiomeArt = {
       mirror: true, embed: [0.02, 0.05],
       variants: [lyingLog({ seed: 5, ramp: "dry", fork: true }), lyingLog({ seed: 6, ramp: "trunk", fork: true })],
     },
+    tumbleweed: {
+      category: "dressing", role: "supporting", shading: "smooth", castShadow: true, unitRadius: 0.5, triangleBudget: 300,
+      mirror: true, embed: [0.02, 0.06],
+      variants: [tumbleweed({ twigs: 11, seed: 1 }), tumbleweed({ twigs: 9, seed: 2 })],
+    },
     marker: {
       category: "marker", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.36, triangleBudget: 300,
       mirror: true, embed: [0.03, 0.05],
@@ -160,6 +166,7 @@ export const DESERT_ART: BiomeArt = {
             { family: "dry-grass", count: [1, 2], ring: [0.4, 0.9], height: [0.3, 0.45] },
             { family: "pebble", count: [1, 2], ring: [0.4, 1], height: [0.1, 0.16] },
             { family: "dry-branch", count: [1, 1], ring: [0.5, 0.9], height: [0.35, 0.5], chance: 0.45 },
+            { family: "tumbleweed", count: [1, 1], ring: [0.55, 0.9], height: [0.35, 0.5], chance: 0.35 },
           ],
         },
       },
@@ -200,7 +207,8 @@ export const DESERT_ART: BiomeArt = {
     recess: "#7a452c",
     rim: "#f6e1bb",
   },
-  ground: { contactColor: "#6b3f22", contactOpacity: 0.38, contactScale: 0.9, patchColor: "#d7a86f" },
+  // Dried, cracked earth under some clusters: darker than the sand so it reads as ground, not a halo.
+  ground: { contactColor: "#6b3f22", contactOpacity: 0.38, contactScale: 0.9, patchColor: "#c08a55", cracks: 0.5 },
   variation: { toneJitter: 0.05, hueJitterDeg: 4 },
   budgets: { triangles: { standard: 80_000, reduced: 35_000 }, membersPerCluster: { standard: 6, reduced: 3 } },
 };
