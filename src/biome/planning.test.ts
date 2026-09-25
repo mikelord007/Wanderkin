@@ -109,6 +109,25 @@ describe("fallbackAdventurePlan", () => {
     expect(["tropical", "desert"]).toContain(unknown.biomeId);
     expect(unknown.flavor).toEqual({ title: null, intro: null, fragmentName: null, destinationName: null });
   });
+
+  it("hints alpine, autumn and ember from clear scene words, without stealing earlier rooms", () => {
+    const snowy = { seed: "x", description: "a snowy mountain poster above the ski boots" };
+    expect(fallbackAdventurePlan(snowy).biomeId).toBe("alpine");
+    expect(fallbackAdventurePlan({ seed: "x", labels: ["pumpkin", "maple leaves", "wool blanket"] }).biomeId).toBe("autumn");
+    expect(fallbackAdventurePlan({ seed: "x", description: "candles on the fireplace, glowing coal" }).biomeId).toBe("ember");
+    // A clear lead is required: one newer-look word against one desert word keeps the original rule.
+    expect(fallbackAdventurePlan({ seed: "x", description: "a stone fireplace" }).biomeId).toBe("desert");
+    // One material word is not a theme: a pine desk keeps the original rule.
+    expect(["tropical", "desert"]).toContain(fallbackAdventurePlan({ seed: "x", description: "a pine desk" }).biomeId);
+    // Earlier inputs keep their plans; the explicit choice still wins.
+    expect(fallbackAdventurePlan({ seed: "x", description: "a towel on the beach by the sea" }).biomeId).toBe("tropical");
+    expect(fallbackAdventurePlan({ seed: "x", labels: ["cactus", "clay pot"] }).biomeId).toBe("desert");
+    expect(fallbackAdventurePlan({ ...snowy, preferredBiome: "tropical" }).biomeId).toBe("tropical");
+    // Deterministic and schema-valid.
+    const plan = fallbackAdventurePlan(snowy);
+    expect(fallbackAdventurePlan(snowy)).toEqual(plan);
+    expect(parseAdventurePlan({ biomeId: plan.biomeId, template: plan.template, labels: plan.labels, flavor: plan.flavor }).ok).toBe(true);
+  });
 });
 
 describe("buildAdventurePlanPrompt", () => {

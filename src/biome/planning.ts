@@ -171,6 +171,41 @@ export function sanitizeSceneLabels(labels: readonly string[] | undefined): stri
 const TROPICAL_WORDS = /\b(?:beach|sand|sea|ocean|palm|island|tropical|surf|shell|towel|sun|pool|plant|green)\b/i;
 const DESERT_WORDS = /\b(?:desert|dune|cact(?:us|i)|dry|clay|terracotta|adobe|rust|canyon|stone|wood|brown|beige|tan)\b/i;
 
+/**
+ * Scene-word hints for the newer looks, and the distinct-word scores they
+ * are compared with. A newer look wins only with a clear lead over every
+ * other theme and at least two distinct words; otherwise the original
+ * Tropical/Desert rule and the seed decide, so earlier inputs keep their
+ * plans. Very common words (white, black, cold) are deliberately left out
+ * so ordinary rooms are not taken.
+ */
+const THEME_WORDS: readonly (readonly [BiomeId, RegExp])[] = [
+  ["tropical", new RegExp(TROPICAL_WORDS.source, "gi")],
+  ["desert", new RegExp(DESERT_WORDS.source, "gi")],
+  ["alpine", /\b(?:alpine|snow(?:y|man|flake)?|ice|icy|frost(?:y)?|winter|mountains?|ski(?:s|ing)?|pines?|fir|glacier|sled|igloo|penguin)\b/gi],
+  ["autumn", /\b(?:autumn|fall|leaf|leaves|forest|woods|woodland|maple|oak|acorns?|pumpkins?|mushrooms?|harvest|cozy|cosy|knit|wool)\b/gi],
+  ["ember", /\b(?:ember|embers|volcano(?:es)?|volcanic|lava|magma|fire|fireplace|flames?|candles?|coal|charcoal|obsidian|basalt|ash)\b/gi],
+];
+
+/** The newer look (alpine, autumn, ember) with a unique top distinct-word score, if any. */
+function hintedNewerLook(words: string): BiomeId | null {
+  let best: BiomeId | null = null;
+  let bestScore = 0;
+  let tied = false;
+  for (const [id, pattern] of THEME_WORDS) {
+    const score = new Set(Array.from(words.matchAll(pattern), (m) => m[0].toLowerCase())).size;
+    if (score > bestScore) {
+      best = id;
+      bestScore = score;
+      tied = false;
+    } else if (score > 0 && score === bestScore) {
+      tied = true;
+    }
+  }
+  // At least two distinct words: one material word ("pine desk", "ash tray") is not a theme.
+  return best && !tied && bestScore >= 2 && best !== "tropical" && best !== "desert" ? best : null;
+}
+
 /** Deterministic, offline and always valid. The player's explicit choices
  * win; otherwise obvious scene words hint a theme, else the seed decides. */
 export function fallbackAdventurePlan(input: AdventurePlanningInput): AdventurePlan {
@@ -179,7 +214,9 @@ export function fallbackAdventurePlan(input: AdventurePlanningInput): AdventureP
   const labels = sanitizeSceneLabels(input.labels);
   const words = `${description} ${labels.join(" ")}`;
   let biomeId: BiomeId;
+  const newer = hintedNewerLook(words);
   if (input.preferredBiome) biomeId = input.preferredBiome;
+  else if (newer) biomeId = newer;
   else if (TROPICAL_WORDS.test(words) && !DESERT_WORDS.test(words)) biomeId = "tropical";
   else if (DESERT_WORDS.test(words) && !TROPICAL_WORDS.test(words)) biomeId = "desert";
   else biomeId = hash % 2 === 0 ? "tropical" : "desert";
