@@ -269,3 +269,172 @@ real, independently pixel-measured visible-size reduction) all hold up under dir
 tracing and a bounded, disposable-browser measurement — not just by re-reading the
 checkpoint's prose. Recommend approval of this batch; the Tripo checkpoint-5 flake remains
 open and pre-existing, as both checkpoints already disclose.
+
+---
+
+# Third pass: material/lighting refinement (`fc121b1`, `b012dd2`)
+
+- Reviewer: fresh Claude Sonnet worker, same coordinator. Runtime model, from this
+  session's own environment block: **Sonnet 5** (`claude-sonnet-5`). No subagents.
+- Read-only. No product paths touched by me. Mid-review, a **new** active worker appeared
+  (`nimbalyst-local/tmp-blackpatch-investigation/`, `vite.oq-blackpatch.config.ts` at repo
+  root, and a live uncommitted change to `src/scene/styleMaterial.ts` — a
+  `RELIT_MINIMUM_BRIGHTNESS_FRACTION` floor, unrelated to and layered on top of the frozen
+  commits below). Detected this via `git status`/`git diff` before drawing conclusions,
+  confirmed the live diff only touches `cloneStyledMaterial`/`installStyleShader`'s call
+  signature and adds a brightness floor — nothing in the two frozen commits' surface — and
+  re-derived every finding below from `git show fc121b1`/`git show b012dd2` (the frozen
+  blobs), not from a raw `Read` of the current working-tree file, which would have been
+  contaminated by that live edit. Did not touch, stash, or otherwise interact with that
+  worker's files. `git stash list` only (4 stashes, untouched).
+
+## Findings, most severe first
+
+### 1. [Moderate — doc/implementation mismatch, mitigated in practice] The known-asset hash gate trusts a declared manifest field, not a hash "computed from the fetched bytes at load time" as documented
+
+`materialRegions.ts`'s own doc comment claims: "Profiles are keyed by the asset's actual
+decoded content hash (`LoadedSceneAsset.sha256`, computed from the fetched bytes at load
+time)... a renamed, duplicated, or user-regenerated asset can never accidentally inherit a
+mapping it was not measured against." Traced the actual wiring:
+
+- `SceneEntities.tsx:94` builds the hash it passes to `cloneStyledObject` from
+  `manifest.assets.map((asset) => [asset.id, asset.sha256])` — i.e. `AssetReference.sha256`
+  (`shared/manifest.ts:32`), a plain **declared string field in the persisted manifest
+  JSON**.
+- The actual `LoadedSceneAsset` type the renderer works with (`src/scene/runtime.ts:33`) has
+  **no `sha256` field at all** — `loadSceneAsset()` (`runtime.ts:50`) calls the loader that
+  does compute a real hash from fetched bytes (`src/scene/loader.ts:179`,
+  `hashBytes(bytes)`), then explicitly discards it, returning only `{ scene, collision }`.
+  There is no code path anywhere that re-hashes the fetched GLB bytes and compares them
+  against the manifest's declared value at the point this material-region decision is made.
+- So, read literally, the doc comment describes a client-side, load-time verification that
+  does not exist in this code. A manifest whose `sha256` field falsely claims the known
+  Rodin hash (`c750cb2c1f...`) while its `url` actually serves a different mesh would
+  incorrectly receive the Rodin-specific wood/fabric shader (with that asset's specific
+  world-space X divider and grain/weave patterns) — a client-only rendering glitch, not a
+  security/data issue, but exactly the "arbitrary label on a mixed mesh" failure mode this
+  mechanism exists to prevent.
+- **Mitigating factor, found by tracing further**: `server/levels.ts` independently
+  recomputes `sha256 = createHash("sha256").update(buffer).digest("hex")` from the actual
+  embedded bytes and **rejects** the request (`InvalidBundleError`) if it doesn't match the
+  manifest's declared `asset.sha256`, at both the two places a manifest's asset list is ever
+  written: export (`levels.ts:423-425`) and import (`levels.ts:508-510`). The freshly-
+  generated-world path also derives the field from `loader.ts`'s real computed hash
+  (`prepare.ts:156`, `options.sha256 ?? loaded.sha256`). So in practice, every manifest a
+  player ever loads for play has already had its `(url, sha256)` pairing validated
+  server-side at creation time — the client re-trusting it on read is a defensible
+  verify-once-at-write pattern, not an open spoofing hole, *provided* no other code path can
+  mutate a manifest's asset list without going through one of those two validated writers
+  (I did not audit the full manifest-mutation surface for that — out of scope for two
+  material commits).
+- For the one asset that actually has a region profile today (the bundled, git-tracked
+  `public/samples/rodin.glb`), I independently re-verified its real sha256
+  (`c750cb2c1fcd2197f8c373b791703bc90073075e11d08cafb0be4d84012d54b8`) matches both the
+  hardcoded profile key and `samples.ts`'s declaration exactly — so there is no live
+  mismatch today.
+- **Net**: downgrade from "the code lacks the safety property" to "the code comment
+  overclaims *how* the safety property is achieved, and no test exercises the actual
+  `SceneEntities.tsx` wiring at all" — `materialRegions.test.ts`/`styleMaterial.test.ts`
+  only ever pass hash strings directly into the pure functions, never through the real
+  manifest-to-hash path. Worth a one-line doc correction and, ideally, a test that the
+  wiring reads `manifest.assets[].sha256` and not something else — but not a functional bug
+  given the server-side write-time validation found above.
+
+### 2. [Minor — evidence gap] The "sofa's underside" same-camera comparison has no "after" screenshot
+
+The checkpoint states the before/after evidence covers three subjects: "the sofa's fabric
+region, the desk's wood-region top surface, and **the sofa's underside**" — and the
+underside case is the specific, named motivating example for the hemisphere ground-colour
+fix ("every downward-facing furniture surface (a desk's underside, a sofa's frame) pick up a
+thematically-wrong green tint... this is the specific mechanism behind 'readability beneath
+furniture'"). Checked the actual delivered files
+(`nimbalyst-local/screenshots/materials/`): `before-sofa-underside-baked-flat.png` exists,
+but there is **no** matching after-shot — only `after-desk-relit-wood-grain.png`,
+`after-sofa-relit-fabric-weave.png`, and `after-tripo-unknown-asset-safe-relight.png` (a
+different subject entirely). Viewed the two pairs that do exist
+(`before-desk-top-flat.png`/`after-desk-relit-wood-grain.png`,
+`before-sofa-fabric-flat.png`/`after-sofa-relit-fabric-weave.png`): both are genuinely
+controlled, same-camera, same-HUD-state comparisons (identical distance readout, identical
+sun icon position) and both show a real, visible lighting/shading difference, not a
+no-op — so the relighting mechanism itself is credible. But the one comparison specifically
+about the underside/hemisphere-colour claim is simply missing its "after" half; the code
+change (`SceneLighting.tsx`'s hemisphere-ground blend) is real and I read it directly, but
+its own headline visual claim is not fully substantiated by the delivered evidence set.
+
+### 3. [Note, not a defect — methodological caution for whoever reads screenshots across workers] Don't use the scale worker's spawn screenshots as material/lighting evidence
+
+The scale-refinement checkpoint's `h035-before-01-spawn.png` / `h0175-pullback-fov72-*.png`
+before/after pair (reviewed in my second pass) shows a dark, unlit patch under the desk
+overhang in *both* frames. That pair varies capsule scale, camera pull-back, and FOV — not
+lighting — and its "before" and "after" captures were taken at different points in a
+timeline that also straddles these material commits landing, so it is not a controlled,
+single-variable comparison for anything about `fc121b1`/`b012dd2`'s lighting work. I did not
+treat it as such; flagging explicitly so a future reader doesn't cite those images as
+evidence for or against the material work either way. The material checkpoint's own
+before/after pairs (finding 2 above) are the only controlled comparisons for that.
+
+### 4. [Note, not a defect — flagging per instruction rather than accepting at face value] The shadow-map "fallback" is an accessibility signal, not a device-capability check
+
+`SceneLighting.tsx`'s corrected cost accounting (2048 vs. 1024 shadow map side length = 4x
+texel area, not free) is arithmetically correct — verified: doubling each of two dimensions
+is indeed 2×2=4x the area. The checkpoint is appropriately hedged about what the
+`usePrefersReducedMotion()` fallback actually is: it calls it "a proxy for 'reduce visual
+load'" and never claims it solves the cost problem for constrained devices generally
+(grepped the checkpoint for "device"/"budget"/"low-end"/"GPU capacity" framing — found none
+that overclaims this). Independently confirmed the underlying hook is genuine, pre-existing
+(`useReducedMotion.ts`, predates this work) and the "same signal `SceneEnvironment` already
+uses" claim is accurate in substance (`GameView.tsx` computes it once and passes it to
+`SceneEnvironment`; `SceneLighting.tsx` now computes the same OS/browser signal a second
+time independently, since threading it through `GameStage.tsx` was out of this worker's
+owned paths). Stating this per the review instruction rather than treating the fallback as
+proof the performance concern is closed: **prefers-reduced-motion is an accessibility
+opt-in, not a GPU-capability signal.** A user with a genuinely weak GPU who has not enabled
+reduced motion still pays the full 4x shadow cost every frame; a user who enabled reduced
+motion for motion-sickness reasons (unrelated to their GPU) gets a lower-fidelity shadow
+they didn't ask for. Neither the checkpoint nor the code claims otherwise, so there is no
+misleading claim to correct here — but there is a real, still-open gap: no actual
+device/GPU-capability-based fallback exists for this cost.
+
+## Verification performed
+
+- Read `fc121b1`/`b012dd2` diffs directly (`styleMaterial.ts`, `materialRegions.ts`,
+  `materialRegions.test.ts`, `styleMaterial.test.ts`, `SceneLighting.tsx`,
+  `SceneEntities.tsx`) rather than trusting the checkpoint prose, cross-referencing every
+  quoted constant/hash against its actual source (`shared/movement.ts`-style
+  cross-referencing, applied here to `shared/manifest.ts`, `samples.ts`, `loader.ts`,
+  `runtime.ts`, `server/levels.ts`).
+- `sha256sum public/samples/rodin.glb` → matches the hardcoded profile key and `samples.ts`
+  exactly (independent re-verification, not trusting the checkpoint's own claimed hash).
+- Read the actual PBR-preservation test fixtures line by line to confirm they exercise the
+  *new* `normalMap`/`metalnessMap`/`roughnessMap` guard specifically (the narrow
+  `isBakedEmissiveOnlyMaterial` unit test does; the broader `cloneStyledObject`
+  end-to-end test is redundant with a pre-existing `map`-presence check but still a valid
+  outcome-level test) — initially suspected a coverage gap here, verified it does not
+  actually hold once the fixtures were read in full.
+- Viewed the actual delivered before/after PNGs (not just their filenames) for both matched
+  pairs and the unmatched "before-sofa-underside" shot.
+- Did not re-run `vitest`/`tsc` against the working tree: `src/scene/styleMaterial.ts` is
+  currently dirty from the unrelated live "blackpatch" investigation, so any run right now
+  would test a mixed state, not the frozen `b012dd2` commit, and would not honestly
+  attribute results to either worker. Cross-checked the claimed "26 tests (was 23)" count
+  instead by counting the actual new `it()` blocks in the `b012dd2` diff (3 new — one
+  narrow-guard test, two PBR-preservation tests) against 23 prior, which matches exactly (a
+  static, arithmetic check, not a re-run).
+- Did not touch any protected port, provider, or the paused Finish/share stash.
+
+## Bottom line (third pass)
+
+Both material commits are well-evidenced and mostly hold up under direct tracing: the
+baked-emissive relight mechanism, the hash-gated wood/fabric region split for the one known
+asset, the Mikkelsen bump-math bug-fix, and the genuine-PBR-preservation guard are all real
+and correctly scoped to exactly what they claim, with tests that actually exercise the code
+paths described (with the one caveat on finding 1: the manifest-hash wiring itself is
+untested, only the pure lookup function is). Two concrete gaps, not previously reported: (1)
+the known-asset gate's own doc comment overclaims how its safety property is achieved — real
+mitigation exists, but one level higher in the pipeline (server-side, at write time) than
+documented (client-side, at load time) — and the wiring that reads it has no direct test;
+(2) the specific "sofa underside" before/after comparison named in the checkpoint has no
+delivered "after" image. Neither blocks approval on its own, but both are real,
+independently-verified gaps that should not be waved through as "fully proven" on this
+checkpoint's evidence alone. The residual "no true GPU-capability fallback for the shadow
+cost" point (finding 4) is an honest, already-disclosed limitation, not a new defect.
