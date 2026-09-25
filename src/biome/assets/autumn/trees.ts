@@ -139,6 +139,125 @@ function insideAny(point: THREE.Vector3, clumps: readonly Clump[], except: numbe
   });
 }
 
+export type CanopyPart = { g: THREE.BufferGeometry; double: boolean; sway: (p: THREE.Vector3) => number };
+
+export interface CanopySpec {
+  leaves: number;
+  leafSize?: number;
+  hang?: number;
+  /** Clumps rest on the ground (shrubs): flat bottoms at y = 0, no leaves below it. */
+  ground?: boolean;
+}
+
+/**
+ * Adds canopy clumps and their shingled leaf fringe to `parts` (native
+ * space). Returns the crown's volume-weighted core.
+ */
+export function addCanopy(
+  parts: CanopyPart[],
+  clumps: readonly Clump[],
+  spec: CanopySpec,
+  ramp: (name: string | undefined) => Ramp,
+  random: () => number,
+  seed: number,
+): THREE.Vector3 {
+  // Crown extent (for tone: core vs. rim, low vs. high).
+  let crownLow = Infinity;
+  let crownHigh = -Infinity;
+  const core = new THREE.Vector3();
+  let weight = 0;
+  for (const k of clumps) {
+    const sq = k.squash ?? 0.78;
+    crownLow = Math.min(crownLow, k.c[1] - k.r * sq * 0.4);
+    crownHigh = Math.max(crownHigh, k.c[1] + k.r * sq);
+    core.addScaledVector(new THREE.Vector3(...k.c), k.r ** 3);
+    weight += k.r ** 3;
+  }
+  core.multiplyScalar(1 / weight);
+  const crownSpan = Math.max(1e-3, crownHigh - crownLow);
+
+  // ---- Canopy clumps -----------------------------------------------------
+  const toCore = new THREE.Vector3();
+  clumps.forEach((k, i) => {
+    const sq = k.squash ?? 0.78;
+    const ry = k.r * sq;
+    const r = ramp(k.ramp);
+    const bias = k.bias ?? 0;
+    const g = lobe({
+      radius: [k.r, ry, k.r * (0.92 + random() * 0.16)],
+      detail: 1,
+      jitter: 0.12,
+      seed: seed * 17 + i,
+      // Flat-bottomed clumps read as stylised canopy layers.
+      // Ground-resting clumps (shrubs) reach down to y = 0 and sit flat on it.
+      floor: spec.ground ? Math.max(-1, -k.c[1] / ry) : -0.45,
+      center: k.c,
+    });
+    paint(g, (p, n) => {
+      const facing = n.y * 0.5 + 0.5;
+      const high = (p.y - crownLow) / crownSpan;
+      toCore.set(p.x - core.x, (p.y - core.y) * 0.6, p.z - core.z);
+      const rim = toCore.lengthSq() > 1e-8 ? Math.max(0, toCore.normalize().dot(n)) : 0;
+      const t = facing * 0.6 + high * 0.26 + rim * 0.14 - 0.14 + bias * 0.5;
+      return rampAt(r, Math.min(1, Math.max(0, t)));
+    });
+    parts.push({ g, double: false, sway: (p) => 0.25 + p.y * 0.5 });
+  });
+
+  // ---- Shingled leaf fringe on the outer shell ---------------------------
+  // Leaves lie along the clump surface and lift off it: on top they point
+  // up the slope (a leafy, notched crown line), below the rim they hang
+  // (a ragged underside instead of a clean blob edge). Only points on the
+  // crown's outer shell get leaves; buried ones would be wasted triangles.
+  const totalR = clumps.reduce((s, k) => s + k.r * k.r, 0);
+  const hang = spec.hang ?? 0.45;
+  const dir = new THREE.Vector3();
+  let placed = 0;
+  for (let attempt = 0; placed < spec.leaves && attempt < spec.leaves * 10; attempt += 1) {
+    let roll = random() * totalR;
+    let index = 0;
+    for (let i = 0; i < clumps.length; i += 1) {
+      roll -= clumps[i]!.r ** 2;
+      if (roll <= 0) {
+        index = i;
+        break;
+      }
+    }
+    const k = clumps[index]!;
+    const sq = k.squash ?? 0.78;
+    const a = random() * Math.PI * 2;
+    const y = -0.42 + random() * 1.35;
+    const cy = Math.min(1, y);
+    const xz = Math.sqrt(Math.max(0, 1 - cy * cy));
+    dir.set(Math.cos(a) * xz, cy, Math.sin(a) * xz);
+    const at = new THREE.Vector3(k.c[0] + dir.x * k.r * 0.9, k.c[1] + Math.max(-0.45, dir.y) * k.r * sq * 0.9, k.c[2] + dir.z * k.r * 0.9);
+    if (insideAny(at, clumps, index, 0.85)) continue;
+    if (spec.ground && at.y < k.r * 0.25) continue;
+    const normal = new THREE.Vector3(dir.x, dir.y / sq, dir.z).normalize();
+    let slope = UP.clone().addScaledVector(normal, -normal.y);
+    if (slope.lengthSq() < 0.02) slope = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
+    slope.normalize();
+    const below = dir.y < -0.12;
+    // Up the slope and out (0 = flush … π/2 = straight out); hanging below.
+    const tilt = below ? 0.35 + random() * 0.4 : 0.5 + random() * 0.45;
+    const along = below ? slope.clone().multiplyScalar(-(0.6 + hang * 0.4)) : slope;
+    const pointing = along.multiplyScalar(Math.cos(tilt)).addScaledVector(normal, Math.sin(tilt)).normalize();
+    pointing.applyAxisAngle(normal, (random() - 0.5) * 1.3);
+    const high = (at.y - crownLow) / crownSpan;
+    const leaf = leafCard(
+      k.r * (spec.leafSize ?? 0.55) * (0.8 + random() * 0.4),
+      0.45 * (0.85 + random() * 0.3),
+      0.2 + hang * 0.35 * random(),
+      ramp(k.ramp),
+      -0.2 + high * 0.28 + (below ? -0.12 : dir.y * 0.12) + (k.bias ?? 0) * 0.5,
+    );
+    leaf.rotateX((random() - 0.5) * 0.6);
+    parts.push({ g: aim(leaf, pointing, normal, at), double: true, sway: (p) => 0.35 + p.y * 0.6 });
+    placed += 1;
+  }
+  return core;
+}
+
 // ---------------------------------------------------------------------------
 // Tree
 
@@ -146,7 +265,7 @@ export function autumnTree(options: AutumnTreeOptions): VariantBuilder {
   return (tones: BiomeTones): UnitMesh => {
     const random = builderRandom(options.seed);
     const kit = new MeshKit();
-    const parts: { g: THREE.BufferGeometry; double: boolean; sway: (p: THREE.Vector3) => number }[] = [];
+    const parts: CanopyPart[] = [];
     const ramp = (name: string | undefined): Ramp => linearRamp(tones[name ?? options.crown.ramp] ?? tones.foliage);
     const { trunk, crown } = options;
     const bark = linearRamp(tones[trunk.ramp ?? "trunk"] ?? tones.trunk);
@@ -156,21 +275,6 @@ export function autumnTree(options: AutumnTreeOptions): VariantBuilder {
     const spine = (t: number) => new THREE.Vector3(trunk.lean * t ** bow, H * t, 0);
     const swell = crown.swell ?? 1.12;
     const clumps: Clump[] = crown.clumps.map((k) => ({ ...k, r: k.r * swell }));
-
-    // Crown extent (for tone: core vs. rim, low vs. high).
-    let crownLow = Infinity;
-    let crownHigh = -Infinity;
-    const core = new THREE.Vector3();
-    let weight = 0;
-    for (const k of clumps) {
-      const sq = k.squash ?? 0.78;
-      crownLow = Math.min(crownLow, k.c[1] - k.r * sq * 0.4);
-      crownHigh = Math.max(crownHigh, k.c[1] + k.r * sq);
-      core.addScaledVector(new THREE.Vector3(...k.c), k.r ** 3);
-      weight += k.r ** 3;
-    }
-    core.multiplyScalar(1 / weight);
-    const crownSpan = Math.max(1e-3, crownHigh - crownLow);
 
     // ---- Trunk: tapered, flared at the base, lit on one side ---------------
     const lightAngle = 0.6;
@@ -260,83 +364,7 @@ export function autumnTree(options: AutumnTreeOptions): VariantBuilder {
       });
     }
 
-    // ---- Canopy clumps -----------------------------------------------------
-    const toCore = new THREE.Vector3();
-    clumps.forEach((k, i) => {
-      const sq = k.squash ?? 0.78;
-      const ry = k.r * sq;
-      const r = ramp(k.ramp);
-      const bias = k.bias ?? 0;
-      const g = lobe({
-        radius: [k.r, ry, k.r * (0.92 + random() * 0.16)],
-        detail: 1,
-        jitter: 0.12,
-        seed: options.seed * 17 + i,
-        // Flat-bottomed clumps read as stylised canopy layers.
-        floor: -0.45,
-        center: k.c,
-      });
-      paint(g, (p, n) => {
-        const facing = n.y * 0.5 + 0.5;
-        const high = (p.y - crownLow) / crownSpan;
-        toCore.set(p.x - core.x, (p.y - core.y) * 0.6, p.z - core.z);
-        const rim = toCore.lengthSq() > 1e-8 ? Math.max(0, toCore.normalize().dot(n)) : 0;
-        const t = facing * 0.6 + high * 0.26 + rim * 0.14 - 0.14 + bias * 0.5;
-        return rampAt(r, Math.min(1, Math.max(0, t)));
-      });
-      parts.push({ g, double: false, sway: (p) => 0.25 + p.y * 0.5 });
-    });
-
-    // ---- Shingled leaf fringe on the outer shell ---------------------------
-    // Leaves lie along the clump surface and lift off it: on top they point
-    // up the slope (a leafy, notched crown line), below the rim they hang
-    // (a ragged underside instead of a clean blob edge). Only points on the
-    // crown's outer shell get leaves; buried ones would be wasted triangles.
-    const totalR = clumps.reduce((s, k) => s + k.r * k.r, 0);
-    const hang = crown.hang ?? 0.45;
-    const dir = new THREE.Vector3();
-    let placed = 0;
-    for (let attempt = 0; placed < crown.leaves && attempt < crown.leaves * 10; attempt += 1) {
-      let roll = random() * totalR;
-      let index = 0;
-      for (let i = 0; i < clumps.length; i += 1) {
-        roll -= clumps[i]!.r ** 2;
-        if (roll <= 0) {
-          index = i;
-          break;
-        }
-      }
-      const k = clumps[index]!;
-      const sq = k.squash ?? 0.78;
-      const a = random() * Math.PI * 2;
-      const y = -0.42 + random() * 1.35;
-      const cy = Math.min(1, y);
-      const xz = Math.sqrt(Math.max(0, 1 - cy * cy));
-      dir.set(Math.cos(a) * xz, cy, Math.sin(a) * xz);
-      const at = new THREE.Vector3(k.c[0] + dir.x * k.r * 0.9, k.c[1] + Math.max(-0.45, dir.y) * k.r * sq * 0.9, k.c[2] + dir.z * k.r * 0.9);
-      if (insideAny(at, clumps, index, 0.85)) continue;
-      const normal = new THREE.Vector3(dir.x, dir.y / sq, dir.z).normalize();
-      let slope = UP.clone().addScaledVector(normal, -normal.y);
-      if (slope.lengthSq() < 0.02) slope = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
-      slope.normalize();
-      const below = dir.y < -0.12;
-      // Up the slope and out (0 = flush … π/2 = straight out); hanging below.
-      const tilt = below ? 0.35 + random() * 0.4 : 0.5 + random() * 0.45;
-      const along = below ? slope.clone().multiplyScalar(-(0.6 + hang * 0.4)) : slope;
-      const pointing = along.multiplyScalar(Math.cos(tilt)).addScaledVector(normal, Math.sin(tilt)).normalize();
-      pointing.applyAxisAngle(normal, (random() - 0.5) * 1.3);
-      const high = (at.y - crownLow) / crownSpan;
-      const leaf = leafCard(
-        k.r * (crown.leafSize ?? 0.55) * (0.8 + random() * 0.4),
-        0.45 * (0.85 + random() * 0.3),
-        0.2 + hang * 0.35 * random(),
-        ramp(k.ramp),
-        -0.2 + high * 0.28 + (below ? -0.12 : dir.y * 0.12) + (k.bias ?? 0) * 0.5,
-      );
-      leaf.rotateX((random() - 0.5) * 0.6);
-      parts.push({ g: aim(leaf, pointing, normal, at), double: true, sway: (p) => 0.35 + p.y * 0.6 });
-      placed += 1;
-    }
+    const core = addCanopy(parts, clumps, crown, ramp, random, options.seed);
 
     // ---- Centre the crown over the axis (leaning trees set the base back) --
     const shift = new THREE.Vector3(-core.x * 0.85, 0, -core.z * 0.85);

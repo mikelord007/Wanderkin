@@ -1,15 +1,19 @@
 /**
- * Autumn art: warm, dense, layered. Round broadleaf crowns in amber, gold
- * and crimson, bracken and berry shrubs, mossy grey stones and fallen logs,
- * with leaf litter scattered on the ground patches. Colour carries the
- * biome, so rocks and trunks stay quiet and cool.
+ * Autumn Forest art: a warm, golden, slightly misty miniature woodland.
+ * Layered broadleaf crowns in amber, gold and brick rust (some still olive),
+ * leafy shrubs with berries, golden bracken, toadstools and mushrooms, cool
+ * grey mossy and lichen-crusted granite, fallen mossy logs, stumps and
+ * broken snags, acorns and fallen leaves, with leaf litter on the ground
+ * patches. Colour lives in the leaves; rock, bark and timber stay quiet.
+ * Grouped into groves, thickets, fern glades, toadstool rings, mossy stones
+ * and snags with clearings between.
  *
- * Wave 2 baseline by the environment lead on the shared builders; owned by
- * the Autumn worker from hand-off (ENVIRONMENT_ARCHITECTURE.md §10 + Wave 2
- * addendum).
+ * Builders live in `../autumn/`. Owned by the Autumn worker
+ * (ENVIRONMENT_ARCHITECTURE.md §10 + Wave 2 addendum).
  */
 import { signpost } from "../builders/dry.js";
-import { bush, leafRosette, tuft } from "../builders/foliage.js";
+import { tuft } from "../builders/foliage.js";
+import { acorns, autumnShrub, bracken, leafScatter, mushrooms } from "../autumn/plants.js";
 import { woodlandRocks } from "../autumn/rocks.js";
 import { autumnTree } from "../autumn/trees.js";
 import { AUTUMN_WALL } from "../autumn/wall.js";
@@ -25,7 +29,6 @@ const tones = {
   // Rust stays brick-warm, not red: the warm sun pushes reds toward crimson.
   rust: { dark: "#6a3020", base: "#9a4a2c", light: "#c47a50" },
   olive: { dark: "#4d5724", base: "#737d36", light: "#a2a85a" },
-  crimson: { dark: "#6e2319", base: "#9c3525", light: "#c65a40" },
   // Warm grey-brown bark: dark enough to anchor the crowns, never black.
   trunk: { dark: "#4a3527", base: "#6a4d38", light: "#93735a" },
   birch: { dark: "#8e897e", base: "#c4beb0", light: "#e4dfd2" },
@@ -37,7 +40,15 @@ const tones = {
   deadwood: { dark: "#4f4238", base: "#75665a", light: "#a09282" },
   heartwood: { dark: "#8a6440", base: "#b88f62", light: "#d8b88c" },
   fungus: { dark: "#7a5230", base: "#a87844", light: "#d0a66e" },
+  // Toadstools: brick-red fly agaric, brown penny bun, pale honey caps on cream stems.
+  capRed: { dark: "#7a2a1e", base: "#a63c26", light: "#c8603e" },
+  capBrown: { dark: "#5e3a22", base: "#8a5a34", light: "#b8844e" },
+  capPale: { dark: "#a08458", base: "#c4a676", light: "#e0c898" },
+  stem: { dark: "#b4a484", base: "#d4c8aa", light: "#ece4d0" },
+  acorn: { dark: "#6a4a22", base: "#946a34", light: "#b8904e" },
+  berry: { dark: "#6a1c2c", base: "#9a2c3e", light: "#c45a64" },
   soil: { dark: "#58402a", base: "#78583a", light: "#9e7c58" },
+  // Dry golden grass and bracken tips.
   dry: { dark: "#76552e", base: "#9c7646", light: "#c29e70" },
   cactus: { dark: "#3f5530", base: "#5a7542", light: "#86a064" },
   accent: { dark: "#7e2440", base: "#a8385a", light: "#cf6a86" },
@@ -55,7 +66,7 @@ const TREES = [
   autumnTree({
     trunk: { height: 0.42, lean: 0.03, baseRadius: 0.07 },
     crown: {
-      ramp: "foliage", leaves: 52,
+      ramp: "foliage", leaves: 44,
       clumps: [
         { c: [0, 0.62, 0], r: 0.25 },
         { c: [0.26, 0.55, 0.06], r: 0.2 },
@@ -72,7 +83,7 @@ const TREES = [
   autumnTree({
     trunk: { height: 0.5, lean: -0.02, baseRadius: 0.06 },
     crown: {
-      ramp: "foliageAlt", leaves: 50,
+      ramp: "foliageAlt", leaves: 42,
       clumps: [
         { c: [0, 0.64, 0], r: 0.2 },
         { c: [0.15, 0.6, 0.06], r: 0.16, ramp: "olive" },
@@ -89,7 +100,7 @@ const TREES = [
   autumnTree({
     trunk: { height: 0.34, lean: 0.02, baseRadius: 0.065, roots: 5 },
     crown: {
-      ramp: "rust", leaves: 54, hang: 0.6,
+      ramp: "rust", leaves: 46, hang: 0.6,
       clumps: [
         { c: [0, 0.6, 0], r: 0.22, squash: 0.7 },
         { c: [0.27, 0.52, 0.05], r: 0.18, squash: 0.7 },
@@ -106,7 +117,7 @@ const TREES = [
   autumnTree({
     trunk: { height: 0.6, lean: 0.14, bow: 2, baseRadius: 0.042, ramp: "birch", marks: true, roots: 3 },
     crown: {
-      ramp: "foliageAlt", leaves: 44, leafSize: 0.65,
+      ramp: "foliageAlt", leaves: 38, leafSize: 0.65,
       clumps: [
         { c: [0.14, 0.72, 0], r: 0.16 },
         { c: [0.27, 0.66, 0.08], r: 0.13 },
@@ -122,7 +133,7 @@ const TREES = [
   autumnTree({
     trunk: { height: 0.44, lean: -0.03, baseRadius: 0.065 },
     crown: {
-      ramp: "foliage", leaves: 52,
+      ramp: "foliage", leaves: 44,
       clumps: [
         { c: [0, 0.64, 0], r: 0.23 },
         { c: [0.24, 0.56, 0.04], r: 0.19, ramp: "olive" },
@@ -154,19 +165,66 @@ const TREES = [
 const SAPLINGS = [
   autumnTree({
     trunk: { height: 0.55, lean: 0.02, baseRadius: 0.036, roots: 3 },
-    crown: { ramp: "foliageAlt", leaves: 22, clumps: [{ c: [0, 0.72, 0], r: 0.15 }, { c: [0.07, 0.87, 0.02], r: 0.12, noLimb: true, bias: 0.1 }, { c: [-0.07, 0.67, 0.05], r: 0.11 }] },
+    crown: { ramp: "foliageAlt", leaves: 18, clumps: [{ c: [0, 0.72, 0], r: 0.15 }, { c: [0.07, 0.87, 0.02], r: 0.12, noLimb: true, bias: 0.1 }, { c: [-0.07, 0.67, 0.05], r: 0.11 }] },
     seed: 21,
   }),
   autumnTree({
     trunk: { height: 0.5, lean: 0.05, baseRadius: 0.036, roots: 3 },
-    crown: { ramp: "rust", leaves: 22, clumps: [{ c: [0.04, 0.66, 0], r: 0.15 }, { c: [0.1, 0.8, -0.03], r: 0.12, noLimb: true }, { c: [-0.06, 0.62, -0.06], r: 0.1, ramp: "foliage" }] },
+    crown: { ramp: "rust", leaves: 18, clumps: [{ c: [0.04, 0.66, 0], r: 0.15 }, { c: [0.1, 0.8, -0.03], r: 0.12, noLimb: true }, { c: [-0.06, 0.62, -0.06], r: 0.1, ramp: "foliage" }] },
     seed: 22,
   }),
   autumnTree({
     trunk: { height: 0.52, lean: -0.03, baseRadius: 0.034, ramp: "birch", marks: true, roots: 3 },
-    crown: { ramp: "olive", leaves: 20, clumps: [{ c: [0, 0.7, 0], r: 0.14, ramp: "foliageAlt" }, { c: [-0.05, 0.84, 0.02], r: 0.11, noLimb: true }, { c: [0.07, 0.64, -0.04], r: 0.1 }] },
+    crown: { ramp: "olive", leaves: 16, clumps: [{ c: [0, 0.7, 0], r: 0.14, ramp: "foliageAlt" }, { c: [-0.05, 0.84, 0.02], r: 0.11, noLimb: true }, { c: [0.07, 0.64, -0.04], r: 0.1 }] },
     seed: 23,
   }),
+];
+
+// Leafy shrubs resting on the ground (native units; fit to height 1).
+const SHRUBS = [
+  // Amber mound with a gold top.
+  autumnShrub({
+    ramp: "foliage", leaves: 32, stems: 3, seed: 31,
+    clumps: [{ c: [0, 0.22, 0], r: 0.26 }, { c: [0.2, 0.16, 0.08], r: 0.19 }, { c: [-0.18, 0.17, -0.06], r: 0.2, bias: -0.05 }, { c: [0.02, 0.42, -0.02], r: 0.18, ramp: "foliageAlt", bias: 0.1 }],
+  }),
+  // Burning-bush rust: lower and spreading.
+  autumnShrub({
+    ramp: "rust", leaves: 32, stems: 3, hang: 0.5, seed: 32,
+    clumps: [{ c: [0, 0.2, 0], r: 0.24, squash: 0.7 }, { c: [0.22, 0.15, 0.06], r: 0.18, squash: 0.7 }, { c: [-0.2, 0.15, -0.08], r: 0.18, squash: 0.7 }, { c: [0.03, 0.34, 0.02], r: 0.16, bias: 0.1 }],
+  }),
+  // Upright gold shrub.
+  autumnShrub({
+    ramp: "foliageAlt", leaves: 28, stems: 2, seed: 33,
+    clumps: [{ c: [0, 0.22, 0], r: 0.2 }, { c: [0.05, 0.42, 0.02], r: 0.17 }, { c: [-0.03, 0.6, -0.01], r: 0.13, bias: 0.12 }, { c: [0.14, 0.16, -0.06], r: 0.14, ramp: "olive" }],
+  }),
+  // Turning: olive body, rust and amber on the exposed top.
+  autumnShrub({
+    ramp: "olive", leaves: 32, stems: 3, seed: 34,
+    clumps: [{ c: [0, 0.2, 0], r: 0.24 }, { c: [0.19, 0.16, 0.08], r: 0.18 }, { c: [-0.17, 0.18, -0.08], r: 0.18, ramp: "foliage" }, { c: [0.02, 0.4, 0], r: 0.17, ramp: "rust", bias: 0.1 }],
+  }),
+  // Berry shrub: dark olive and rust with red berries.
+  autumnShrub({
+    ramp: "olive", leaves: 26, stems: 3, berries: 6, seed: 35,
+    clumps: [{ c: [0, 0.22, 0], r: 0.24, bias: -0.1 }, { c: [0.2, 0.18, -0.06], r: 0.18, ramp: "rust", bias: -0.05 }, { c: [-0.16, 0.2, 0.1], r: 0.18 }, { c: [0.03, 0.42, 0.02], r: 0.15, ramp: "rust" }],
+  }),
+];
+
+const SMALL_SHRUBS = [
+  autumnShrub({ ramp: "foliage", leaves: 16, seed: 41, clumps: [{ c: [0, 0.18, 0], r: 0.2 }, { c: [0.14, 0.13, 0.05], r: 0.14, ramp: "foliageAlt" }] }),
+  autumnShrub({ ramp: "rust", leaves: 16, seed: 42, clumps: [{ c: [0, 0.17, 0], r: 0.19, squash: 0.72 }, { c: [-0.13, 0.12, 0.06], r: 0.14 }] }),
+  autumnShrub({ ramp: "olive", leaves: 16, berries: 6, seed: 43, clumps: [{ c: [0, 0.18, 0], r: 0.19 }, { c: [0.12, 0.13, -0.07], r: 0.13, ramp: "rust" }] }),
+];
+
+// Toadstool clusters (fit to height) and small mushrooms.
+const TOADSTOOLS = [
+  mushrooms({ ramp: "capRed", spots: 3, seed: 51, caps: [{ at: [0, 0], h: 0.5, r: 0.2 }, { at: [0.2, 0.08], h: 0.32, r: 0.14 }, { at: [-0.12, 0.16], h: 0.22, r: 0.1, dome: 0.6 }] }),
+  mushrooms({ ramp: "capBrown", seed: 52, caps: [{ at: [0, 0], h: 0.42, r: 0.22, dome: 0.5 }, { at: [0.2, -0.1], h: 0.28, r: 0.15 }, { at: [-0.16, -0.1], h: 0.2, r: 0.12 }, { at: [0.06, 0.2], h: 0.16, r: 0.09 }] }),
+];
+const MUSHROOMS = [
+  mushrooms({ ramp: "capRed", spots: 2, seed: 61, caps: [{ at: [0, 0], h: 0.5, r: 0.24 }] }),
+  mushrooms({ ramp: "capPale", seed: 62, caps: [{ at: [0, 0], h: 0.46, r: 0.2, dome: 0.4 }, { at: [0.22, 0.06], h: 0.3, r: 0.14, dome: 0.4 }] }),
+  mushrooms({ ramp: "capBrown", seed: 63, caps: [{ at: [0, 0], h: 0.4, r: 0.24, dome: 0.5 }] }),
+  mushrooms({ ramp: "capPale", seed: 64, caps: [{ at: [0, 0], h: 0.36, r: 0.14, dome: 0.3 }, { at: [0.14, 0.08], h: 0.26, r: 0.11, dome: 0.3 }, { at: [-0.08, 0.14], h: 0.2, r: 0.08, dome: 0.3 }] }),
 ];
 
 export const AUTUMN_ART: BiomeArt = {
@@ -189,32 +247,69 @@ export const AUTUMN_ART: BiomeArt = {
       variants: SAPLINGS,
     },
     shrub: {
-      category: "bush", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.8, triangleBudget: 900,
-      mirror: true, embed: [0, 0.03],
-      variants: [
-        bush({ lobes: 6, spread: 0.52, height: 1.25, seed: 1, ramp: "crimson", altRamp: "foliage" }),
-        bush({ lobes: 5, spread: 0.48, height: 1.2, seed: 2, ramp: "foliageAlt" }),
-        bush({ lobes: 7, spread: 0.5, height: 1.35, seed: 3, blossoms: 4 }),
-        bush({ lobes: 4, spread: 0.44, height: 1.2, seed: 4, ramp: "foliage", altRamp: "crimson" }),
-        bush({ lobes: 6, spread: 0.5, height: 1.3, seed: 5, ramp: "foliageAlt", altRamp: "foliage" }),
-      ],
+      category: "bush", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.84, triangleBudget: 900,
+      mirror: true, embed: [0.01, 0.03],
+      variants: SHRUBS,
+      weights: [1, 1, 1, 1, 0.8],
     },
-    "berry-bush": {
-      category: "bush", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.68, triangleBudget: 900,
-      mirror: true, embed: [0, 0.03],
+    "shrub-small": {
+      category: "bush", role: "supporting", shading: "smooth", castShadow: true, unitRadius: 0.92, triangleBudget: 500,
+      mirror: true, embed: [0.01, 0.03],
+      variants: SMALL_SHRUBS,
+    },
+    fern: {
+      category: "bush", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.74, triangleBudget: 700,
+      mirror: true, embed: [0, 0.02],
       variants: [
-        bush({ lobes: 5, spread: 0.4, height: 1.35, seed: 11, ramp: "foliageAlt", altRamp: "crimson", blossoms: 5 }),
-        bush({ lobes: 4, spread: 0.38, height: 1.3, seed: 12, ramp: "crimson", blossoms: 4 }),
-        bush({ lobes: 5, spread: 0.42, height: 1.4, seed: 13, ramp: "foliage", blossoms: 5 }),
+        bracken({ fronds: 7, length: 0.95, rise: 1.27, droop: 0.55, serrate: 0.55, ramp: "foliageAlt", altRamp: "olive", altEvery: 3, seed: 71 }),
+        bracken({ fronds: 7, length: 0.95, rise: 1.2, droop: 0.6, serrate: 0.55, ramp: "rust", altRamp: "foliageAlt", altEvery: 2, seed: 72 }),
       ],
     },
     bracken: {
-      category: "bush", role: "supporting", shading: "smooth", castShadow: true, unitRadius: 0.68, triangleBudget: 700,
+      category: "bush", role: "supporting", shading: "smooth", castShadow: true, unitRadius: 0.5, triangleBudget: 500,
       mirror: true, embed: [0, 0.02],
       variants: [
-        leafRosette({ leaves: 9, length: 0.62, width: 0.1, rise: 0.8, droop: 0.45, seed: 31, ramp: "dry", serrate: 0.5 }),
-        leafRosette({ leaves: 7, length: 0.6, width: 0.12, rise: 0.9, droop: 0.4, seed: 32, ramp: "foliage", serrate: 0.5 }),
-        leafRosette({ leaves: 8, length: 0.58, width: 0.11, rise: 0.85, droop: 0.5, seed: 33, ramp: "foliageAlt", serrate: 0.4 }),
+        bracken({ fronds: 6, length: 0.9, rise: 0.8, droop: 0.9, ramp: "dry", altRamp: "foliage", altEvery: 3, seed: 81, fit: "size" }),
+        bracken({ fronds: 5, length: 0.9, rise: 0.9, droop: 0.9, ramp: "olive", altRamp: "foliageAlt", altEvery: 2, seed: 82, fit: "size" }),
+        bracken({ fronds: 6, length: 0.85, rise: 0.85, droop: 1.0, ramp: "rust", seed: 83, fit: "size" }),
+      ],
+    },
+    toadstool: {
+      category: "dressing", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.74, triangleBudget: 700,
+      mirror: true, embed: [0, 0.02],
+      variants: TOADSTOOLS,
+    },
+    "mushroom-cluster": {
+      category: "dressing", role: "supporting", shading: "smooth", castShadow: true, unitRadius: 0.74, triangleBudget: 700,
+      mirror: true, embed: [0, 0.02],
+      variants: [...TOADSTOOLS, MUSHROOMS[3]!],
+    },
+    mushroom: {
+      category: "dressing", role: "micro", shading: "smooth", castShadow: false, unitRadius: 0.74, triangleBudget: 380,
+      mirror: true, embed: [0, 0.02],
+      variants: MUSHROOMS,
+    },
+    acorns: {
+      category: "dressing", role: "micro", shading: "smooth", castShadow: false, unitRadius: 0.5, triangleBudget: 140,
+      mirror: true, embed: [0.01, 0.03],
+      variants: [acorns({ count: 3, seed: 1 }), acorns({ count: 2, seed: 2 })],
+    },
+    leaves: {
+      category: "dressing", role: "micro", shading: "smooth", castShadow: false, unitRadius: 0.5, triangleBudget: 60,
+      mirror: true, embed: [0, 0.005],
+      variants: [
+        leafScatter({ count: 6, seed: 1, ramps: ["foliage", "rust", "foliageAlt"] }),
+        leafScatter({ count: 5, seed: 2, ramps: ["foliageAlt", "foliage"] }),
+        leafScatter({ count: 7, seed: 3, ramps: ["rust", "foliage", "olive"] }),
+      ],
+    },
+    grass: {
+      category: "grass", role: "micro", shading: "smooth", castShadow: false, unitRadius: 1.1, triangleBudget: 220,
+      mirror: true, embed: [0, 0.02],
+      variants: [
+        tuft({ blades: 8, splay: 0.5, seed: 41, ramp: "dry" }),
+        tuft({ blades: 7, splay: 0.7, seed: 42, ramp: "foliageAlt", width: 0.035 }),
+        tuft({ blades: 6, splay: 0.4, seed: 43, ramp: "olive", width: 0.04 }),
       ],
     },
     "rock-mossy": {
@@ -236,14 +331,6 @@ export const AUTUMN_ART: BiomeArt = {
       category: "rock", role: "micro", shading: "faceted", castShadow: false, unitRadius: 0.5, triangleBudget: 60,
       mirror: true, embed: [0.05, 0.15], alignToNormal: 1,
       variants: rocks.pebbles,
-    },
-    grass: {
-      category: "grass", role: "micro", shading: "smooth", castShadow: false, unitRadius: 1.1, triangleBudget: 220,
-      mirror: true, embed: [0, 0.02],
-      variants: [
-        tuft({ blades: 8, splay: 0.5, seed: 41, ramp: "dry" }),
-        tuft({ blades: 7, splay: 0.7, seed: 42, ramp: "foliageAlt", width: 0.035 }),
-      ],
     },
     log: {
       category: "dressing", role: "supporting", shading: "smooth", castShadow: true, unitRadius: 0.5, triangleBudget: 360,
@@ -282,50 +369,88 @@ export const AUTUMN_ART: BiomeArt = {
       {
         weight: 3,
         preset: {
+          // A tree with a sapling or small shrub, fallen leaves and a mushroom at its foot.
           id: "grove",
           primary: "broadleaf",
           primaryOffset: 0.15,
           members: [
             { family: "sapling", count: [0, 1], ring: [0.55, 0.95], height: [0.4, 0.6] },
-            { family: "shrub", count: [0, 1], ring: [0.55, 0.95], height: [0.18, 0.26] },
-            { family: "pebble", count: [1, 2], ring: [0.45, 1], height: [0.03, 0.06] },
-            { family: "log", count: [1, 1], ring: [0.5, 0.9], height: [0.14, 0.2], chance: 0.4 },
+            { family: "shrub-small", count: [0, 1], ring: [0.5, 0.95], height: [0.16, 0.24] },
+            { family: "leaves", count: [1, 2], ring: [0.3, 0.9], height: [0.12, 0.18] },
+            { family: "mushroom", count: [1, 1], ring: [0.3, 0.8], height: [0.05, 0.08], chance: 0.5 },
+            { family: "pebble", count: [0, 1], ring: [0.45, 1], height: [0.03, 0.06] },
           ],
         },
       },
       {
-        weight: 1,
+        weight: 2,
         preset: {
+          // A lone tree in a clearing: acorns, leaves, a bracken frond, grass.
           id: "lone-tree",
           primary: "broadleaf",
-          members: [{ family: "grass", count: [1, 2], ring: [0.45, 0.95], height: [0.05, 0.08] }],
+          primaryOffset: 0.1,
+          members: [
+            { family: "bracken", count: [0, 1], ring: [0.5, 0.9], height: [0.22, 0.3], chance: 0.6 },
+            { family: "leaves", count: [1, 2], ring: [0.3, 0.9], height: [0.12, 0.18] },
+            { family: "acorns", count: [1, 1], ring: [0.3, 0.8], height: [0.05, 0.08], chance: 0.6 },
+            { family: "grass", count: [1, 2], ring: [0.4, 0.95], height: [0.05, 0.08] },
+          ],
         },
       },
     ],
     shrub: [
       {
-        weight: 2,
+        weight: 3,
         preset: {
-          id: "berry-thicket",
+          id: "thicket",
           primary: "shrub",
           members: [
-            { family: "bracken", count: [0, 1], ring: [0.5, 0.95], height: [0.45, 0.6] },
-            { family: "pebble", count: [1, 2], ring: [0.5, 1], height: [0.1, 0.16] },
-            { family: "grass", count: [1, 2], ring: [0.45, 0.95], height: [0.25, 0.35] },
+            { family: "shrub-small", count: [1, 1], ring: [0.5, 0.9], height: [0.45, 0.65] },
+            { family: "bracken", count: [0, 1], ring: [0.5, 0.95], height: [0.5, 0.7] },
+            { family: "leaves", count: [1, 2], ring: [0.35, 0.95], height: [0.3, 0.45] },
+            { family: "pebble", count: [0, 1], ring: [0.5, 1], height: [0.08, 0.14] },
+          ],
+        },
+      },
+      {
+        weight: 2,
+        preset: {
+          // A shrub with toadstools and grass at its edge.
+          id: "berry-edge",
+          primary: "shrub",
+          primaryOffset: 0.15,
+          members: [
+            { family: "mushroom", count: [1, 2], ring: [0.45, 0.9], height: [0.12, 0.18] },
+            { family: "leaves", count: [1, 1], ring: [0.35, 0.95], height: [0.3, 0.45] },
+            { family: "grass", count: [1, 2], ring: [0.4, 0.95], height: [0.2, 0.3] },
           ],
         },
       },
     ],
     "dry-plant": [
       {
-        weight: 2,
+        weight: 3,
         preset: {
-          id: "bracken-patch",
-          primary: "berry-bush",
+          // Golden bracken with smaller ferns, a mushroom and leaves.
+          id: "fern-glade",
+          primary: "fern",
           members: [
-            { family: "bracken", count: [1, 2], ring: [0.5, 0.95], height: [0.35, 0.5] },
-            { family: "grass", count: [1, 2], ring: [0.4, 0.9], height: [0.3, 0.45] },
-            { family: "pebble", count: [0, 1], ring: [0.4, 1], height: [0.1, 0.16] },
+            { family: "bracken", count: [1, 2], ring: [0.5, 0.95], height: [0.5, 0.7] },
+            { family: "mushroom", count: [0, 1], ring: [0.4, 0.9], height: [0.12, 0.18], chance: 0.6 },
+            { family: "leaves", count: [1, 1], ring: [0.35, 0.95], height: [0.35, 0.5] },
+          ],
+        },
+      },
+      {
+        weight: 1,
+        preset: {
+          // Toadstool ring: a big cluster, smaller clusters, fallen leaves.
+          id: "toadstool-ring",
+          primary: "toadstool",
+          members: [
+            { family: "mushroom-cluster", count: [1, 2], ring: [0.5, 0.95], height: [0.35, 0.55] },
+            { family: "leaves", count: [1, 2], ring: [0.35, 0.95], height: [0.4, 0.6] },
+            { family: "bracken", count: [0, 1], ring: [0.55, 0.95], height: [0.5, 0.7], chance: 0.4 },
           ],
         },
       },
@@ -334,14 +459,15 @@ export const AUTUMN_ART: BiomeArt = {
       {
         weight: 3,
         preset: {
-          // Mossy boulder with companion stones, a log, a fern.
+          // Mossy boulder with companion stones, a log, a fern, fallen leaves.
           id: "mossy-stones",
           primary: "rock-mossy",
           members: [
             { family: "rock-medium", count: [1, 2], ring: [0.55, 0.9], height: [0.25, 0.42] },
-            { family: "pebble", count: [1, 3], ring: [0.35, 1], height: [0.07, 0.13] },
             { family: "log", count: [1, 1], ring: [0.6, 0.95], height: [0.4, 0.55], chance: 0.35 },
             { family: "bracken", count: [0, 1], ring: [0.45, 0.9], height: [0.3, 0.42], chance: 0.5 },
+            { family: "leaves", count: [1, 1], ring: [0.4, 0.95], height: [0.2, 0.3] },
+            { family: "pebble", count: [1, 2], ring: [0.35, 1], height: [0.07, 0.13] },
           ],
         },
       },
@@ -354,8 +480,9 @@ export const AUTUMN_ART: BiomeArt = {
           primaryOffset: 0.1,
           members: [
             { family: "rock-medium", count: [1, 2], ring: [0.55, 0.9], height: [0.22, 0.38] },
-            { family: "pebble", count: [2, 3], ring: [0.4, 1], height: [0.06, 0.12] },
             { family: "stump", count: [1, 1], ring: [0.55, 0.9], height: [0.22, 0.32], chance: 0.35 },
+            { family: "mushroom", count: [0, 1], ring: [0.45, 0.9], height: [0.1, 0.16], chance: 0.4 },
+            { family: "pebble", count: [2, 3], ring: [0.4, 1], height: [0.06, 0.12] },
           ],
         },
       },
@@ -364,12 +491,13 @@ export const AUTUMN_ART: BiomeArt = {
       {
         weight: 2,
         preset: {
-          // A broken snag with a fallen log and stones at its foot.
+          // A broken snag with a fallen log, toadstools and stones at its foot.
           id: "snag",
           primary: "snag",
           members: [
             { family: "log", count: [1, 1], ring: [0.55, 0.95], height: [0.5, 0.7], chance: 0.6 },
             { family: "stump", count: [0, 1], ring: [0.5, 0.9], height: [0.2, 0.3] },
+            { family: "mushroom", count: [1, 1], ring: [0.4, 0.9], height: [0.08, 0.14], chance: 0.6 },
             { family: "pebble", count: [1, 2], ring: [0.4, 0.9], height: [0.05, 0.08] },
           ],
         },
@@ -381,6 +509,7 @@ export const AUTUMN_ART: BiomeArt = {
           primary: "marker",
           members: [
             { family: "stump", count: [1, 1], ring: [0.5, 0.9], height: [0.2, 0.3], chance: 0.6 },
+            { family: "leaves", count: [1, 1], ring: [0.35, 0.9], height: [0.2, 0.3] },
             { family: "pebble", count: [1, 2], ring: [0.4, 0.9], height: [0.05, 0.08] },
           ],
         },

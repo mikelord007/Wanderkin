@@ -25,7 +25,8 @@ export const AUTUMN: BiomeDefinition = {
   },
   // Soft golden light through a light mist.
   lighting: { sun: "#ffd79a", sky: "#e9dcc4", ground: "#c9a878", intensity: 2.2, ambient: 0.82, direction: [4, 5.5, -3] },
-  sky: { zenith: "#86a9c9", horizon: "#f0e2c8", fogNear: 1.5, fogFar: 6.4 },
+  // A warm golden haze a little closer in, so far groves soften into mist.
+  sky: { zenith: "#8aa9c4", horizon: "#efdcb8", fogNear: 1.3, fogFar: 5.8 },
   surface: { color: "#b3864f", blend: 0.4, upwardNormalMin: 0.8, patchCoverage: 0.6 },
   props: { kinds: ["palm", "shrub", "rock", "wood", "dry-plant"], density: 0.55, scaleRange: [0.8, 3.1] },
   wind: { direction: [-0.8, -0.6], strength: 0.3 },
@@ -36,5 +37,5 @@ export const AUTUMN: BiomeDefinition = {
     fragmentName: "ember-leaf fragment",
     collectibleColor: "#3fc9d6",
   },
-  budget: { props: 120, patches: 22, particles: 120, drawCalls: 14 },
+  budget: { props: 100, patches: 22, particles: 120, drawCalls: 14 },
 };
