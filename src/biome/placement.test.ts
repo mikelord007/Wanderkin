@@ -203,6 +203,37 @@ describe("prepareBiomeLayout", () => {
     }
   });
 
+  it("gives every requested kind a share of the layout on real scans, standard and reduced", () => {
+    for (const id of ["sample-rodin-room-corner", "sample-tripo-room-corner"]) {
+      const fixture = sampleScanFixture(id, true);
+      for (const biome of ["tropical", "desert", "alpine", "autumn", "ember"] as const) {
+        const standard = layoutFor(fixture, biome);
+        const reduced = layoutFor(fixture, biome, "layout", "reduced");
+        for (const kind of getBiomeDefinition(biome).props.kinds) {
+          if (kind === "windsock") continue;
+          expect(standard.props.filter((p) => p.kind === kind).length, `${id} ${biome} ${kind} standard`).toBeGreaterThan(0);
+          expect(reduced.props.filter((p) => p.kind === kind).length, `${id} ${biome} ${kind} reduced`).toBeGreaterThan(0);
+        }
+        expect(standard.props.length).toBeGreaterThan(reduced.props.length);
+      }
+    }
+  });
+
+  it("a kind that keeps failing cannot starve the kinds planned after it (fair attempt shares)", () => {
+    // Oversized trees fail almost everywhere on a cramped scan; before the fix
+    // they spent the whole attempt budget and nothing smaller was placed.
+    const fixture = sampleScanFixture("sample-tripo-room-corner", true);
+    const tropical = getBiomeDefinition("tropical");
+    const oversized = { ...tropical, props: { ...tropical.props, scaleRange: [2.6, 3.2] as [number, number] } };
+    const layout = prepareBiomeLayout({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, definition: oversized, seed: "starve", quality: "standard" });
+    for (const kind of ["shrub", "rock", "wood"] as const) {
+      expect(layout.props.filter((p) => p.kind === kind && !p.id.includes("-skirt-")).length, kind).toBeGreaterThan(0);
+    }
+    // Same seed, same layout: the shares are deterministic.
+    const again = prepareBiomeLayout({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, definition: oversized, seed: "starve", quality: "standard" });
+    expect(again.props).toEqual(layout.props);
+  });
+
   it("places exactly one windsock in the desert and none in the tropics", () => {
     const fixture = deskFixture();
     expect(layoutFor(fixture, "desert").props.filter((p) => p.kind === "windsock")).toHaveLength(1);

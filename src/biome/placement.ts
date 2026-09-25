@@ -486,13 +486,23 @@ function placeProps(
   const weighted = kinds.filter((kind) => kind !== "windsock" && (options.allowTall || !TALL_KINDS.has(kind)));
   if (weighted.length === 0) return placements;
   const totalWeight = weighted.reduce((sum, kind) => sum + KIND_WEIGHT[kind], 0);
-  // Big props claim space first.
+  // Tall props claim grove centres first (largest first); the other kinds
+  // then take turns, largest first in each round, so no kind's whole
+  // allocation is spent before another kind has placed anything.
+  const counts = new Map<BiomePropKind, number>();
+  for (const kind of weighted) counts.set(kind, Math.round((target * KIND_WEIGHT[kind]) / totalWeight));
+  const bySize = [...weighted].sort((a, b) => KIND_SCALE_SHARE[b][1] - KIND_SCALE_SHARE[a][1]);
   const plan: BiomePropKind[] = [];
-  for (const kind of weighted) {
-    const count = Math.round((target * KIND_WEIGHT[kind]) / totalWeight);
-    for (let i = 0; i < count; i += 1) plan.push(kind);
+  for (const kind of bySize.filter((k) => TALL_KINDS.has(k))) for (let i = 0; i < counts.get(kind)!; i += 1) plan.push(kind);
+  const rest = bySize.filter((k) => !TALL_KINDS.has(k));
+  const left = new Map(rest.map((kind) => [kind, counts.get(kind)!]));
+  while (rest.some((kind) => left.get(kind)! > 0)) {
+    for (const kind of rest) {
+      if (left.get(kind)! <= 0) continue;
+      plan.push(kind);
+      left.set(kind, left.get(kind)! - 1);
+    }
   }
-  plan.sort((a, b) => KIND_SCALE_SHARE[b][1] - KIND_SCALE_SHARE[a][1]);
 
   // Cluster-seeded candidate order (own stream, so no other draw shifts).
   const { spacing, reach, openShare } = groveScale(options.bodyHeight, definition.props.density);
@@ -507,17 +517,32 @@ function placeProps(
   const openLimit = Math.ceil(target * openShare);
   let openPlaced = 0;
 
+  // Attempt budget, shared FAIRLY between kinds. Big kinds go first so they
+  // claim grove centres, but one shared budget let a kind that keeps failing
+  // (big trees on a cramped scan) use it all up before the kinds planned
+  // after it got a single attempt (and, with kinds planned in blocks, the
+  // grove space and open-ground quota were spent before the last kind ran):
+  // rocks vanished from standard layouts while reduced ones (a smaller plan)
+  // still had them. Pass 1 gives each kind an attempt share proportional to
+  // its planned count; pass 2 lets entries that only ran out of their share
+  // use whatever budget is left, in plan order. Deterministic per seed: the
+  // same cursor, streams and candidate order as before.
   let cursor = 0;
   const maxTests = Math.min(order.length * 3, 6000);
+  const planned = new Map<BiomePropKind, number>();
+  for (const kind of plan) planned.set(kind, (planned.get(kind) ?? 0) + 1);
+  const allowance = new Map<BiomePropKind, number>();
+  for (const [kind, count] of planned) allowance.set(kind, Math.ceil((maxTests * count) / Math.max(1, plan.length)));
+  const used = new Map<BiomePropKind, number>();
   let tests = 0;
-  for (const kind of plan) {
-    if (placements.length >= options.budget) break;
-    const spec = request(kind);
-    for (let attempt = 0; attempt < order.length && tests < maxTests; attempt += 1) {
+  const attempt = (kind: BiomePropKind, spec: AnchorRequest, limit: () => boolean): "placed" | "exhausted" | "limited" => {
+    for (let tried = 0; tried < order.length; tried += 1) {
+      if (limit()) return "limited";
       const candidate = order[cursor % order.length]!;
       const patch = standable[candidate]!;
       cursor += 1;
       tests += 1;
+      used.set(kind, (used.get(kind) ?? 0) + 1);
       // Open ground between groves is kept mostly open.
       const open = !grove.inGrove.has(candidate);
       if (open && openPlaced >= openLimit) continue;
@@ -525,9 +550,21 @@ function placeProps(
       if (anchor) {
         accept(kind, spec, anchor);
         if (open) openPlaced += 1;
-        break;
+        return "placed";
       }
     }
+    return "exhausted";
+  };
+  const deferred: { kind: BiomePropKind; spec: AnchorRequest }[] = [];
+  for (const kind of plan) {
+    if (placements.length >= options.budget) break;
+    const spec = request(kind);
+    const outcome = attempt(kind, spec, () => (used.get(kind) ?? 0) >= allowance.get(kind)!);
+    if (outcome === "limited") deferred.push({ kind, spec });
+  }
+  for (const { kind, spec } of deferred) {
+    if (placements.length >= options.budget || tests >= maxTests) break;
+    attempt(kind, spec, () => tests >= maxTests);
   }
   return placements;
 }
