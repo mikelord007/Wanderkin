@@ -13,10 +13,16 @@ import { toMiniatureScale } from "../game/core/characterScale.js";
 import { initRapier } from "../game/core/physicsWorld.js";
 import { GameSimulation, NEUTRAL_INPUT } from "../game/core/simulation.js";
 import type { Transition } from "../scene/route.js";
-import { generateAdventure, type AdventureGenerationDetail } from "./adventures.js";
+import { DEFAULT_ADVENTURE_BUDGET, generateAdventure, type AdventureGenerationDetail } from "./adventures.js";
 import { bedFixture, countertopFixture, deskFixture, poorFixture, sampleScanFixture, type GeometryFixture } from "./geometryFixtures.js";
+import { ADVENTURE_TIME_BUDGET_MS, WorkDeadline } from "./workBudget.js";
 
 const RUNTIME = toMiniatureScale(DEFAULT_MOVEMENT_CONFIG);
+
+/** The production limit on a clock that never advances: these tests drive
+ * generated layouts, not the 2 s budget, so a loaded machine must not turn a
+ * slow generation into a budget refusal (the budget has its own tests). */
+const unhurried = () => new WorkDeadline(ADVENTURE_TIME_BUDGET_MS, () => 0);
 
 beforeAll(async () => {
   await initRapier();
@@ -177,7 +183,7 @@ const CASES: [string, () => GeometryFixture][] = [
 describe("generated adventures are completable by the real controller at miniature scale", () => {
   it.each(CASES)("%s — restore the portal", async (_label, make) => {
     const fixture = make();
-    const detail = generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template: "restore-portal", seed: `controller-${fixture.name}` });
+    const detail = generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template: "restore-portal", seed: `controller-${fixture.name}` }, DEFAULT_ADVENTURE_BUDGET, unhurried());
     // The adventure really climbs: its last fragment is on an elevated surface.
     const floor = detail.chain[0]![1];
     expect(Math.max(...detail.chain.map((point) => point[1] - floor))).toBeGreaterThanOrEqual(0.5);
@@ -188,7 +194,7 @@ describe("generated adventures are completable by the real controller at miniatu
 
   it.each(CASES)("%s — reach the beacon", async (_label, make) => {
     const fixture = make();
-    const detail = generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template: "reach-beacon", seed: `controller-${fixture.name}` });
+    const detail = generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template: "reach-beacon", seed: `controller-${fixture.name}` }, DEFAULT_ADVENTURE_BUDGET, unhurried());
     const floor = detail.chain[0]![1];
     expect(detail.chain.at(-1)![1] - floor).toBeGreaterThanOrEqual(0.5);
     const result = await drive(fixture, detail);
@@ -198,7 +204,7 @@ describe("generated adventures are completable by the real controller at miniatu
 
   it("crosses the generated jump gap on a flat scene", async () => {
     const fixture = countertopFixture();
-    const detail = generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template: "reach-beacon", seed: "controller-countertop" });
+    const detail = generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template: "reach-beacon", seed: "controller-countertop" }, DEFAULT_ADVENTURE_BUDGET, unhurried());
     expect(detail.structures.map((structure) => structure.kind)).toContain("platform-route");
     const jumps = detail.report.segments.flatMap((segment) => segment.transitions).filter((t) => t.kind === "jump" && Math.abs(t.heightChange) < 0.05);
     expect(jumps.length).toBeGreaterThan(0);

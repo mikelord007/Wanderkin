@@ -26,7 +26,7 @@ import {
   runtimeCentreFromAuthored,
   surfaceFromAuthoredCentre,
 } from "./geometry.js";
-import { WorkDeadline } from "./workBudget.js";
+import { ADVENTURE_TIME_BUDGET_MS, WorkDeadline } from "./workBudget.js";
 import { bedFixture, boxSoup, countertopFixture, deskFixture, loadedAssets, lowCeilingFixture, poorFixture, sampleScanFixture } from "./geometryFixtures.js";
 import { validateRoute } from "../scene/route.js";
 import { getBiomeDefinition } from "./presets.js";
@@ -34,6 +34,12 @@ import { TriangleGrid } from "../scene/spatial.js";
 
 const RUNTIME = toMiniatureScale(DEFAULT_MOVEMENT_CONFIG);
 const AUTHORED = DEFAULT_MOVEMENT_CONFIG;
+
+/** The production limit on a clock that never advances. Tests that check
+ * layouts (not the budget) pass this so the wall-clock 2 s default cannot
+ * refuse a slow scene on a loaded machine and fail them for an unrelated
+ * reason. The budget itself is tested with step clocks below. */
+const unhurried = () => new WorkDeadline(ADVENTURE_TIME_BUDGET_MS, () => 0);
 
 describe("centre conventions", () => {
   it("round-trips authored centres and matches the simulation's re-seat", () => {
@@ -67,7 +73,7 @@ describe("prepareAdventure", () => {
   it.each(cases.map((make) => [make().name, make] as const))("%s: both templates produce a validated, schema-valid draft", (_name, make) => {
     const fixture = make();
     for (const template of ["restore-portal", "reach-beacon"] as const) {
-      const outcome = prepareAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template, seed: "t1" });
+      const outcome = prepareAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template, seed: "t1" }, unhurried());
       expect(outcome.ok, outcome.diagnostics.join(" ")).toBe(true);
       const manifest = outcome.manifest;
       expect(manifest.levelId).not.toBe(fixture.manifest.levelId);
@@ -105,7 +111,7 @@ describe("prepareAdventure", () => {
   it("is deterministic for a seed and varies with the seed", () => {
     const fixture = deskFixture();
     const run = (seed: string) =>
-      generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template: "restore-portal", seed });
+      generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template: "restore-portal", seed }, DEFAULT_ADVENTURE_BUDGET, unhurried());
     const a = run("same");
     const b = run("same");
     expect(b.chain).toEqual(a.chain);
@@ -125,7 +131,7 @@ describe("prepareAdventure", () => {
         seed: "theme",
         definition: getBiomeDefinition(id),
         quality: "standard",
-      });
+      }, unhurried());
       if (!outcome.ok) throw new Error(outcome.reason);
       const { spawn, checkpoints, entities, experience } = outcome.manifest;
       return JSON.stringify({
@@ -141,9 +147,9 @@ describe("prepareAdventure", () => {
 
   it("replaces its own structures on regeneration instead of stacking them", () => {
     const fixture = deskFixture();
-    const first = prepareAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template: "reach-beacon", seed: "r1" });
+    const first = prepareAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template: "reach-beacon", seed: "r1" }, unhurried());
     if (!first.ok) throw new Error(first.reason);
-    const second = prepareAdventure({ manifest: first.manifest, assets: fixture.assets, movement: RUNTIME, template: "reach-beacon", seed: "r1" });
+    const second = prepareAdventure({ manifest: first.manifest, assets: fixture.assets, movement: RUNTIME, template: "reach-beacon", seed: "r1" }, unhurried());
     if (!second.ok) throw new Error(second.reason);
     const generated = (manifest: SceneManifest) => manifest.entities.filter((e) => e.id.startsWith(ADVENTURE_HELPER_PREFIX));
     expect(generated(second.manifest)).toEqual(generated(first.manifest));
@@ -152,7 +158,7 @@ describe("prepareAdventure", () => {
 
   it("keeps a valid source spawn exactly and never buries it", () => {
     const fixture = deskFixture();
-    const detail = generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template: "restore-portal", seed: "spawn" });
+    const detail = generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template: "restore-portal", seed: "spawn" }, DEFAULT_ADVENTURE_BUDGET, unhurried());
     expect(detail.manifest.spawn.position).toEqual(fixture.manifest.spawn.position);
     const spawnSurface = surfaceFromAuthoredCentre(detail.manifest.spawn.position, AUTHORED);
     for (const entity of detail.manifest.entities.filter((e) => e.id.startsWith(ADVENTURE_HELPER_PREFIX))) {
@@ -166,7 +172,7 @@ describe("prepareAdventure", () => {
 
   it("puts every objective on a real surface with its trigger at the authored centre", () => {
     const fixture = countertopFixture();
-    const detail = generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template: "restore-portal", seed: "surface" });
+    const detail = generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template: "restore-portal", seed: "surface" }, DEFAULT_ADVENTURE_BUDGET, unhurried());
     const experience = detail.manifest.experience!;
     const points = [...experience.collectibles.map((c) => c.transform.position), experience.finishPortal!.transform.position];
     points.forEach((position, index) => {
@@ -176,9 +182,9 @@ describe("prepareAdventure", () => {
   });
 
   it("adds a modest elevated route to a flat scene, and stairs to a multi-height one", () => {
-    const flat = generateAdventure({ ...inputs(countertopFixture()), template: "reach-beacon", seed: "flat" });
+    const flat = generateAdventure({ ...inputs(countertopFixture()), template: "reach-beacon", seed: "flat" }, DEFAULT_ADVENTURE_BUDGET, unhurried());
     expect(flat.structures.map((s) => s.kind)).toContain("platform-route");
-    const desk = generateAdventure({ ...inputs(deskFixture()), template: "reach-beacon", seed: "desk" });
+    const desk = generateAdventure({ ...inputs(deskFixture()), template: "reach-beacon", seed: "desk" }, DEFAULT_ADVENTURE_BUDGET, unhurried());
     expect(desk.structures.map((s) => s.kind)).toContain("staircase");
     // Generated structures stay inside the existing floor footprint.
     for (const detail of [flat, desk]) {
@@ -195,7 +201,7 @@ describe("prepareAdventure", () => {
   });
 
   it("falls back to a simplified game floor for a floorless poor scan", () => {
-    const detail = generateAdventure({ ...inputs(poorFixture(false)), template: "restore-portal", seed: "poor" });
+    const detail = generateAdventure({ ...inputs(poorFixture(false)), template: "restore-portal", seed: "poor" }, DEFAULT_ADVENTURE_BUDGET, unhurried());
     expect(detail.fallbackStage).toBe("game-floor");
     expect(detail.fallbackUsed).toBe(true);
     expect(detail.manifest.entities.some((e) => e.id === `${ADVENTURE_HELPER_PREFIX}floor`)).toBe(true);
@@ -206,11 +212,11 @@ describe("prepareAdventure", () => {
     // Nothing to stand on at all: a lone sliver of geometry and no floor.
     const manifest: SceneManifest = { ...fixture.manifest, entities: fixture.manifest.entities.filter((e) => e.kind === "generated-mesh") };
     const sliver = loadedAssets(fixture.manifest.assets[0]!.id, boxSoup([0, 0, 0], [0.05, 3, 0.05]));
-    const outcome = prepareAdventure({ manifest, assets: sliver, movement: RUNTIME, template: "restore-portal", seed: "x" });
+    const outcome = prepareAdventure({ manifest, assets: sliver, movement: RUNTIME, template: "restore-portal", seed: "x" }, unhurried());
     // A simplified floor is still added, so even this is playable; the
     // point is that a missing asset is reported, not thrown.
     expect(typeof outcome.ok).toBe("boolean");
-    const missing = prepareAdventure({ manifest, assets: new Map(), movement: RUNTIME, template: "restore-portal", seed: "x" });
+    const missing = prepareAdventure({ manifest, assets: new Map(), movement: RUNTIME, template: "restore-portal", seed: "x" }, unhurried());
     expect(missing.ok).toBe(false);
     if (!missing.ok) {
       expect(missing.reason).toBe("geometry-unavailable");
@@ -220,7 +226,8 @@ describe("prepareAdventure", () => {
 
   it("refuses honestly when no playable layout exists, even after the floor fallback", () => {
     const fixture = lowCeilingFixture();
-    const outcome = prepareAdventure({ ...inputs(fixture), template: "restore-portal", seed: "impossible" });
+    // Unhurried, so the refusal comes from exhausting layouts, never the clock.
+    const outcome = prepareAdventure({ ...inputs(fixture), template: "restore-portal", seed: "impossible" }, unhurried());
     expect(outcome.ok).toBe(false);
     if (!outcome.ok) {
       expect(outcome.reason).toBe("no-playable-layout");
@@ -241,19 +248,19 @@ describe("prepareAdventure", () => {
     // A world the generator never touched: a same-prefix entity is preserved,
     // and the generated ids steer around it.
     const untouched: SceneManifest = { ...fixture.manifest, entities: [...fixture.manifest.entities, foreign] };
-    const outcome = prepareAdventure({ manifest: untouched, assets: fixture.assets, movement: RUNTIME, template: "reach-beacon", seed: "own" });
+    const outcome = prepareAdventure({ manifest: untouched, assets: fixture.assets, movement: RUNTIME, template: "reach-beacon", seed: "own" }, unhurried());
     if (!outcome.ok) throw new Error(outcome.reason);
     expect(outcome.manifest.entities).toContainEqual(foreign);
     expect(new Set(outcome.manifest.entities.map((e) => e.id)).size).toBe(outcome.manifest.entities.length);
     // Original, non-generated entities always survive regeneration.
-    const again = prepareAdventure({ manifest: outcome.manifest, assets: fixture.assets, movement: RUNTIME, template: "reach-beacon", seed: "own-2" });
+    const again = prepareAdventure({ manifest: outcome.manifest, assets: fixture.assets, movement: RUNTIME, template: "reach-beacon", seed: "own-2" }, unhurried());
     if (!again.ok) throw new Error(again.reason);
     for (const entity of fixture.manifest.entities) expect(again.manifest.entities).toContainEqual(entity);
   });
 
   it("owns planner ramps too: themed, removed on regeneration, never stacked; foreign ramps kept", () => {
     const fixture = deskFixture();
-    const first = prepareAdventure({ ...inputs(fixture), template: "reach-beacon", seed: "ramp" });
+    const first = prepareAdventure({ ...inputs(fixture), template: "reach-beacon", seed: "ramp" }, unhurried());
     if (!first.ok) throw new Error(first.reason);
     // What step 1 keeps when the course planner finds a ramp: renamed into
     // this module's namespace, still a triangle-mesh wedge.
@@ -270,13 +277,13 @@ describe("prepareAdventure", () => {
     expect(adventureStructures(withRamps)).toContainEqual(plannerRamp);
     expect(adventureStructures(withRamps)).not.toContainEqual(foreignRamp);
 
-    const again = prepareAdventure({ ...inputs(fixture), manifest: withRamps, template: "reach-beacon", seed: "ramp" });
+    const again = prepareAdventure({ ...inputs(fixture), manifest: withRamps, template: "reach-beacon", seed: "ramp" }, unhurried());
     if (!again.ok) throw new Error(again.reason);
     expect(again.manifest.entities).not.toContainEqual(plannerRamp);
     expect(again.manifest.entities).toContainEqual(foreignRamp);
     const generated = (manifest: SceneManifest) => manifest.entities.filter((e) => isOwnGeneratedHelper(manifest, e));
     // Regenerating once more keeps exactly one set of structures.
-    const third = prepareAdventure({ ...inputs(fixture), manifest: again.manifest, template: "reach-beacon", seed: "ramp" });
+    const third = prepareAdventure({ ...inputs(fixture), manifest: again.manifest, template: "reach-beacon", seed: "ramp" }, unhurried());
     if (!third.ok) throw new Error(third.reason);
     expect(generated(third.manifest)).toEqual(generated(again.manifest));
     expect(third.manifest.entities.filter((e) => e.id === foreignRamp.id)).toHaveLength(1);
@@ -287,7 +294,7 @@ describe("prepareAdventure", () => {
     for (const make of [deskFixture, countertopFixture, bedFixture]) {
       const fixture = make();
       for (const template of ["restore-portal", "reach-beacon"] as const) {
-        const detail = generateAdventure({ ...inputs(fixture), template, seed: "respawn" });
+        const detail = generateAdventure({ ...inputs(fixture), template, seed: "respawn" }, DEFAULT_ADVENTURE_BUDGET, unhurried());
         const analysis = analyzeManifest(detail.manifest, assetGeometryFromLoaded(fixture.assets), RUNTIME);
         const checkpoints = [...detail.manifest.checkpoints].sort((a, b) => a.order - b.order);
         // The chain is spawn, objectives..., exit; checkpoint k sits on a
@@ -309,8 +316,10 @@ describe("prepareAdventure", () => {
       for (const authoredSteps of [false, true]) {
         const fixture = sampleScanFixture(id, authoredSteps);
         for (const template of ["restore-portal", "reach-beacon"] as const) {
+          // Unhurried so a slow run fails the timing bound below with its
+          // measured number, not as an opaque budget refusal.
           const started = performance.now();
-          const outcome = prepareAdventure({ ...inputs(fixture), template, seed: "timing" });
+          const outcome = prepareAdventure({ ...inputs(fixture), template, seed: "timing" }, unhurried());
           timings[`${fixture.name}/${template}`] = Math.round(performance.now() - started);
           expect(outcome.ok).toBe(true);
           // Real scans reach a raised surface (the old planner stayed on the floor).
@@ -347,7 +356,7 @@ describe("adventure work budget", () => {
     const fixture = poorFixture(false);
     const request = { ...inputs(fixture), template: "restore-portal" as const, seed: "budget" };
     const source = JSON.stringify(fixture.manifest);
-    const reference = generateAdventure(request);
+    const reference = generateAdventure(request, DEFAULT_ADVENTURE_BUDGET, unhurried());
     expect(reference.fallbackStage).toBe("game-floor");
 
     const counted = new StageLog(Infinity, stepClock());

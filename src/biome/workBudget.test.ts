@@ -66,7 +66,12 @@ describe("worst-case refusal on a real scan", () => {
 
     force.on = true;
     try {
-      const deadline = new WorkDeadline();
+      // The production limit on a clock that never advances, so every loop of
+      // both attempts runs and is refused. With the wall clock, a loaded
+      // machine let the 2 s budget stop it after as few as 11 checks, making
+      // the check count below depend on CPU contention. The budget itself is
+      // covered with an injected clock above and in adventures.test.ts.
+      const deadline = new WorkDeadline(ADVENTURE_TIME_BUDGET_MS, () => 0);
       const started = performance.now();
       const outcome = prepareAdventure(request, deadline);
       const elapsed = performance.now() - started;
@@ -77,9 +82,9 @@ describe("worst-case refusal on a real scan", () => {
         expect(outcome.manifest).toBe(manifest);
       }
       expect(JSON.stringify(manifest)).toBe(source);
-      // Either both attempts were exhausted (about 60 checks, 1.2–1.3 s here)
-      // or the deadline stopped it. Bounded by the budget plus one stage; the
-      // margin absorbs a loaded machine without making this a timing test.
+      // Both attempts are exhausted (about 60 checks, 1.2–1.3 s here). The
+      // bound is the budget plus a generous margin; it absorbs a loaded
+      // machine without making this a timing test.
       expect(deadline.checkCount).toBeGreaterThan(10);
       expect(elapsed).toBeLessThan(ADVENTURE_TIME_BUDGET_MS + 8000);
     } finally {

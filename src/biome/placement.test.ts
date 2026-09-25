@@ -3,7 +3,7 @@ import { DEFAULT_MOVEMENT_CONFIG, type SceneManifest } from "@shared/index.js";
 import { capsuleHeight, toMiniatureScale } from "../game/core/characterScale.js";
 import { createGameFloor } from "../scene/helpers.js";
 import { validateRoute } from "../scene/route.js";
-import { generateAdventure } from "./adventures.js";
+import { DEFAULT_ADVENTURE_BUDGET, generateAdventure } from "./adventures.js";
 import { analyzeManifest, assetGeometryFromLoaded, raycastDown, surfaceFromAuthoredCentre } from "./geometry.js";
 import { bedFixture, countertopFixture, deskFixture, poorFixture, sampleScanFixture, type GeometryFixture } from "./geometryFixtures.js";
 import { PROP_FOOTPRINT_RATIO, computeGameplayExclusions, groveOrder, groveScale, prepareBiomeLayout, segmentDistance } from "./placement.js";
@@ -11,9 +11,15 @@ import { getBiomeDefinition } from "./presets.js";
 import { PROP_UNIT_RADIUS } from "./render/propGeometry.js";
 import type { BiomeLayout, BiomeId } from "./types.js";
 import { seededRandom } from "./render/selection.js";
+import { ADVENTURE_TIME_BUDGET_MS, WorkDeadline } from "./workBudget.js";
 
 const RUNTIME = toMiniatureScale(DEFAULT_MOVEMENT_CONFIG);
 const BODY = capsuleHeight(RUNTIME);
+
+/** The production limit on a clock that never advances: these tests only need
+ * a generated adventure to decorate, so a loaded machine must not turn a slow
+ * generation into a 2 s budget refusal (the budget has its own tests). */
+const unhurried = () => new WorkDeadline(ADVENTURE_TIME_BUDGET_MS, () => 0);
 
 function layoutFor(fixture: { manifest: SceneManifest; assets: GeometryFixture["assets"] }, biome: BiomeId, seed = "layout", quality: "standard" | "reduced" = "standard"): BiomeLayout {
   return prepareBiomeLayout({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, definition: getBiomeDefinition(biome), seed, quality });
@@ -113,7 +119,7 @@ describe("prepareBiomeLayout", () => {
   it.each(FIXTURES.map((make) => [make().name, make] as const))("%s: props stay off a generated adventure's route, jumps and objectives", (_name, make) => {
     const fixture = make();
     for (const template of ["restore-portal", "reach-beacon"] as const) {
-      const adventure = generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template, seed: "route" });
+      const adventure = generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template, seed: "route" }, DEFAULT_ADVENTURE_BUDGET, unhurried());
       const played = { manifest: adventure.manifest, assets: fixture.assets };
       for (const biome of ["tropical", "desert"] as const) {
         const layout = layoutFor(played, biome);
@@ -183,7 +189,7 @@ describe("prepareBiomeLayout", () => {
 
   it("reserves jump take-offs, landings and mantle climbs", () => {
     const fixture = countertopFixture();
-    const adventure = generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template: "reach-beacon", seed: "controller-countertop" });
+    const adventure = generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template: "reach-beacon", seed: "controller-countertop" }, DEFAULT_ADVENTURE_BUDGET, unhurried());
     const analysis = analyzeManifest(adventure.manifest, assetGeometryFromLoaded(fixture.assets), RUNTIME);
     const exclusions = computeGameplayExclusions(adventure.manifest, analysis);
     expect(exclusions.certain).toBe(true);
@@ -199,7 +205,7 @@ describe("prepareBiomeLayout", () => {
 
   it("follows the race order even when the checkpoint array is stored out of order", () => {
     const fixture = deskFixture();
-    const adventure = generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template: "restore-portal", seed: "race-order" });
+    const adventure = generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template: "restore-portal", seed: "race-order" }, DEFAULT_ADVENTURE_BUDGET, unhurried());
     const sorted = [...adventure.manifest.checkpoints].sort((a, b) => a.order - b.order);
     expect(sorted.length).toBeGreaterThanOrEqual(3);
     const race: SceneManifest = {

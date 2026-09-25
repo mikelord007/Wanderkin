@@ -11,10 +11,16 @@ import { prepareBiomeLayout } from "./placement.js";
 import { getBiomeDefinition } from "./presets.js";
 import { adventureHudCopy } from "./missionCopy.js";
 import type { AdventureTemplateId } from "./types.js";
+import { ADVENTURE_TIME_BUDGET_MS, WorkDeadline } from "./workBudget.js";
 
 const runtime = toMiniatureScale(DEFAULT_MOVEMENT_CONFIG);
 const authored = DEFAULT_MOVEMENT_CONFIG;
 const TEMPLATES: AdventureTemplateId[] = ["restore-portal", "reach-beacon"];
+
+/** The production limit on a clock that never advances. These contracts
+ * compare layouts across runs; on a loaded machine the wall-clock 2 s default
+ * could refuse one run and not another, which is not what they test. */
+const unhurried = () => new WorkDeadline(ADVENTURE_TIME_BUDGET_MS, () => 0);
 
 /** Everything that decides where the player goes and what they must reach. */
 function traversal(manifest: SceneManifest) {
@@ -38,8 +44,8 @@ describe.each(GEOMETRY_FIXTURES.map((make) => [make().name, make] as const))("fi
   for (const template of TEMPLATES) {
     it(`${template}: runtime or authored input give the same authored-scale result (no double shrink)`, () => {
       const fixture = make();
-      const fromRuntime = prepareAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: runtime, template, seed: "contract" });
-      const fromAuthored = prepareAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: authored, template, seed: "contract" });
+      const fromRuntime = prepareAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: runtime, template, seed: "contract" }, unhurried());
+      const fromAuthored = prepareAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: authored, template, seed: "contract" }, unhurried());
       expect(fromRuntime.ok).toBe(fromAuthored.ok);
       // Everything except generation timestamps must match exactly.
       const stable = (m: SceneManifest) => JSON.stringify({ ...m, updatedAt: null,
@@ -56,9 +62,9 @@ describe.each(GEOMETRY_FIXTURES.map((make) => [make().name, make] as const))("fi
     it(`${template}: the look never moves objectives, and the result survives the integration gate and loader`, () => {
       const fixture = make();
       const base = { manifest: fixture.manifest, assets: fixture.assets, movement: runtime, template, seed: "same-seed" };
-      const neutral = prepareAdventure(base);
-      const tropical = prepareAdventure({ ...base, definition: getBiomeDefinition("tropical"), quality: "standard" });
-      const desert = prepareAdventure({ ...base, definition: getBiomeDefinition("desert"), quality: "reduced" });
+      const neutral = prepareAdventure(base, unhurried());
+      const tropical = prepareAdventure({ ...base, definition: getBiomeDefinition("tropical"), quality: "standard" }, unhurried());
+      const desert = prepareAdventure({ ...base, definition: getBiomeDefinition("desert"), quality: "reduced" }, unhurried());
       expect(tropical.ok).toBe(neutral.ok);
       expect(desert.ok).toBe(neutral.ok);
       if (!neutral.ok) {
