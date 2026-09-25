@@ -41,6 +41,7 @@ import { createLevel, downloadLevelBundle, getLevel, getSharedLevel, publishLeve
 import { createRaceVariant } from "./game/modes/raceVariant.js";
 import type { GameCompletionResult } from "./game/types.js";
 import {
+  clearActiveCreationId,
   loadActiveCreation,
   loadCreationWorldItems,
   setActiveCreationId,
@@ -327,6 +328,20 @@ export function App() {
 
   const goStart = useCallback(() => go({ name: "start" }), [go]);
 
+  // The creation journey's only exit back to Start happens from its very
+  // first step (CaptureScreen's Back), before any photo or job exists — so
+  // nothing durable is ever lost here. But `persist()` already wrote this
+  // still-empty record as the active creation, and nothing else clears that
+  // pointer: without this, `resolveSyncScreen`'s "start"/"worlds" case would
+  // find it on the very next visit to "/" and silently reopen Create instead
+  // of showing the landing page the user just backed out to. Clearing only
+  // the pointer (not the record) still leaves it resumable as a Draft card
+  // via My worlds if one was ever actually created.
+  const handleCreationBack = useCallback(() => {
+    clearActiveCreationId();
+    goStart();
+  }, [goStart]);
+
   const handleJobStarted = useCallback((jobId: string) => {
     // PhotosScreen already persisted the ActiveSource record (kind "job",
     // with its source photos) and cleared the PendingSubmission the moment
@@ -448,7 +463,7 @@ export function App() {
       );
 
     case "photos":
-      return <PhotosScreen onJobStarted={handleJobStarted} onBack={goStart} />;
+      return <PhotosScreen onJobStarted={handleJobStarted} onBack={handleCreationBack} />;
 
     case "generation":
       return (
