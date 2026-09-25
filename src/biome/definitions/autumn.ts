@@ -23,8 +23,10 @@ export const AUTUMN: BiomeDefinition = {
     accent: "#c2412f",
     water: "#6a9aa8",
   },
-  // Soft golden light through a light mist.
-  lighting: { sun: "#ffd79a", sky: "#e9dcc4", ground: "#c9a878", intensity: 2.2, ambient: 0.82, direction: [4, 5.5, -3] },
+  // Soft golden light through a light mist. The low sun comes from the
+  // front-left, like the other looks: from behind, it left furniture
+  // undersides (the Tripo sofa) as flat black cutouts (wave-2 review A1).
+  lighting: { sun: "#ffd79a", sky: "#e9dcc4", ground: "#c9a878", intensity: 2.2, ambient: 0.82, direction: [-4, 4.2, 4] },
   // A warm golden haze a little closer in, so far groves soften into mist.
   sky: { zenith: "#8aa9c4", horizon: "#efdcb8", fogNear: 1.3, fogFar: 5.8 },
   surface: { color: "#9c8674", blend: 0.36, upwardNormalMin: 0.8, patchCoverage: 0.6 },
