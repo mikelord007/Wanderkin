@@ -523,24 +523,56 @@ diff directly:
 mismatch I flagged is gone: the hash actually used for region gating is now, in fact, computed
 from the fetched bytes at load time, exactly as `materialRegions.ts` always claimed.
 
-### Matched-underside evidence (`after-sofa-underside-relit-floor-fixed.png`) — one precision note, not a defect
+### Correction: the "matched" sofa-underside pair is NOT a controlled comparison — retracting the "matched" framing
 
-The new "after" screenshot **is** captured at the exact documented spawn coordinates
-(`[-4.02, 0.09, -1.086]`, cross-checked against my own live diagnostics below: real spawn
-reads `[-4.02, 0.1075, -1.086]` — same x/z exactly, y differs by ~2 cm, consistent with normal
-skin/settling variance, not a different point). However, viewing
-`before-sofa-underside-baked-flat.png` and the new `after-sofa-underside-relit-floor-fixed.png`
-side by side, the apparent field of view and boom distance visibly differ between the two
-(more terrain and a shifted sun-icon position in the "after" shot) — because the "before" shot
-was captured when `fc121b1` first landed, **before** the scale/camera owner's `13caa6b`
-(wider FOV, longer pull-back boom) existed, while the "after" shot was captured at the current
-tip, **after** `13caa6b`. So this specific pair is same-world-position but not
-same-camera-parameters — it closes the "no after image existed at all" gap I raised, but isn't
-quite the single-variable comparison its framing implies. This does not undermine the fix
-itself: the `underfurniture-crush-fix/` set (reviewed above) *is* a genuinely
-camera-frozen, single-variable comparison and independently proves the same fix. Noting this
-precisely rather than either rejecting the new evidence or accepting the "matched" framing at
-face value.
+On re-check (prompted by the coordinator, who was right to push back): matching *spawn
+coordinates* is not the same claim as matching *camera*, and I should have led with that
+distinction more forcefully the first time instead of calling it a "precision note." Retracting
+the implication that this pair is any kind of controlled evidence, and correcting the record
+rather than asking the material worker to reshoot anything.
+
+**Position match, confirmed real**: the new "after" screenshot is genuinely captured at the
+documented spawn coordinates (`[-4.02, 0.09, -1.086]`; my own live diagnostics below
+independently read `[-4.02, 0.1075, -1.086]` for the same spawn — identical x/z, ~2 cm y
+difference consistent with normal skin/settling, not a different point).
+
+**Camera match: false, confirmed with hard evidence, not just eyeballing.** Checked
+`git log --follow` on both files directly:
+
+| File | Committed at | Time |
+| --- | --- | --- |
+| `before-sofa-underside-baked-flat.png` | `fc121b1` | 07:21:12 |
+| `13caa6b` (FOV 55→72, `CAMERA_MINIATURE_PULLBACK_RATIO` boom change) | — | 07:26:40 |
+| `after-sofa-underside-relit-floor-fixed.png` | `7ec73b2` | 08:00:15 |
+
+The "before" image was committed **5.5 minutes before** `13caa6b` landed; the "after" image was
+committed **33 minutes after** it. There is no way for the "before" shot to reflect the
+post-`13caa6b` camera — it was captured under the old FOV 55 / short boom, full stop. This
+isn't inference from vibes: also stacked the two images at native 1:1 pixel scale (same method
+used to verify the scale worker's own before/after pair earlier in this review) and the
+difference is the unmistakable FOV/boom signature, not a lighting artifact — the "after" frame
+shows a visibly smaller character, a shifted/smaller sun icon, and a wide extra patch of floor
+to the right that is entirely out of frame in the "before" shot. This is the same visual
+signature as the scale checkpoint's own `h035-before` vs `h0175-pullback-fov72` pair.
+
+**Conclusion, stated plainly**: this pair conflates two independent changes (material relight
++ floor-fix, and an unrelated camera FOV/boom change from a different worker's commit landing
+in between the two captures). It is **not** evidence for or against the lighting/floor fix, in
+either direction, and I did not and do not use it that way — my actual basis for confirming the
+`28fa5d2` fix works is (1) the `underfurniture-crush-fix/` set, which *is* genuinely
+camera-frozen (per its own stated method: only the four material files were reverted/restored,
+`GameStage.tsx` and every scale-owned file were never touched for that comparison) and (2) my
+own live re-render at the frozen `7ec73b2` tip in the final-verification section below, which
+observes the current, single, real build state directly rather than comparing two different
+historical states at all. The new sofa-underside pair only ever demonstrated position-matching,
+which is enough to close "no after-image existed" but not enough to call it "matched" in the
+full sense implied — that framing is retracted here, not carried forward. No production edit is
+needed to fix this: it's a mischaracterization of existing evidence, not a code or asset defect,
+and reshooting it under the current camera would just produce a third data point, not a
+requirement.
+
+This does not change the "does it work" verdict below at all — the `underfurniture-crush-fix/`
+set already independently proved it, and does so without relying on this pair.
 
 ## Final combined verification (this session, at the frozen `7ec73b2` tip)
 
@@ -606,11 +638,15 @@ face value.
 - **Shadow-map reduced-motion fallback** (third-pass finding 4): unchanged, still an honest,
   disclosed limitation — an accessibility signal reused for cost reduction, not a genuine
   GPU-capability check. Not revisited or re-litigated this pass.
-- **One remaining precision note** (not a blocking defect): the new matched
-  sofa-underside screenshot pair is position-matched but spans a camera-parameter change from
-  an unrelated commit (`13caa6b`), so it is weaker evidence than its "matched" framing implies
-  — though the fix's correctness is independently proven by both the properly camera-frozen
-  `underfurniture-crush-fix/` set and my own live re-render above.
+- **Correction, retracted, not just noted**: the new "matched" sofa-underside screenshot pair
+  is **not** a controlled comparison — confirmed with hard evidence (`git log --follow`
+  timestamps show the "before" image predates `13caa6b`'s camera FOV/boom change by 5.5
+  minutes and the "after" image postdates it by 33 minutes; a native-scale pixel stack of the
+  two shows the unmistakable FOV/boom signature, not a lighting-only difference). It is not
+  usable as evidence for or against the lighting/floor fix in either direction, and was not
+  used that way for the actual verdict below — see the dedicated correction above. This is a
+  mischaracterization in the evidence description, not a code or asset problem, and does not
+  call for any production edit or reshoot.
 
 ## Final verdict
 
@@ -618,9 +654,12 @@ face value.
 frozen material/lighting/region-identity work. Both concrete gaps raised in my third pass
 (the hash-gating doc/implementation mismatch, and the missing underside evidence) are now
 correctly closed by `7ec73b2` and `28fa5d2`/`7ec73b2` respectively, verified by reading the
-actual diffs and re-deriving the reasoning rather than trusting the checkpoint prose, plus one
-live, independent real-Chrome re-render at the exact frozen tip showing both the new camera
-framing and the no-longer-crushed underside working correctly with zero console/page errors.
+actual diffs and re-deriving the reasoning rather than trusting the checkpoint prose. The
+approval below rests on the `underfurniture-crush-fix/` set (genuinely camera-frozen, per its
+own stated method) and my own live re-render at the frozen tip — **not** on the "matched"
+sofa-underside pair, which is retracted as controlled evidence above. That live re-render
+independently shows both the new camera framing and the no-longer-crushed underside working
+correctly with zero console/page errors.
 Full typecheck, full unit suite (505/505), and a full production build all pass cleanly at
 this tip. This is not a blanket "everything in the project is done" — it is a scoped approval
 of exactly the material/lighting/camera-identity commits reviewed across these four passes;
