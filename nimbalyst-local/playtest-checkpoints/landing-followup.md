@@ -164,15 +164,42 @@ against an in-memory `Storage`, not a mock of them:
   via "← Back", 3 times) and confirms My Worlds shows zero "Resume" buttons and no "Untitled world" text
   afterward — closes the loop from the pure-storage unit tests up through the real wired `App.tsx` handler.
 
-Regression pass (isolated temp port, sequential — not run concurrently with any other disposable Vite
-instance, so the previously-reported shared-cache collision does not apply; did not touch the shared/
-protected `vite.config.ts` or `tests/e2e/browser/playwright.config.ts` to add a dedicated cache dir, since
-neither is in this task's ownership and sequential unique ports already avoid the collision): both
-`landing-resume.test.ts` cases plus the new repeated-cycle case, and existing `B6`/`B10`/`B11`/both `B19`
-contracts — 8/8 pass. `B19`'s own "creation jobs" case seeds a `step: "customize"` draft record precisely to
-assert it still shows a "Resume" action; confirms this fix does not touch any record beyond a truly
-untouched `step: "photo"` one. `npx vitest run src/ui/creationFlow.test.ts src/ui/creationStorage.test.ts
-src/ui/routing.test.ts src/ui/jobStorage.test.ts` → 29/29 pass. `tsc --noEmit` (app + server) clean.
+Regression pass (isolated temp port, sequential relative to my own other runs): both `landing-resume.test.ts`
+cases plus the new repeated-cycle case, and existing `B6`/`B10`/`B11`/both `B19` contracts — 8/8 pass.
+`B19`'s own "creation jobs" case seeds a `step: "customize"` draft record precisely to assert it still shows
+a "Resume" action; confirms this fix does not touch any record beyond a truly untouched `step: "photo"` one.
+`npx vitest run src/ui/creationFlow.test.ts src/ui/creationStorage.test.ts src/ui/routing.test.ts
+src/ui/jobStorage.test.ts` → 29/29 pass. `tsc --noEmit` (app + server) clean.
+
+**Correction (evidence-checked, not just re-asserted):** the line originally here claimed "sequential unique
+ports already avoid the collision" with the shared Vite dep-optimizer cache. That claim was false and has
+been removed. "Sequential" only ever meant *my own* disposable runs didn't overlap each other — it said
+nothing about the two **persistent** dev servers on `5173`/`15173`, which were running the entire time these
+regression passes ran and share the exact same `node_modules/.vite` cache dir as any disposable instance
+launched from this same checkout, regardless of port. That is precisely the shape of the earlier brand
+incident. The claim should never have been written without checking for exactly that overlap; noted here so
+it isn't repeated. A bounded, read-only, actual-Chrome check of both persistent servers afterward (see
+below) found no resulting breakage this time, but that is a fact about this particular run's luck/timing,
+not something the sequential-ports reasoning actually guaranteed. Going forward, any disposable Vite
+instance in this repo must use a private `cacheDir` (a throwaway `--config` file under a session-local temp
+dir, no edit to the shared/protected `vite.config.ts` or `playwright.config.ts` needed) — not implemented in
+this session per explicit instruction (no new Vite processes, no cache-service changes), left as a
+requirement for whoever next runs disposable Vite here.
+
+**Read-only verification of the two persistent servers (no server started/restarted/modified):** confirmed
+both are actually listening first — `5173` only on the IPv6 loopback (`[::1]:5173`, so `curl 127.0.0.1:5173`
+alone misleadingly reports connection failure; `localhost:5173` resolves correctly), `15173` on
+`127.0.0.1:15173` — then loaded each in a real headless Chrome (`playwright-core`, `channel: "chrome"`,
+scratch script run from and deleted immediately after, under `nimbalyst-local/`, nothing committed) and
+inspected every network response, not just the root document:
+- `http://localhost:5173/` — 125 requests observed, 0 with status `0` or `>=400`, 0 console errors, 0 page
+  errors.
+- `http://127.0.0.1:15173/` — 122 requests observed, 0 with status `0` or `>=400`, 0 console errors, 0 page
+  errors.
+
+**No breakage found on either persistent server right now.** Both currently serve cleanly. This is a
+snapshot, not a guarantee for future disposable runs against the same shared cache — see the correction
+above.
 
 Did not touch: `worker27653085`'s stash or any of its FinishScreen/capture-media files (per explicit
 instruction — clarification still pending on that side, untouched); the two live scale/material workers'
