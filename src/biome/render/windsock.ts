@@ -31,6 +31,11 @@ function colored(geometry: THREE.BufferGeometry, color: THREE.Color): THREE.Buff
   for (let i = 0; i < count; i += 1) color.toArray(colors, i * 3);
   flat.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   flat.setAttribute("aSway", new THREE.BufferAttribute(new Float32Array(count), 1));
+  // Local pivot at the mesh origin, unit height: the prop shader's fade then
+  // scales with the windsock's world size. It never sways (aSway = 0).
+  const pivots = new Float32Array(count * 4);
+  for (let i = 0; i < count; i += 1) pivots[i * 4 + 3] = 1;
+  flat.setAttribute("aPivot", new THREE.BufferAttribute(pivots, 4));
   return flat;
 }
 
@@ -124,7 +129,7 @@ function mergeAll(parts: THREE.BufferGeometry[], doubleSided = false): THREE.Buf
   let vertexCount = 0;
   for (const g of out) vertexCount += g.getAttribute("position").count;
   const merged = new THREE.BufferGeometry();
-  for (const [name, size] of [["position", 3], ["normal", 3], ["color", 3], ["aSway", 1]] as const) {
+  for (const [name, size] of [["position", 3], ["normal", 3], ["color", 3], ["aSway", 1], ["aPivot", 4]] as const) {
     const array = new Float32Array(vertexCount * size);
     let offset = 0;
     for (const g of out) {

@@ -72,7 +72,7 @@ describe("biome decoration layer", () => {
   });
 
   for (const id of ["tropical", "desert"] as const) {
-    it(`${id}: instanced by kind, only its own kinds, inside every budget`, () => {
+    it(`${id}: props merged into a few buckets, only its own kinds, inside every budget`, () => {
       const definition = getBiomeDefinition(id);
       const layer = createBiomeLayer({ definition, layout: fixtureLayout(id), quality: "standard", reducedMotion: false });
       const { stats } = layer;
@@ -83,16 +83,23 @@ describe("biome decoration layer", () => {
       expect(stats.particles).toBeLessThanOrEqual(definition.budget.particles);
       for (const kind of Object.keys(stats.propsByKind)) expect(definition.props.kinds).toContain(kind);
       expect(stats.dropped.kind).toBeGreaterThan(0); // the fixture offers every kind
+      expect(stats.unstyled).toBe(0);
 
-      // One InstancedMesh per prop kind; the actual draw count matches the plan.
+      // The actual draw count matches the plan.
       let draws = 0;
       layer.root.traverse((child) => {
         if ((child as THREE.Mesh).isMesh || (child as THREE.Points).isPoints) draws += 1;
       });
       expect(draws).toBe(stats.drawCalls);
-      const instanced = layer.root.children.filter((child) => (child as THREE.InstancedMesh).isInstancedMesh);
-      const propMeshes = instanced.filter((child) => child.name.startsWith("biome-props:"));
-      expect(propMeshes.length).toBe(Object.keys(stats.propsByKind).filter((k) => k !== "windsock").length);
+      // Contract (v2, env upgrade): every variant of every kind is baked into
+      // at most four merged buckets (faceted/smooth x cast/no-cast) instead of
+      // one InstancedMesh per kind, so draw calls do not grow with variants.
+      const propMeshes = layer.root.children.filter((child) => child.name.startsWith("biome-props:"));
+      expect(propMeshes.length).toBe(stats.buckets.length);
+      expect(propMeshes.length).toBeLessThanOrEqual(4);
+      expect(propMeshes.every((mesh) => !(mesh as THREE.InstancedMesh).isInstancedMesh)).toBe(true);
+      expect(stats.buckets.reduce((sum, bucket) => sum + bucket.members, 0)).toBe(stats.members);
+      expect(stats.clusters).toBe(stats.propInstances - (stats.windsock ? 1 : 0));
       layer.dispose();
     });
   }
@@ -135,19 +142,22 @@ describe("biome decoration layer", () => {
     });
     expect(layer.stats.dropped.invalid).toBe(4);
     expect(layer.stats.dropped.clamped).toBeGreaterThanOrEqual(1);
-    const rocks = layer.root.getObjectByName("biome-props:rock") as THREE.InstancedMesh;
-    const matrix = new THREE.Matrix4();
-    const scale = new THREE.Vector3();
-    for (let i = 0; i < rocks.count; i += 1) {
-      rocks.getMatrixAt(i, matrix);
-      scale.setFromMatrixScale(matrix);
-      expect(scale.x).toBeLessThanOrEqual(0.4 + 1e-9);
-    }
-    // The over-tall rock in a 0.09 clearance is shrunk to fit it.
-    const tightIndex = layer.stats.propsByKind.rock! - 1;
-    rocks.getMatrixAt(tightIndex, matrix);
-    scale.setFromMatrixScale(matrix);
-    expect(scale.x * 0.9).toBeLessThanOrEqual(0.09 + 1e-9);
+
+    // Alone in a layout, every baked vertex of the over-tall rock stays in
+    // the 0.09 clearance cylinder (props are merged now, so check vertices).
+    const alone = { ...fixtureLayout("desert"), props: [tight] };
+    const single = createBiomeLayer({ definition: getBiomeDefinition("desert"), layout: alone, quality: "standard", reducedMotion: false });
+    let vertices = 0;
+    single.root.traverse((child) => {
+      if (!child.name.startsWith("biome-props:")) return;
+      const position = (child as THREE.Mesh).geometry.getAttribute("position");
+      for (let i = 0; i < position.count; i += 1) {
+        vertices += 1;
+        expect(Math.hypot(position.getX(i) - 0.1, position.getZ(i) - 0.1)).toBeLessThanOrEqual(0.09 + 1e-6);
+        expect(position.getY(i)).toBeLessThanOrEqual(0.4 + 1e-6);
+      }
+    });
+    expect(vertices).toBeGreaterThan(0);
   });
 
   it("is non-colliding: no three.js raycast ever hits decoration", () => {

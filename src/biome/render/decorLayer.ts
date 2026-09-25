@@ -6,8 +6,9 @@
  * or picking.
  *
  * Draw calls are planned up front against the biome's budget, in priority
- * order: props (one instanced draw per kind), windsock, support patches,
- * water, particles. Anything that would exceed the budget is skipped and
+ * order: props (each placement becomes a cluster from the biome's art, all
+ * baked into at most four merged buckets, see `assets/batch.ts`), windsock,
+ * support patches, water, particles. Anything that would exceed the budget is skipped and
  * recorded in `stats.skipped`.
  */
 import * as THREE from "three";
@@ -19,15 +20,13 @@ import {
   createWaterRing,
   type ParticleField,
 } from "./atmosphereEffects.js";
-import {
-  createPropGeometry,
-  PROP_UNIT_RADIUS,
-  SHADOW_CASTING_KINDS,
-  SWAYING_KINDS,
-  type InstancedPropKind,
-} from "./propGeometry.js";
+import { bakeBucket, groupMembers, type BucketKey } from "../assets/batch.js";
+import { getBiomeArt } from "../assets/biomes/index.js";
+import { composeLayout } from "../assets/compose.js";
+import type { AssetShading } from "../assets/types.js";
+import { PROP_UNIT_RADIUS } from "./propGeometry.js";
 import { createPropMaterial } from "./propMaterial.js";
-import { layoutMatchesDefinition, selectProps, selectSurfacePatches, type SelectedProp } from "./selection.js";
+import { layoutMatchesDefinition, selectProps, selectSurfacePatches } from "./selection.js";
 import { createWindsock, type Windsock } from "./windsock.js";
 import { createWindUniforms } from "./wind.js";
 
@@ -51,6 +50,15 @@ export interface BiomeLayerStats {
   water: boolean;
   windsock: boolean;
   triangles: number;
+  /** Clusters drawn (one per placement, windsock excluded). */
+  clusters: number;
+  /** Cluster members drawn, primaries included. */
+  members: number;
+  buckets: { key: BucketKey; members: number; triangles: number }[];
+  /** Placements the biome's art has no composition for. */
+  unstyled: number;
+  /** Dressing members removed to honour the art's triangle budget. */
+  trimmed: number;
   dropped: { invalid: number; kind: number; budget: number; clamped: number };
   skipped: string[];
 }
@@ -74,7 +82,6 @@ export interface BiomeLayerHandle {
   dispose(): void;
 }
 
-const INSTANCED_ORDER: readonly InstancedPropKind[] = ["palm", "rock", "shrub", "cactus", "dry-plant", "wood"];
 const noRaycast: THREE.Object3D["raycast"] = () => {};
 
 export function createBiomeLayer({ definition, layout, quality, reducedMotion }: BiomeLayerInput): BiomeLayerHandle {
@@ -93,6 +100,11 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
     water: false,
     windsock: false,
     triangles: 0,
+    clusters: 0,
+    members: 0,
+    buckets: [],
+    unstyled: 0,
+    trimmed: 0,
     dropped: { invalid: 0, kind: 0, budget: 0, clamped: 0 },
     skipped: [],
   };
@@ -164,65 +176,59 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
     root.add(object);
   };
 
-  // ---- Props -------------------------------------------------------------
+  // ---- Props: placements → clusters → merged buckets ----------------------
   const selection = selectProps(definition, layout, quality);
   stats.dropped = selection.dropped;
-  const byKind = new Map<BiomePropKind, SelectedProp[]>();
-  for (const selected of selection.props) {
-    const list = byKind.get(selected.placement.kind) ?? [];
-    list.push(selected);
-    byKind.set(selected.placement.kind, list);
-  }
-  const propMaterial = createPropMaterial(wind);
-  materials.push(propMaterial);
-
-  const up = new THREE.Vector3(0, 1, 0);
-  const normal = new THREE.Vector3();
-  const tilt = new THREE.Quaternion();
-  const yaw = new THREE.Quaternion();
-  const rotation = new THREE.Quaternion();
-  const matrix = new THREE.Matrix4();
-  const position = new THREE.Vector3();
-  const scale = new THREE.Vector3();
-  for (const kind of INSTANCED_ORDER) {
-    const list = byKind.get(kind);
-    if (!list || list.length === 0) continue;
-    if (!canDraw(`props:${kind}`, 1)) {
-      stats.dropped.budget += list.length;
-      continue;
+  const art = getBiomeArt(definition.id);
+  const clustered = selection.props.filter(({ placement }) => placement.kind !== "windsock");
+  const sockPlacement = selection.props.find(({ placement }) => placement.kind === "windsock");
+  const shadingMaterials = new Map<AssetShading, THREE.MeshStandardMaterial>();
+  const materialFor = (shading: AssetShading) => {
+    let material = shadingMaterials.get(shading);
+    if (!material) {
+      material = createPropMaterial(wind, shading);
+      shadingMaterials.set(shading, material);
+      materials.push(material);
     }
-    const geometry = createPropGeometry(kind, definition.palette);
-    geometries.push(geometry);
-    const mesh = new THREE.InstancedMesh(geometry, propMaterial, list.length);
-    mesh.name = `biome-props:${kind}`;
-    mesh.castShadow = castShadows && SHADOW_CASTING_KINDS.has(kind);
-    mesh.receiveShadow = true;
-    list.forEach(({ placement, height }, index) => {
-      yaw.setFromAxisAngle(up, placement.yaw);
-      if (SWAYING_KINDS.has(kind) || kind === "cactus" || kind === "wood") {
-        rotation.copy(yaw); // plants and posts grow straight up
-      } else {
-        normal.set(placement.normal[0], placement.normal[1], placement.normal[2]).normalize();
-        tilt.setFromUnitVectors(up, normal);
-        rotation.identity().slerp(tilt, 0.8).multiply(yaw);
+    return material;
+  };
+
+  if (art && clustered.length > 0) {
+    const composed = composeLayout(
+      art,
+      clustered.map(({ placement, height }) => ({ placement, height })),
+      layout.seed,
+      quality,
+    );
+    stats.unstyled = composed.unstyled;
+    stats.trimmed = composed.trimmed;
+    for (const [key, members] of groupMembers(composed.clusters, castShadows)) {
+      if (!canDraw(`props:${key}`, 1)) {
+        stats.dropped.budget += members.length;
+        continue;
       }
-      // Sink a hair so an uneven scan never shows a gap under the base.
-      position.set(placement.position[0], placement.position[1] - height * 0.02, placement.position[2]);
-      scale.setScalar(height);
-      matrix.compose(position, rotation, scale);
-      mesh.setMatrixAt(index, matrix);
-    });
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere();
-    stats.propInstances += list.length;
-    stats.propsByKind[kind] = list.length;
-    track(mesh);
+      const bucket = bakeBucket(key, members);
+      geometries.push(bucket.geometry);
+      const mesh = new THREE.Mesh(bucket.geometry, materialFor(bucket.shading));
+      mesh.name = `biome-props:${key}`;
+      mesh.castShadow = bucket.castShadow;
+      mesh.receiveShadow = true;
+      stats.buckets.push({ key, members: bucket.members, triangles: bucket.triangles });
+      stats.members += bucket.members;
+      track(mesh);
+    }
+    for (const cluster of composed.clusters) {
+      stats.clusters += 1;
+      stats.propInstances += 1;
+      stats.propsByKind[cluster.kind] = (stats.propsByKind[cluster.kind] ?? 0) + 1;
+    }
+  } else if (clustered.length > 0) {
+    stats.unstyled = clustered.length;
   }
 
   // ---- Windsock ----------------------------------------------------------
-  const sockPlacement = byKind.get("windsock")?.[0];
   if (sockPlacement && canDraw("windsock", 2)) {
-    windsock = createWindsock(definition, propMaterial, castShadows);
+    windsock = createWindsock(definition, materialFor("faceted"), castShadows);
     geometries.push(...windsock.geometries);
     const { placement } = sockPlacement;
     const height = Math.min(sockPlacement.height, placement.radius / PROP_UNIT_RADIUS.windsock);
