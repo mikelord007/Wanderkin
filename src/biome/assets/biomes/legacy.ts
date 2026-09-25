@@ -46,6 +46,7 @@ export function legacyArt(definition: BiomeDefinition): BiomeArt {
     };
     families[kind] = {
       role: "hero",
+      category: kind === "palm" ? "tree" : kind === "shrub" || kind === "dry-plant" ? "bush" : kind === "wood" ? "marker" : kind === "rock" ? "rock" : "cactus",
       shading: "faceted",
       castShadow: SHADOW_CASTING_KINDS.has(kind),
       unitRadius: PROP_UNIT_RADIUS[kind],

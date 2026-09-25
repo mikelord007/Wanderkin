@@ -12,6 +12,8 @@
  * print and edges from the photo stay readable through the sand/grass.
  */
 import * as THREE from "three";
+import { getBiomeArt } from "../assets/biomes/index.js";
+import type { WallStyle } from "../assets/types.js";
 import type { BiomeDefinition, BiomeLayout, BiomeSurfacePatch, EffectsQuality } from "../types.js";
 import { layoutMatchesDefinition, MAX_SURFACE_PATCHES, selectSurfacePatches } from "./selection.js";
 
@@ -31,6 +33,12 @@ export interface BiomeSurfaceTreatment {
    * `SceneEntities` stay, so structures remain readable.
    */
   helper: { floorColor: string; structureColor: string; floorStrength: number; structureStrength: number; grainFrequency: number };
+  /**
+   * The biome's wall style: box helpers (steps, bridges, stepped routes) are
+   * drawn as a sculpted visual shell instead of a plain box (see
+   * `structureShell.ts`). Colliders never change. Null keeps the box.
+   */
+  structureShell: WallStyle | null;
 }
 
 /** Which surface a material belongs to; only helpers receive the whole-surface tint. */
@@ -73,6 +81,7 @@ export function biomeSurfaceTreatment(
       structureStrength: 0.85,
       grainFrequency: Number.isFinite(extent) && extent > 0 ? 40 / extent : 10,
     },
+    structureShell: getBiomeArt(definition.id)?.wall ?? null,
   };
 }
 

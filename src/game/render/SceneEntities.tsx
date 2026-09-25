@@ -18,6 +18,7 @@ import {
   installBiomeSurfaceBlendOnObject,
   type BiomeSurfaceTreatment,
 } from "../../biome/render/surfaceBlend.js";
+import { createStructureShell } from "../../biome/render/structureShell.js";
 
 export interface SceneEntitiesProps {
   manifest: SceneManifest;
@@ -86,6 +87,18 @@ function HelperMesh({
     [geometry, edges, material],
   );
 
+  // Themed looks only: a box structure is drawn as the biome's sculpted
+  // shell (visual only; the collider, transform and dimensions are
+  // untouched). Without a wall style this is null and the box renders as before.
+  const wallStyle = biomeSurface?.structureShell ?? null;
+  const shell = useMemo(
+    () => (wallStyle && entity.kind === "box"
+      ? createStructureShell({ dimensions: entity.dimensions, scale: entity.transform.scale, style: wallStyle, seed: entity.id })
+      : null),
+    [wallStyle, entity],
+  );
+  useEffect(() => () => shell?.dispose(), [shell]);
+
   const edgeColor = style.render.outline.enabled
     ? style.render.outline.color
     : style.uiAccents.focusRing;
@@ -96,10 +109,16 @@ function HelperMesh({
       quaternion={entity.transform.rotation as unknown as [number, number, number, number]}
       scale={entity.transform.scale as unknown as [number, number, number]}
     >
-      <mesh geometry={geometry} material={material} receiveShadow castShadow={!isFloor} />
-      <lineSegments geometry={edges} renderOrder={2}>
-        <lineBasicMaterial color={edgeColor} transparent opacity={isFloor ? 0.58 : 0.9} />
-      </lineSegments>
+      {shell ? (
+        <primitive object={shell.mesh} dispose={null} />
+      ) : (
+        <>
+          <mesh geometry={geometry} material={material} receiveShadow castShadow={!isFloor} />
+          <lineSegments geometry={edges} renderOrder={2}>
+            <lineBasicMaterial color={edgeColor} transparent opacity={isFloor ? 0.58 : 0.9} />
+          </lineSegments>
+        </>
+      )}
     </group>
   );
 }

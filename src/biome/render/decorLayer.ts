@@ -7,8 +7,8 @@
  *
  * Draw calls are planned up front against the biome's budget, in priority
  * order: props (each placement becomes a cluster from the biome's art, all
- * baked into at most four merged buckets, see `assets/batch.ts`), windsock,
- * support patches, water, particles. Anything that would exceed the budget is skipped and
+ * baked into at most four merged buckets, see `assets/batch.ts`), ground
+ * contact decals, windsock, support patches, water, particles. Anything that would exceed the budget is skipped and
  * recorded in `stats.skipped`.
  */
 import * as THREE from "three";
@@ -23,6 +23,7 @@ import {
 import { bakeBucket, groupMembers, type BucketKey } from "../assets/batch.js";
 import { getBiomeArt } from "../assets/biomes/index.js";
 import { composeLayout } from "../assets/compose.js";
+import { createContactDecals } from "./contactDecals.js";
 import type { AssetShading } from "../assets/types.js";
 import { PROP_UNIT_RADIUS } from "./propGeometry.js";
 import { createPropMaterial } from "./propMaterial.js";
@@ -59,6 +60,8 @@ export interface BiomeLayerStats {
   unstyled: number;
   /** Dressing members removed to honour the art's triangle budget. */
   trimmed: number;
+  /** Ground contact decals (blobs and soil patches) under clusters. */
+  contacts: number;
   dropped: { invalid: number; kind: number; budget: number; clamped: number };
   skipped: string[];
 }
@@ -105,6 +108,7 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
     buckets: [],
     unstyled: 0,
     trimmed: 0,
+    contacts: 0,
     dropped: { invalid: 0, kind: 0, budget: 0, clamped: 0 },
     skipped: [],
   };
@@ -216,6 +220,19 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
       stats.buckets.push({ key, members: bucket.members, triangles: bucket.triangles });
       stats.members += bucket.members;
       track(mesh);
+    }
+    // Ground contact: one instanced draw of blobs and soil patches.
+    const contact = createContactDecals(composed.clusters, art.ground, layout.seed);
+    if (contact) {
+      if (canDraw("contact", 1)) {
+        geometries.push(...contact.geometries);
+        materials.push(...contact.materials);
+        stats.contacts = contact.object.count;
+        track(contact.object);
+      } else {
+        for (const geometry of contact.geometries) geometry.dispose();
+        for (const material of contact.materials) material.dispose();
+      }
     }
     for (const cluster of composed.clusters) {
       stats.clusters += 1;

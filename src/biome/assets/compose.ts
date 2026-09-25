@@ -41,6 +41,8 @@ export interface ComposedCluster {
   kind: BiomePropKind;
   presetId: string;
   base: Vec3Tuple;
+  /** Unit support normal at the base (for ground decals). */
+  normal: Vec3Tuple;
   /** Horizontal footprint radius the cluster was fitted into. */
   radius: number;
   /** Height the cluster was fitted under. */
@@ -198,7 +200,9 @@ export function composeCluster(
   // ---- Layout in the local disc (world axes, relative to the base) --------
   const local: LocalMember[] = [];
   const offsetAngle = random() * Math.PI * 2;
-  const offset = (preset.primaryOffset ?? 0) * radius * random();
+  // The primary may sit off-centre only as far as its own extent allows.
+  const offsetRoom = Math.max(0, radius - primaryFamily.unitRadius * height);
+  const offset = Math.min(offsetRoom, (preset.primaryOffset ?? 0) * radius * random());
   local.push({
     familyId: preset.primary,
     family: primaryFamily,
@@ -221,8 +225,20 @@ export function composeCluster(
     for (let i = 0; i < count; i += 1) {
       for (let attempt = 0; attempt < 6; attempt += 1) {
         const angle = random() * Math.PI * 2;
-        const distance = lerp(group.ring, random()) * radius;
-        const memberHeight = lerp(group.height, random()) * height;
+        const ringRoll = random();
+        let memberHeight = lerp(group.height, random()) * height;
+        // Keep the whole member inside the footprint: its ring distance plus
+        // its own extent. A member too wide for its ring is shrunk (never by
+        // more than half) instead of forcing the fit to shrink the cluster.
+        const inner = group.ring[0] * radius;
+        const room = radius - inner;
+        if (family.unitRadius * memberHeight > room) {
+          const shrunk = room / family.unitRadius;
+          if (shrunk < memberHeight * 0.5) continue;
+          memberHeight = shrunk;
+        }
+        const outer = Math.max(inner, Math.min(group.ring[1] * radius, radius - family.unitRadius * memberHeight));
+        const distance = inner + (outer - inner) * ringRoll;
         const candidate: LocalMember = {
           familyId: group.family,
           family,
@@ -323,7 +339,17 @@ export function composeCluster(
     }
   }
 
-  return { placementId: placement.id, kind, presetId: preset.id, base: [bx, by, bz], radius, height, fit, members };
+  return {
+    placementId: placement.id,
+    kind,
+    presetId: preset.id,
+    base: [bx, by, bz],
+    normal: [normal.x, normal.y, normal.z],
+    radius,
+    height,
+    fit,
+    members,
+  };
 }
 
 /**

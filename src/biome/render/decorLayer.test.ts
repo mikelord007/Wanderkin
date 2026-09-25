@@ -160,6 +160,31 @@ describe("biome decoration layer", () => {
     expect(vertices).toBeGreaterThan(0);
   });
 
+  it("grounds every cluster with contact decals that stay inside its footprint", () => {
+    for (const id of ["tropical", "desert"] as const) {
+      const layout = fixtureLayout(id);
+      const layer = createBiomeLayer({ definition: getBiomeDefinition(id), layout, quality: "standard", reducedMotion: false });
+      const contact = layer.root.getObjectByName("biome-contact") as THREE.InstancedMesh;
+      expect(contact).toBeDefined();
+      expect(layer.stats.contacts).toBeGreaterThanOrEqual(layer.stats.clusters);
+      expect(contact.renderOrder).toBe(0);
+      expect((contact.material as THREE.Material).depthWrite).toBe(false);
+      const byPosition = layout.props.map((p) => p);
+      const matrix = new THREE.Matrix4();
+      const position = new THREE.Vector3();
+      const scale = new THREE.Vector3();
+      const rotation = new THREE.Quaternion();
+      for (let i = 0; i < contact.count; i += 1) {
+        contact.getMatrixAt(i, matrix);
+        matrix.decompose(position, rotation, scale);
+        const owner = byPosition.find((p) => Math.hypot(p.position[0] - position.x, p.position[2] - position.z) < 1e-3)!;
+        expect(owner).toBeDefined();
+        expect(Math.max(scale.x, scale.z)).toBeLessThanOrEqual(owner.radius + 1e-9);
+      }
+      layer.dispose();
+    }
+  });
+
   it("is non-colliding: no three.js raycast ever hits decoration", () => {
     const layer = createBiomeLayer({ definition: getBiomeDefinition("tropical"), layout: fixtureLayout("tropical"), quality: "standard", reducedMotion: false });
     layer.root.updateMatrixWorld(true);

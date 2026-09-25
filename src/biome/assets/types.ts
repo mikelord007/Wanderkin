@@ -58,8 +58,12 @@ export type AssetRole = "hero" | "supporting" | "micro";
 /** Deterministic: the same tones always give the same mesh. */
 export type VariantBuilder = (tones: BiomeTones) => UnitMesh;
 
+/** Spec categories whose minimum variant counts the guardrail tests enforce. */
+export type AssetCategory = "tree" | "bush" | "rock" | "cactus" | "grass" | "dressing" | "marker";
+
 export interface AssetFamily {
   role: AssetRole;
+  category: AssetCategory;
   shading: AssetShading;
   /** Casts into the sun's shadow map (standard quality only). Micro never does. */
   castShadow: boolean;
@@ -87,7 +91,10 @@ export interface CompositionMember {
   count: readonly [number, number];
   /** Distance from the cluster axis as a fraction of the footprint radius. */
   ring: readonly [number, number];
-  /** Height as a fraction of the primary's drawn height. */
+  /**
+   * Size as a fraction of the primary's drawn height: the member's height
+   * for upright assets, its largest dimension for `fit: "size"` dressing.
+   */
   height: readonly [number, number];
   /** Probability the whole group appears (default 1). */
   chance?: number;

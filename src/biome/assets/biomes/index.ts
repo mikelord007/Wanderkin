@@ -3,14 +3,18 @@
  * biome's art lives in its own module so biome workers never share a file;
  * adding a biome is one line here.
  */
-import { getBiomeDefinition } from "../../presets.js";
 import type { BiomeId } from "../../types.js";
 import type { BiomeArt } from "../types.js";
-import { legacyArt } from "./legacy.js";
+import { DESERT_ART } from "./desert.js";
+import { TROPICAL_ART } from "./tropical.js";
 
+/**
+ * One line per biome. A biome without its own art yet can use
+ * `legacyArt(getBiomeDefinition(id))` from `./legacy.js` (the v1 props).
+ */
 const FACTORIES: Partial<Record<BiomeId, () => BiomeArt>> = {
-  tropical: () => legacyArt(getBiomeDefinition("tropical")),
-  desert: () => legacyArt(getBiomeDefinition("desert")),
+  tropical: () => TROPICAL_ART,
+  desert: () => DESERT_ART,
 };
 
 const cache = new Map<BiomeId, BiomeArt>();

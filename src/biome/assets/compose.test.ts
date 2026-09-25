@@ -18,13 +18,14 @@ function leaning(reach: number, radius: number): VariantBuilder {
     cone.translate(0, 0.5, 0);
     const p = cone.getAttribute("position");
     for (let i = 0; i < p.count; i += 1) p.setX(i, p.getX(i) + reach * p.getY(i));
-    return new MeshKit().add(cone, new THREE.Color(0.4, 0.6, 0.3), (v) => v.y).finish();
+    return new MeshKit().add(cone, { color: new THREE.Color(0.4, 0.6, 0.3), sway: (v) => v.y }).finish();
   };
 }
 
 function family(role: AssetFamily["role"], extra: Partial<AssetFamily> = {}): AssetFamily {
   return {
     role,
+    category: "dressing",
     shading: role === "micro" ? "faceted" : "smooth",
     castShadow: role !== "micro",
     unitRadius: 0.9,

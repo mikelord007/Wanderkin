@@ -63,6 +63,16 @@ describe("biome surface blend on cloned scan materials", () => {
     expect(bare.helper.floorStrength).toBeGreaterThan(0);
   });
 
+  it("hands box structures the look's wall style for their shells; Original keeps plain boxes", () => {
+    for (const id of ["tropical", "desert"] as const) {
+      const treatment = biomeSurfaceTreatment(getBiomeDefinition(id), layout(id), "standard")!;
+      expect(treatment.structureShell).not.toBeNull();
+      expect(treatment.structureShell!.strata[0]).toBeGreaterThanOrEqual(1);
+    }
+    // Original has no treatment at all, so HelperMesh renders its box and edges.
+    expect(biomeSurfaceTreatment(getBiomeDefinition("original"), layout("original"), "standard")).toBeNull();
+  });
+
   it("tints helper floors/structures wholesale but never the scan wholesale", () => {
     const treatment = biomeSurfaceTreatment(getBiomeDefinition("desert"), layout("desert"), "standard")!;
     const scan = new THREE.MeshStandardMaterial();
