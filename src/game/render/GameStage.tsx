@@ -257,9 +257,17 @@ export function GameStage({
         collectedIds={collectedIds}
         style={style}
         reducedMotion={reducedMotion}
+        authoredConfig={simulation.authoredConfig}
+        runtimeConfig={config}
       />
       {manifest.experience && modeState ? (
-        <ModeEntities experience={manifest.experience} state={modeState} reducedMotion={reducedMotion} />
+        <ModeEntities
+          experience={manifest.experience}
+          state={modeState}
+          reducedMotion={reducedMotion}
+          authoredConfig={simulation.authoredConfig}
+          runtimeConfig={config}
+        />
       ) : null}
       <PlayerAvatar ref={avatar} config={config} reducedMotion={reducedMotion} />
     </>

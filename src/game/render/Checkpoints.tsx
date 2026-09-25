@@ -5,14 +5,20 @@
  * three distinct states: the active objective is bright, pulsing and lit so
  * it can be picked out from across a furniture scene; later ones are dim
  * and still, so the player is never misled about where to go next; and
- * collected ones fade to a calm green. The translucent sphere is drawn at
- * the real `triggerRadius`, so what looks collectable is exactly what is.
+ * collected ones fade to a calm green.
+ *
+ * Everything is sized and seated for the body actually running
+ * (`markerLayout.ts`): a toy-sized gem hovering just over the character's
+ * head on the surface the checkpoint stands on, and a flat ring at the radius
+ * a grounded character is really collected at. The trigger itself — stored
+ * position and `triggerRadius` — is gameplay data and is not touched here.
  */
 
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import type { Checkpoint, SceneManifest, StyleDefinition } from "@shared/index.js";
+import type { Checkpoint, MovementConfig, SceneManifest, StyleDefinition } from "@shared/index.js";
+import { checkpointMarkerLayout } from "./markerLayout.js";
 
 export interface CheckpointMarkersProps {
   manifest: SceneManifest;
@@ -21,22 +27,42 @@ export interface CheckpointMarkersProps {
   collectedIds: ReadonlySet<string>;
   style: StyleDefinition;
   reducedMotion: boolean;
+  /** Config the manifest positions were authored against. */
+  authoredConfig: MovementConfig;
+  /** Config the simulation is actually running, i.e. the real body size. */
+  runtimeConfig: MovementConfig;
 }
+
+/** Footprint ring width as a fraction of its radius. */
+const RING_WIDTH_FRACTION = 0.1;
+/** Lift off the surface, in body heights, so the ring never z-fights it. */
+const RING_LIFT_IN_HEIGHTS = 0.03;
+/** Height of the guide column above the gem; a world-scale navigation cue. */
+const BEAM_HEIGHT = 2.4;
 
 function CheckpointMarker({
   checkpoint,
   state,
   style,
   reducedMotion,
+  authoredConfig,
+  runtimeConfig,
 }: {
   checkpoint: Checkpoint;
   state: "active" | "pending" | "collected";
   style: StyleDefinition;
   reducedMotion: boolean;
+  authoredConfig: MovementConfig;
+  runtimeConfig: MovementConfig;
 }) {
   const core = useRef<THREE.Mesh>(null);
-  const halo = useRef<THREE.Mesh>(null);
+  const ring = useRef<THREE.Mesh>(null);
   const beam = useRef<THREE.Mesh>(null);
+
+  const layout = useMemo(
+    () => checkpointMarkerLayout(checkpoint.position, checkpoint.triggerRadius, authoredConfig, runtimeConfig),
+    [checkpoint.position, checkpoint.triggerRadius, authoredConfig, runtimeConfig],
+  );
 
   useFrame((_, delta) => {
     const time = performance.now() / 1000;
@@ -45,19 +71,23 @@ function CheckpointMarker({
         core.current.rotation.y += delta * (state === "active" ? 1.1 : 0.2);
         core.current.rotation.x += delta * 0.35;
       }
-      const bob = !reducedMotion && state === "active" ? Math.sin(time * 2.2) * 0.035 : 0;
-      core.current.position.y = bob;
+      const bob = !reducedMotion && state === "active" ? Math.sin(time * 2.2) * layout.bobAmplitude : 0;
+      core.current.position.y = layout.coreLift + bob;
       const pulse = !reducedMotion && state === "active" ? 1 + Math.sin(time * 3.4) * 0.08 : 1;
-      core.current.scale.setScalar(pulse);
+      core.current.scale.setScalar(pulse * (state === "collected" ? 0.75 : 1));
     }
-    if (halo.current) {
-      const material = halo.current.material as THREE.MeshBasicMaterial;
-      material.opacity = state === "active" && !reducedMotion ? 0.14 + Math.sin(time * 2.6) * 0.05 : state === "active" ? 0.14 : 0.05;
+    if (ring.current) {
+      // Collected rings go away: the gem alone marks a respawn point, and a
+      // ring round the character's feet would only add clutter where it is.
+      ring.current.visible = state !== "collected";
+      const material = ring.current.material as THREE.MeshBasicMaterial;
+      material.opacity =
+        state === "active" ? (reducedMotion ? 0.5 : 0.42 + Math.sin(time * 2.6) * 0.12) : 0.2;
     }
     if (beam.current) {
       beam.current.visible = state === "active";
       const material = beam.current.material as THREE.MeshBasicMaterial;
-      material.opacity = reducedMotion ? 0.1 : 0.1 + Math.sin(time * 2.6) * 0.04;
+      material.opacity = reducedMotion ? 0.12 : 0.12 + Math.sin(time * 2.6) * 0.04;
     }
   });
 
@@ -69,37 +99,41 @@ function CheckpointMarker({
         : style.uiAccents.secondary,
   );
   const beamColour = style.sceneColors.finishPortal;
-  const coreRadius = Math.min(checkpoint.triggerRadius * 0.34, 0.16);
+  const ringLift = RING_LIFT_IN_HEIGHTS * layout.bodyHeight;
 
   return (
-    <group position={checkpoint.position as unknown as [number, number, number]}>
-      <mesh ref={core}>
-        <icosahedronGeometry args={[coreRadius, 0]} />
+    <group position={layout.surface}>
+      <mesh ref={core} position={[0, layout.coreLift, 0]}>
+        <icosahedronGeometry args={[layout.coreRadius, 0]} />
         <meshStandardMaterial
           color={colour}
           emissive={colour}
-          emissiveIntensity={state === "active" ? 2.4 : state === "collected" ? 0.9 : 0.35}
+          emissiveIntensity={state === "active" ? 2.4 : state === "collected" ? 0.6 : 0.35}
           roughness={0.25}
           metalness={0.1}
         />
       </mesh>
 
-      {/* The real trigger volume, drawn honestly at triggerRadius. */}
-      <mesh ref={halo}>
-        <sphereGeometry args={[checkpoint.triggerRadius, 20, 16]} />
-        <meshBasicMaterial
-          color={colour}
-          transparent
-          opacity={0.12}
-          depthWrite={false}
-          side={THREE.BackSide}
-        />
-      </mesh>
+      {/* Where a grounded character is really collected, flat on the surface. */}
+      {layout.footprintRadius > 0 ? (
+        <mesh ref={ring} position={[0, ringLift, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
+          <ringGeometry
+            args={[layout.footprintRadius * (1 - RING_WIDTH_FRACTION), layout.footprintRadius, 48]}
+          />
+          <meshBasicMaterial
+            color={colour}
+            transparent
+            opacity={0.3}
+            depthWrite={false}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      ) : null}
 
       {/* A soft column so the active objective can be found from a distance
           even when the marker itself is behind furniture. */}
-      <mesh ref={beam} position={[0, 1.2, 0]}>
-        <cylinderGeometry args={[coreRadius * 0.7, coreRadius * 0.9, 2.4, 12, 1, true]} />
+      <mesh ref={beam} position={[0, layout.coreLift + BEAM_HEIGHT / 2, 0]}>
+        <cylinderGeometry args={[layout.beamRadiusTop, layout.beamRadiusBottom, BEAM_HEIGHT, 12, 1, true]} />
         <meshBasicMaterial
           color={beamColour}
           transparent
@@ -111,7 +145,13 @@ function CheckpointMarker({
       </mesh>
 
       {state === "active" ? (
-        <pointLight color={beamColour} intensity={1.1} distance={2.6} decay={2} />
+        <pointLight
+          position={[0, layout.coreLift, 0]}
+          color={beamColour}
+          intensity={1.1}
+          distance={2.6}
+          decay={2}
+        />
       ) : null}
     </group>
   );
@@ -123,6 +163,8 @@ export function CheckpointMarkers({
   collectedIds,
   style,
   reducedMotion,
+  authoredConfig,
+  runtimeConfig,
 }: CheckpointMarkersProps) {
   return (
     <group>
@@ -132,6 +174,8 @@ export function CheckpointMarkers({
           checkpoint={checkpoint}
           style={style}
           reducedMotion={reducedMotion}
+          authoredConfig={authoredConfig}
+          runtimeConfig={runtimeConfig}
           state={
             collectedIds.has(checkpoint.id)
               ? "collected"

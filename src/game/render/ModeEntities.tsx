@@ -1,8 +1,9 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import type { ColorFragmentEntity, LevelExperience } from "@shared/index.js";
+import type { ColorFragmentEntity, LevelExperience, MovementConfig, Vec3 } from "@shared/index.js";
 import type { GameplaySessionSnapshot } from "../modes/session.js";
+import { destinationMarkerLayout } from "./markerLayout.js";
 
 function Fragment({ fragment, reducedMotion }: { fragment: ColorFragmentEntity; reducedMotion: boolean }) {
   const group = useRef<THREE.Group>(null);
@@ -66,10 +67,40 @@ function Portal({ experience, active, reducedMotion }: {
   );
 }
 
-export function ModeEntities({ experience, state, reducedMotion }: {
+/**
+ * An explore destination: a glowing pad on the surface the destination stands
+ * on, sized to the running body. The stored position is a capsule centre for
+ * the authored body, so drawing there would float the pad above a miniature
+ * character's head. Reaching it is decided elsewhere, from the stored point.
+ */
+function DestinationPad({ position, reached, authoredConfig, runtimeConfig }: {
+  position: Vec3;
+  reached: boolean;
+  authoredConfig: MovementConfig;
+  runtimeConfig: MovementConfig;
+}) {
+  const layout = useMemo(
+    () => destinationMarkerLayout(position, authoredConfig, runtimeConfig),
+    [position, authoredConfig, runtimeConfig],
+  );
+  return (
+    <group position={layout.surface}>
+      <mesh visible={!reached} position={[0, layout.padThickness / 2, 0]}>
+        <cylinderGeometry args={[layout.padRadius * 0.65, layout.padRadius, layout.padThickness, 24]} />
+        <meshStandardMaterial color="#ffd166" emissive="#ffd166" emissiveIntensity={1.1} />
+      </mesh>
+    </group>
+  );
+}
+
+export function ModeEntities({ experience, state, reducedMotion, authoredConfig, runtimeConfig }: {
   experience: LevelExperience;
   state: GameplaySessionSnapshot;
   reducedMotion: boolean;
+  /** Config the stored positions were authored against. */
+  authoredConfig: MovementConfig;
+  /** Config the simulation is actually running, i.e. the real body size. */
+  runtimeConfig: MovementConfig;
 }) {
   return (
     <group>
@@ -81,12 +112,13 @@ export function ModeEntities({ experience, state, reducedMotion }: {
       <Portal experience={experience} active={state.portalActive} reducedMotion={reducedMotion} />
       {experience.mode.kind === "explore"
         ? experience.mode.destinations.map((destination) => (
-            <group key={destination.id} position={destination.position as unknown as [number, number, number]}>
-              <mesh visible={!state.destinationsReached.has(destination.id)}>
-                <cylinderGeometry args={[0.18, 0.28, 0.08, 20]} />
-                <meshStandardMaterial color="#ffd166" emissive="#ffd166" emissiveIntensity={1.1} />
-              </mesh>
-            </group>
+            <DestinationPad
+              key={destination.id}
+              position={destination.position}
+              reached={state.destinationsReached.has(destination.id)}
+              authoredConfig={authoredConfig}
+              runtimeConfig={runtimeConfig}
+            />
           ))
         : null}
     </group>
