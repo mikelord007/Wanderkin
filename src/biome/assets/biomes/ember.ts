@@ -280,7 +280,9 @@ export const EMBER_ART: BiomeArt = {
     patchColor: "#2e2826",
     cracks: 0.42,
     crackGlow: "#ff4a2a",
-    patches: { tints: [{ color: "#5a504c", weight: 2 }, { color: "#3e3634", weight: 1 }] },
+    // Support patches: ash drifts one step darker or lighter than the lit
+    // mauve-ash floor, never dark stains around the player.
+    patches: { tints: [{ color: "#8a7c80", weight: 2 }, { color: "#a09496", weight: 1 }] },
   },
   variation: { toneJitter: 0.04, hueJitterDeg: 3 },
   budgets: { triangles: { standard: 75_000, reduced: 32_000 }, membersPerCluster: { standard: 5, reduced: 3 } },
