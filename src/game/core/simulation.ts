@@ -163,6 +163,11 @@ export class GameSimulation {
   private elapsedSeconds = 0;
   private disposed = false;
 
+  /** True once `dispose()` has freed the physics world; no query may follow. */
+  get isDisposed(): boolean {
+    return this.disposed;
+  }
+
   /**
    * Builds the physics world for a manifest. `assetGeometry` maps
    * `AssetReference.id` to the asset-local collision triangles decoded from

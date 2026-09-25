@@ -121,6 +121,12 @@ export interface CourseValidation {
   uncertaintyNotes?: string;
 }
 
+export const SCENE_BIOME_IDS = ["original", "tropical", "desert"] as const;
+export type SceneBiomeId = (typeof SCENE_BIOME_IDS)[number];
+export const ADVENTURE_TEMPLATE_IDS = ["restore-portal", "reach-beacon"] as const;
+export type AdventureTemplateId = (typeof ADVENTURE_TEMPLATE_IDS)[number];
+export const ADVENTURE_GENERATOR_VERSION = 1 as const;
+
 export interface SceneManifest {
   schemaVersion: typeof SCENE_MANIFEST_SCHEMA_VERSION;
   levelId: string;
@@ -150,6 +156,14 @@ export interface SceneManifest {
   media?: LevelMedia;
   /** Durable creation/resume snapshot. Jobs themselves remain server-owned. */
   workflow?: WorldWorkflowV1;
+  /** Visual theme saved with an explicitly generated adventure draft. Pure
+   * presentation: omission is Original, and it never changes collision,
+   * objectives or progression. */
+  biome?: { id: SceneBiomeId; seed: string };
+  /** Present only on worlds whose objectives came from the adventure
+   * generator. Theme-independent: the same source, template and seed always
+   * produce the same traversal. */
+  adventure?: { template: AdventureTemplateId; seed: string; generator: typeof ADVENTURE_GENERATOR_VERSION };
 }
 
 export function createEmptyManifest(params: {

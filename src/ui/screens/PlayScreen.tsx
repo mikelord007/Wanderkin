@@ -16,13 +16,15 @@ interface PlayScreenProps {
   manifest: SceneManifest;
   onExit: () => void;
   onComplete: (result: GameCompletionResult, media: CompletedRunMedia) => void;
+  /** Explicit "Start new adventure" only; omit to hide that action. */
+  onAdventurePrepared?: (manifest: SceneManifest) => void;
   publishedVersionId?: PublishedLevelVersion["versionId"];
 }
 
 /** Thin wrapper — GameView owns gameplay HUD, mantle prompt, pause, and
  * respawn controls. This screen only supplies the lazy boundary and the
  * exit/complete callbacks. */
-export function PlayScreen({ manifest, onExit, onComplete, publishedVersionId }: PlayScreenProps) {
+export function PlayScreen({ manifest, onExit, onComplete, publishedVersionId, onAdventurePrepared }: PlayScreenProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [captureState, setCaptureState] = useState<"idle" | "recording" | "stopping" | "ready">("idle");
@@ -139,11 +141,17 @@ export function PlayScreen({ manifest, onExit, onComplete, publishedVersionId }:
       <ErrorBoundary key={retryAttempt} onError={setLoadError}>
         <Suspense fallback={<LoadingScreen stage="Loading the game…" />}>
           <GameView
+            // A generated adventure is a different world: mount it fresh so no
+            // per-world state (session, audio, look cache) carries over. Frames
+            // that arrive after the old physics world is freed are skipped in
+            // GameStage.
+            key={manifest.levelId}
             ref={gameViewRef}
             manifest={manifest}
             onExit={onExit}
             onComplete={handleComplete}
             onToggleCapture={handleToggleCapture}
+            {...(onAdventurePrepared ? { onAdventurePrepared } : {})}
             {...(publishedVersionId === undefined ? {} : { publishedVersionId })}
           />
         </Suspense>

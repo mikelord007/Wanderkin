@@ -3,24 +3,41 @@ import { useEffect, useMemo } from "react";
 import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { StyleDefinition } from "@shared/index.js";
+import type { BiomeDefinition } from "../../biome/types.js";
 import type { Bounds } from "../core/soup.js";
 import { usePrefersReducedMotion } from "./useReducedMotion.js";
 
 export interface SceneLightingProps {
   bounds: Bounds;
   style: StyleDefinition;
+  /**
+   * Optional biome sky/sun/haze. `null`, `undefined` or the Original biome
+   * leave every value exactly as the style defines it; tone mapping,
+   * shadow setup and fill intensity always stay the style's.
+   */
+  biome?: BiomeDefinition | null;
 }
 
-function GradientBackdrop({ radius, style }: { radius: number; style: StyleDefinition }) {
+function GradientBackdrop({
+  radius,
+  zenith,
+  horizon,
+  paper,
+}: {
+  radius: number;
+  zenith: string;
+  horizon: string;
+  paper: number;
+}) {
   const material = useMemo(
     () =>
       new THREE.ShaderMaterial({
         side: THREE.BackSide,
         depthWrite: false,
         uniforms: {
-          zenith: { value: new THREE.Color(style.sceneColors.background) },
-          horizon: { value: new THREE.Color(style.sceneColors.fog) },
-          paper: { value: style.render.paperTextureOpacity },
+          zenith: { value: new THREE.Color(zenith) },
+          horizon: { value: new THREE.Color(horizon) },
+          paper: { value: paper },
         },
         vertexShader: /* glsl */ `
           varying float vHeight;
@@ -47,7 +64,7 @@ function GradientBackdrop({ radius, style }: { radius: number; style: StyleDefin
           }
         `,
       }),
-    [style],
+    [zenith, horizon, paper],
   );
 
   useEffect(() => () => material.dispose(), [material]);
@@ -59,7 +76,13 @@ function GradientBackdrop({ radius, style }: { radius: number; style: StyleDefin
   );
 }
 
-export function SceneLighting({ bounds, style }: SceneLightingProps) {
+/** Biome sun elevation is clamped so shadows stay long enough to read
+ * furniture depth; the style path keeps its own lowered window key. */
+const BIOME_MIN_SUN_ELEVATION = (24 * Math.PI) / 180;
+const BIOME_MAX_SUN_ELEVATION = (52 * Math.PI) / 180;
+
+export function SceneLighting({ bounds, style, biome }: SceneLightingProps) {
+  const themed = biome && biome.id !== "original" ? biome : null;
   const gl = useThree((state) => state.gl);
   useEffect(() => {
     const previousExposure = gl.toneMappingExposure;
@@ -108,11 +131,13 @@ export function SceneLighting({ bounds, style }: SceneLightingProps) {
   const keyDirX = key[0] / keyHorizontal;
   const keyDirZ = key[2] / keyHorizontal;
   const WINDOW_KEY_ELEVATION = 0.85;
-  const keyPosition: [number, number, number] = [
-    centre.x + keyDirX * sunDistance * 0.9,
-    centre.y + WINDOW_KEY_ELEVATION * sunDistance * 0.48,
-    centre.z + keyDirZ * sunDistance * 0.9,
-  ];
+  const keyPosition: [number, number, number] = themed
+    ? biomeSunPosition(themed.lighting.direction, centre, sunDistance)
+    : [
+        centre.x + keyDirX * sunDistance * 0.9,
+        centre.y + WINDOW_KEY_ELEVATION * sunDistance * 0.48,
+        centre.z + keyDirZ * sunDistance * 0.9,
+      ];
 
   /** A soft warm bounce mixed into the cool fill light, standing in for the
    * warm light a real window key would bounce back off nearby surfaces.
@@ -120,8 +145,11 @@ export function SceneLighting({ bounds, style }: SceneLightingProps) {
    * hemisphere light remains the sky/ground fill term; this only nudges the
    * secondary directional fill's colour, not its intensity or direction. */
   const fillColor = useMemo(
-    () => new THREE.Color(style.sceneColors.fillLight).lerp(new THREE.Color(style.sceneColors.keyLight), 0.22),
-    [style],
+    () =>
+      themed
+        ? new THREE.Color(themed.lighting.sky).lerp(new THREE.Color(themed.lighting.sun), 0.22)
+        : new THREE.Color(style.sceneColors.fillLight).lerp(new THREE.Color(style.sceneColors.keyLight), 0.22),
+    [style, themed],
   );
 
   /**
@@ -139,11 +167,13 @@ export function SceneLighting({ bounds, style }: SceneLightingProps) {
    */
   const hemisphereGroundColor = useMemo(
     () =>
-      new THREE.Color(style.sceneColors.surfaces[3] ?? style.sceneColors.fog).lerp(
-        new THREE.Color(style.sceneColors.fillLight),
-        0.55,
-      ),
-    [style],
+      themed
+        ? new THREE.Color(themed.lighting.ground).lerp(new THREE.Color(themed.lighting.sky), 0.35)
+        : new THREE.Color(style.sceneColors.surfaces[3] ?? style.sceneColors.fog).lerp(
+            new THREE.Color(style.sceneColors.fillLight),
+            0.55,
+          ),
+    [style, themed],
   );
 
   /**
@@ -163,18 +193,33 @@ export function SceneLighting({ bounds, style }: SceneLightingProps) {
   const reducedMotion = usePrefersReducedMotion();
   const keyShadowMapSize = reducedMotion ? 1024 : 2048;
 
+  const sky = themed
+    ? { zenith: themed.sky.zenith, horizon: themed.sky.horizon, fogNear: themed.sky.fogNear, fogFar: themed.sky.fogFar }
+    : { zenith: style.sceneColors.background, horizon: style.sceneColors.fog, fogNear: 1.7, fogFar: 7.2 };
+  const ambientColor = themed
+    ? `#${new THREE.Color(themed.lighting.sun).lerp(new THREE.Color(themed.lighting.sky), 0.35).getHexString()}`
+    : style.sceneColors.ambientLight;
+
   return (
     <>
-      <GradientBackdrop radius={Math.max(size.radius * 8, 60)} style={style} />
-      <fog attach="fog" args={[style.sceneColors.fog, size.radius * 1.7, size.radius * 7.2]} />
-      <ambientLight intensity={style.lighting.ambientIntensity} color={style.sceneColors.ambientLight} />
+      <GradientBackdrop
+        radius={Math.max(size.radius * 8, 60)}
+        zenith={sky.zenith}
+        horizon={sky.horizon}
+        paper={style.render.paperTextureOpacity}
+      />
+      <fog attach="fog" args={[sky.horizon, size.radius * sky.fogNear, size.radius * sky.fogFar]} />
+      <ambientLight
+        intensity={themed ? themed.lighting.ambient : style.lighting.ambientIntensity}
+        color={ambientColor}
+      />
       <hemisphereLight
-        args={[style.sceneColors.fillLight, hemisphereGroundColor, style.lighting.fillIntensity]}
+        args={[themed ? themed.lighting.sky : style.sceneColors.fillLight, hemisphereGroundColor, style.lighting.fillIntensity]}
       />
       <directionalLight
         position={keyPosition}
-        intensity={style.lighting.keyIntensity}
-        color={style.sceneColors.keyLight}
+        intensity={themed ? themed.lighting.intensity : style.lighting.keyIntensity}
+        color={themed ? themed.lighting.sun : style.sceneColors.keyLight}
         castShadow
         shadow-mapSize-width={keyShadowMapSize}
         shadow-mapSize-height={keyShadowMapSize}
@@ -195,4 +240,20 @@ export function SceneLighting({ bounds, style }: SceneLightingProps) {
       />
     </>
   );
+}
+
+/** Sun placed along the biome's (scene → sun) direction at the same
+ * distance as the style key, with its elevation clamped for legible shadows. */
+export function biomeSunPosition(
+  direction: readonly [number, number, number],
+  centre: { x: number; y: number; z: number },
+  sunDistance: number,
+): [number, number, number] {
+  const horizontal = Math.hypot(direction[0], direction[2]);
+  const dirX = horizontal > 1e-6 ? direction[0] / horizontal : 1;
+  const dirZ = horizontal > 1e-6 ? direction[2] / horizontal : 0;
+  const rawElevation = Math.atan2(Number.isFinite(direction[1]) ? direction[1] : 1, horizontal || 1e-6);
+  const elevation = Math.min(BIOME_MAX_SUN_ELEVATION, Math.max(BIOME_MIN_SUN_ELEVATION, rawElevation));
+  const flat = Math.cos(elevation) * sunDistance;
+  return [centre.x + dirX * flat, centre.y + Math.sin(elevation) * sunDistance, centre.z + dirZ * flat];
 }

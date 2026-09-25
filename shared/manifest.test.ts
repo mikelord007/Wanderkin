@@ -36,6 +36,28 @@ describe("isTerminalJobState", () => {
 });
 
 describe("legacy manifest compatibility", () => {
+  it("round-trips supported biome metadata without changing the source or mission", () => {
+    const input = { ...lostColorsFixture, biome: { id: "tropical", seed: "safe-seed" } };
+    const parsed = migrateSceneManifest(input);
+    expect(parsed.biome).toEqual(input.biome);
+    expect(parsed.entities).toEqual(input.entities);
+    expect(parsed.experience).toEqual(input.experience);
+    expect(sceneManifestReaderSchema.safeParse({ ...input, biome: { id: "unknown", seed: "a" } }).success).toBe(false);
+    expect(sceneManifestReaderSchema.safeParse({ ...input, biome: { id: "desert", seed: "a", assetUrl: "https://untrusted.test/a" } }).success).toBe(false);
+  });
+  it("round-trips the generated-adventure marker and rejects unknown templates or extra fields", () => {
+    const adventure = { template: "reach-beacon", seed: "s:1", generator: 1 };
+    expect(migrateSceneManifest({ ...lostColorsFixture, adventure }).adventure).toEqual(adventure);
+    expect(migrateSceneManifest(lostColorsFixture).adventure).toBeUndefined();
+    for (const bad of [
+      { ...adventure, template: "escort" },
+      { ...adventure, generator: 2 },
+      { ...adventure, spawn: [0, 0, 0] },
+      { ...adventure, seed: "" },
+    ]) {
+      expect(sceneManifestReaderSchema.safeParse({ ...lostColorsFixture, adventure: bad }).success).toBe(false);
+    }
+  });
   it("loads the pre-v2 saved-level fixture without changing its envelope version", () => {
     expect(sceneManifestReaderSchema.parse(legacyFixture).schemaVersion).toBe(1);
 

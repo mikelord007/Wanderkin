@@ -228,5 +228,5 @@ export class InputController {
 
 function isInteractiveTarget(target: EventTarget | null): boolean {
   if (typeof HTMLElement === "undefined" || !(target instanceof HTMLElement)) return false;
-  return target.matches("input, button, select, textarea, a[href], [contenteditable='true']");
+  return target.matches("input, button, select, textarea, summary, a[href], [contenteditable='true']");
 }

@@ -74,6 +74,10 @@ export interface GameViewProps {
   publishedVersionId?: PublishedLevelVersion["versionId"];
   /** `C` keyboard shortcut, usable while pointer-locked — see GameViewHandle. */
   onToggleCapture?: () => void;
+  /** Receives a validated, unsaved generated-adventure draft. Only the
+   * explicit "Start new adventure" action calls it; a look change never does.
+   * Omit to hide that action (e.g. shared challenges). */
+  onAdventurePrepared?: (manifest: SceneManifest) => void;
 }
 
 /**

@@ -11,12 +11,26 @@ import {
   disposeStyledObject,
   setObjectColorRestoration,
 } from "../../scene/styleMaterial.js";
+import {
+  applyBiomeSurface,
+  applyBiomeSurfaceToMaterial,
+  installBiomeSurfaceBlend,
+  installBiomeSurfaceBlendOnObject,
+  type BiomeSurfaceTreatment,
+} from "../../biome/render/surfaceBlend.js";
 
 export interface SceneEntitiesProps {
   manifest: SceneManifest;
   assets: ReadonlyMap<string, LoadedSceneAsset>;
   style: StyleDefinition;
   colorRestoration: number;
+  /**
+   * Optional localized biome tint on the CLONED scan and helper materials
+   * (see `biomeSurfaceTreatment`). It is uniform-only: changing it never
+   * re-clones or recompiles, and `null`/`undefined` renders exactly as
+   * Original. Memoize it; a new object each render re-uploads uniforms.
+   */
+  biomeSurface?: BiomeSurfaceTreatment | null;
 }
 
 function soupGeometry(soup: TriangleSoup): THREE.BufferGeometry {
@@ -37,10 +51,12 @@ function HelperMesh({
   entity,
   style,
   colorRestoration,
+  biomeSurface,
 }: {
   entity: HelperEntity;
   style: StyleDefinition;
   colorRestoration: number;
+  biomeSurface: BiomeSurfaceTreatment | null;
 }) {
   const geometry = useMemo(() => soupGeometry(helperLocalSoup(entity)), [entity]);
   const edges = useMemo(() => new THREE.EdgesGeometry(geometry, 24), [geometry]);
@@ -48,15 +64,19 @@ function HelperMesh({
   const baseColor = isFloor
     ? (style.sceneColors.surfaces[3] ?? style.sceneColors.background)
     : (style.sceneColors.surfaces[0] ?? style.uiAccents.primary);
-  const material = useMemo(
-    () => createStyledHelperMaterial(baseColor, style, colorRestoration, { floor: isFloor }),
-    [baseColor, style, isFloor],
-  );
+  const material = useMemo(() => {
+    const created = createStyledHelperMaterial(baseColor, style, colorRestoration, { floor: isFloor });
+    installBiomeSurfaceBlend(created);
+    return created;
+  }, [baseColor, style, isFloor]);
 
   useEffect(() => {
     const holder = new THREE.Mesh(geometry, material);
     setObjectColorRestoration(holder, colorRestoration);
   }, [geometry, material, colorRestoration]);
+  useEffect(() => {
+    applyBiomeSurfaceToMaterial(material, biomeSurface, isFloor ? "floor" : "structure");
+  }, [material, biomeSurface, isFloor]);
   useEffect(
     () => () => {
       geometry.dispose();
@@ -89,6 +109,7 @@ export function SceneEntities({
   assets,
   style,
   colorRestoration,
+  biomeSurface = null,
 }: SceneEntitiesProps) {
   const clones = useMemo(() => {
     const map = new Map<string, THREE.Object3D>();
@@ -98,7 +119,10 @@ export function SceneEntities({
       // manifest's declared `AssetReference.sha256`, which a manifest is
       // free to get wrong or lie about. Known-sample material regions must
       // only ever key off what was actually fetched.
-      map.set(assetId, cloneStyledObject(asset.scene, style, colorRestoration, asset.sha256));
+      const clone = cloneStyledObject(asset.scene, style, colorRestoration, asset.sha256);
+      // Clone-owned materials only; the cached source scene is never touched.
+      installBiomeSurfaceBlendOnObject(clone);
+      map.set(assetId, clone);
     }
     return map;
   }, [assets, style]);
@@ -106,6 +130,9 @@ export function SceneEntities({
   useEffect(() => {
     for (const object of clones.values()) setObjectColorRestoration(object, colorRestoration);
   }, [clones, colorRestoration]);
+  useEffect(() => {
+    for (const object of clones.values()) applyBiomeSurface(object, biomeSurface);
+  }, [clones, biomeSurface]);
   useEffect(
     () => () => {
       for (const object of clones.values()) disposeStyledObject(object);
@@ -136,6 +163,7 @@ export function SceneEntities({
             entity={entity}
             style={style}
             colorRestoration={colorRestoration}
+            biomeSurface={biomeSurface}
           />
         );
       })}

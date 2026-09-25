@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { COORDINATE_CONVENTION } from "./geometry.js";
 import type { LevelExperience } from "./experience.js";
-import type { SceneManifest } from "./manifest.js";
+import { ADVENTURE_GENERATOR_VERSION, ADVENTURE_TEMPLATE_IDS, SCENE_BIOME_IDS, type SceneManifest } from "./manifest.js";
 import { worldWorkflowSchema } from "./workflow.js";
 import {
   LEVEL_EXPERIENCE_SCHEMA_VERSION,
@@ -262,6 +262,15 @@ export const sceneManifestReaderSchema = z
     experience: levelExperienceSchema.optional(),
     media: z.object({ audio: z.array(audioAsset), video: z.array(videoAsset) }).optional(),
     workflow: worldWorkflowSchema.optional(),
+    biome: z.object({
+      id: z.enum(SCENE_BIOME_IDS),
+      seed: z.string().min(1).max(256),
+    }).strict().optional(),
+    adventure: z.object({
+      template: z.enum(ADVENTURE_TEMPLATE_IDS),
+      seed: z.string().min(1).max(256),
+      generator: z.literal(ADVENTURE_GENERATOR_VERSION),
+    }).strict().optional(),
   })
   .superRefine((manifest, context) => {
     const orders = manifest.checkpoints.map((item) => item.order).sort((a, b) => a - b);

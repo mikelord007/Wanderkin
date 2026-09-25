@@ -36,6 +36,10 @@ import { updateGameplayProximity } from "./modes/proximity.js";
 import { gameplayEvents } from "./events.js";
 import type { Vec3Like } from "./core/vec.js";
 import { useGameAudio } from "../audio/useGameAudio.js";
+import { useBiomeAdventure } from "../biome/useBiomeAdventure.js";
+import { adventureHudCopy } from "../biome/missionCopy.js";
+import { getBiomeDefinition } from "../biome/presets.js";
+import { AdventureControls } from "../ui/components/AdventureControls.js";
 
 interface Runtime {
   simulation: GameSimulation;
@@ -85,6 +89,7 @@ export const GameView = forwardRef<GameViewHandle, GameViewProps>(function GameV
   eventBus,
   publishedVersionId,
   onToggleCapture,
+  onAdventurePrepared,
 }, ref) {
   const config = DEFAULT_MOVEMENT_CONFIG;
   const reducedMotion = usePrefersReducedMotion();
@@ -92,13 +97,18 @@ export const GameView = forwardRef<GameViewHandle, GameViewProps>(function GameV
   manifestRef.current = manifest;
   const signature = useMemo(() => gameplaySignature(manifest), [manifest]);
   const resolvedEventBus = eventBus ?? gameplayEvents;
+  // Generated adventures carry theme-neutral quest text; the guide speaks the
+  // same themed objective the HUD shows, using the look saved with the world.
+  const narrationScript = useMemo(
+    () => adventureHudCopy(manifest, getBiomeDefinition(manifest.biome?.id ?? "original"))?.objective
+      ?? manifest.experience?.quest.narrationScript,
+    [manifest],
+  );
   const audio = useGameAudio({
     worldId: manifest.levelId,
     eventBus: resolvedEventBus,
     ...(manifest.media ? { media: manifest.media } : {}),
-    ...(manifest.experience?.quest.narrationScript
-      ? { narrationScript: manifest.experience.quest.narrationScript }
-      : {}),
+    ...(narrationScript ? { narrationScript } : {}),
   });
   // Read inside the `M` keyboard-shortcut handler below, which is wired
   // once per InputController construction rather than on every render.
@@ -139,6 +149,20 @@ export const GameView = forwardRef<GameViewHandle, GameViewProps>(function GameV
   const [stage, setStage] = useState<GameLoadStage>("idle");
   const [error, setError] = useState<string | null>(null);
   const [runtime, setRuntime] = useState<Runtime | null>(null);
+  // Look and new-adventure state sit outside the gameplay session: a look
+  // change never rebuilds physics or touches objectives and progress.
+  const biome = useBiomeAdventure({
+    manifest,
+    assets: runtime?.assets ?? null,
+    movement: runtime?.simulation.config ?? null,
+    onAdventure: onAdventurePrepared,
+  });
+  const adventureCopy = useMemo(
+    () => adventureHudCopy(manifest, biome.definition),
+    [manifest, biome.definition],
+  );
+  const adventureCopyRef = useRef(adventureCopy);
+  adventureCopyRef.current = adventureCopy;
   const [loadToken, setLoadToken] = useState(0);
 
   const [started, setStarted] = useState(false);
@@ -184,7 +208,8 @@ export const GameView = forwardRef<GameViewHandle, GameViewProps>(function GameV
   }, []);
 
   useEffect(() => resolvedEventBus.on("fragmentCollected", (event) => {
-    setFeedback(`Color found — ${event.collected} of ${event.required}`);
+    setFeedback(adventureCopyRef.current?.pickup(event.collected, event.required)
+      ?? `Color found — ${event.collected} of ${event.required}`);
     if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
     feedbackTimerRef.current = setTimeout(() => setFeedback(null), 1800);
   }), [resolvedEventBus]);
@@ -483,7 +508,8 @@ export const GameView = forwardRef<GameViewHandle, GameViewProps>(function GameV
   }, [runtime, gameplaySession, syncModeState]);
 
   const handleRestart = useCallback(() => {
-    if (!runtime) return;
+    // A world being replaced may already be freed; reset() would query it.
+    if (!runtime || runtime.simulation.isDisposed) return;
     runtime.simulation.reset();
     gameplaySession?.restart();
     runtime.input.setYaw(manifestRef.current.spawn.headingRadians);
@@ -622,6 +648,9 @@ export const GameView = forwardRef<GameViewHandle, GameViewProps>(function GameV
             modeState={modeState}
             objectivePosition={objectivePosition}
             onGameplayFrame={handleGameplayFrame}
+            biomeDefinition={biome.definition}
+            biomeLayout={biome.presented.layout}
+            effectsQuality={biome.presented.quality}
           />
         </Canvas>
       ) : null}
@@ -650,6 +679,24 @@ export const GameView = forwardRef<GameViewHandle, GameViewProps>(function GameV
         onPause={handlePause}
         modeState={modeState}
         objective={manifest.experience?.quest.objective}
+        adventureCopy={adventureCopy}
+        settingsPanel={
+          // Only reachable from the pause and click-to-play cards, where the
+          // pointer is already released.
+          <AdventureControls
+            biomeId={biome.selectedId}
+            template={biome.template}
+            quality={biome.selectedQuality}
+            busy={biome.busy}
+            error={biome.error}
+            confirmReset={started}
+            newAdventureAvailable={biome.canStartNewAdventure}
+            onBiomeChange={biome.setBiome}
+            onTemplateChange={biome.setTemplate}
+            onQualityChange={biome.setQuality}
+            onNewAdventure={biome.newAdventure}
+          />
+        }
         introVisible={introVisible}
         feedback={feedback}
         audioSettings={audio.settings}

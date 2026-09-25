@@ -512,3 +512,47 @@
     bottom: 0.75rem;
   }
 }
+
+/* ---- Look & adventure settings (pause and click-to-play cards) -------- */
+
+.oq-hud__card:has(> .oq-hud__settings[open]) {
+  width: min(36rem, 100%);
+  max-height: calc(100dvh - 4rem);
+  overflow-y: auto;
+}
+
+.oq-hud__settings {
+  margin-top: 1.1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: left;
+  cursor: auto;
+}
+
+.oq-hud__settings > summary {
+  cursor: pointer;
+  font-weight: 650;
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 0.35rem;
+  border-radius: 8px;
+}
+
+.oq-hud__settings > summary:focus-visible {
+  outline: 2px solid #7cf4ff;
+  outline-offset: 2px;
+}
+
+.oq-hud__settings[open] > summary {
+  margin-bottom: 0.9rem;
+}
+
+/* The summary already names the panel; keep its heading for assistive tech. */
+.oq-hud__settings .oq-adventure__heading {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

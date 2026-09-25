@@ -569,7 +569,18 @@ export function App() {
               ? go({ name: "friend", shareId: screen.publication.shareId })
               : goStart()
           }
-          onComplete={(result, media) =>
+          // A generated adventure is a new private, unsaved draft. Shared
+          // challenges keep their fixed course, so they cannot regenerate.
+          {...(screen.publication ? {} : {
+            onAdventurePrepared: (manifest: SceneManifest) => {
+              if (currentScreenRef.current !== screen) return;
+              go({ name: "play", manifest, publishable: false, unsaved: { kind: "draft", manifest } }, { replace: true });
+            },
+          })}
+          // Changing the look is presentation only: the run finishes against
+          // the same world, so save, share and publication identity never move.
+          onComplete={(result, media) => {
+            if (currentScreenRef.current !== screen) return;
             go(
               screen.publication
                 ? {
@@ -588,8 +599,8 @@ export function App() {
                     publishable: screen.publishable,
                     ...(screen.unsaved ? { unsaved: screen.unsaved } : {}),
                   },
-            )
-          }
+            );
+          }}
           {...(screen.publication ? { publishedVersionId: screen.publication.versionId } : {})}
         />
       );

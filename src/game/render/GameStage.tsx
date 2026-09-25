@@ -28,6 +28,9 @@ import { SceneEnvironment } from "./SceneEnvironment.js";
 import { ModeEntities } from "./ModeEntities.js";
 import type { GameplaySessionSnapshot } from "../modes/session.js";
 import type { Vec3Like } from "../core/vec.js";
+import type { BiomeDefinition, BiomeLayout, EffectsQuality } from "../../biome/types.js";
+import { BiomeLayer } from "../../biome/render/BiomeLayer.js";
+import { biomeSurfaceTreatment } from "../../biome/render/surfaceBlend.js";
 
 /** Frame-by-frame values the HUD cares about. Compared shallowly upstream. */
 export interface HudSignals {
@@ -61,6 +64,9 @@ export interface GameStageProps {
   modeState: GameplaySessionSnapshot | null;
   objectivePosition: Vec3Like | null;
   onGameplayFrame: (position: Vec3Like) => void;
+  biomeDefinition: BiomeDefinition;
+  biomeLayout: BiomeLayout | null;
+  effectsQuality: EffectsQuality;
 }
 
 export function GameStage({
@@ -85,8 +91,30 @@ export function GameStage({
   modeState,
   objectivePosition,
   onGameplayFrame,
+  biomeDefinition,
+  biomeLayout,
+  effectsQuality,
 }: GameStageProps) {
   const camera = useThree((state) => state.camera);
+  const renderer = useThree((state) => state.gl);
+  const themed = biomeDefinition.id !== "original" && biomeLayout !== null;
+  // Uniform-only tint on cloned scan materials; null restores Original.
+  const biomeSurface = useMemo(
+    () => (themed ? biomeSurfaceTreatment(biomeDefinition, biomeLayout, effectsQuality) : null),
+    [themed, biomeDefinition, biomeLayout, effectsQuality],
+  );
+  // Generated adventures take the look's collectible colour. Authored worlds
+  // keep theirs: Lost Colors fragments ARE their colours.
+  const displayedExperience = useMemo(() => {
+    if (!themed || !manifest.experience || !manifest.adventure) return manifest.experience;
+    const color = biomeDefinition.mission.collectibleColor;
+    return { ...manifest.experience,
+      collectibles: manifest.experience.collectibles.map((item) => ({ ...item, color })),
+      ...(manifest.experience.finishPortal ? { finishPortal: {
+        ...manifest.experience.finishPortal, activeColor: color,
+      } } : {}),
+    };
+  }, [themed, manifest.experience, manifest.adventure, biomeDefinition]);
   const avatar = useRef<PlayerAvatarHandle>(null);
   const frames = useRef(0);
   const announcedFirstFrame = useRef(false);
@@ -120,6 +148,10 @@ export function GameStage({
   }, [rig]);
 
   useFrame((_, delta) => {
+    // A world being replaced is freed in a React effect cleanup, but the Canvas
+    // can still deliver frames until it unmounts. Every call below queries the
+    // Rapier world, which must never happen once it is freed.
+    if (simulation.isDisposed) return;
     frames.current += 1;
 
     if (runningRef.current) {
@@ -226,6 +258,12 @@ export function GameStage({
       },
       collisionTriangles: simulation.triangleCount,
       warnings: simulation.warnings,
+      biome: { id: themed ? biomeDefinition.id : "original", seed: biomeLayout?.seed ?? manifest.seed,
+        props: biomeLayout?.props.length ?? 0, patches: biomeLayout?.patches.length ?? 0,
+        drawCalls: renderer.info.render.calls, geometries: renderer.info.memory.geometries,
+        textures: renderer.info.memory.textures,
+        fragments: modeState?.requiredFragmentsCollected ?? 0,
+        destinations: modeState?.destinationsReached.size ?? 0 },
     };
 
     // Only claim readiness once a frame has actually been drawn: the first
@@ -238,16 +276,19 @@ export function GameStage({
 
   return (
     <>
-      <SceneLighting bounds={simulation.bounds} style={style} />
-      <SceneEnvironment
+      <SceneLighting bounds={simulation.bounds} style={style} biome={themed ? biomeDefinition : null} />
+      {!themed ? <SceneEnvironment
         bounds={simulation.bounds}
         style={style}
         atmosphere={atmosphere}
         reducedMotion={reducedMotion}
-      />
+      /> : null}
+      {themed && biomeLayout ? <BiomeLayer definition={biomeDefinition} layout={biomeLayout}
+        quality={effectsQuality} reducedMotion={reducedMotion} /> : null}
       <SceneEntities
         manifest={manifest}
         assets={assets}
+        biomeSurface={biomeSurface}
         style={style}
         colorRestoration={colorRestoration}
       />
@@ -260,9 +301,9 @@ export function GameStage({
         authoredConfig={simulation.authoredConfig}
         runtimeConfig={config}
       />
-      {manifest.experience && modeState ? (
+      {displayedExperience && modeState ? (
         <ModeEntities
-          experience={manifest.experience}
+          experience={displayedExperience}
           state={modeState}
           reducedMotion={reducedMotion}
           authoredConfig={simulation.authoredConfig}

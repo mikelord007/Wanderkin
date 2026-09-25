@@ -8,8 +8,9 @@
  * leaving the level and reacting to completion, via `onExit`/`onComplete`.
  */
 
-import { useState, type RefObject } from "react";
+import { useState, type ReactNode, type RefObject } from "react";
 import type { GameLoadStage } from "../types.js";
+import type { AdventureHudCopy } from "../../biome/missionCopy.js";
 import type { GameplaySessionSnapshot } from "../modes/session.js";
 import { AudioControls, SubtitleBar, type AudioSettings } from "../../ui/components/index.js";
 import type { SubtitleState } from "../../audio/useGameAudio.js";
@@ -39,6 +40,10 @@ export interface HudProps {
   onPause: () => void;
   modeState: GameplaySessionSnapshot | null;
   objective: string | undefined;
+  /** Only for generated adventures; every other world keeps its own wording. */
+  adventureCopy?: AdventureHudCopy | null;
+  /** Look/adventure settings, shown inside the pause and click-to-play cards. */
+  settingsPanel?: ReactNode;
   introVisible: boolean;
   feedback: string | null;
   audioSettings: AudioSettings;
@@ -107,6 +112,7 @@ function Controls() {
 
 function ObjectivePanel({ props }: { props: HudProps }) {
   const state = props.modeState;
+  const copy = props.adventureCopy ?? null;
   if (!state) {
     return <div className="oq-hud__objective">
       <div className="oq-hud__objective-label">{props.completed ? "Course complete" : "Checkpoints"}</div>
@@ -115,16 +121,20 @@ function ObjectivePanel({ props }: { props: HudProps }) {
   }
   if (state.mode === "collect") {
     return <div className="oq-hud__objective" role="status" aria-live="polite">
-      <div className="oq-hud__objective-label">Lost Colors</div>
-      <div className="oq-hud__objective-count">Colors found {state.requiredFragmentsCollected}<span> / {state.requiredFragmentsTotal}</span></div>
-      <p>{state.portalActive ? "The portal is awake — step inside." : props.objective}</p>
+      <div className="oq-hud__objective-label">{copy ? copy.title : "Lost Colors"}</div>
+      <div className="oq-hud__objective-count">{copy ? copy.counterLabel : "Colors found"} {state.requiredFragmentsCollected}<span> / {state.requiredFragmentsTotal}</span></div>
+      <p>{state.portalActive
+        ? (copy ? copy.exitOpenHint : "The portal is awake — step inside.")
+        : (copy ? copy.objective : props.objective)}</p>
     </div>;
   }
   if (state.mode === "explore") {
     return <div className="oq-hud__objective">
-      <div className="oq-hud__objective-label">Explore</div>
-      <div className="oq-hud__objective-count">{state.destinationsReached.size} places visited</div>
-      <p>{props.objective}</p>
+      <div className="oq-hud__objective-label">{copy ? copy.title : "Explore"}</div>
+      <div className="oq-hud__objective-count">{copy
+        ? <>{copy.counterLabel} {Math.min(state.destinationsReached.size, 1)}<span> / 1</span></>
+        : `${state.destinationsReached.size} places visited`}</div>
+      <p>{copy ? copy.objective : props.objective}</p>
     </div>;
   }
   return <div className="oq-hud__objective">
@@ -132,6 +142,23 @@ function ObjectivePanel({ props }: { props: HudProps }) {
     <div className="oq-hud__objective-count">{formatMilliseconds(state.race.elapsedMilliseconds)}</div>
     {state.race.bestMilliseconds !== null ? <p>Best {formatMilliseconds(state.race.bestMilliseconds)}</p> : null}
   </div>;
+}
+
+/** Collapsed by default so pause/play stay one click away. Events are kept
+ * inside: the click-to-play overlay starts the game (and takes the pointer)
+ * on any click or Enter/Space that bubbles up to it. */
+function SettingsDisclosure({ panel }: { panel: ReactNode }) {
+  if (!panel) return null;
+  return (
+    <details
+      className="oq-hud__settings"
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => event.stopPropagation()}
+    >
+      <summary>Look &amp; adventure</summary>
+      {panel}
+    </details>
+  );
 }
 
 function LoadingCard({
@@ -326,6 +353,7 @@ export function Hud(props: HudProps) {
                 Leave level
               </button>
             </div>
+            <SettingsDisclosure panel={props.settingsPanel} />
             {warnings.length > 0 ? (
               <div className="oq-hud__warnings">
                 <strong>Level data notes</strong>
@@ -361,6 +389,7 @@ export function Hud(props: HudProps) {
                 Play
               </button>
             </div>
+            <SettingsDisclosure panel={props.settingsPanel} />
           </div>
         </div>
       ) : null}

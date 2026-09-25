@@ -45,6 +45,9 @@ export interface GameDiagnostics {
   readonly sceneBounds: { min: Vec3Tuple; max: Vec3Tuple };
   readonly collisionTriangles: number;
   readonly warnings: readonly string[];
+  readonly biome?: { readonly id: string; readonly seed: string; readonly props: number;
+    readonly patches: number; readonly drawCalls: number; readonly geometries: number;
+    readonly textures: number; readonly fragments: number; readonly destinations: number };
 }
 
 export interface GameDiagnosticsApi {
