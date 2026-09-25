@@ -205,7 +205,31 @@ this work.
 
 Staged and committed via `developer_git_commit_proposal` (not CLI git), exactly the files listed
 under "Owned paths touched" above, plus this checkpoint and the new
-`nimbalyst-local/screenshots/materials/` evidence images. Sibling in-progress files (scale
-worker's `characterScale.ts`/`constants.ts`/`GameStage.tsx`/`gameplay.test.ts`, and every other
-worker's `nimbalyst-local/` artifact) were left untouched and unstaged — confirmed via `git
-status` immediately before commit that only the intended paths were included.
+`nimbalyst-local/screenshots/materials/` evidence images (commit `fc121b1`). Sibling in-progress
+files (scale worker's `characterScale.ts`/`constants.ts`/`GameStage.tsx`/`gameplay.test.ts`, and
+every other worker's `nimbalyst-local/` artifact) were left untouched and unstaged — confirmed
+via `git status` immediately before commit that only the intended paths were included.
+
+## Post-commit test-isolation note (coordinator-relayed)
+
+Coordinator relayed a finding after this work landed: disposable Vite dev servers on different
+ports (e.g. this worker's throwaway port 5199) still share the repo's single
+`node_modules/.vite` dependency-optimizer cache by default, and a throwaway instance can
+invalidate chunks the protected dev servers (5173/15173) depend on — the brand worker hit this
+by accident and repaired it without needing restarts; both protected ports verified healthy
+(HTTP 200, no console errors) afterward.
+
+All of this worker's own disposable Vite invocations (`npx vite --host 127.0.0.1 --port 5199
+--strictPort`, used only for the before/after screenshots and FPS check above) ran with Vite's
+default `cacheDir`, i.e. against that same shared `node_modules/.vite` — not yet isolated at the
+time. Checked immediately after this note arrived: **5173, 15173, 8787, and 18799 all still
+respond normally (5173/15173 HTTP 200, no reoptimize/cache repair performed)**, so no repair was
+needed this time, but the exposure was real. Per the coordinator's instruction, did not clear or
+"repair" any shared cache — this note is a forward-looking process fix, not evidence of current
+breakage.
+
+Going forward (recorded here for this worker and any future disposable-Vite testing on this
+repo): point disposable instances at a private `cacheDir` outside `node_modules/.vite` (e.g. a
+`--config` pointing to a throwaway config with `cacheDir` under the OS temp dir, keyed by port),
+never the repo-shared default, so a throwaway test server can never invalidate the protected
+5173/15173 dependency-optimizer state again.
