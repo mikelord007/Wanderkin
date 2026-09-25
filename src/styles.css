@@ -38,7 +38,7 @@
    page, so a screen taller than one screenful never shows a seam. */
 html {
   background: var(--oq-paper);
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html,
@@ -77,7 +77,7 @@ select {
 }
 
 :is(button, a, input, textarea, select, summary, [tabindex]):focus-visible {
-  outline: 3px solid var(--wk-marigold);
+  outline: 3px solid var(--wk-focus);
   outline-offset: 3px;
   border-radius: var(--oq-round-sm);
 }
@@ -264,19 +264,19 @@ a {
 
 .oq-button--primary {
   background: var(--oq-action-fill);
-  border-color: color-mix(in srgb, var(--oq-action) 62%, transparent);
+  border-color: var(--oq-action-fill);
   color: var(--oq-on-action);
-  box-shadow: inset 0 1px 0 #ffffff24, 0 8px 28px -10px color-mix(in srgb, var(--oq-action) 70%, transparent);
+  box-shadow: 0 8px 22px -10px color-mix(in srgb, var(--oq-action) 75%, transparent);
 }
 
 .oq-button--primary:not(:disabled):hover {
   background: var(--oq-action-fill-hover);
-  border-color: var(--oq-action);
+  border-color: var(--oq-action-fill-hover);
 }
 
 .oq-button--secondary {
-  background: #1a0d33b8;
-  border-color: #c9b8ff57;
+  background: var(--oq-btn2-bg);
+  border-color: var(--oq-btn2-border);
   color: var(--oq-ink);
   box-shadow: var(--wk-highlight);
 }
@@ -287,12 +287,12 @@ a {
 }
 
 .oq-button--secondary:not(:disabled):hover {
-  background: #2a1a52d9;
-  border-color: #d9ccffa6;
+  background: var(--oq-btn2-hover-bg);
+  border-color: var(--oq-btn2-hover-border);
 }
 
 .oq-button--ghost:not(:disabled):hover {
-  background: #ffffff0f;
+  background: var(--oq-ghost-hover);
   color: var(--oq-ink);
 }
 
@@ -382,7 +382,7 @@ a {
   bottom: 6px;
   right: 6px;
   background: var(--oq-action);
-  color: #1a0d33;
+  color: var(--oq-on-action);
   border-radius: 999px;
   padding: 2px 9px;
   font-size: .75rem;
@@ -491,7 +491,7 @@ a {
 }
 
 .oq-capability-card:hover {
-  background: #221443;
+  background: var(--oq-wash);
 }
 
 .oq-capability-card--selected {
@@ -559,18 +559,18 @@ a {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: var(--wk-violet);
+  background: var(--wk-purple);
   animation: oq-bounce .9s ease-in-out infinite;
 }
 
 .oq-loading__spinner-dot:nth-child(2) {
   animation-delay: .15s;
-  background: #b79cff;
+  background: #a58cff;
 }
 
 .oq-loading__spinner-dot:nth-child(3) {
   animation-delay: .3s;
-  background: var(--wk-halo);
+  background: var(--wk-warm);
 }
 
 @keyframes oq-bounce {
@@ -601,7 +601,7 @@ a {
 .oq-progressbar__fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--wk-violet), var(--wk-halo));
+  background: linear-gradient(90deg, var(--wk-purple-ink), var(--wk-purple));
   transition: width .3s ease;
 }
 
@@ -686,3 +686,6 @@ a {
   .oq-button:not(:disabled):active { transform: none; }
   .oq-progressbar__fill { transition: none; }
 }
+
+/* v2: loading is the doorway with a line of text, not a box. */
+.oq-loading__arch { width: 56px; height: auto; margin-bottom: var(--oq-space-2); }
