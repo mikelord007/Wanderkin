@@ -51,7 +51,8 @@ export function bambooPoles(options: BambooOptions): VariantBuilder {
         rings: 10,
         sides: 3,
         cap: "open",
-        color: (t) => rampAt(fibre, 0.45 + 0.2 * Math.sin(t * Math.PI * 4)),
+        // Dark fibre, so the band reads against the pale-green bamboo.
+        color: (t) => rampAt(fibre, 0.12 + 0.12 * Math.sin(t * Math.PI * 4)),
       }),
       { color: "attribute", smooth: true },
     );

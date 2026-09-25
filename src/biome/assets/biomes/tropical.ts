@@ -124,8 +124,8 @@ const S = TROPICAL_ROCK_SHAPES;
 
 // Rounded, weathered pale stones, mossy on top, with companion stones.
 const ROUND_ROCKS = [
-  tropicalRock({ moss: 0.8, bodies: [{ shape: S.dome }, { shape: S.pebble, at: [0.62, 0.18], size: 0.22 }, { shape: S.chip, at: [-0.3, 0.58], size: 0.16 }] }),
-  tropicalRock({ moss: 0.85, bodies: [{ shape: { ...S.dome, seed: 131, scale: [0.72, 0.86, 0.7] } }, { shape: S.loaf, at: [0.5, -0.25], size: 0.55 }, { shape: S.pebble, at: [-0.5, 0.35], size: 0.2 }] }),
+  tropicalRock({ moss: 0.8, bodies: [{ shape: S.dome }, { shape: S.pebble, at: [0.52, 0.16], size: 0.22 }, { shape: S.chip, at: [-0.26, 0.5], size: 0.16 }] }),
+  tropicalRock({ moss: 0.85, bodies: [{ shape: { ...S.dome, seed: 131, scale: [0.72, 0.86, 0.7] } }, { shape: S.loaf, at: [0.4, -0.2], size: 0.5 }, { shape: S.pebble, at: [-0.44, 0.3], size: 0.2 }] }),
   tropicalRock({ bodies: [{ shape: S.knob }, { shape: { ...S.knob, seed: 133 }, at: [0.5, 0.35], size: 0.5 }, { shape: S.pebble, at: [-0.5, -0.4], size: 0.18 }] }),
   tropicalRock({ moss: 0.75, bodies: [{ shape: S.wedge }, { shape: S.chip, at: [0.58, 0.32], size: 0.22 }] }),
 ];
@@ -193,12 +193,12 @@ export const TROPICAL_ART: BiomeArt = {
       ],
     },
     "rock-round": {
-      category: "rock", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.99, triangleBudget: 400,
+      category: "rock", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.9, triangleBudget: 400,
       mirror: true, embed: [0.03, 0.06], alignToNormal: 0.6,
       variants: ROUND_ROCKS,
     },
     "rock-coastal": {
-      category: "rock", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.95, triangleBudget: 400,
+      category: "rock", role: "hero", shading: "faceted", castShadow: true, unitRadius: 0.9, triangleBudget: 400,
       mirror: true, embed: [0.02, 0.05], alignToNormal: 0.5,
       variants: COASTAL_ROCKS,
     },
@@ -381,9 +381,11 @@ export const TROPICAL_ART: BiomeArt = {
           id: "beach-marker",
           primary: "marker",
           members: [
-            { family: "pebble", count: [1, 2], ring: [0.4, 0.9], height: [0.05, 0.08] },
+            // Low base dressing so a marker never stands alone on open sand.
+            { family: "tuft", count: [1, 2], ring: [0.25, 0.7], height: [0.12, 0.2] },
+            { family: "fern", count: [1, 1], ring: [0.35, 0.8], height: [0.3, 0.42], chance: 0.6 },
+            { family: "pebble", count: [1, 3], ring: [0.3, 0.9], height: [0.05, 0.09] },
             { family: "driftwood", count: [1, 1], ring: [0.5, 0.9], height: [0.3, 0.42], chance: 0.5 },
-            { family: "tuft", count: [0, 1], ring: [0.3, 0.8], height: [0.08, 0.12] },
           ],
         },
       },
