@@ -18,7 +18,18 @@ function wav(seconds, sample, rate = RATE) {
 
 const tone = (frequency, t, gain = 1) => Math.sin(Math.PI * 2 * frequency * t) * gain;
 const envelope = (i, count, attack = .02, release = .18, rate = RATE) => Math.min(1, i / (rate * attack), (count - i) / (rate * release));
-const seedNoise = (i) => (((Math.imul(i + 17, 1103515245) + 12345) >>> 16) / 32768 - 1);
+
+/** Avalanche integer hash (not a one-step LCG applied directly to the sample index —
+ * that formula is linear in `i`, so it produced a near-periodic ~2 kHz sawtooth ramp
+ * that read as a pitched "metallic" tone instead of noise). Multiple xor/imul rounds
+ * decorrelate consecutive samples so this is genuine broadband hiss. */
+function seedNoise(i) {
+  let x = (i + 17) | 0;
+  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
+  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
+  x = (x ^ (x >>> 16)) >>> 0;
+  return x / 2147483648 - 1;
+}
 
 /** Short plucked/mallet note: fast attack, exponential decay, brighter fast-decaying 2nd
  * harmonic for a bell-like "ping" — deliberately no sustained tone, so notes leave silence

@@ -1,8 +1,12 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { LevelMedia } from "@shared/index.js";
 import { BUNDLED_AUDIO_URLS, EFFECT_CUES, resolveAudioUrls } from "./assets.js";
 import { loadAudioSettings, saveAudioSettings } from "./settings.js";
 import { GameAudioEngine } from "./engine.js";
+import { LOST_COLORS_BUNDLED_MEDIA } from "./bundledMedia.js";
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>();
@@ -63,5 +67,37 @@ describe("client audio", () => {
     await engine.playNarrationOnce("world-1");
     expect(starts - loopStarts).toBe(1);
     engine.stop();
+  });
+
+  it("ships bundled WAV bytes that match the recorded provenance hash/size", () => {
+    for (const asset of LOST_COLORS_BUNDLED_MEDIA.audio) {
+      const bytes = readFileSync(path.join(process.cwd(), "public", asset.url.replace(/^\//, "")));
+      expect(bytes.byteLength, asset.url).toBe(asset.sizeBytes);
+      expect(createHash("sha256").update(bytes).digest("hex"), asset.url).toBe(asset.sha256);
+    }
+  });
+
+  it("generates the looping ambience bed as broadband noise, not a pitched tone", () => {
+    // Regression guard for the "metallic hum" defect: the generator's noise function
+    // used to be a one-step LCG applied directly to the sample index, which is linear
+    // in `i` and produced a near-periodic ~2 kHz sawtooth instead of real noise. A
+    // proper noise source has near-zero autocorrelation at every nonzero lag; a
+    // periodic/tonal artifact shows up as a strong peak.
+    const ambience = LOST_COLORS_BUNDLED_MEDIA.audio.find((asset) => asset.kind === "ambience")!;
+    const bytes = readFileSync(path.join(process.cwd(), "public", ambience.url.replace(/^\//, "")));
+    const dataStart = 44; // fixed PCM16 mono header written by scripts/generate-bundled-audio.mjs
+    const sampleCount = (bytes.byteLength - dataStart) / 2;
+    const samples = new Float64Array(sampleCount);
+    for (let i = 0; i < sampleCount; i += 1) samples[i] = bytes.readInt16LE(dataStart + i * 2) / 32768;
+
+    const mean = samples.reduce((sum, value) => sum + value, 0) / samples.length;
+    const denominator = samples.reduce((sum, value) => sum + (value - mean) ** 2, 0);
+    let maxAbsCorrelation = 0;
+    for (let lag = 1; lag <= 500; lag += 1) {
+      let accumulator = 0;
+      for (let i = 0; i < samples.length - lag; i += 1) accumulator += (samples[i]! - mean) * (samples[i + lag]! - mean);
+      maxAbsCorrelation = Math.max(maxAbsCorrelation, Math.abs(accumulator / denominator));
+    }
+    expect(maxAbsCorrelation).toBeLessThan(0.5);
   });
 });
