@@ -31,4 +31,14 @@ describe("biome sun placement", () => {
     const broken = biomeLightRig({ lighting: { sun: "#fff", sky: "#fff", ground: "#fff", intensity: 2, ambient: Number.NaN, direction: [1, 1, 1] } }, 0.5);
     expect(Number.isFinite(broken.ambient) && Number.isFinite(broken.hemisphere)).toBe(true);
   });
+
+  it("honours a biome's own elevation range and fill tuning", () => {
+    const centre0 = { x: 0, y: 0, z: 0 };
+    const high = biomeSunPosition([1, 10, 0], centre0, 10, [(20 * Math.PI) / 180, (60 * Math.PI) / 180]);
+    expect(Math.asin(high[1] / 10)).toBeCloseTo((60 * Math.PI) / 180, 6);
+    const lighting = { sun: "#fff", sky: "#fff", ground: "#fff", intensity: 2, ambient: 1, direction: [1, 1, 1] as [number, number, number] };
+    const flat = biomeLightRig({ lighting }, 0.5, { ambientKeep: 1, hemisphereShare: 0 });
+    expect(flat.ambient).toBe(1);
+    expect(flat.hemisphere).toBe(0.5);
+  });
 });

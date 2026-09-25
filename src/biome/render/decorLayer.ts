@@ -24,6 +24,7 @@ import { bakeBucket, groupMembers, type BucketKey } from "../assets/batch.js";
 import { getBiomeArt } from "../assets/biomes/index.js";
 import { composeLayout } from "../assets/compose.js";
 import { createContactDecals } from "./contactDecals.js";
+import { resolveBiomeLighting } from "../assets/lighting.js";
 import type { AssetShading } from "../assets/types.js";
 import { PROP_UNIT_RADIUS } from "./propGeometry.js";
 import { createPropMaterial } from "./propMaterial.js";
@@ -222,7 +223,12 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
       track(mesh);
     }
     // Ground contact: one instanced draw of blobs and soil patches.
-    const contact = createContactDecals(composed.clusters, art.ground, layout.seed);
+    const contactStrength = resolveBiomeLighting(art.lighting).contactStrength;
+    const contact = createContactDecals(
+      composed.clusters,
+      { ...art.ground, contactOpacity: art.ground.contactOpacity * contactStrength },
+      layout.seed,
+    );
     if (contact) {
       if (canDraw("contact", 1)) {
         geometries.push(...contact.geometries);

@@ -105,6 +105,26 @@ describe.each(arts.map((art) => [art.id, art] as const))("art guardrails: %s", (
     }
   });
 
+  it("lighting adjustments, if any, sit inside their documented bounds (no silent clamping)", () => {
+    const l = art.lighting;
+    if (!l) return;
+    const within = (v: number | undefined, lo: number, hi: number, name: string) => {
+      if (v !== undefined) {
+        expect(v, name).toBeGreaterThanOrEqual(lo);
+        expect(v, name).toBeLessThanOrEqual(hi);
+      }
+    };
+    within(l.ambientKeep, 0.3, 1, "ambientKeep");
+    within(l.hemisphereShare, 0, 1, "hemisphereShare");
+    within(l.fogScale, 0.6, 1.6, "fogScale");
+    within(l.contactStrength, 0, 1.5, "contactStrength");
+    if (l.sunElevation) {
+      within(l.sunElevation[0], 15, 65, "sunElevation[0]");
+      within(l.sunElevation[1], 15, 65, "sunElevation[1]");
+      expect(l.sunElevation[0]).toBeLessThanOrEqual(l.sunElevation[1]);
+    }
+  });
+
   it("reduced effects budgets are strictly lower", () => {
     expect(art.budgets.triangles.reduced).toBeLessThan(art.budgets.triangles.standard);
     expect(art.budgets.membersPerCluster.reduced).toBeLessThan(art.budgets.membersPerCluster.standard);

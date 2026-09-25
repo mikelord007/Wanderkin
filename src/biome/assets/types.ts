@@ -141,8 +141,30 @@ export interface GroundStyle {
   patchColor?: string;
 }
 
+/**
+ * Per-biome lighting adjustments on top of the definition's own
+ * `lighting`/`sky` (sun colour = warmth, direction, intensity, ambient,
+ * fog distances), applied by `SceneLighting` in themed looks only. Every
+ * field is optional and clamped by `resolveBiomeLighting` (assets/lighting.ts);
+ * omitted fields keep the framework defaults.
+ */
+export interface LightingAdjust {
+  /** Share of `lighting.ambient` kept as flat ambient light, 0.3–1 (default 0.62). */
+  ambientKeep?: number;
+  /** Share of `lighting.ambient` added to the sky/ground hemisphere fill, 0–1 (default 0.45). */
+  hemisphereShare?: number;
+  /** Sun elevation clamp in degrees, within 15–65 (default [24, 52]). */
+  sunElevation?: readonly [number, number];
+  /** Multiplier on the definition's fog near/far distances, 0.6–1.6 (default 1). */
+  fogScale?: number;
+  /** Multiplier on the ground contact decal opacity, 0–1.5 (default 1). */
+  contactStrength?: number;
+}
+
 export interface BiomeArt {
   id: BiomeId;
+  /** Optional lighting adjustments (see {@link LightingAdjust}). */
+  lighting?: LightingAdjust;
   tones: BiomeTones;
   families: Readonly<Record<string, AssetFamily>>;
   /** Cluster presets per geometry placement kind. Missing kind = not drawn. */

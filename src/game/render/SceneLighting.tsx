@@ -4,6 +4,8 @@ import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { StyleDefinition } from "@shared/index.js";
 import type { BiomeDefinition } from "../../biome/types.js";
+import { getBiomeArt } from "../../biome/assets/biomes/index.js";
+import { LIGHTING_DEFAULTS, resolveBiomeLighting, type ResolvedBiomeLighting } from "../../biome/assets/lighting.js";
 import type { Bounds } from "../core/soup.js";
 import { usePrefersReducedMotion } from "./useReducedMotion.js";
 
@@ -78,8 +80,6 @@ function GradientBackdrop({
 
 /** Biome sun elevation is clamped so shadows stay long enough to read
  * furniture depth; the style path keeps its own lowered window key. */
-const BIOME_MIN_SUN_ELEVATION = (24 * Math.PI) / 180;
-const BIOME_MAX_SUN_ELEVATION = (52 * Math.PI) / 180;
 
 export function SceneLighting({ bounds, style, biome }: SceneLightingProps) {
   const themed = biome && biome.id !== "original" ? biome : null;
@@ -131,8 +131,10 @@ export function SceneLighting({ bounds, style, biome }: SceneLightingProps) {
   const keyDirX = key[0] / keyHorizontal;
   const keyDirZ = key[2] / keyHorizontal;
   const WINDOW_KEY_ELEVATION = 0.85;
+  // Per-biome adjustments live in the biome's own art file (BiomeArt.lighting).
+  const tuning = useMemo(() => (themed ? resolveBiomeLighting(getBiomeArt(themed.id)?.lighting) : null), [themed]);
   const keyPosition: [number, number, number] = themed
-    ? biomeSunPosition(themed.lighting.direction, centre, sunDistance)
+    ? biomeSunPosition(themed.lighting.direction, centre, sunDistance, tuning!.sunElevation)
     : [
         centre.x + keyDirX * sunDistance * 0.9,
         centre.y + WINDOW_KEY_ELEVATION * sunDistance * 0.48,
@@ -193,9 +195,14 @@ export function SceneLighting({ bounds, style, biome }: SceneLightingProps) {
   const reducedMotion = usePrefersReducedMotion();
   const keyShadowMapSize = reducedMotion ? 1024 : 2048;
 
-  const rig = themed ? biomeLightRig(themed, style.lighting.fillIntensity) : null;
+  const rig = themed ? biomeLightRig(themed, style.lighting.fillIntensity, tuning!) : null;
   const sky = themed
-    ? { zenith: themed.sky.zenith, horizon: themed.sky.horizon, fogNear: themed.sky.fogNear, fogFar: themed.sky.fogFar }
+    ? {
+        zenith: themed.sky.zenith,
+        horizon: themed.sky.horizon,
+        fogNear: themed.sky.fogNear * tuning!.fogScale,
+        fogFar: themed.sky.fogFar * tuning!.fogScale,
+      }
     : { zenith: style.sceneColors.background, horizon: style.sceneColors.fog, fogNear: 1.7, fogFar: 7.2 };
   const ambientColor = themed
     ? `#${new THREE.Color(themed.lighting.sun).lerp(new THREE.Color(themed.lighting.sky), 0.35).getHexString()}`
@@ -253,11 +260,12 @@ export function SceneLighting({ bounds, style, biome }: SceneLightingProps) {
 export function biomeLightRig(
   biome: Pick<BiomeDefinition, "lighting">,
   styleFillIntensity: number,
+  tuning: Pick<ResolvedBiomeLighting, "ambientKeep" | "hemisphereShare"> = LIGHTING_DEFAULTS,
 ): { ambient: number; hemisphere: number; shadowBias: number; shadowNormalBias: number } {
   const ambient = Number.isFinite(biome.lighting.ambient) ? Math.max(0, biome.lighting.ambient) : 0;
   return {
-    ambient: ambient * 0.62,
-    hemisphere: styleFillIntensity + ambient * 0.45,
+    ambient: ambient * tuning.ambientKeep,
+    hemisphere: styleFillIntensity + ambient * tuning.hemisphereShare,
     shadowBias: -0.0006,
     shadowNormalBias: 0.006,
   };
@@ -269,12 +277,13 @@ export function biomeSunPosition(
   direction: readonly [number, number, number],
   centre: { x: number; y: number; z: number },
   sunDistance: number,
+  elevationRange: readonly [number, number] = LIGHTING_DEFAULTS.sunElevation,
 ): [number, number, number] {
   const horizontal = Math.hypot(direction[0], direction[2]);
   const dirX = horizontal > 1e-6 ? direction[0] / horizontal : 1;
   const dirZ = horizontal > 1e-6 ? direction[2] / horizontal : 0;
   const rawElevation = Math.atan2(Number.isFinite(direction[1]) ? direction[1] : 1, horizontal || 1e-6);
-  const elevation = Math.min(BIOME_MAX_SUN_ELEVATION, Math.max(BIOME_MIN_SUN_ELEVATION, rawElevation));
+  const elevation = Math.min(elevationRange[1], Math.max(elevationRange[0], rawElevation));
   const flat = Math.cos(elevation) * sunDistance;
   return [centre.x + dirX * flat, centre.y + Math.sin(elevation) * sunDistance, centre.z + dirZ * flat];
 }
