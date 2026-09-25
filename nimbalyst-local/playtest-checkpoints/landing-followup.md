@@ -181,6 +181,7 @@ dirty/untracked files (`src/game/render/SceneEntities.tsx`, `src/game/render/Sce
 protected port or live/provider/publish path — this review and fix were pure client-side storage-shape
 logic, no network or provider calls.
 
-Commit: pending (staged next) — scoped to exactly `src/App.tsx`, `src/ui/creationFlow.ts`,
-`src/ui/creationFlow.test.ts`, `src/ui/creationStorage.ts`, `src/ui/creationStorage.test.ts`,
-`tests/e2e/browser/landing-resume.test.ts`, and this checkpoint file.
+Commit: `e13e24c408ffbeab31917255845da6fb0af9daf2` — scoped to exactly `src/App.tsx`,
+`src/ui/creationFlow.ts`, `src/ui/creationFlow.test.ts`, `src/ui/creationStorage.ts`,
+`src/ui/creationStorage.test.ts`, `tests/e2e/browser/landing-resume.test.ts`, and this checkpoint file.
+`git status` after the commit shows no other uncommitted changes in any path this worker owns.
