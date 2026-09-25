@@ -174,8 +174,13 @@ if (params.get("scene") === "sofa") {
     scene.add(part);
   }
 
-  // Left: today's authored 0.70 m capsule. Right: the new 0.35 m one.
-  for (const [index, height] of [0.7, 0.35].entries()) {
+  // Scale candidates, left to right: today's authored 0.70 m capsule, the
+  // shipped 0.35 m miniature, then the further-reduction candidates under
+  // exploration (?heights=0.7,0.35,0.2,0.175,0.15 overrides the list).
+  const heightsParam = params.get("heights");
+  const heights = heightsParam ? heightsParam.split(",").map(Number) : [0.7, 0.35];
+  const spacing = under ? Math.min(2.4, 5 / heights.length) : Math.min(4, 16 / heights.length);
+  for (const [index, height] of heights.entries()) {
     const model = buildCharacter();
     const animator = new CharacterAnimator();
     const holder = new THREE.Group();
@@ -183,7 +188,7 @@ if (params.get("scene") === "sofa") {
     tilt.add(model.group);
     holder.add(tilt);
     holder.position.set(
-      under ? -1.2 + index * 2.4 : -2 + index * 4,
+      (index - (heights.length - 1) / 2) * spacing,
       under ? height / 2 : lift + SOFA.seat + height / 2,
       under ? 0.4 : 1.1,
     );
@@ -282,10 +287,25 @@ function frame(fixedDelta?: number): void {
       if (fixedDelta === undefined) requestAnimationFrame(() => frame());
       return;
     }
-    camera.position.set(1.5, 3.4, 9.5);
-    camera.lookAt(0, 1.5, 0);
+    if (params.get("cam") === "closeup") {
+      // Tight on the seat cushion (1.68 m tall, known reference) so the
+      // sub-0.35 m candidates can be told apart from each other, which the
+      // wide comparison (zoomed out to fit the whole 8 m sofa) cannot do.
+      const under = params.get("under") === "1";
+      const midX = sofaSubjects.reduce((sum, s) => sum + s.holder.position.x, 0) / sofaSubjects.length;
+      const midY = sofaSubjects.reduce((sum, s) => sum + s.holder.position.y, 0) / sofaSubjects.length;
+      const targetZ = under ? 0.4 : 1.1;
+      const dz = 1.3 + sofaSubjects.length * 0.35;
+      camera.position.set(midX + 0.35, midY + 0.35 + dz * 0.15, targetZ + dz);
+      camera.lookAt(midX, midY, targetZ);
+    } else {
+      const spread = sofaSubjects.length;
+      camera.position.set(1.5, 3.4 + spread * 0.35, 9.5 + spread * 1.1);
+      camera.lookAt(0, 1.5, 0);
+    }
     renderer.render(scene, camera);
-    label.textContent = `sofa scale: 0.70 m (left) vs 0.35 m (right)\nsofa ${SOFA.length} m long, ${SOFA.height} m tall, seat ${SOFA.seat} m`;
+    const heightsLabel = sofaSubjects.map((s) => `${s.height.toFixed(3)} m`).join(" | ");
+    label.textContent = `sofa scale, left to right: ${heightsLabel}\nsofa ${SOFA.length} m long, ${SOFA.height} m tall, seat ${SOFA.seat} m`;
     if (fixedDelta === undefined) requestAnimationFrame(() => frame());
     return;
   }

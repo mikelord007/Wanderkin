@@ -31,10 +31,11 @@
  *  - `walkMaxSpan`: **smaller**, because the planner's surface sampling grid
  *    (`defaultSurfaceOptions`) sizes its cells from the character's radius. A
  *    gap that used to be crossed by a walk edge may now need a jump edge — but
- *    the old walk span is only about a third of the unchanged flat jump range,
- *    so it stays comfortably reachable. `characterScale.test.ts` pins that
- *    margin down, and `authoredCourse.test.ts` drives the real controller up
- *    the authored climb at this scale as the end-to-end check.
+ *    the walk span stays a small fraction of the unchanged flat jump range at
+ *    every scale explored here (down to about a tenth at 0.175 m), so it stays
+ *    comfortably reachable. `characterScale.test.ts` pins that margin down,
+ *    and `authoredCourse.test.ts` drives the real controller up the authored
+ *    climb at this scale as the end-to-end check.
  *
  * No saved manifest is rewritten and no asset or world is rescaled.
  *
@@ -42,18 +43,45 @@
  * horizontal extent becomes eight game metres (`DEFAULT_ASSUMED_EXTENT_METERS`
  * in `src/scene/normalize.ts`), so a real sofa is about eight metres long and
  * three and a half tall in game space. Against the authored 0.70 m capsule the
- * character was roughly a fifth of the sofa's height — a cat on a sofa. At
- * 0.35 m it is about a tenth of its height and some twenty-three body-lengths
- * along it, and the camera boom halves to match. Because the collider shrinks
- * with the body, this is real scale rather than a rendered-only trick: the
- * character can get into gaps it could not reach before.
+ * character was roughly a fifth of the sofa's height — a cat on a sofa. The
+ * first miniature pass, 0.35 m, read as about a tenth. At this size, 0.175 m
+ * (half that again), the sofa is roughly nineteen character-heights tall and
+ * forty-six body-lengths long, and the camera boom shrinks to a quarter of the
+ * authored length to match. Because the collider shrinks with the body, this
+ * is real scale rather than a rendered-only trick: the character can get into
+ * gaps it could not reach before.
+ *
+ * WHY 0.175 M AND NOT SOMETHING ELSE IN THE 0.15–0.20 M RANGE EXPLORED
+ * ---------------------------------------------------------------------
+ * All of 0.20 / 0.175 / 0.15 m pass the reachability, camera-collision and
+ * real-browser checks with margin to spare (see `scale-refinement.md`). The
+ * deciding factors for picking the middle value:
+ *  - It is a clean second halving of the previous 0.35 m pass (0.70 → 0.35 →
+ *    0.175), which is easy to reason about and keeps the walkMaxSpan/jump-range
+ *    margin comfortably away from the tighter end of the explored range.
+ *  - The third-person camera's boom and target-lift are ratios of the
+ *    capsule's own height ({@link "./cameraRig.js" CameraRig}), so the
+ *    character's *apparent size on screen* is framing-invariant across this
+ *    whole range — confirmed in real Chrome spawn screenshots at 0.35 / 0.20 /
+ *    0.175 / 0.15 m, which are visually near-identical. Going smaller does not
+ *    buy extra on-screen legibility, only a bigger jump in the walk-speed and
+ *    jump-height-in-body-heights ratios below.
+ *  - `walkSpeed` and `jumpHeight` stay authored (unchanged in metres) at every
+ *    scale, by design (see above) — so as the body shrinks, the same absolute
+ *    speed/jump reads as faster/higher relative to the body. At 0.35 m that
+ *    was already ~6.3 body-heights/s and a ~1.7-body-height jump; at 0.175 m
+ *    it is ~12.6 body-heights/s and a ~3.4-body-height jump. That is a real,
+ *    quantified trade-off of picking the middle of the range rather than its
+ *    top end, accepted here as "a small energetic toy", not tuned away: doing
+ *    so would mean touching the capability envelope that keeps existing
+ *    courses reachable, which is out of scope for this pass.
  */
 
 import type { MovementConfig } from "@shared/index.js";
 import type { Vec3Like } from "./vec.js";
 
 /** Standing height of the miniature capsule, in metres. */
-export const MINIATURE_CAPSULE_HEIGHT = 0.35;
+export const MINIATURE_CAPSULE_HEIGHT = 0.175;
 
 /** Total standing height of the capsule described by a config. */
 export function capsuleHeight(config: MovementConfig): number {
@@ -76,17 +104,22 @@ export function isMiniatureScale(config: MovementConfig): boolean {
 export function toMiniatureScale(base: MovementConfig): MovementConfig {
   if (isMiniatureScale(base)) return base;
   const factor = MINIATURE_CAPSULE_HEIGHT / capsuleHeight(base);
+  const characterRadius = base.characterRadius * factor;
+  const characterHalfHeight = base.characterHalfHeight * factor;
 
   return {
     ...base,
-    characterRadius: base.characterRadius * factor,
-    characterHalfHeight: base.characterHalfHeight * factor,
+    characterRadius,
+    characterHalfHeight,
     mantle: {
       ...base.mantle,
-      // Exactly the capsule's height: the contract is that a mantle
-      // destination must fit the whole capsule, and demanding the old, taller
-      // clearance would reject destinations the character now fits in.
-      requiredClearanceHeight: MINIATURE_CAPSULE_HEIGHT,
+      // Derived from the *actual* scaled radius/half-height rather than the
+      // nominal `MINIATURE_CAPSULE_HEIGHT` constant, so it can never fall a
+      // float-rounding hair short of the capsule it is meant to clear: the
+      // contract is that a mantle destination must fit the whole capsule,
+      // and demanding the old, taller clearance would reject destinations
+      // the character now fits in.
+      requiredClearanceHeight: 2 * (characterHalfHeight + characterRadius),
     },
     camera: {
       ...base.camera,
