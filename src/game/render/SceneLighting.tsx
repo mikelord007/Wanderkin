@@ -4,6 +4,7 @@ import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { StyleDefinition } from "@shared/index.js";
 import type { Bounds } from "../core/soup.js";
+import { usePrefersReducedMotion } from "./useReducedMotion.js";
 
 export interface SceneLightingProps {
   bounds: Bounds;
@@ -145,11 +146,22 @@ export function SceneLighting({ bounds, style }: SceneLightingProps) {
     [style],
   );
 
-  /** Doubled from the previous 1024: this is still a single shadow-casting
-   * light (the fill light below never casts), so the extra resolution buys
-   * noticeably crisper contact shadows under furniture at a fixed, modest
-   * cost rather than adding a second shadow pass or a global effect. */
-  const keyShadowMapSize = 2048;
+  /**
+   * Doubled from the previous 1024. Accurate cost accounting: doubling each
+   * dimension is 4x the shadow-map texel area (and matching GPU memory/depth
+   * fill-rate for that one pass), not a free change — it is still only a
+   * single shadow-casting light (the fill light below never casts, and this
+   * project renders one shadow-casting light total), so there is no second
+   * shadow pass and no global post-effect, but the 4x cost is real and paid
+   * every frame this light re-renders its shadow map.
+   *
+   * Reasonable fallback: readers who have asked the OS/browser for reduced
+   * motion are treated as a proxy for "reduce visual load" here too (the
+   * same signal `SceneEnvironment` already uses to drop ambient motion), and
+   * get the previous 1024 back rather than the extra 4x cost.
+   */
+  const reducedMotion = usePrefersReducedMotion();
+  const keyShadowMapSize = reducedMotion ? 1024 : 2048;
 
   return (
     <>

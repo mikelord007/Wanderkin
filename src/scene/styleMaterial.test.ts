@@ -79,6 +79,81 @@ describe("scene style materials", () => {
       material.emissiveMap = null;
       expect(isBakedEmissiveOnlyMaterial(material)).toBe(false);
     });
+
+    it("leaves a material carrying a real normal/metalness/roughness map untouched", () => {
+      const withNormalMap = bakedEmissiveMaterial();
+      withNormalMap.normalMap = new THREE.Texture();
+      expect(isBakedEmissiveOnlyMaterial(withNormalMap)).toBe(false);
+
+      const withMetalnessMap = bakedEmissiveMaterial();
+      withMetalnessMap.metalnessMap = new THREE.Texture();
+      expect(isBakedEmissiveOnlyMaterial(withMetalnessMap)).toBe(false);
+
+      const withRoughnessMap = bakedEmissiveMaterial();
+      withRoughnessMap.roughnessMap = new THREE.Texture();
+      expect(isBakedEmissiveOnlyMaterial(withRoughnessMap)).toBe(false);
+    });
+  });
+
+  describe("genuine PBR material preservation", () => {
+    /** Stands in for a real metallic/roughness-mapped import (e.g. a metal
+     * object with an actual PBR texture set) — the shape this pipeline's
+     * baked photogrammetry assets never have, and the shape the relight and
+     * region logic must never touch. */
+    function genuinePbrMetalMaterial(): {
+      material: THREE.MeshStandardMaterial;
+      albedo: THREE.Texture;
+      normalMap: THREE.Texture;
+      metalnessMap: THREE.Texture;
+      roughnessMap: THREE.Texture;
+    } {
+      const albedo = new THREE.Texture();
+      const normalMap = new THREE.Texture();
+      const metalnessMap = new THREE.Texture();
+      const roughnessMap = new THREE.Texture();
+      const material = new THREE.MeshStandardMaterial({
+        color: 0xb0b0b0,
+        map: albedo,
+        normalMap,
+        metalnessMap,
+        roughnessMap,
+        metalness: 0.92,
+        roughness: 0.28,
+      });
+      return { material, albedo, normalMap, metalnessMap, roughnessMap };
+    }
+
+    it("is never detected as a baked-emissive bake", () => {
+      const { material } = genuinePbrMetalMaterial();
+      expect(isBakedEmissiveOnlyMaterial(material)).toBe(false);
+    });
+
+    it("passes through cloneStyledObject with every PBR map and value intact", () => {
+      const { material, albedo, normalMap, metalnessMap, roughnessMap } = genuinePbrMetalMaterial();
+      const source = new THREE.Group();
+      source.add(new THREE.Mesh(new THREE.BoxGeometry(), material));
+
+      // Not the known Rodin hash, and not undefined either — a real asset
+      // with its own (different) content hash, same as any other generated
+      // or imported mesh that isn't the one known sample.
+      const clone = cloneStyledObject(source, STYLE_DEFINITIONS.cartoon, 1, "some-other-assets-real-hash");
+      const preserved = (clone.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial;
+
+      expect(preserved.map).toBe(albedo);
+      expect(preserved.normalMap).toBe(normalMap);
+      expect(preserved.metalnessMap).toBe(metalnessMap);
+      expect(preserved.roughnessMap).toBe(roughnessMap);
+      expect(preserved.metalness).toBe(0.92);
+      expect(preserved.roughness).toBe(0.28);
+      // No region-specific shader code should be present for a material with
+      // no known region profile.
+      const shader = { uniforms: {}, vertexShader: "#include <begin_vertex>", fragmentShader: "#include <roughnessmap_fragment>\n#include <normal_fragment_maps>\n#include <dithering_fragment>" };
+      preserved.onBeforeCompile(shader as never, {} as never);
+      expect(shader.fragmentShader).not.toContain("oqPerturbNormal");
+
+      disposeStyledObject(clone);
+      material.dispose();
+    });
   });
 
   describe("baked-material relight", () => {

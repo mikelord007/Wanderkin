@@ -82,10 +82,34 @@ with a 0.4 m smoothstep blend, splits the one mesh into a "wood" side (x ≥ −
 side — anchored to the object in world space (via a `modelMatrix * position` vertex varying), so
 it does not depend on the UV atlas at all and doesn't swim with the camera.
 
-**No metal region is applied.** There is no measured or documented evidence of a distinct metal
-part on this asset (no bounding box, no separate material, nothing observed in the extracted
-texture atlas) — adding one would have been exactly the "arbitrary label on a mixed mesh" this
-task explicitly said not to do, so it was left out rather than guessed.
+**No metal region is applied, on this asset or anywhere else in the scene.** There is no measured
+or documented evidence of a distinct metal part on the Rodin asset (no bounding box, no separate
+material, nothing observed in the extracted texture atlas) — adding one would have been exactly
+the "arbitrary label on a mixed mesh" this task explicitly said not to do, so it was left out
+rather than guessed. To be explicit, restating after review: **the current scene has verified
+fabric and wood regions only; there is no metal treatment of any kind, and this checkpoint does
+not claim one.** If a future asset is measured and shown to have a genuine metal surface, the
+same pattern used here (an explicit profile keyed to that asset's exact content hash) is the
+right way to add one — never a global "make shiny things metal" heuristic.
+
+Separately, and just as important: this restraint about *adding* a metal region must not be
+confused with *preserving* one that already exists. If any generated or imported asset ever
+ships with a real PBR metallic-roughness material (an actual `metallicRoughnessTexture`,
+`normalTexture`, non-zero `metalnessFactor` — not this pipeline's flat baked-emissive bake),
+`isBakedEmissiveOnlyMaterial()` must never treat it as a candidate for relighting. It is checked
+for exactly that: the detection guard requires the *absence* of `map`, `normalMap`,
+`metalnessMap`, and `roughnessMap`, on top of the black-base/zero-metalness signature — so a
+material carrying any of those real PBR maps is left completely untouched, its metalness,
+roughness, and every map it ships with passed through unchanged. Verified directly in
+`styleMaterial.test.ts`'s "genuine PBR material preservation" suite, using a fixture materials
+built to look like an actual metallic/roughness-mapped import (map + normalMap + metalnessMap +
+roughnessMap + metalness 0.92 + roughness 0.28): `cloneStyledObject` returns every one of those
+values and map references unchanged, and does not attach any region shader code to it. No asset
+in this pipeline currently has such a material (every shipped `.glb` bakes `metalnessFactor: 0`),
+so this is a forward-looking guarantee, not evidence of an existing metal object being preserved
+— but it closes the gap the coordinator asked about: nothing in this change can flatten a real
+metal material's maps via a global roughness floor or an emissive-conversion sweep, because both
+of those code paths only ever fire on the one narrow, structurally-verified baked-bake shape.
 
 Per-region detail (fragment shader, `src/scene/styleMaterial.ts`):
 - **Roughness**: wood ≈0.42–0.62 (semi-matte), fabric ≈0.55–0.97 (matte, restrained noise
@@ -134,14 +158,19 @@ angles, independent of the bug above.
   it change. This was found and fixed by direct observation (see before/after evidence) — it is
   the specific mechanism behind "readability beneath furniture."
 - **Shadow map resolution doubled** (1024→2048) on the single shadow-casting key light only (the
-  fill light never casts) — crisper contact shadows under furniture at a fixed, small, one-light
-  cost; no new shadow pass, no global post-effect.
+  fill light never casts). Accurate cost accounting (corrected after review — the first pass of
+  this checkpoint underplayed it): doubling each dimension is **4x the shadow-map texel area**
+  and matching GPU memory/depth fill-rate for that one pass every frame it re-renders, not a free
+  change. It is still bounded to one light (no second shadow pass, no global post-effect), and a
+  reasonable fallback is in place: `usePrefersReducedMotion()` (the same OS/browser signal
+  `SceneEnvironment` already reads to drop ambient motion) drops the resolution back to 1024 for
+  anyone who has asked for reduced motion.
 - Fill light gets a soft warm bounce-tint (blended 22% toward the key colour) standing in for a
   window key's bounce off nearby surfaces; there is no environment map/IBL in this renderer, so
   the existing hemisphere term remains the sky/ground fill.
 
-Reduced-motion/particles: untouched — no new particles or ambient-motion elements were added by
-this work.
+Reduced-motion/particles: no new particles or ambient-motion elements were added by this work;
+reduced-motion now also caps the key light's shadow-map resolution (see above).
 
 ## Verification performed (actual results)
 
@@ -181,13 +210,9 @@ this work.
 
 ## What was not done / residual limitations (stated honestly)
 
-- **Hand-painted and watercolor styles were not visually verified in-browser.** The bundled
-  "Play now" sample flow always plays the default (Cartoon) style; there is no in-flow style
-  switch for it. The region/relight code does not branch on `style.id` at all (it composes with
-  whichever style-specific fragment is already selected), so there is no logical reason it would
-  behave differently, and this was confirmed by unit test (materials construct successfully and
-  tag distinct cache keys for all three `STYLE_DEFINITIONS`) — but that is not the same as a
-  pixel-verified render. Flagging for follow-up if the coordinator wants that closed.
+- ~~Hand-painted and watercolor styles were not visually verified in-browser.~~ **Closed — see
+  "Follow-up: gaps closed after coordinator review" below.** All three styles are now verified
+  through the real production renderer.
 - **No metal treatment anywhere.** Explicitly not attempted without evidence, per the task's own
   instruction — see Part 2.
 - The Tripo sample and all user-generated/storage assets get Part 1 (relight) only, never a
@@ -233,3 +258,93 @@ repo): point disposable instances at a private `cacheDir` outside `node_modules/
 `--config` pointing to a throwaway config with `cacheDir` under the OS temp dir, keyed by port),
 never the repo-shared default, so a throwaway test server can never invalidate the protected
 5173/15173 dependency-optimizer state again.
+
+## Follow-up: gaps closed after coordinator review
+
+Coordinator read `fc121b1` and this checkpoint and asked for three specific gaps closed before
+final signoff. All three are closed in a follow-up commit; details below.
+
+### 1. Browser verification of all three styles (previously an open limitation)
+
+The bundled "Play now" sample flow has no in-UI style switch, but `GameView` accepts an
+independent `styleId`/`manifest.experience.style.id`, and the real `/play/:levelId` route fetches
+its manifest with a plain `GET /api/levels/:levelId`. Used exactly the isolated-fixture approach
+the coordinator suggested: loaded the real bundled Rodin manifest with `getSampleLevel()` (the
+same function the production Start screen uses — not a hand-rewritten copy, so the geometry,
+transforms, and helper-step layout are byte-identical to the real sample), cloned it three times,
+and attached a minimal valid `experience` block to each clone whose only meaningful field is
+`style.id` (`cartoon`, `hand-painted`, `watercolor`) — `mode: {kind: "explore"}` with no
+collectibles/finish-portal, so no other gameplay system is exercised or changed. Each clone got
+its own `levelId` and was served only via Playwright's `page.route()` intercepting
+`GET /api/levels/verify-rodin-<style>` with that JSON directly — no write, no `POST`, no provider
+call, no saved-world storage touched. Ran a **private-cacheDir** disposable Vite instance
+(`vite.oq-verify.config.ts`, `cacheDir` under the OS temp dir, port 5198, deleted after use) per
+the test-isolation finding above, on top of the disposable API-mocking (so no real request ever
+reached the shared dev API at 8787 either).
+
+Drove the real production renderer/camera/shader pipeline through the same bounded viewpoints
+used for the original verification — spawn under the sofa, beside the sofa end (fabric
+close-up), and mantled onto the desk top (wood close-up) — for all three styles. Result: **zero
+console/page errors on all three styles**, no shader compile failures, the fabric weave and wood
+grain read clearly and distinctly under each style's own colour grading (Cartoon's saturated
+quantized bands, Hand-painted's warm desaturated softness, Watercolor's pastel low-contrast
+wash), and no artifact resembling the earlier banding bug on any of them. Evidence saved to
+`nimbalyst-local/screenshots/materials/style-verification/` (`hand-painted-sofa-fabric.png`,
+`hand-painted-desk-wood.png`, `watercolor-sofa-fabric.png`, `watercolor-desk-wood.png`,
+`cartoon-desk-wood.png`). The disposable server, its private cache directory, and the temporary
+config/fixture script were all removed after use; protected 5173/15173/8787/18799 re-verified
+healthy afterward.
+
+### 2. Genuine PBR metal material preservation + explicit metal-scope restatement
+
+Tightened `isBakedEmissiveOnlyMaterial()` to also require the *absence* of `normalMap`,
+`metalnessMap`, and `roughnessMap` (previously it only checked for `map`) — so any material
+carrying a real PBR map of any kind is structurally excluded from relighting, on top of the
+existing black-base/zero-metalness/no-`map` checks. Added a "genuine PBR material preservation"
+test suite to `styleMaterial.test.ts` using a fixture built to look like an actual
+metallic-roughness-mapped import (`map` + `normalMap` + `metalnessMap` + `roughnessMap` +
+`metalness: 0.92` + `roughness: 0.28`): confirms it is never detected as a baked-emissive
+material, and that `cloneStyledObject` returns every one of those maps and values completely
+unchanged, with no region shader code attached. Restated explicitly in Part 2 above: **the
+current scene has verified fabric and wood regions only — there is no metal treatment anywhere in
+this scene**, and this was not an oversight; no measured evidence of a metal surface exists on
+the one asset that has region detail. The preservation guarantee is forward-looking (no asset in
+this pipeline currently ships real PBR metal maps), not evidence a metal object exists and was
+protected — but it closes the actual risk the coordinator flagged: nothing in this change can
+flatten a real metal material's maps.
+
+### 3. Accurate shadow-map cost accounting + fallback
+
+Corrected the checkpoint and the code comment in `SceneLighting.tsx`: doubling the key light's
+shadow map from 1024 to 2048 per side is **4x the texel area** (and matching GPU memory/fill-rate
+for that one shadow pass every frame), not the "fixed, modest cost" the first pass of this
+checkpoint called it. It remains bounded to the single shadow-casting light in the scene (no
+second pass, no global effect). Added a reasonable, self-contained fallback: `SceneLighting` now
+reads `usePrefersReducedMotion()` (the same signal `SceneEnvironment` already uses to drop
+ambient motion) and drops the shadow map back to 1024 when the OS/browser has requested reduced
+motion, without needing a new prop threaded through `GameStage.tsx` (which stays out of this
+worker's owned paths, per the active scale-owner boundary).
+
+Per the coordinator's explicit instruction, did not re-run a performance benchmark or the full
+unit suite for this follow-up — only `npx tsc --noEmit`, the focused `src/scene` vitest suite
+(26 tests, up from 23: 3 new PBR-preservation tests), and the bounded three-style browser render
+above.
+
+### Verification for this follow-up
+
+- `npx tsc -p tsconfig.json --noEmit` → exit 0.
+- `npx vitest run src/scene` → 5 files, **26 tests pass** (was 23; +3 genuine-PBR-preservation
+  tests). Full unit suite intentionally not re-run (no unrelated product change, per instruction).
+- Real Chrome (`channel: "chrome"`), private-cacheDir disposable Vite on port 5198, isolated
+  mocked-GET fixture manifests — all three styles, zero console errors, screenshots saved (listed
+  above).
+- Re-verified protected 5173/15173/8787/18799 all respond normally after the disposable server
+  and its private cache directory were torn down.
+
+### Commit (follow-up)
+
+Staged and committed via `developer_git_commit_proposal`: `src/scene/styleMaterial.ts`,
+`src/scene/styleMaterial.test.ts`, `src/game/render/SceneLighting.tsx`, this checkpoint, and the
+5 new screenshots under `nimbalyst-local/screenshots/materials/style-verification/`. No other
+files touched; no saved-world, provider, or paid calls of any kind were made by the verification
+fixtures.

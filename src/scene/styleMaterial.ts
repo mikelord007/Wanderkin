@@ -94,10 +94,16 @@ export function disposeStyledObject(object: THREE.Object3D): void {
  * `nimbalyst-local/playtest-checkpoints/material-lighting-refinement.md`).
  *
  * This is a structural check on the material's own already-decoded
- * properties, not a guess about what the mesh depicts. A material that
- * already has a real base-colour map, or a deliberately emissive decorative
- * object (non-black base colour), never matches this shape and is left
- * completely untouched.
+ * properties, not a guess about what the mesh depicts. Deliberately
+ * conservative: it requires the *absence* of `map`, `normalMap`,
+ * `metalnessMap`, and `roughnessMap`, plus a black base colour and near-zero
+ * metalness. A material carrying any real PBR map — including a genuinely
+ * imported metallic/roughness-mapped asset, should one ever exist in this
+ * pipeline — never matches this shape and is left completely untouched:
+ * its metalness, roughness, and every map it ships with pass through
+ * `cloneStyledObject` unmodified (see the "genuine PBR material" test in
+ * `styleMaterial.test.ts`). A deliberately emissive decorative object
+ * (non-black base colour) is equally excluded.
  */
 export function isBakedEmissiveOnlyMaterial(
   material: THREE.Material,
@@ -105,6 +111,7 @@ export function isBakedEmissiveOnlyMaterial(
   if (!(material instanceof THREE.MeshStandardMaterial)) return false;
   if (material.map) return false;
   if (!material.emissiveMap) return false;
+  if (material.normalMap || material.metalnessMap || material.roughnessMap) return false;
   const { r, g, b } = material.color;
   const isBlackBase = r < 0.02 && g < 0.02 && b < 0.02;
   return isBlackBase && material.metalness < 0.05;
