@@ -1,0 +1,192 @@
+/*
+ * The signed-in dashboard (v3 light system). A quiet white sidebar and the
+ * lavender product ground; the only loud thing is the imagery: the world you
+ * can jump back into, and each world's own picture in the library. Every value
+ * comes from tokens.css.
+ */
+
+.wk-shell {
+  --wk-side: 248px;
+  width: 100%;
+  align-self: stretch;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: var(--wk-side) minmax(0, 1fr);
+  background: var(--wk-page);
+}
+
+.wk-shell .wk-shell__skip {
+  position: absolute; left: 12px; top: -60px; z-index: 20;
+  padding: 10px 16px; border-radius: var(--oq-round-pill);
+  background: var(--wk-surface); color: var(--wk-purple-ink); box-shadow: var(--wk-shadow-md);
+}
+.wk-shell__skip:focus { top: 12px; }
+
+/* === Sidebar ============================================================ */
+.wk-shell__side {
+  position: sticky; top: 0; height: 100vh;
+  display: flex; flex-direction: column; gap: var(--oq-space-6);
+  padding: var(--oq-space-5) var(--oq-space-4);
+  background: var(--wk-surface);
+  border-right: 1px solid var(--wk-border);
+}
+.wk-shell__brand { display: inline-flex; align-self: flex-start; padding: 6px 8px; border-radius: var(--wk-r-inner); color: inherit; text-decoration: none; }
+.wk-shell__nav-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.wk-shell .wk-shell__link {
+  position: relative; display: flex; align-items: center; gap: 12px;
+  min-height: 44px; padding: 8px 12px; border-radius: var(--wk-r-inner);
+  color: var(--wk-text-2); font-weight: 500; text-decoration: none;
+  transition: background-color var(--oq-duration) var(--oq-ease), color var(--oq-duration) var(--oq-ease);
+}
+.wk-shell__link svg { flex: none; color: var(--wk-text-3); }
+.wk-shell .wk-shell__link:hover { background: var(--wk-tint); color: var(--wk-text); }
+/* Where you are: the one purple thing in the chrome, a rail and a tint. */
+.wk-shell .wk-shell__link[aria-current="page"] { background: var(--wk-tint); color: var(--wk-purple-ink); }
+.wk-shell__link[aria-current="page"] svg { color: var(--wk-purple-ink); }
+.wk-shell__link[aria-current="page"]::before {
+  content: ""; position: absolute; left: -16px; top: 10px; bottom: 10px; width: 3px;
+  border-radius: 0 3px 3px 0; background: var(--wk-purple);
+}
+
+.wk-shell__me {
+  margin-top: auto; display: flex; align-items: center; gap: 10px;
+  padding: 12px 8px 4px; border-top: 1px solid var(--wk-border);
+}
+.wk-shell__who { display: grid; min-width: 0; line-height: 1.3; }
+.wk-shell__name { font-weight: 500; font-size: .9375rem; color: var(--wk-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wk-shell__email { font-size: .8125rem; color: var(--wk-text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wk-shell__signout {
+  margin-left: auto; flex: none; display: grid; place-items: center;
+  width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent;
+  color: var(--wk-text-2); cursor: pointer;
+}
+.wk-shell__signout:hover { background: var(--wk-tint); color: var(--wk-purple-ink); }
+
+.wk-shell__me-link { flex: none; display: inline-flex; border: 0; padding: 0; background: none; border-radius: 50%; cursor: pointer; }
+.wk-avatar { flex: none; width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: var(--wk-tint); box-shadow: 0 0 0 2px var(--wk-surface), 0 0 0 3px var(--wk-border); }
+.wk-avatar--initials { display: inline-grid; place-items: center; font-size: .8125rem; font-weight: 600; letter-spacing: .02em; color: var(--wk-purple-ink); background: #ece5ff; }
+
+.wk-shell__content { min-width: 0; outline: none; }
+/* Screens that bring their own full-page frame (the creation journey) sit in
+   the content column instead of the viewport. */
+.wk-shell__content > .oq-creation { min-height: 100vh; }
+
+/* === Page scaffold ====================================================== */
+.wk-page {
+  width: min(100%, calc(var(--wk-max) + 2 * var(--wk-page-x)));
+  margin-inline: auto;
+  padding: clamp(28px, 4vw, 48px) var(--wk-page-x) var(--wk-section-y);
+  display: grid; gap: var(--wk-gap-group); align-content: start;
+}
+.wk-page__head { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: var(--wk-gap-sm) var(--wk-gap); }
+.wk-page__head h1 { font-size: clamp(2rem, 1.5rem + 1.6vw, 2.75rem); font-weight: 400; letter-spacing: -.03em; line-height: 1.05; }
+.wk-page__lede { margin-top: 6px; color: var(--wk-text-2); max-inline-size: 56ch; }
+.wk-page__section { display: grid; gap: var(--wk-gap); }
+.wk-page__section-head h2 { font-size: 1.375rem; font-weight: 500; letter-spacing: -.015em; }
+.wk-page__notice { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--wk-gap-sm); }
+.wk-page__notice p { color: var(--oq-error-ink); }
+.wk-page__imports summary svg { margin-right: 8px; }
+
+/* === Jump back in ======================================================= *
+ * The page's one bold moment: your latest world as a wide picture, with a
+ * white card resting on it like a postcard on a table. */
+.wk-resume {
+  position: relative; isolation: isolate; overflow: hidden;
+  min-height: clamp(300px, 34vw, 440px);
+  display: flex; align-items: flex-end;
+  padding: clamp(16px, 2.4vw, 28px);
+  border-radius: var(--wk-r-stage);
+  background: var(--wk-tint);
+  box-shadow: var(--wk-shadow-md);
+}
+.wk-resume__picture { position: absolute; inset: 0; z-index: -1; }
+.wk-resume__picture img { width: 100%; height: 100%; object-fit: cover; transition: transform 900ms var(--oq-ease); }
+.wk-resume:hover .wk-resume__picture img, .wk-resume:focus-within .wk-resume__picture img { transform: scale(1.03); }
+/* A soft floor of shade under the card so its edge reads on any photo. */
+.wk-resume::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(to top, rgba(36, 20, 61, .38), rgba(36, 20, 61, 0) 55%);
+}
+.wk-resume__card {
+  display: grid; gap: 6px; width: min(100%, 420px);
+  padding: var(--wk-card-pad);
+  background: var(--wk-surface); border-radius: var(--wk-r-card);
+  box-shadow: var(--wk-shadow-lg);
+}
+.wk-resume__kicker { font-size: var(--wk-type-small); font-weight: 600; color: var(--wk-purple-ink); }
+.wk-resume__card h2 { font-size: clamp(1.5rem, 1.2rem + 1vw, 2rem); font-weight: 400; letter-spacing: -.025em; line-height: 1.1; }
+.wk-resume__meta { color: var(--wk-text-2); font-size: var(--wk-type-small); }
+.wk-resume__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: var(--oq-space-3); }
+
+/* === Loading tiles ====================================================== */
+.wk-tile--skeleton { pointer-events: none; }
+.wk-tile--skeleton .wk-tile__image,
+.wk-tile--skeleton .wk-tile__info span {
+  background: linear-gradient(100deg, var(--wk-tint) 40%, #faf7ff 50%, var(--wk-tint) 60%) 0 0 / 300% 100%;
+  animation: wk-shimmer 1.4s linear infinite;
+}
+.wk-tile--skeleton .wk-tile__info { gap: 10px; }
+.wk-tile--skeleton .wk-tile__info span { display: block; height: 14px; border-radius: 7px; }
+.wk-tile--skeleton .wk-tile__info span:first-child { width: 60%; height: 18px; }
+.wk-tile--skeleton .wk-tile__info span:last-child { width: 85%; }
+@keyframes wk-shimmer { to { background-position: -150% 0; } }
+
+/* === Account ============================================================ */
+.wk-account {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--wk-gap);
+  padding: var(--wk-card-pad);
+  background: var(--wk-surface); border: 1px solid var(--wk-border); border-radius: var(--wk-r-card); box-shadow: var(--wk-shadow-sm);
+}
+.wk-account .wk-avatar { width: 72px; height: 72px; font-size: 1.375rem; }
+.wk-account__who { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.wk-account__who h2 { font-size: 1.5rem; font-weight: 500; letter-spacing: -.02em; overflow-wrap: anywhere; }
+.wk-account__who p { color: var(--wk-text-2); overflow-wrap: anywhere; }
+.wk-account__how { font-size: var(--wk-type-small); color: var(--wk-text-3); }
+.wk-account .wk-account__how { color: var(--wk-text-3); }
+.wk-account__note {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 14px 18px; border-radius: var(--wk-r-inner);
+  background: var(--oq-warning-wash); color: var(--oq-warning-ink); border: 1px solid #efd9a6;
+}
+.wk-account__note svg { flex: none; margin-top: 3px; }
+.wk-account__facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--wk-grid-gap); }
+.wk-account__facts > div { display: grid; gap: 6px; padding-top: var(--oq-space-4); border-top: 1px solid var(--wk-border); }
+.wk-account__facts h3 { font-size: 1.0625rem; font-weight: 500; }
+.wk-account__facts p { color: var(--wk-text-2); max-inline-size: 48ch; }
+
+/* === Narrow screens: top bar + tab row ================================== */
+@media (max-width: 860px) {
+  .wk-shell { grid-template-columns: minmax(0, 1fr); }
+  .wk-shell__side {
+    position: sticky; top: 0; z-index: 10; height: auto;
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "brand me" "nav nav";
+    gap: 6px 12px; padding: 10px var(--wk-page-x) 0;
+    border-right: 0; border-bottom: 1px solid var(--wk-border);
+  }
+  .wk-shell__brand { grid-area: brand; align-self: center; }
+  .wk-shell__me { grid-area: me; margin: 0; padding: 0; border: 0; gap: 4px; }
+  .wk-shell__who { display: none; }
+  .wk-shell__me .wk-avatar { width: 32px; height: 32px; }
+  .wk-shell__nav { grid-area: nav; margin-inline: calc(var(--wk-page-x) * -1); overflow-x: auto; scrollbar-width: none; }
+  .wk-shell__nav::-webkit-scrollbar { display: none; }
+  .wk-shell__nav-list { display: flex; gap: 2px; padding-inline: calc(var(--wk-page-x) - 8px); width: max-content; }
+  .wk-shell .wk-shell__link { min-height: 44px; padding: 8px 12px 10px; border-radius: 0; white-space: nowrap; font-size: .9375rem; }
+  .wk-shell__link svg { display: none; }
+  .wk-shell .wk-shell__link:hover, .wk-shell .wk-shell__link[aria-current="page"] { background: transparent; }
+  .wk-shell__link[aria-current="page"]::before { left: 12px; right: 12px; top: auto; bottom: 0; width: auto; height: 3px; border-radius: 3px 3px 0 0; }
+  .wk-account__facts { grid-template-columns: 1fr; }
+}
+@media (max-width: 620px) {
+  .wk-page__head > .oq-kit-button { width: 100%; }
+  .wk-resume { min-height: 0; flex-direction: column; align-items: stretch; padding: 0; background: var(--wk-surface); }
+  .wk-resume__picture { position: relative; inset: auto; z-index: auto; aspect-ratio: 16 / 9; min-height: 0; overflow: hidden; }
+  .wk-resume__picture img { position: absolute; inset: 0; }
+  .wk-resume::after { display: none; }
+  .wk-resume__card { width: 100%; border-radius: 0; box-shadow: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wk-shell__link, .wk-resume__picture img { transition: none; }
+  .wk-resume:hover .wk-resume__picture img, .wk-resume:focus-within .wk-resume__picture img { transform: none; }
+  .wk-tile--skeleton .wk-tile__image, .wk-tile--skeleton .wk-tile__info span { animation: none; }
+}
