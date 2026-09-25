@@ -10,7 +10,8 @@
 import { bush, flowers, leafRosette, tuft } from "../builders/foliage.js";
 import { defaultRockVariants } from "../builders/rocks.js";
 import { post, signpost } from "../builders/dry.js";
-import { fallenFrond, lyingLog, palm } from "../builders/trees.js";
+import { lyingLog } from "../builders/trees.js";
+import { fallenPalmFrond, tropicalPalm } from "../tropical/palm.js";
 import type { BiomeArt, BiomeTones } from "../types.js";
 
 const tones = {
@@ -26,7 +27,53 @@ const tones = {
   stoneSide: { dark: "#8f8577", base: "#b3a894", light: "#d2c7b0" },
   stoneRecess: { dark: "#5f574d", base: "#766c60", light: "#8c8274" },
   driftwood: { dark: "#9a8b76", base: "#c2b39b", light: "#e3d8c4" },
+  foliageDeep: { dark: "#1f5e3a", base: "#2f7f4a", light: "#5aa55f" },
+  nut: { dark: "#5a4526", base: "#7d6435", light: "#a88a4f" },
 } satisfies BiomeTones;
+
+const PALMS = [
+  // Leaning coconut palm: long lean, full crown, a dry frond, coconuts.
+  tropicalPalm({
+    trunk: { height: 0.72, lean: 0.22, bow: 1.8, segments: 8, baseRadius: 0.05 },
+    crown: { fronds: 6, lower: 3, young: 2, dry: 1, length: 0.46, leaflets: 7, rise: 0.6, droop: 1.1, coconuts: 3, seed: 3 },
+  }),
+  // Tall S-curve palm, slimmer crown.
+  tropicalPalm({
+    trunk: { height: 0.82, lean: 0.08, wiggle: 0.04, segments: 9, baseRadius: 0.046 },
+    crown: { fronds: 6, lower: 3, young: 2, length: 0.47, leaflets: 7, rise: 0.62, droop: 1.2, coconuts: 2, seed: 7 },
+  }),
+  // Short, upright and full.
+  tropicalPalm({
+    trunk: { height: 0.6, lean: 0.05, segments: 7, baseRadius: 0.056 },
+    crown: { fronds: 7, lower: 3, young: 3, dry: 1, length: 0.43, leaflets: 7, rise: 0.58, droop: 1.15, coconuts: 4, seed: 11 },
+  }),
+  // Banana curve: bows out low, then turns up under the crown.
+  tropicalPalm({
+    trunk: { height: 0.7, lean: 0.26, bow: 2.4, segments: 8, baseRadius: 0.05 },
+    crown: { fronds: 6, lower: 3, young: 2, dry: 1, length: 0.45, leaflets: 7, rise: 0.62, droop: 1.25, coconuts: 2, seed: 19 },
+  }),
+  // Twin palm: two trunks from one base, leaning apart.
+  tropicalPalm({
+    trunk: { height: 0.8, lean: 0.13, leanYaw: 0.2, segments: 8, baseRadius: 0.042 },
+    crown: { fronds: 5, lower: 2, young: 1, length: 0.38, leaflets: 6, rise: 0.6, droop: 1.15, coconuts: 2, seed: 23, knob: 0.034 },
+    twin: {
+      offset: [-0.03, 0.025],
+      trunk: { height: 0.56, lean: 0.15, leanYaw: Math.PI + 0.4, segments: 6, baseRadius: 0.036 },
+      crown: { fronds: 5, lower: 1, young: 1, length: 0.34, leaflets: 6, rise: 0.62, droop: 1.15, seed: 29, knob: 0.03 },
+    },
+  }),
+];
+
+const YOUNG_PALMS = [
+  tropicalPalm({
+    trunk: { height: 0.42, lean: 0.06, segments: 4, baseRadius: 0.05 },
+    crown: { fronds: 6, young: 2, length: 0.4, leaflets: 6, rise: 0.75, droop: 1.15, seed: 31 },
+  }),
+  tropicalPalm({
+    trunk: { height: 0.34, lean: 0.1, bow: 2, segments: 3, baseRadius: 0.052 },
+    crown: { fronds: 5, lower: 2, young: 2, length: 0.4, leaflets: 6, rise: 0.8, droop: 1.25, seed: 37 },
+  }),
+];
 
 const rocks = defaultRockVariants("rock");
 
@@ -37,20 +84,12 @@ export const TROPICAL_ART: BiomeArt = {
     palm: {
       category: "tree", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.62, triangleBudget: 1300,
       leanMax: 0.06, mirror: true, embed: [0.01, 0.02],
-      variants: [
-        palm({ trunk: 0.84, bend: 0.06, fronds: 10, frondLength: 0.47, frondRise: 0.5, droop: 1.05, seed: 3 }),
-        palm({ trunk: 0.8, bend: 0.1, wiggle: 0.03, fronds: 9, frondLength: 0.48, frondRise: 0.6, droop: 1.2, seed: 7, coconuts: 4 }),
-        palm({ trunk: 0.88, bend: 0.04, fronds: 11, frondLength: 0.5, frondRise: 0.42, droop: 0.95, seed: 11, segments: 8 }),
-        palm({ trunk: 0.78, bend: 0.05, wiggle: -0.03, fronds: 9, frondLength: 0.46, frondRise: 0.55, droop: 1.3, seed: 19, coconuts: 2 }),
-      ],
+      variants: PALMS,
     },
     "palm-young": {
-      category: "tree", role: "supporting", shading: "smooth", castShadow: true, unitRadius: 0.65, triangleBudget: 1100,
+      category: "tree", role: "supporting", shading: "smooth", castShadow: true, unitRadius: 0.9, triangleBudget: 700,
       leanMax: 0.08, mirror: true, embed: [0.01, 0.02],
-      variants: [
-        palm({ trunk: 0.6, bend: 0.06, fronds: 8, frondLength: 0.35, frondRise: 0.75, droop: 1.15, seed: 23, coconuts: 0, segments: 5 }),
-        palm({ trunk: 0.55, bend: 0.08, fronds: 7, frondLength: 0.34, frondRise: 0.85, droop: 1.25, seed: 29, coconuts: 0, segments: 4 }),
-      ],
+      variants: YOUNG_PALMS,
     },
     bush: {
       category: "bush", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.8, triangleBudget: 900,
@@ -96,7 +135,7 @@ export const TROPICAL_ART: BiomeArt = {
     "fallen-frond": {
       category: "dressing", role: "micro", shading: "smooth", castShadow: false, unitRadius: 0.5, triangleBudget: 120,
       mirror: true, embed: [0, 0.01],
-      variants: [fallenFrond(1), fallenFrond(2)],
+      variants: [fallenPalmFrond(1), fallenPalmFrond(2), fallenPalmFrond(3, true)],
     },
     driftwood: {
       category: "dressing", role: "micro", shading: "faceted", castShadow: false, unitRadius: 0.5, triangleBudget: 120,
@@ -140,6 +179,22 @@ export const TROPICAL_ART: BiomeArt = {
             { family: "palm-young", count: [1, 1], ring: [0.5, 0.75], height: [0.45, 0.6] },
             { family: "tuft", count: [1, 2], ring: [0.2, 0.8], height: [0.06, 0.1] },
             { family: "pebble", count: [0, 2], ring: [0.3, 0.9], height: [0.04, 0.07] },
+            { family: "fallen-frond", count: [1, 1], ring: [0.4, 0.85], height: [0.25, 0.35], chance: 0.4 },
+          ],
+        },
+      },
+      {
+        weight: 1,
+        preset: {
+          // A lone palm on open sand: driftwood, a shed frond, a few stones.
+          id: "beach-palm",
+          primary: "palm",
+          primaryOffset: 0.1,
+          members: [
+            { family: "fallen-frond", count: [1, 2], ring: [0.35, 0.85], height: [0.26, 0.38] },
+            { family: "driftwood", count: [1, 1], ring: [0.5, 0.9], height: [0.22, 0.32], chance: 0.6 },
+            { family: "pebble", count: [1, 3], ring: [0.35, 0.95], height: [0.03, 0.06] },
+            { family: "tuft", count: [0, 1], ring: [0.2, 0.6], height: [0.05, 0.09] },
           ],
         },
       },
