@@ -2,6 +2,7 @@
 
 Owner: the recovery worker, model `claude-opus-5-5` (Claude Code). No fallback models, no subagents.
 Scope: `src/ui/screens/FinishScreen.tsx`, `src/ui/screens/finish-screen.css`, `src/capture/media.css`, and the Finish share state in `src/App.tsx`.
+**Landed as `e83f8b1` (frozen).** The independent Opus reviewer `2d3b34b6` owns the narrow review of the 4-file Finish/App change, including the real App state hand-off.
 Source base: main `ce8f3be`. The final visual review's frozen source `13ed712` doesn't include these files. This is a separate finish scope.
 
 ## Recovery
