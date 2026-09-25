@@ -2,10 +2,12 @@
  * The landing page.
  *
  * The first screen is the whole idea in one picture: the headline, and under
- * it a dark world rising with violet and white light round its rim. That
- * planetrise is where all of the page's boldness is spent. Below the fold the
- * page stands on the planet's night side and stays quiet: the before/after,
- * the three steps, the samples and your worlds.
+ * it a dark world rising with violet and white light round its rim. The rest
+ * of the page keeps the hero's principles rather than its gradients: scale,
+ * depth, overlap, oversized household things and a tiny explorer. Loud and
+ * quiet sections alternate (showcase, journey, interlude, worlds, library,
+ * finale), each with about one strong motif, and the lit arch returns as a
+ * doorway throughout.
  */
 
 .oq-welcome { min-height: 100vh; width: 100%; align-self: flex-start; }
@@ -66,50 +68,151 @@
 .oq-welcome__note { font-size: .875rem; color: var(--wk-mist); max-inline-size: 50ch; }
 .oq-welcome__note svg { display: inline-block; width: 16px; height: 16px; margin-right: 8px; vertical-align: -3px; color: var(--oq-accent-ink); }
 
-/* --- The before / after, standing on the night side of the planet ------ */
-.oq-welcome__horizon { position: relative; margin-top: calc(var(--oq-space-7) * -1); }
-.oq-welcome__example {
-  max-width: 920px; margin-inline: auto;
-  border-radius: var(--oq-round-xl);
-  background: var(--wk-dusk);
-  border: 1px solid var(--wk-rim);
-  box-shadow: var(--wk-highlight), 0 -30px 80px -40px #8b6cff66;
-  padding: clamp(14px, 1.6vw, 20px);
+/* Shared by the loud sections: a heading row that sits left, not centred. */
+.wk-section-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--oq-space-3); flex-wrap: wrap; margin-bottom: var(--oq-space-6); }
+.wk-section-head h2 { font-size: clamp(2rem, 1.3rem + 2.6vw, 3.4rem); font-weight: 300; letter-spacing: -.035em; line-height: 1; }
+.wk-section-head p { color: var(--oq-muted); font-size: .9375rem; }
+
+/* The lit arch, stood up as a doorway (Scenery.tsx). Sized by its parent. */
+.wk-arch { display: block; overflow: visible; }
+
+/* --- 1. Showcase: photo print to live world ----------------------------- */
+.wk-showcase { position: relative; margin-top: calc(var(--oq-space-8) * -1); padding-bottom: var(--oq-section); }
+.wk-showcase__inner {
+  position: relative; display: grid; align-items: center;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 8fr);
 }
-.oq-welcome__comparison { display: grid; grid-template-columns: 1fr 1fr; gap: var(--oq-space-3); }
-.oq-welcome__comparison figure { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
-.oq-welcome__photo, .oq-welcome__render {
-  aspect-ratio: 4 / 3; width: 100%; border-radius: var(--oq-round-md);
-  overflow: hidden; position: relative;
+/* The photograph is a physical print, tilted and held over the edge of the
+   stage: the one thing in the section that is still ordinary. */
+.wk-showcase__print {
+  position: relative; z-index: 2; margin: 0 -14% 0 0; align-self: end;
+  padding: 10px 10px 0; border-radius: 6px; background: #f1ecfa;
+  transform: rotate(-5deg) translateY(-12%);
+  box-shadow: 0 50px 60px -30px #05010fe6, 0 18px 30px -12px #05010f99;
 }
-.oq-welcome__photo { object-fit: cover; object-position: 63% center; }
-.oq-welcome__render { background: #0e061f; }
+.wk-showcase__print img { aspect-ratio: 4 / 3; width: 100%; height: auto; border-radius: 3px; }
+.wk-showcase__print figcaption { padding: 12px 6px 14px; color: #241545; font-size: .9375rem; font-weight: 500; }
+.wk-showcase__print figcaption span { display: block; font-weight: 400; font-size: .8125rem; color: #4c3d73; }
+/* The world is big: an open stage with the arch standing behind the live
+   model and a pool of light on the floor under it. */
+.wk-showcase__stage { position: relative; z-index: 1; margin: 0; }
+.wk-showcase__set { position: relative; aspect-ratio: 16 / 11; }
+.wk-showcase__set::before {
+  content: ""; position: absolute; left: 7%; right: 7%; bottom: 2%; height: 26%; border-radius: 50%;
+  background: radial-gradient(closest-side, #b79cff66, #5a3bd033 55%, transparent);
+}
+.wk-showcase__arch { position: absolute; left: 50%; bottom: 9%; height: 90%; width: auto; transform: translateX(-50%); }
+.wk-showcase__stage .oq-welcome__render { position: absolute; inset: 22% 0 0 0; aspect-ratio: auto; border-radius: 0; background: transparent; }
+.wk-showcase__stage figcaption { text-align: right; padding: 0 2%; margin-top: calc(var(--oq-space-4) * -1); font-size: clamp(1.25rem, 1rem + .8vw, 1.75rem); font-weight: 300; letter-spacing: -.02em; color: var(--wk-ink); }
+.wk-showcase__stage figcaption span { display: block; font-size: .9375rem; font-weight: 400; letter-spacing: 0; color: var(--wk-mist); }
+/* The live preview component fills whatever frame holds it. */
 .oq-welcome__model { height: 100%; width: 100%; }
+.oq-welcome__photo { object-fit: cover; object-position: 63% center; }
 .oq-welcome__preview-status {
   position: absolute; inset: 0; display: grid; place-content: center;
   text-align: center; padding: 16px; font-size: .8125rem; color: var(--wk-mist);
 }
-.oq-welcome__comparison figcaption { padding-inline: 4px; font-size: .9375rem; font-weight: 500; color: var(--wk-ink); }
-.oq-welcome__comparison figcaption span { display: block; font-weight: 400; font-size: .875rem; color: var(--wk-mist); }
-.oq-welcome__example-footer {
-  margin-top: var(--oq-space-4); padding: var(--oq-space-3) 4px 0;
-  border-top: 1px solid var(--oq-line);
-  font-size: .8125rem; color: var(--wk-mist);
+/* A faint glowing trail from the print into the world. */
+.wk-showcase__path { position: absolute; z-index: 1; left: 30%; top: 30%; width: 18%; height: auto; overflow: visible; pointer-events: none; }
+.wk-showcase__path path { fill: none; stroke-linecap: round; }
+.wk-showcase__path path:first-child { stroke: #8b6cff; stroke-opacity: .3; stroke-width: 7; }
+.wk-showcase__path path:last-child { stroke: #f4eeff; stroke-width: 2; stroke-dasharray: 2 9; }
+.wk-showcase .oq-welcome__example-footer { grid-column: 1 / -1; justify-self: center; margin-top: var(--oq-space-5); font-size: .8125rem; color: var(--wk-mist); }
+
+/* --- 2. Journey: three real pictures on one glowing path --------------- */
+.wk-journey { position: relative; padding-block: var(--oq-space-7) var(--oq-section); }
+.wk-journey__steps { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(20px, 3.4vw, 56px); list-style: none; margin: 0; padding: 0; }
+/* Stepping down the page, the way the path does. */
+.wk-step:nth-child(2) { margin-top: clamp(40px, 6vw, 96px); }
+.wk-step:nth-child(3) { margin-top: clamp(80px, 12vw, 192px); }
+.wk-step { position: relative; display: grid; gap: var(--oq-space-2); align-content: start; }
+.wk-step__frame { position: relative; overflow: hidden; margin-bottom: var(--oq-space-4); background: var(--wk-dusk); }
+.wk-step__frame img { width: 100%; height: 100%; object-fit: cover; }
+/* One shape per stage: an ordinary print, a portal doorway for the rebuild,
+   and a wide window onto the world you are now inside. */
+.wk-step__frame--print { aspect-ratio: 4 / 3; padding: 8px 8px 22px; border-radius: 5px; background: #f1ecfa; transform: rotate(-2.5deg); box-shadow: 0 30px 40px -24px #05010fe6; }
+.wk-step__frame--print img { border-radius: 2px; }
+.wk-step__frame--model { aspect-ratio: 4 / 4.2; border-radius: 999px 999px 22px 22px; border: 1px solid #c9b8ff59; background: #0e061f; box-shadow: inset 0 2px 0 #f4eeff55, 0 0 60px -20px #8b6cff; }
+.wk-step__frame--model img { object-fit: contain; object-position: center 70%; transform: scale(1.1); }
+.wk-step__frame--world { aspect-ratio: 16 / 10; border-radius: 22px; box-shadow: 0 40px 60px -30px #05010fe6; }
+/* The number is the path's checkpoint: a marigold ring on the frame's edge. */
+.wk-step__num {
+  position: absolute; left: 14px; top: 0; transform: translateY(-50%); z-index: 2;
+  width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%;
+  background: var(--wk-night); color: var(--wk-ink); border: 2px solid var(--wk-marigold);
+  box-shadow: 0 0 0 5px #f2b24d26; font-size: .875rem; font-weight: 500; font-variant-numeric: tabular-nums;
+}
+.wk-step h3 { font-size: clamp(1.25rem, 1.1rem + .5vw, 1.5rem); font-weight: 400; letter-spacing: -.02em; }
+.wk-step p { color: var(--oq-muted); max-inline-size: 34ch; }
+.wk-journey__path { position: absolute; z-index: 0; left: clamp(20px, 4vw, 48px); right: clamp(20px, 4vw, 48px); top: clamp(60px, 8vw, 120px); height: clamp(180px, 22vw, 330px); width: calc(100% - 2 * clamp(20px, 4vw, 48px)); overflow: visible; pointer-events: none; }
+.wk-journey__path path { fill: none; stroke-linecap: round; }
+.wk-journey__path path:first-child { stroke: #8b6cff; stroke-opacity: .28; stroke-width: 10; }
+.wk-journey__path path:last-child { stroke: #e9e0ff; stroke-opacity: .9; stroke-width: 2; stroke-dasharray: 2 12; }
+
+/* --- 3. Interlude: one oversized thing, one tiny figure ----------------- */
+.wk-interlude { position: relative; overflow: hidden; min-height: clamp(320px, 38vw, 520px); display: grid; align-items: center; }
+.wk-interlude__scene {
+  --s: clamp(420px, 52vw, 820px);
+  position: absolute; top: 50%; right: calc(var(--s) * -.28); width: var(--s); aspect-ratio: 1;
+  transform: translateY(-38%);
+}
+.wk-giant-button { display: block; width: 100%; height: 100%; }
+/* Standing on the button's rim (radius 92 of 100, so 4% down from the top). */
+.wk-interlude__explorer { position: absolute; width: 72px; height: auto; left: calc(50% - 20px); top: calc(var(--s) * .04 - 26px); }
+.wk-interlude__line {
+  position: relative; z-index: 1; font-size: clamp(2rem, 1.2rem + 3.4vw, 4.2rem); font-weight: 300;
+  letter-spacing: -.04em; line-height: 1; color: var(--wk-ink);
 }
 
-/* --- The three steps. A real sequence, so it earns its numbers. -------- */
-.oq-welcome__steps {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(24px, 3vw, 48px);
-  padding-block: var(--oq-section);
+/* --- 4. Worlds to borrow: a world-select screen, not a card grid -------- */
+.wk-worlds { padding-block: var(--oq-space-7) var(--oq-section); }
+.wk-worlds__grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); grid-auto-rows: auto; gap: clamp(14px, 1.6vw, 22px); }
+.wk-world {
+  position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end;
+  min-height: 300px; border-radius: 22px; border: 1px solid #c9b8ff26; background: var(--wk-night);
+  transition: border-color 240ms var(--oq-ease), box-shadow 240ms var(--oq-ease);
 }
-.oq-welcome__step { display: grid; gap: var(--oq-space-2); align-content: start; }
-.oq-welcome__step > span {
-  width: 36px; height: 36px; display: grid; place-items: center;
-  border-radius: 50%; margin-bottom: var(--oq-space-2);
-  color: var(--wk-ink); border: 1px solid var(--oq-control-line);
-  font-size: .9375rem; font-weight: 400; font-variant-numeric: tabular-nums;
-}
-.oq-welcome__step p { color: var(--oq-muted); max-inline-size: 34ch; }
+.wk-world__image { position: absolute; inset: 0; z-index: -1; }
+.wk-world__image img { width: 100%; height: 100%; object-fit: cover; transition: transform 700ms var(--oq-ease); }
+/* A scrim only as tall as the text needs, so the world stays the subject. */
+.wk-world__image::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, #120726f7 0%, #120726d9 26%, #12072666 50%, #12072600 72%); }
+.wk-world__body { padding: clamp(18px, 2vw, 28px); display: grid; gap: 6px; }
+.wk-world__meta { font-size: .8125rem; color: #d3c8ef; }
+.wk-world__meta span { color: var(--wk-mist); }
+.wk-world h3 { font-size: clamp(1.35rem, 1.15rem + .7vw, 1.8rem); font-weight: 400; letter-spacing: -.02em; line-height: 1.1; }
+.wk-world__summary { color: #d3c8ef; font-size: .9375rem; max-inline-size: 42ch; }
+.wk-world__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+/* Hover and keyboard focus light the rim like the hero's planet, and the
+   world leans in a little. */
+.wk-world:hover, .wk-world:focus-within { border-color: #d9ccffb3; box-shadow: inset 0 2px 0 #f4eeffcc, 0 0 0 1px #c9b8ff66, 0 40px 80px -40px #8b6cffcc; }
+.wk-world:hover .wk-world__image img, .wk-world:focus-within .wk-world__image img { transform: scale(1.05); }
+/* The featured world takes the portal's shape and two rows of height. */
+.wk-world--featured { grid-row: span 2; min-height: clamp(460px, 44vw, 660px); border-radius: 48% 48% 22px 22px / 26% 26% 22px 22px; }
+.wk-world--featured h3 { font-size: clamp(1.9rem, 1.3rem + 2vw, 3rem); font-weight: 300; letter-spacing: -.035em; }
+.wk-world--standard { aspect-ratio: 4 / 3; min-height: 0; }
+.wk-world--standard .wk-world__image::after { background: linear-gradient(to top, #120726fa 0%, #120726e6 38%, #120726a6 58%, #12072600 82%); }
+.wk-world--standard h3 { font-size: clamp(1.25rem, 1.1rem + .5vw, 1.55rem); }
+/* The last one lies on its side: a wide window with the text beside it. */
+.wk-world--wide { grid-column: 1 / -1; flex-direction: row; min-height: 260px; }
+.wk-world--wide .wk-world__image { right: 38%; }
+.wk-world--wide .wk-world__image::after { background: linear-gradient(to right, #12072600 55%, #120726 100%); }
+.wk-world--wide .wk-world__body { margin-left: auto; width: 42%; align-self: center; }
+
+/* --- 6. Finale: back to the ordinary, with a door in it ---------------- */
+.wk-finale { position: relative; padding-block: var(--oq-section); }
+.wk-finale__inner { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: clamp(28px, 5vw, 80px); align-items: center; }
+.wk-finale__copy { display: grid; gap: var(--oq-space-5); }
+.wk-finale__copy h2 { font-size: clamp(2.4rem, 1.3rem + 4vw, 5rem); font-weight: 300; letter-spacing: -.045em; line-height: .98; max-inline-size: 12ch; }
+.wk-finale__copy p { color: #d3c8ef; font-size: clamp(1.0625rem, 1rem + .3vw, 1.25rem); max-inline-size: 40ch; }
+/* The room at night, the arch standing on its floor and throwing light. */
+.wk-finale__scene { position: relative; aspect-ratio: 9 / 13; max-height: 680px; justify-self: center; width: min(100%, 470px); border-radius: 28px; overflow: hidden; background: var(--wk-night); box-shadow: 0 60px 90px -40px #05010f, 0 0 0 1px #c9b8ff26; }
+.wk-finale__scene img { width: 100%; height: 100%; object-fit: cover; filter: saturate(.55) brightness(.5); }
+.wk-finale__scene::before { content: ""; position: absolute; inset: 0; z-index: 1; background: #2a1470; mix-blend-mode: multiply; opacity: .55; }
+.wk-finale__scene::after { content: ""; position: absolute; z-index: 1; left: 12%; right: 12%; bottom: 4%; height: 22%; border-radius: 50%; background: radial-gradient(closest-side, #e9e0ffb3, #8b6cff55 45%, transparent); }
+.wk-finale__arch { position: absolute; z-index: 2; left: 50%; bottom: 13%; height: 46%; width: auto; transform: translateX(-50%); }
+.wk-finale__explorer { position: absolute; z-index: 3; width: 58px; height: auto; left: calc(50% - 16px); bottom: calc(13% - 4px); }
+
+/* --- Your worlds (library) --------------------------------------------- */
 
 /* --- Page sections ----------------------------------------------------- */
 .oq-welcome__section {
@@ -118,15 +221,6 @@
 }
 .oq-welcome__section-heading { display: flex; justify-content: space-between; align-items: baseline; gap: var(--oq-space-3); flex-wrap: wrap; }
 .oq-welcome__section-heading p { color: var(--oq-muted); font-size: .9375rem; }
-
-/* The thumbnail sits beside the title; the description and the actions get the
-   full card width. `1fr` on the description keeps every card's buttons on the
-   same baseline across a row. */
-.oq-welcome__sample-card { display: grid; grid-template-rows: auto 1fr auto; gap: var(--oq-space-3); }
-.oq-welcome__sample-head { display: flex; align-items: center; gap: var(--oq-space-3); min-width: 0; }
-.oq-welcome__sample-head img { flex: none; width: 56px; aspect-ratio: 1; border-radius: var(--oq-round-sm); object-fit: cover; }
-.oq-welcome__sample-card p { font-size: .9375rem; color: var(--oq-muted); text-wrap: pretty; }
-.oq-welcome__sample-card .oq-kit-row { gap: var(--oq-space-2); }
 
 /* --- Import + footer. Quiet by design; these are not the point. -------- */
 .oq-welcome__imports { border-top: 1px solid var(--oq-line); padding-top: var(--oq-space-5); }
@@ -145,7 +239,6 @@
 
 /* --- Widths ------------------------------------------------------------ */
 @media (max-width: 860px) {
-  .oq-welcome__steps { grid-template-columns: repeat(2, 1fr); row-gap: var(--oq-space-6); }
   /* A narrow screen keeps the same planet, just broader in proportion, so the
      rim light stays beside the limb instead of under the buttons. */
   .oq-welcome__band::before {
@@ -157,18 +250,39 @@
   }
 }
 @media (max-width: 620px) {
-  .oq-welcome__steps { grid-template-columns: 1fr; gap: var(--oq-space-5); }
-  .oq-welcome__comparison { gap: var(--oq-space-2); }
   .oq-welcome__hero { padding-block: var(--oq-space-6) 180px; }
   .oq-welcome__ctas { width: 100%; flex-direction: column; align-items: stretch; }
   /* Full-width stacked actions rather than two squeezed pills. */
   .oq-welcome__intro .oq-kit-button { width: 100%; }
-  .oq-welcome__horizon { margin-top: calc(var(--oq-space-5) * -1); }
+}
+@media (max-width: 860px) {
+  .wk-showcase__inner { grid-template-columns: 1fr; }
+  .wk-showcase__print { width: min(78%, 420px); margin: 0 0 -18% 4%; justify-self: start; transform: rotate(-4deg); }
+  .wk-showcase__set { aspect-ratio: 4 / 3.4; }
+  .wk-showcase__path { display: none; }
+  .wk-journey__path { display: none; }
+  .wk-journey__steps { grid-template-columns: 1fr; gap: var(--oq-space-7); padding-left: 8px; }
+  .wk-step:nth-child(2), .wk-step:nth-child(3) { margin-top: 0; }
+  /* On one column the path runs down the page as a dotted line of light. */
+  .wk-journey__steps::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: repeating-linear-gradient(to bottom, #e9e0ffcc 0 2px, transparent 2px 14px); box-shadow: 0 0 12px #8b6cff; }
+  .wk-step__frame--model { max-width: 320px; }
+  .wk-worlds__grid { grid-template-columns: 1fr; }
+  .wk-world--featured { grid-row: auto; min-height: 480px; }
+  .wk-world--standard { aspect-ratio: 4 / 5; }
+  .wk-world--wide { flex-direction: column; min-height: 320px; }
+  .wk-world--wide .wk-world__image { right: 0; }
+  .wk-world--wide .wk-world__image::after { background: linear-gradient(to top, #120726f7 0%, #120726d9 30%, #12072600 70%); }
+  .wk-world--wide .wk-world__body { width: auto; margin-left: 0; align-self: stretch; }
+  .wk-finale__inner { grid-template-columns: 1fr; }
+  .wk-finale__scene { width: min(100%, 380px); }
+  .wk-interlude { min-height: 0; padding-block: var(--oq-space-7) 0; align-items: start; }
+  .wk-interlude__scene { position: relative; top: auto; right: auto; transform: none; --s: min(92vw, 420px); margin: var(--oq-space-5) -18vw 0 auto; }
 }
 @media (max-width: 440px) {
   .oq-welcome__nav .mh-logo__word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
-  .oq-welcome__sample-card .oq-kit-button { flex: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   .oq-welcome__band::before { animation: none; }
+  .wk-world__image img { transition: none; }
+  .wk-world:hover .wk-world__image img, .wk-world:focus-within .wk-world__image img { transform: none; }
 }
