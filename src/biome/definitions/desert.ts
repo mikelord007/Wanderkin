@@ -20,7 +20,8 @@ export const DESERT: BiomeDefinition = {
     accent: "#ff7a3d",
     water: "#3aa3b8",
   },
-  lighting: { sun: "#ffd89a", sky: "#e9dccb", ground: "#e8c08c", intensity: 2.5, ambient: 0.72, direction: [-3, 7, 4] },
+  // Sun-baked: a warmer, slightly stronger sun; warm sky/ground bounce.
+  lighting: { sun: "#ffd08a", sky: "#eadbc4", ground: "#e9bd86", intensity: 2.6, ambient: 0.72, direction: [-3, 7, 4] },
   sky: { zenith: "#3f97e0", horizon: "#f4e2c4", fogNear: 1.9, fogFar: 7.8 },
   surface: { color: "#e6c089", blend: 0.48, upwardNormalMin: 0.8, patchCoverage: 0.65 },
   props: { kinds: ["rock", "cactus", "dry-plant", "wood", "windsock"], density: 0.34, scaleRange: [0.6, 2.6] },

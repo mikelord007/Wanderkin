@@ -36,6 +36,9 @@ const rocks = desertRocks();
 export const DESERT_ART: BiomeArt = {
   id: "desert",
   tones,
+  // Harsher, higher desert sun: less flat ambient, a touch more warm haze
+  // for depth across the open sand, firmer ground contact.
+  lighting: { ambientKeep: 0.52, hemisphereShare: 0.5, sunElevation: [28, 56], fogScale: 0.92, contactStrength: 1.15 },
   families: {
     "cactus-tall": {
       category: "cactus", role: "hero", shading: "smooth", castShadow: true, unitRadius: 0.34, triangleBudget: 1300,
