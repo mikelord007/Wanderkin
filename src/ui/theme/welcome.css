@@ -1,38 +1,42 @@
 /*
- * The landing page.
+ * The landing page (v3): a clean, light product site with one cinematic
+ * purple moment, the hero's planetrise. Sections alternate between
+ * explanatory and product-focused, on the page colour or the tint, and every
+ * value comes from the tokens (tokens.css) and layout primitives (global.css).
  *
- * The first screen is the whole idea in one picture: the headline, and under
- * it a dark world rising with violet and white light round its rim. The rest
- * of the page keeps the hero's principles rather than its gradients: scale,
- * depth, overlap, oversized household things and a tiny explorer. Loud and
- * quiet sections alternate (showcase, journey, interlude, worlds, library,
- * finale), each with about one strong motif, and the lit arch returns as a
- * doorway throughout.
+ *   hero (cinematic, light) · transformation (explanatory, page) ·
+ *   how it works (explanatory, tint) · interlude (scale) ·
+ *   worlds to borrow (product, page) · your worlds (product, tint) ·
+ *   final call to action (page)
  */
 
-.oq-welcome { min-height: 100vh; width: 100%; align-self: flex-start; }
+.oq-welcome { min-height: 100vh; width: 100%; align-self: flex-start; background: var(--wk-page); }
 
-/* --- The arrival band -------------------------------------------------- */
+/* === Hero ================================================================
+   Kept: huge light type, the portal/planet language, a clear CTA pair. The
+   planetrise is translated to light: a pale world rising at the foot of the
+   screen, with purple light strongest just beside its limb. Gradients only. */
 .oq-welcome__band {
   position: relative; isolation: isolate; overflow: hidden;
   display: flex; flex-direction: column;
-  min-height: min(100svh, 1040px);
-  background: var(--wk-night);
+  min-height: min(100svh, 980px);
+  background: var(--wk-page);
 }
 .oq-welcome__band > .oq-kit-container { flex: 1; display: flex; flex-direction: column; }
-/* Four layers, top first: a fade into the ground so the band has no hard
-   bottom edge; the dark planet; the rim light, a very wide flat ellipse so it
-   is brightest just beside the planet's limb; and a faint haze over the dome. */
 .oq-welcome__band::before {
   content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background:
-    linear-gradient(to bottom, #12072600 76%, #1207268c 90%, var(--wk-night) 100%),
-    radial-gradient(ellipse 28% 60% at 50% 100%, var(--wk-night) 0%, var(--wk-night) 84%, #12072600 100%),
-    radial-gradient(ellipse 130% 68% at 50% 100%, #ffffff 0%, #fbf8ff 20%, #e6dcff 27%, #bba2ff 35%, #8b6cff 45%, #5a3bd0 57%, #33198a 70%, #1c0d4f 82%, #12072600 94%),
-    radial-gradient(ellipse 62% 80% at 50% 100%, #2d1878 0%, #1f0f52 45%, #12072600 80%);
+    /* a gentle fade into the page, so the hero hands over without an edge */
+    linear-gradient(to bottom, #faf7ff00 84%, var(--wk-page) 100%),
+    /* the world: a pale lavender dome with a crisp lit limb */
+    radial-gradient(ellipse 28% 57% at 50% 100%, #fbf9ff 0%, #f3edff 74%, #e4d9fd 90%, #e4d9fd00 100%),
+    /* its rim light, a wide flat ellipse, strongest beside the limb */
+    radial-gradient(ellipse 125% 72% at 50% 100%, #6a4af6 0%, #7b5cfa 16%, #9a80fb 27%, #bca9fd 38%, #d8cdfe 50%, #ebe4ff 63%, #faf7ff00 80%),
+    /* a soft wash of daylight at the top */
+    radial-gradient(ellipse 70% 50% at 50% 0%, #ffffff 0%, #ffffff00 70%);
   animation: wk-planetrise 1.1s var(--oq-ease) both;
 }
-/* The one orchestrated moment: the planet lifts into place as the page opens. */
+/* The one orchestrated moment: the world lifts into place as the page opens. */
 @keyframes wk-planetrise {
   from { opacity: 0; transform: translateY(28px); }
   to { opacity: 1; transform: none; }
@@ -42,299 +46,251 @@
   display: flex; align-items: center; justify-content: space-between;
   gap: var(--oq-space-4); padding-block: var(--oq-space-5);
 }
-.oq-welcome__nav .mh-logo { color: var(--wk-ink); }
 .oq-welcome__nav .oq-welcome__nav-action { min-height: 40px; padding: 8px 18px; font-size: .9rem; }
 
 .oq-welcome__hero {
   flex: 1; display: flex; justify-content: center;
-  padding-block: clamp(28px, 7vh, 88px) clamp(120px, 22vh, 240px);
+  padding-block: clamp(24px, 6vh, 80px) clamp(150px, 26vh, 260px);
 }
 .oq-welcome__intro {
   display: flex; flex-direction: column; align-items: center; text-align: center;
-  gap: var(--oq-space-5); max-width: 1000px;
+  gap: var(--wk-gap); max-width: 1000px;
 }
-/* The headline is the page's type specimen: light, enormous and tightly led,
-   so the words sit together as one shape above the horizon. */
+/* The headline is the page's type specimen: light, enormous and tightly led. */
 .oq-welcome__intro h1 {
   max-inline-size: 11ch;
   font-size: clamp(3rem, 1.1rem + 7.2vw, 7.4rem);
   font-weight: 300; line-height: .94; letter-spacing: -.045em;
-  color: #f7f2ff;
+  color: var(--wk-text);
 }
-.oq-welcome__lede { max-inline-size: 44ch; font-size: clamp(1.0625rem, 1rem + .35vw, 1.25rem); line-height: 1.55; color: #ddd3f5; }
+.oq-welcome__lede { max-inline-size: 44ch; font-size: clamp(1.0625rem, 1rem + .35vw, 1.25rem); line-height: 1.55; color: var(--wk-text-2); }
 .oq-welcome__ctas { justify-content: center; margin-top: var(--oq-space-2); }
-/* The note sits on the planet's dark dome, where the reference keeps its
-   small line-icon row. */
-.oq-welcome__note { font-size: .875rem; color: var(--wk-mist); max-inline-size: 50ch; }
-.oq-welcome__note svg { display: inline-block; width: 16px; height: 16px; margin-right: 8px; vertical-align: -3px; color: var(--oq-accent-ink); }
+.oq-welcome__note { font-size: var(--wk-type-small); color: var(--wk-text-2); max-inline-size: 50ch; }
+.oq-welcome__note svg { display: inline-block; width: 16px; height: 16px; margin-right: 8px; vertical-align: -3px; color: var(--wk-purple-ink); }
 
-/* Shared by the loud sections: a heading row that sits left, not centred. */
-.wk-section-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--oq-space-3); flex-wrap: wrap; margin-bottom: var(--oq-space-6); }
-.wk-section-head h2 { font-size: clamp(2rem, 1.3rem + 2.6vw, 3.4rem); font-weight: 300; letter-spacing: -.035em; line-height: 1; }
-.wk-section-head p { color: var(--oq-muted); font-size: .9375rem; }
-
-/* The lit arch, stood up as a doorway (Scenery.tsx). Sized by its parent. */
-.wk-arch { display: block; overflow: visible; }
-
-/* --- 1. Showcase: photo print to live world ----------------------------- */
-.wk-showcase { position: relative; margin-top: calc(var(--oq-space-8) * -1); padding-bottom: var(--oq-section); }
-.wk-showcase__inner {
-  position: relative; display: grid; align-items: center;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 8fr);
-}
-/* The photograph is a physical print, tilted and held over the edge of the
-   stage: the one thing in the section that is still ordinary. */
-.wk-showcase__print {
-  position: relative; z-index: 2; margin: 0 -14% 0 0; align-self: end;
-  padding: 10px 10px 0; border-radius: 6px; background: #f1ecfa;
-  transform: rotate(-5deg) translateY(-12%);
-  box-shadow: 0 50px 60px -30px #05010fe6, 0 18px 30px -12px #05010f99;
-}
-.wk-showcase__print img { aspect-ratio: 4 / 3; width: 100%; height: auto; border-radius: 3px; }
-.wk-showcase__print figcaption { padding: 12px 6px 14px; color: #241545; font-size: .9375rem; font-weight: 500; }
-.wk-showcase__print figcaption span { display: block; font-weight: 400; font-size: .8125rem; color: #4c3d73; }
-/* The world is big: an open stage with the arch standing behind the live
-   model and a pool of light on the floor under it. */
-.wk-showcase__stage { position: relative; z-index: 1; margin: 0; }
-.wk-showcase__set { position: relative; aspect-ratio: 16 / 11; }
-.wk-showcase__set::before {
-  content: ""; position: absolute; left: 7%; right: 7%; bottom: 2%; height: 26%; border-radius: 50%;
-  background: radial-gradient(closest-side, #b79cff66, #5a3bd033 55%, transparent);
-}
-.wk-showcase__arch { position: absolute; left: 50%; bottom: 9%; height: 90%; width: auto; transform: translateX(-50%); }
-.wk-showcase__stage .oq-welcome__render { position: absolute; inset: 22% 0 0 0; aspect-ratio: auto; border-radius: 0; background: transparent; }
-.wk-showcase__stage figcaption { text-align: right; padding: 0 2%; margin-top: calc(var(--oq-space-4) * -1); font-size: clamp(1.25rem, 1rem + .8vw, 1.75rem); font-weight: 300; letter-spacing: -.02em; color: var(--wk-ink); }
-.wk-showcase__stage figcaption span { display: block; font-size: .9375rem; font-weight: 400; letter-spacing: 0; color: var(--wk-mist); }
-/* The live preview component fills whatever frame holds it. */
+/* === Photo → world (explanatory, page) ================================== */
+.wk-transform__pair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--wk-gap); }
+.wk-transform__item { margin: 0; display: grid; gap: var(--wk-gap-sm); }
+.wk-transform__media { aspect-ratio: 4 / 3; }
+.wk-transform__item figcaption { font-size: 1.0625rem; font-weight: 500; color: var(--wk-text); }
+.wk-transform__item figcaption span { display: block; font-size: var(--wk-type-small); font-weight: 400; color: var(--wk-text-2); }
+/* The generated world stands on a pale stage with the portal behind it. */
+.wk-transform__stage { background: radial-gradient(ellipse 70% 30% at 50% 94%, var(--wk-glow), transparent 72%), linear-gradient(#fbf9ff, var(--wk-tint)); }
+.wk-transform__arch { position: absolute; left: 50%; bottom: 5%; height: 93%; width: auto; transform: translateX(-50%); }
+.wk-transform__stage .oq-welcome__render { position: absolute; inset: 16% 0 0 0; }
 .oq-welcome__model { height: 100%; width: 100%; }
 .oq-welcome__photo { object-fit: cover; object-position: 63% center; }
-.oq-welcome__preview-status {
-  position: absolute; inset: 0; display: grid; place-content: center;
-  text-align: center; padding: 16px; font-size: .8125rem; color: var(--wk-mist);
-}
-/* A faint glowing trail from the print into the world. */
-.wk-showcase__path { position: absolute; z-index: 1; left: 30%; top: 30%; width: 18%; height: auto; overflow: visible; pointer-events: none; }
-.wk-showcase__path path { fill: none; stroke-linecap: round; }
-.wk-showcase__path path:first-child { stroke: #8b6cff; stroke-opacity: .3; stroke-width: 7; }
-.wk-showcase__path path:last-child { stroke: #f4eeff; stroke-width: 2; stroke-dasharray: 2 9; }
-.wk-showcase .oq-welcome__example-footer { grid-column: 1 / -1; justify-self: center; margin-top: var(--oq-space-5); font-size: .8125rem; color: var(--wk-mist); }
+.oq-welcome__preview-status { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; padding: 16px; font-size: var(--wk-type-small); color: var(--wk-text-2); }
+/* A quiet connector: a thin purple arrow in a small white pill. */
+.wk-transform__link { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--wk-surface); border: 1px solid var(--wk-border); box-shadow: var(--wk-shadow-sm); }
+.wk-transform__link svg { width: 30px; height: auto; fill: none; stroke: var(--wk-purple); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.wk-transform__note { margin-top: var(--wk-gap); text-align: center; font-size: var(--wk-type-small); color: var(--wk-text-3); }
 
-/* --- 2. Journey: three real pictures on one glowing path --------------- */
-.wk-journey { position: relative; padding-block: var(--oq-space-7) var(--oq-section); }
-.wk-journey__steps { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(20px, 3.4vw, 56px); list-style: none; margin: 0; padding: 0; }
-/* Stepping down the page, the way the path does. */
-.wk-step:nth-child(2) { margin-top: clamp(40px, 6vw, 96px); }
-.wk-step:nth-child(3) { margin-top: clamp(80px, 12vw, 192px); }
-.wk-step { position: relative; display: grid; gap: var(--oq-space-2); align-content: start; }
-.wk-step__frame { position: relative; overflow: hidden; margin-bottom: var(--oq-space-4); background: var(--wk-dusk); }
-.wk-step__frame img { width: 100%; height: 100%; object-fit: cover; }
-/* One shape per stage: an ordinary print, a portal doorway for the rebuild,
-   and a wide window onto the world you are now inside. */
-.wk-step__frame--print { aspect-ratio: 4 / 3; padding: 8px 8px 22px; border-radius: 5px; background: #f1ecfa; transform: rotate(-2.5deg); box-shadow: 0 30px 40px -24px #05010fe6; }
-.wk-step__frame--print img { border-radius: 2px; }
-.wk-step__frame--model { aspect-ratio: 4 / 4.2; border-radius: 999px 999px 22px 22px; border: 1px solid #c9b8ff59; background: #0e061f; box-shadow: inset 0 2px 0 #f4eeff55, 0 0 60px -20px #8b6cff; }
-.wk-step__frame--model img { object-fit: contain; object-position: center 70%; transform: scale(1.1); }
-.wk-step__frame--world { aspect-ratio: 16 / 10; border-radius: 22px; box-shadow: 0 40px 60px -30px #05010fe6; }
-/* The number is the path's checkpoint: a marigold ring on the frame's edge. */
-.wk-step__num {
-  position: absolute; left: 14px; top: 0; transform: translateY(-50%); z-index: 2;
-  width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%;
-  background: var(--wk-night); color: var(--wk-ink); border: 2px solid var(--wk-marigold);
-  box-shadow: 0 0 0 5px #f2b24d26; font-size: .875rem; font-weight: 500; font-variant-numeric: tabular-nums;
+/* === How it works (explanatory, tint) ===================================
+   Three identical cards on one checkpoint track: a dotted purple line runs
+   behind the cards and shows in the gaps; each number sits on it. */
+.wk-steps__list { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--wk-grid-gap); list-style: none; margin: 0; padding: 18px 0 0; }
+.wk-steps__list::before { content: ""; position: absolute; left: 10%; right: 10%; top: 18px; border-top: 2px dotted var(--wk-purple); opacity: .55; }
+.wk-step-card {
+  position: relative; display: grid; grid-template-rows: auto auto 1fr; gap: var(--wk-gap-sm);
+  padding: var(--wk-card-pad); padding-top: calc(var(--wk-card-pad) + 8px);
+  background: var(--wk-surface); border: 1px solid var(--wk-border); border-radius: var(--wk-r-card); box-shadow: var(--wk-shadow-sm);
 }
-.wk-step h3 { font-size: clamp(1.25rem, 1.1rem + .5vw, 1.5rem); font-weight: 400; letter-spacing: -.02em; }
-.wk-step p { color: var(--oq-muted); max-inline-size: 34ch; }
-.wk-journey__path { position: absolute; z-index: 0; left: clamp(20px, 4vw, 48px); right: clamp(20px, 4vw, 48px); top: clamp(60px, 8vw, 120px); height: clamp(180px, 22vw, 330px); width: calc(100% - 2 * clamp(20px, 4vw, 48px)); overflow: visible; pointer-events: none; }
-.wk-journey__path path { fill: none; stroke-linecap: round; }
-.wk-journey__path path:first-child { stroke: #8b6cff; stroke-opacity: .28; stroke-width: 10; }
-.wk-journey__path path:last-child { stroke: #e9e0ff; stroke-opacity: .9; stroke-width: 2; stroke-dasharray: 2 12; }
+.wk-step-card__num {
+  position: absolute; top: 0; left: var(--wk-card-pad); transform: translateY(-50%);
+  width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%;
+  background: var(--wk-surface); color: var(--wk-purple-ink); border: 2px solid var(--wk-purple);
+  font-size: .875rem; font-weight: 600; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 5px var(--wk-tint);
+}
+.wk-step-card__media { aspect-ratio: 4 / 3; overflow: hidden; border-radius: var(--wk-r-inner); background: var(--wk-tint); margin-bottom: 6px; }
+.wk-step-card__media img { width: 100%; height: 100%; object-fit: cover; }
+.wk-step-card__media--model { background: radial-gradient(ellipse 70% 30% at 50% 92%, var(--wk-glow), transparent 72%), linear-gradient(#fbf9ff, var(--wk-tint)); }
+.wk-step-card__media--model img { object-fit: contain; }
+.wk-step-card h3 { font-size: var(--wk-type-h3); font-weight: 500; letter-spacing: -.01em; }
+.wk-step-card p { color: var(--wk-text-2); max-inline-size: 36ch; }
 
-/* --- 3. Interlude: one oversized thing, one tiny figure ----------------- */
-.wk-interlude { position: relative; overflow: hidden; min-height: clamp(320px, 38vw, 520px); display: grid; align-items: center; }
-.wk-interlude__scene {
-  --s: clamp(420px, 52vw, 820px);
-  position: absolute; top: 50%; right: calc(var(--s) * -.28); width: var(--s); aspect-ratio: 1;
-  transform: translateY(-38%);
+/* === Scale interlude ====================================================
+   Breaks the rhythm without stopping the page: 50-65vh, a big statement on
+   the left, a huge sewing button entering from the right edge. */
+.wk-interlude {
+  position: relative; overflow: hidden; display: grid; align-items: center;
+  min-height: clamp(360px, 56vh, 580px);
+  background: linear-gradient(115deg, #efe6ff 0%, #f6f1ff 55%, var(--wk-page) 100%);
 }
-.wk-giant-button { display: block; width: 100%; height: 100%; }
-/* Standing on the button's rim (radius 92 of 100, so 4% down from the top). */
-.wk-interlude__explorer { position: absolute; width: 72px; height: auto; left: calc(50% - 20px); top: calc(var(--s) * .04 - 26px); }
+.wk-interlude__inner { position: relative; z-index: 1; }
 .wk-interlude__line {
-  position: relative; z-index: 1; font-size: clamp(2rem, 1.2rem + 3.4vw, 4.2rem); font-weight: 300;
-  letter-spacing: -.04em; line-height: 1; color: var(--wk-ink);
+  max-inline-size: 13ch; font-size: clamp(2.2rem, 1.3rem + 3.4vw, 4.2rem);
+  font-weight: 300; letter-spacing: -.04em; line-height: 1.02; color: var(--wk-text);
 }
+.wk-interlude__scene {
+  --s: clamp(360px, 46vw, 700px);
+  position: absolute; top: 50%; right: calc(var(--s) * -.26); width: var(--s); aspect-ratio: 1;
+  transform: translateY(-44%);
+}
+.wk-interlude__button { width: 100%; height: 100%; filter: drop-shadow(0 30px 40px rgba(36, 20, 61, .14)); }
+/* Standing on the button's rim (radius 92 of 100, so 4% down from the top). */
+.wk-interlude__explorer { position: absolute; width: 74px; height: auto; left: calc(50% - 20px); top: calc(var(--s) * .04 - 27px); }
 
-/* --- 4. Worlds to borrow: a world-select screen, not a card grid -------- */
-.wk-worlds { padding-block: var(--oq-space-7) var(--oq-section); }
-.wk-worlds__grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); grid-auto-rows: auto; gap: clamp(14px, 1.6vw, 22px); }
+/* === Worlds to borrow (product, page) ===================================
+   Like choosing a game: one featured world across the top, then the rest.
+   Image first, then title, mode and Play; Edit course stays quiet. */
+.wk-worlds__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--wk-grid-gap); }
 .wk-world {
-  position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end;
-  min-height: 300px; border-radius: 22px; border: 1px solid #c9b8ff26; background: var(--wk-night);
-  transition: border-color 240ms var(--oq-ease), box-shadow 240ms var(--oq-ease);
+  position: relative; display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+  background: var(--wk-surface); border: 1px solid var(--wk-border); border-radius: var(--wk-r-card); box-shadow: var(--wk-shadow-sm);
+  transition: transform 220ms var(--oq-ease), box-shadow 220ms var(--oq-ease), border-color 220ms var(--oq-ease);
 }
-.wk-world__image { position: absolute; inset: 0; z-index: -1; }
-.wk-world__image img { width: 100%; height: 100%; object-fit: cover; transition: transform 700ms var(--oq-ease); }
-/* A scrim only as tall as the text needs, so the world stays the subject. */
-.wk-world__image::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, #120726f7 0%, #120726d9 26%, #12072666 50%, #12072600 72%); }
-.wk-world__body { padding: clamp(18px, 2vw, 28px); display: grid; gap: 6px; }
-.wk-world__meta { font-size: .8125rem; color: #d3c8ef; }
-.wk-world__meta span { color: var(--wk-mist); }
-.wk-world h3 { font-size: clamp(1.35rem, 1.15rem + .7vw, 1.8rem); font-weight: 400; letter-spacing: -.02em; line-height: 1.1; }
-.wk-world__summary { color: #d3c8ef; font-size: .9375rem; max-inline-size: 42ch; }
-.wk-world__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-/* Hover and keyboard focus light the rim like the hero's planet, and the
-   world leans in a little. */
-.wk-world:hover, .wk-world:focus-within { border-color: #d9ccffb3; box-shadow: inset 0 2px 0 #f4eeffcc, 0 0 0 1px #c9b8ff66, 0 40px 80px -40px #8b6cffcc; }
-.wk-world:hover .wk-world__image img, .wk-world:focus-within .wk-world__image img { transform: scale(1.05); }
-/* The featured world takes the portal's shape and two rows of height. */
-.wk-world--featured { grid-row: span 2; min-height: clamp(460px, 44vw, 660px); border-radius: 48% 48% 22px 22px / 26% 26% 22px 22px; }
-.wk-world--featured h3 { font-size: clamp(1.9rem, 1.3rem + 2vw, 3rem); font-weight: 300; letter-spacing: -.035em; }
-.wk-world--standard { aspect-ratio: 4 / 3; min-height: 0; }
-.wk-world--standard .wk-world__image::after { background: linear-gradient(to top, #120726fa 0%, #120726e6 38%, #120726a6 58%, #12072600 82%); }
-.wk-world--standard h3 { font-size: clamp(1.25rem, 1.1rem + .5vw, 1.55rem); }
-/* The last one lies on its side: a wide window with the text beside it. */
-.wk-world--wide { grid-column: 1 / -1; flex-direction: row; min-height: 260px; }
-.wk-world--wide .wk-world__image { right: 38%; }
-.wk-world--wide .wk-world__image::after { background: linear-gradient(to right, #12072600 55%, #120726 100%); }
-.wk-world--wide .wk-world__body { margin-left: auto; width: 42%; align-self: center; }
-
-/* --- 6. Finale: back to the ordinary, with a door in it ---------------- */
-.wk-finale { position: relative; padding-block: var(--oq-section); }
-.wk-finale__inner { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: clamp(28px, 5vw, 80px); align-items: center; }
-.wk-finale__copy { display: grid; gap: var(--oq-space-5); }
-.wk-finale__copy h2 { font-size: clamp(2.4rem, 1.3rem + 4vw, 5rem); font-weight: 300; letter-spacing: -.045em; line-height: .98; max-inline-size: 12ch; }
-.wk-finale__copy p { color: #d3c8ef; font-size: clamp(1.0625rem, 1rem + .3vw, 1.25rem); max-inline-size: 40ch; }
-/* The room at night, the arch standing on its floor and throwing light. */
-.wk-finale__scene { position: relative; aspect-ratio: 9 / 13; max-height: 680px; justify-self: center; width: min(100%, 470px); border-radius: 28px; overflow: hidden; background: var(--wk-night); box-shadow: 0 60px 90px -40px #05010f, 0 0 0 1px #c9b8ff26; }
-.wk-finale__scene img { width: 100%; height: 100%; object-fit: cover; filter: saturate(.55) brightness(.5); }
-.wk-finale__scene::before { content: ""; position: absolute; inset: 0; z-index: 1; background: #2a1470; mix-blend-mode: multiply; opacity: .55; }
-.wk-finale__scene::after { content: ""; position: absolute; z-index: 1; left: 12%; right: 12%; bottom: 4%; height: 22%; border-radius: 50%; background: radial-gradient(closest-side, #e9e0ffb3, #8b6cff55 45%, transparent); }
-.wk-finale__arch { position: absolute; z-index: 2; left: 50%; bottom: 13%; height: 46%; width: auto; transform: translateX(-50%); }
-.wk-finale__explorer { position: absolute; z-index: 3; width: 58px; height: auto; left: calc(50% - 16px); bottom: calc(13% - 4px); }
-
-/* --- Your worlds (library) ---------------------------------------------
-   Functional, but the worlds are the content: a shelf of 16:9 pictures, not
-   a stack of records. No card box; the picture has the rim, the text sits
-   under it on the page. */
-.wk-library { padding-block: var(--oq-space-7) var(--oq-section); scroll-margin-top: var(--oq-space-5); }
-.wk-library__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: clamp(28px, 3vw, 44px) clamp(18px, 2vw, 28px); }
-.wk-tile { --tile-rim: #c9b8ff33; display: grid; gap: 14px; align-content: start; min-width: 0; }
-.wk-tile__image {
-  position: relative; overflow: hidden; aspect-ratio: 16 / 9; border-radius: 18px;
-  background: var(--wk-dusk); border: 1px solid var(--tile-rim);
-  box-shadow: 0 28px 50px -30px #05010fe6;
-  transition: border-color 220ms var(--oq-ease), box-shadow 220ms var(--oq-ease);
+.wk-world__media { position: relative; overflow: hidden; aspect-ratio: 16 / 10; background: var(--wk-tint); }
+.wk-world__media img { width: 100%; height: 100%; object-fit: cover; transition: transform 600ms var(--oq-ease); }
+/* The mode sits on the picture as a small white pill: a restrained overlay. */
+.wk-world__mode {
+  position: absolute; left: 12px; top: 12px; padding: 4px 11px; border-radius: 999px;
+  background: #ffffffeb; color: var(--wk-purple-ink); font-size: .78rem; font-weight: 600; box-shadow: var(--wk-shadow-sm);
 }
+.wk-world__body { display: grid; gap: 6px; padding: var(--wk-card-pad); align-content: start; flex: 1; }
+.wk-world h3 { font-size: var(--wk-type-h3); font-weight: 500; letter-spacing: -.01em; line-height: 1.25; }
+.wk-world__meta { font-size: var(--wk-type-small); color: var(--wk-text-2); }
+.wk-world__meta span { color: var(--wk-text-3); }
+.wk-world__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: auto; padding-top: var(--wk-gap-sm); }
+.wk-world:hover, .wk-world:focus-within { transform: translateY(-3px); border-color: #d6c9f8; box-shadow: var(--wk-shadow-md), var(--wk-shadow-glow); }
+.wk-world:hover .wk-world__media img, .wk-world:focus-within .wk-world__media img { transform: scale(1.04); }
+/* The featured world lies across the top: a large picture beside its text. */
+.wk-world--featured { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); }
+.wk-world--featured .wk-world__media { aspect-ratio: 16 / 9; }
+.wk-world--featured .wk-world__body { align-content: center; padding: clamp(24px, 3vw, 44px); gap: var(--wk-gap-sm); }
+.wk-world--featured h3 { font-size: var(--wk-type-h2-product); font-weight: 400; letter-spacing: -.025em; line-height: 1.1; }
+.wk-world--featured .wk-world__meta { font-size: 1rem; }
+.wk-world--featured .wk-world__actions { margin-top: var(--oq-space-2); }
+
+/* === Your worlds (product, tint) ======================================== */
+.wk-library { scroll-margin-top: var(--oq-space-5); }
+.wk-library__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: var(--wk-grid-gap); }
+.wk-tile {
+  --tile-border: var(--wk-border); --tile-light: var(--oq-success-ink);
+  display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+  background: var(--wk-surface); border: 1px solid var(--tile-border); border-radius: var(--wk-r-card); box-shadow: var(--wk-shadow-sm);
+  transition: transform 220ms var(--oq-ease), box-shadow 220ms var(--oq-ease);
+}
+.wk-tile__image { position: relative; overflow: hidden; aspect-ratio: 16 / 9; background: var(--wk-tint); }
 .wk-tile__image img { width: 100%; height: 100%; object-fit: cover; transition: transform 600ms var(--oq-ease); }
-/* A world without a picture yet gets a small night scene of its own: the
-   doorway, a pool of light, and the explorer, instead of an empty box. */
-.wk-tile__scene { position: absolute; inset: 0; background: radial-gradient(ellipse 60% 34% at 50% 100%, #5a3bd066, transparent 70%), linear-gradient(#1a0d36, #0e061f); }
-.wk-tile__arch { position: absolute; left: 50%; bottom: 10%; height: 74%; width: auto; transform: translateX(-50%); }
-.wk-tile__explorer { position: absolute; width: 48px; height: auto; left: calc(50% - 13px); bottom: calc(10% - 3px); }
-/* Status is a small badge and a rim colour; the layout never changes. */
+/* A world without a picture yet: a small lavender stage with the doorway. */
+.wk-tile__scene { position: absolute; inset: 0; background: radial-gradient(ellipse 60% 30% at 50% 96%, var(--wk-glow), transparent 72%), linear-gradient(#fbf9ff, var(--wk-tint)); }
+.wk-tile__arch { position: absolute; left: 50%; bottom: 10%; height: 72%; width: auto; transform: translateX(-50%); }
+.wk-tile__explorer { position: absolute; width: 46px; height: auto; left: calc(50% - 12px); bottom: calc(10% - 3px); }
+/* Status is a badge on the picture plus a quiet border colour. */
 .wk-tile__badge {
   position: absolute; left: 12px; top: 12px; display: inline-flex; align-items: center; gap: 7px;
-  padding: 4px 11px 4px 9px; border-radius: 999px; background: #120726d9; border: 1px solid #c9b8ff38;
-  font-size: .78rem; font-weight: 500; color: var(--wk-ink);
+  padding: 4px 11px 4px 9px; border-radius: 999px; background: #ffffffeb; box-shadow: var(--wk-shadow-sm);
+  font-size: .78rem; font-weight: 600; color: var(--wk-text);
 }
-.wk-tile__badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--tile-light, #8fe3b8); }
-.wk-tile[data-status="ready"] { --tile-light: #8fe3b8; }
-.wk-tile[data-status="draft"] { --tile-rim: #f2b24d66; --tile-light: var(--wk-marigold); }
-.wk-tile[data-status="draft"] .wk-tile__image { border-style: dashed; }
-.wk-tile[data-status="pending"] { --tile-rim: #b79cff73; --tile-light: #b79cff; }
-.wk-tile[data-status="failed"] { --tile-rim: #ffaaa466; --tile-light: var(--oq-error-ink); }
-.wk-tile:hover .wk-tile__image, .wk-tile:focus-within .wk-tile__image { border-color: #d9ccffb3; box-shadow: inset 0 2px 0 #f4eeffaa, 0 30px 60px -30px #8b6cffcc; }
+.wk-tile__badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--tile-light); }
+.wk-tile[data-status="draft"] { --tile-border: #efd9a6; --tile-light: #c28a16; }
+.wk-tile[data-status="pending"] { --tile-border: #cbbcf9; --tile-light: var(--wk-purple); }
+.wk-tile[data-status="failed"] { --tile-border: #f2c3bf; --tile-light: var(--oq-error-ink); }
+.wk-tile[data-status="draft"] { border-style: dashed; }
+.wk-tile:hover, .wk-tile:focus-within { transform: translateY(-3px); box-shadow: var(--wk-shadow-md); }
 .wk-tile:hover .wk-tile__image img, .wk-tile:focus-within .wk-tile__image img { transform: scale(1.04); }
-/* A world still being built: its doorway glows a little brighter. */
-.wk-tile[data-status="pending"] .wk-tile__arch { filter: drop-shadow(0 0 10px #b79cff); }
-.wk-tile__info { display: grid; gap: 4px; padding-inline: 2px; }
-.wk-tile__info h3 { font-size: 1.25rem; font-weight: 400; letter-spacing: -.015em; line-height: 1.2; }
-.wk-tile__meta { font-size: .875rem; color: var(--oq-muted); text-transform: none; }
-.wk-tile__info .oq-kit-error, .wk-tile__info .oq-kit-muted { font-size: .875rem; }
-/* One way in, clearly first; the rest are quiet and to the side. */
-.wk-tile__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 4px; margin-top: 10px; }
-.wk-tile__actions > .oq-kit-button:first-child { min-width: 118px; }
-.wk-tile__more { display: inline-flex; flex-wrap: wrap; gap: 2px; margin-left: auto; }
-.wk-tile__more .oq-kit-button { min-height: 40px; padding: 8px 14px; font-size: .875rem; color: var(--wk-mist); }
-.wk-tile__more .oq-kit-button:not(:disabled):hover { color: var(--wk-ink); }
-.wk-tile .oq-saved-postcard { margin-top: 6px; }
-.wk-library__notice { padding: 14px 18px; border-radius: 16px; border: 1px solid #ffaaa459; background: var(--oq-error-wash); }
-
-/* The empty library: a photo on the floor with a doorway in it. */
-.wk-library-empty { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(24px, 4vw, 56px); align-items: center; }
-.wk-library-empty__scene { position: relative; aspect-ratio: 16 / 10; border-radius: 22px; overflow: hidden; box-shadow: 0 40px 70px -40px #05010f, 0 0 0 1px #c9b8ff26; }
-.wk-library-empty__scene img { width: 100%; height: 100%; object-fit: cover; filter: saturate(.5) brightness(.45); }
-.wk-library-empty__scene::before { content: ""; position: absolute; inset: 0; z-index: 1; background: #2a1470; mix-blend-mode: multiply; opacity: .5; }
-.wk-library-empty__scene::after { content: ""; position: absolute; z-index: 1; left: 22%; right: 22%; bottom: 3%; height: 24%; border-radius: 50%; background: radial-gradient(closest-side, #e9e0ffa6, #8b6cff4d 45%, transparent); }
-.wk-library-empty__arch { position: absolute; z-index: 2; left: 50%; bottom: 12%; height: 62%; width: auto; transform: translateX(-50%); }
-.wk-library-empty__explorer { position: absolute; z-index: 3; width: 52px; height: auto; left: calc(50% - 14px); bottom: calc(12% - 4px); }
-.wk-library-empty__copy { display: grid; gap: var(--oq-space-3); justify-items: start; }
-.wk-library-empty__copy h3 { font-size: clamp(1.6rem, 1.2rem + 1.4vw, 2.4rem); font-weight: 300; letter-spacing: -.03em; line-height: 1.05; }
-.wk-library-empty__copy .oq-kit-button { margin-top: var(--oq-space-2); }
-/* --- Import + footer. Quiet by design; these are not the point. -------- */
-.oq-welcome__imports { border-top: 1px solid var(--oq-line); padding-top: var(--oq-space-5); }
-.oq-welcome__imports summary {
-  cursor: pointer; min-height: 44px; display: flex; align-items: center; width: fit-content;
-  font-weight: 500; color: var(--oq-accent-ink);
+.wk-tile__info { display: flex; flex-direction: column; gap: 4px; padding: var(--wk-card-pad); flex: 1; }
+/* Actions always sit on the card's bottom edge, so a row of tiles shares one
+   baseline for Play whatever sits above it. */
+.wk-tile__info > .wk-tile__actions { order: 2; }
+.wk-tile__info > .oq-saved-postcard { order: 1; }
+.wk-tile__info h3 { font-size: 1.125rem; font-weight: 500; letter-spacing: -.01em; line-height: 1.25; }
+.wk-tile__meta { font-size: var(--wk-type-small); color: var(--wk-text-2); }
+.wk-tile__info .oq-kit-error, .wk-tile__info .oq-kit-muted { font-size: var(--wk-type-small); }
+/* One way in, clearly first; the rest are quiet text actions beside it. */
+.wk-tile__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 2px; margin-top: auto; padding-top: var(--wk-gap-sm); }
+.wk-tile__more { display: inline-flex; flex-wrap: wrap; gap: 0; margin-left: auto; }
+.wk-tile__more .oq-kit-button { min-height: 40px; padding: 8px 12px; font-size: var(--wk-type-small); color: var(--wk-text-2); }
+.wk-tile__more .oq-kit-button:not(:disabled):hover { color: var(--wk-purple-ink); }
+/* In the library the postcard's poster is already the tile's picture, so the
+   panel collapses to one quiet line: its label and the download. */
+.wk-tile .oq-saved-postcard { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; margin-top: 8px; padding: 8px 0 0; border-top: 1px solid var(--wk-border); }
+.wk-tile .oq-saved-postcard video { display: none; }
+.wk-tile .oq-saved-postcard .oq-media-card__label { margin: 0; color: var(--wk-text-3) !important; }
+.wk-tile .oq-saved-postcard .oq-kit-button { width: auto; min-height: 36px; padding: 6px 10px; font-size: var(--wk-type-small); }
+.wk-library__notice { padding: 14px 18px; border-radius: var(--wk-r-inner); border: 1px solid #f2c3bf; background: var(--oq-error-wash); }
+/* The empty library: one white card, a lavender stage with the doorway. */
+.wk-library-empty {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: var(--wk-gap-group);
+  padding: var(--wk-card-pad); background: var(--wk-surface); border: 1px solid var(--wk-border); border-radius: var(--wk-r-stage); box-shadow: var(--wk-shadow-sm);
 }
+.wk-library-empty__scene { position: relative; aspect-ratio: 16 / 10; border-radius: var(--wk-r-card); overflow: hidden; background: radial-gradient(ellipse 60% 30% at 50% 94%, var(--wk-glow), transparent 72%), linear-gradient(#fbf9ff, var(--wk-tint)); }
+.wk-library-empty__arch { position: absolute; left: 50%; bottom: 10%; height: 70%; width: auto; transform: translateX(-50%); }
+.wk-library-empty__explorer { position: absolute; width: 56px; height: auto; left: calc(50% - 15px); bottom: calc(10% - 4px); }
+.wk-library-empty__copy { display: grid; gap: var(--wk-gap-sm); justify-items: start; padding-right: var(--wk-card-pad); }
+.wk-library-empty__copy h3 { font-size: var(--wk-type-h2-product); font-weight: 400; letter-spacing: -.025em; line-height: 1.1; }
+.wk-library-empty__copy .oq-kit-button { margin-top: var(--oq-space-2); }
+
+/* === Final call to action (page) ======================================== */
+.wk-finale__inner { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: var(--wk-gap-group); align-items: center; }
+.wk-finale__copy { display: grid; gap: var(--wk-gap); justify-items: start; }
+.wk-finale__copy h2 { font-size: clamp(2.4rem, 1.3rem + 3.8vw, 4.6rem); font-weight: 300; letter-spacing: -.045em; line-height: .98; max-inline-size: 12ch; }
+.wk-finale__copy p { color: var(--wk-text-2); font-size: var(--wk-type-lede); max-inline-size: 40ch; }
+/* A white frame holding the one dark picture on the page: a real room at
+   night with the portal glowing on its floor. */
+.wk-finale__frame { justify-self: center; width: min(100%, 460px); padding: 12px; background: var(--wk-surface); border: 1px solid var(--wk-border); border-radius: var(--wk-r-stage); box-shadow: var(--wk-shadow-lg); }
+.wk-finale__scene { position: relative; aspect-ratio: 4 / 5; border-radius: var(--wk-r-card); overflow: hidden; background: var(--wk-cinema); }
+.wk-finale__scene img { width: 100%; height: 100%; object-fit: cover; filter: saturate(.6) brightness(.55); }
+.wk-finale__scene::before { content: ""; position: absolute; inset: 0; z-index: 1; background: #3b1f9a; mix-blend-mode: multiply; opacity: .45; }
+.wk-finale__scene::after { content: ""; position: absolute; z-index: 1; left: 14%; right: 14%; bottom: 4%; height: 22%; border-radius: 50%; background: radial-gradient(closest-side, #e9e0ffb3, #8b6cff55 45%, transparent); }
+.wk-finale__scene .wk-arch { --wk-arch-fill: #8b6cff; --wk-arch-fill-opacity: .1; --wk-arch-halo: #8b6cff; --wk-arch-glow: #b79cff; --wk-arch-core: #f4eeff; }
+.wk-finale__arch { position: absolute; z-index: 2; left: 50%; bottom: 13%; height: 48%; width: auto; transform: translateX(-50%); }
+.wk-finale__explorer { position: absolute; z-index: 3; width: 58px; height: auto; left: calc(50% - 16px); bottom: calc(13% - 4px); }
+.wk-finale__scene .wk-explorer { --wk-explorer-shadow: #05010f; }
+
+/* === Import + footer. Quiet by design. ================================= */
+.wk-welcome-foot { padding-bottom: var(--oq-space-7); }
+.oq-welcome__imports { border-top: 1px solid var(--wk-border); padding-top: var(--oq-space-5); }
+.oq-welcome__imports summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; width: fit-content; font-weight: 500; color: var(--wk-purple-ink); }
 .oq-welcome__imports > div { padding-top: var(--oq-space-4); }
-.oq-welcome__imports p { margin-top: var(--oq-space-3); font-size: .875rem; }
+.oq-welcome__imports p { margin-top: var(--oq-space-3); font-size: var(--wk-type-small); }
 .oq-welcome__footer {
   display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--oq-space-3);
-  margin-top: var(--oq-space-6); padding-block: var(--oq-space-5) var(--oq-space-7);
-  border-top: 1px solid var(--oq-line);
-  font-size: .875rem; color: var(--oq-muted);
+  margin-top: var(--oq-space-6); padding-top: var(--oq-space-5);
+  border-top: 1px solid var(--wk-border); font-size: var(--wk-type-small); color: var(--wk-text-3);
 }
 
-/* --- Widths ------------------------------------------------------------ */
+/* === Widths ============================================================= */
+@media (max-width: 960px) {
+  .wk-worlds__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wk-world--featured { grid-template-columns: 1fr; }
+  .wk-finale__inner { grid-template-columns: 1fr; }
+  .wk-finale__frame { justify-self: start; width: min(100%, 400px); }
+}
 @media (max-width: 860px) {
-  /* A narrow screen keeps the same planet, just broader in proportion, so the
-     rim light stays beside the limb instead of under the buttons. */
+  /* A narrow screen keeps the same world, broader in proportion, so the rim
+     light stays beside the limb instead of under the buttons. */
   .oq-welcome__band::before {
     background:
-      linear-gradient(to bottom, #12072600 90%, var(--wk-night) 100%),
-      radial-gradient(ellipse 40% 34% at 50% 100%, var(--wk-night) 0%, var(--wk-night) 84%, #12072600 100%),
-      radial-gradient(ellipse 160% 26% at 50% 100%, #ffffff 0%, #f3edff 12%, #d3c2ff 22%, #9d80ff 34%, #6a48e0 48%, #3a2096 64%, #1f0f55 78%, #12072600 92%),
-      radial-gradient(ellipse 80% 50% at 50% 100%, #2d1878 0%, #1f0f52 45%, #12072600 80%);
+      linear-gradient(to bottom, #faf7ff00 86%, var(--wk-page) 100%),
+      radial-gradient(ellipse 40% 30% at 50% 100%, #fbf9ff 0%, #f3edff 74%, #e4d9fd 90%, #e4d9fd00 100%),
+      radial-gradient(ellipse 170% 34% at 50% 100%, #6a4af6 0%, #7b5cfa 16%, #9a80fb 27%, #bca9fd 38%, #d8cdfe 50%, #ebe4ff 63%, #faf7ff00 80%),
+      radial-gradient(ellipse 90% 40% at 50% 0%, #ffffff 0%, #ffffff00 70%);
   }
+  .wk-transform__pair { grid-template-columns: 1fr; justify-items: stretch; }
+  .wk-transform__link { justify-self: center; transform: rotate(90deg); width: 48px; height: 48px; }
+  .wk-steps__list { grid-template-columns: 1fr; gap: calc(var(--wk-grid-gap) + 16px); padding-top: 16px; }
+  /* One column: the track runs down the left edge through each number. */
+  .wk-steps__list::before { left: calc(var(--wk-card-pad) + 15px); right: auto; top: 16px; bottom: 0; border-top: 0; border-left: 2px dotted var(--wk-purple); }
+  .wk-library-empty { grid-template-columns: 1fr; }
+  .wk-library-empty__copy { padding: 0 var(--oq-space-2) var(--oq-space-2); }
+  .wk-interlude { min-height: 0; padding-block: var(--wk-section-y) 0; align-items: start; }
+  .wk-interlude__scene { position: relative; top: auto; right: auto; transform: none; --s: min(80vw, 380px); margin: var(--wk-gap) -14vw 0 auto; }
 }
 @media (max-width: 620px) {
-  .oq-welcome__hero { padding-block: var(--oq-space-6) 180px; }
+  .oq-welcome__hero { padding-block: var(--oq-space-6) 190px; }
   .oq-welcome__ctas { width: 100%; flex-direction: column; align-items: stretch; }
-  /* Full-width stacked actions rather than two squeezed pills. */
   .oq-welcome__intro .oq-kit-button { width: 100%; }
-}
-@media (max-width: 860px) {
-  .wk-showcase__inner { grid-template-columns: 1fr; }
-  .wk-showcase__print { width: min(78%, 420px); margin: 0 0 -18% 4%; justify-self: start; transform: rotate(-4deg); }
-  .wk-showcase__set { aspect-ratio: 4 / 3.4; }
-  .wk-showcase__path { display: none; }
-  .wk-journey__path { display: none; }
-  .wk-journey__steps { grid-template-columns: 1fr; gap: var(--oq-space-7); padding-left: 8px; }
-  .wk-step:nth-child(2), .wk-step:nth-child(3) { margin-top: 0; }
-  /* On one column the path runs down the page as a dotted line of light. */
-  .wk-journey__steps::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: repeating-linear-gradient(to bottom, #e9e0ffcc 0 2px, transparent 2px 14px); box-shadow: 0 0 12px #8b6cff; }
-  .wk-step__frame--model { max-width: 320px; }
   .wk-worlds__grid { grid-template-columns: 1fr; }
-  .wk-world--featured { grid-row: auto; min-height: 480px; }
-  .wk-world--standard { aspect-ratio: 4 / 5; }
-  .wk-world--wide { flex-direction: column; min-height: 320px; }
-  .wk-world--wide .wk-world__image { right: 0; }
-  .wk-world--wide .wk-world__image::after { background: linear-gradient(to top, #120726f7 0%, #120726d9 30%, #12072600 70%); }
-  .wk-world--wide .wk-world__body { width: auto; margin-left: 0; align-self: stretch; }
-  .wk-finale__inner { grid-template-columns: 1fr; }
-  .wk-library-empty { grid-template-columns: 1fr; }
-  .wk-finale__scene { width: min(100%, 380px); }
-  .wk-interlude { min-height: 0; padding-block: var(--oq-space-7) 0; align-items: start; }
-  .wk-interlude__scene { position: relative; top: auto; right: auto; transform: none; --s: min(92vw, 420px); margin: var(--oq-space-5) -18vw 0 auto; }
 }
 @media (max-width: 440px) {
   .oq-welcome__nav .mh-logo__word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
 }
 @media (prefers-reduced-motion: reduce) {
   .oq-welcome__band::before { animation: none; }
-  .wk-tile__image img { transition: none; }
+  .wk-world, .wk-tile, .wk-world__media img, .wk-tile__image img { transition: none; }
+  .wk-world:hover, .wk-world:focus-within, .wk-tile:hover, .wk-tile:focus-within { transform: none; }
+  .wk-world:hover .wk-world__media img, .wk-world:focus-within .wk-world__media img,
   .wk-tile:hover .wk-tile__image img, .wk-tile:focus-within .wk-tile__image img { transform: none; }
-  .wk-world__image img { transition: none; }
-  .wk-world:hover .wk-world__image img, .wk-world:focus-within .wk-world__image img { transform: none; }
 }

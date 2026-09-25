@@ -25,9 +25,9 @@ const SampleWorldPreview = lazy(() => import("../components/SampleWorldPreview.j
 /** Real in-game renders of each bundled sample (captured from the app, see
  * public/landing/README.md). Two are shown in a theme look, and say so. */
 const SAMPLE_ART: Record<string, { src: string; alt: string; look?: string }> = {
-  "sample-lost-colors-rodin": { src: "/landing/world-lost-colors.webp", alt: "In the game: the tiny explorer on the floor beneath a towering desk, with the portal ring standing beside them" },
-  "sample-explore-rodin": { src: "/landing/world-teacup-wander.webp", alt: "In the game: the explorer under the sofa on a tropical shore, palms and a pink portal behind", look: "Tropical Island" },
-  "sample-rodin-room-corner": { src: "/landing/world-desk-sofa.webp", alt: "In the game: the explorer on desert sand, dwarfed by a desk leg the size of a tower", look: "Desert" },
+  "sample-lost-colors-rodin": { src: "/landing/world-lost-colors.webp", alt: "In the game: the tiny explorer between the portal ring, a golden color fragment and a sofa leg as tall as a tower", look: "Tropical Island" },
+  "sample-explore-rodin": { src: "/landing/world-teacup-wander.webp", alt: "In the game: the explorer on a sandy shore under the sofa, among island shrubs and palms", look: "Tropical Island" },
+  "sample-rodin-room-corner": { src: "/landing/world-desk-sofa.webp", alt: "In the game: the explorer on desert sand beside a color fragment and a towering sofa leg", look: "Desert" },
   "sample-tripo-room-corner": { src: "/landing/world-different-perspective.webp", alt: "In the game: the explorer on a green floor under the dark underside of a sofa" },
 };
 
@@ -236,7 +236,9 @@ export function StartScreen({
 
   return (
     <WorldStyleScope className="oq-welcome">
-      <div className="oq-welcome__band oq-shade">
+      {/* The hero: the one cinematic moment, now in light. A pale world
+          rises at the foot of the screen with purple light round its rim. */}
+      <div className="oq-welcome__band">
         <div className="oq-kit-container">
           <nav className="oq-welcome__nav" aria-label="Main navigation">
             <Logo size={34} />
@@ -256,162 +258,187 @@ export function StartScreen({
           </section>
         </div>
       </div>
-      {/* The transformation, staged: the photograph is a print held at the
-          edge of the frame, and the live reconstruction stands in a portal
-          arch beside it, much larger. No container around either. */}
-      <section className="wk-showcase" aria-label="From a photograph to a world">
-        <div className="oq-kit-container wk-showcase__inner">
-          <figure className="wk-showcase__print">
-            <img className="oq-welcome__photo" src="/samples/photo-4.jpg" alt="A photo of a small room: a wooden desk with a laptop beside a dark fabric sofa" />
-            <figcaption>The photograph<span>One corner of a real room</span></figcaption>
-          </figure>
-          <svg className="wk-showcase__path" viewBox="0 0 200 80" aria-hidden="true" focusable="false"><path d="M4 60C60 60 80 14 196 18" /><path d="M4 60C60 60 80 14 196 18" /></svg>
-          <figure className="wk-showcase__stage">
-            <div className="wk-showcase__set">
-              <PortalArch className="wk-showcase__arch" />
-              <div className="oq-welcome__render">
-                <Suspense fallback={<p className="oq-welcome__preview-status" role="status">Opening the little world…</p>}><SampleWorldPreview /></Suspense>
-              </div>
-            </div>
-            <figcaption>The same corner<span>Now somewhere you can stand</span></figcaption>
-          </figure>
-          <p className="oq-welcome__example-footer">A real bundled world, running live — not a mock-up.</p>
-        </div>
-      </section>
       <main>
-        {/* A sequence, so it keeps its numbers: three real pictures joined by
-            one glowing path with a checkpoint at each stop. */}
-        <section className="wk-journey oq-kit-container" aria-label={`How ${BRAND_NAME} works`}>
-          <svg className="wk-journey__path" viewBox="0 0 1000 300" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-            <path d="M120 70C300 70 300 150 500 150S700 235 880 235" vectorEffect="non-scaling-stroke" />
-            <path d="M120 70C300 70 300 150 500 150S700 235 880 235" vectorEffect="non-scaling-stroke" />
-          </svg>
-          <ol className="wk-journey__steps">
-            <li className="wk-step">
-              <div className="wk-step__frame wk-step__frame--print"><img src="/samples/photo-4.jpg" alt="The original photo: a desk and a sofa in the corner of a room" loading="lazy" /></div>
-              <span className="wk-step__num" aria-hidden="true">1</span><h3>Photograph it</h3><p>Anything with some shape to it — a chair, a kettle, a pile of books.</p>
-            </li>
-            <li className="wk-step">
-              <div className="wk-step__frame wk-step__frame--model"><img src="/landing/step-reconstruction.webp" alt="The same desk and sofa rebuilt as a 3D model" loading="lazy" /></div>
-              <span className="wk-step__num" aria-hidden="true">2</span><h3>Watch it get big</h3><p>Your object is rebuilt in 3D, and a course is laid out through it.</p>
-            </li>
-            <li className="wk-step">
-              <div className="wk-step__frame wk-step__frame--world"><img src="/landing/step-explore.webp" alt="In the game: the tiny explorer standing under the towering desk, a portal ring and a glowing color fragment nearby" loading="lazy" /></div>
-              <span className="wk-step__num" aria-hidden="true">3</span><h3>Shrink and explore</h3><p>Run its length, climb what you can, and find the way through.</p>
-            </li>
-          </ol>
+        {/* Explanatory: the transformation, read at a glance. Two equal
+            frames, a quiet connector, and the portal behind the world. */}
+        <section className="wk-section wk-transform" aria-labelledby="transform-heading">
+          <div className="oq-kit-container">
+            <div className="wk-section__head wk-section__head--center">
+              <h2 id="transform-heading">From photo to explorable world</h2>
+              <p>{BRAND_NAME} rebuilds an ordinary object in 3D and turns it into somewhere you can walk through.</p>
+            </div>
+            <div className="wk-transform__pair">
+              <figure className="wk-transform__item">
+                <div className="wk-frame wk-transform__media">
+                  <img className="oq-welcome__photo" src="/samples/photo-4.jpg" alt="A photo of a small room: a wooden desk with a laptop beside a dark fabric sofa" />
+                </div>
+                <figcaption>The photograph<span>One corner of a real room</span></figcaption>
+              </figure>
+              <div className="wk-transform__link" aria-hidden="true">
+                <svg viewBox="0 0 64 24" focusable="false"><path d="M2 12h52" /><path d="M48 5l8 7-8 7" /></svg>
+              </div>
+              <figure className="wk-transform__item">
+                <div className="wk-frame wk-transform__media wk-transform__stage">
+                  <PortalArch className="wk-transform__arch" />
+                  <div className="oq-welcome__render">
+                    <Suspense fallback={<p className="oq-welcome__preview-status" role="status">Opening the little world…</p>}><SampleWorldPreview /></Suspense>
+                  </div>
+                </div>
+                <figcaption>The same corner<span>Now somewhere you can stand</span></figcaption>
+              </figure>
+            </div>
+            <p className="wk-transform__note">A real bundled world, running live — not a mock-up.</p>
+          </div>
         </section>
-        {/* A quiet breath between two loud sections, with one oversized
-            object bleeding off the page and a very small figure on it. */}
+        {/* Explanatory: one journey. Three identical cards on a checkpoint
+            track, so no step outweighs the others. */}
+        <section className="wk-section wk-section--tint wk-steps" aria-label={`How ${BRAND_NAME} works`}>
+          <div className="oq-kit-container">
+            <div className="wk-section__head wk-section__head--center">
+              <h2>How it works</h2>
+              <p>Three steps from something in your room to somewhere you can explore.</p>
+            </div>
+            <ol className="wk-steps__list">
+              <li className="wk-step-card">
+                <span className="wk-step-card__num" aria-hidden="true">1</span>
+                <div className="wk-step-card__media"><img src="/samples/photo-4.jpg" alt="The original photo: a desk and a sofa in the corner of a room" loading="lazy" /></div>
+                <h3>Photograph it</h3><p>Anything with some shape to it — a chair, a kettle, a pile of books.</p>
+              </li>
+              <li className="wk-step-card">
+                <span className="wk-step-card__num" aria-hidden="true">2</span>
+                <div className="wk-step-card__media wk-step-card__media--model"><img src="/landing/step-reconstruction.webp" alt="The same desk and sofa rebuilt as a 3D model" loading="lazy" /></div>
+                <h3>Watch it get big</h3><p>Your object is rebuilt in 3D, and a course is laid out through it.</p>
+              </li>
+              <li className="wk-step-card">
+                <span className="wk-step-card__num" aria-hidden="true">3</span>
+                <div className="wk-step-card__media"><img src="/landing/step-explore.webp" alt="In the game: the tiny explorer on the floor under the desk, with the portal ring beside them" loading="lazy" /></div>
+                <h3>Shrink and explore</h3><p>Run its length, climb what you can, and find the way through.</p>
+              </li>
+            </ol>
+          </div>
+        </section>
+        {/* Interlude: breaks the rhythm without stopping the page. One
+            oversized object entering from the edge, one tiny figure. */}
         <section className="wk-interlude" aria-label="Scale">
+          <div className="oq-kit-container wk-interlude__inner">
+            <p className="wk-interlude__line">At this size, a sewing button is a planet.</p>
+          </div>
           <div className="wk-interlude__scene" aria-hidden="true">
             <GiantButton className="wk-interlude__button" />
             <TinyExplorer className="wk-interlude__explorer" />
           </div>
-          <p className="wk-interlude__line oq-kit-container">At this size, a sewing button is a planet.</p>
         </section>
-        <section className="wk-worlds oq-kit-container" aria-labelledby="samples-heading">
-          <div className="wk-section-head"><h2 id="samples-heading">Worlds to borrow</h2><p>Built in already. Keyboard controls.</p></div>
-          {sampleError ? <p role="alert" className="oq-kit-error">The samples couldn’t load. Refresh to try again.</p>
-            : !sampleLevels ? <p role="status" className="oq-kit-muted">Opening the sample collection…</p>
-            : sampleLevels.length === 0 ? <EmptyState title="No samples available" description="You can still start a world from your own photo." action={<Button onClick={onCreateFromPhotos}>Create my world</Button>} />
-            : <div className="wk-worlds__grid">{sampleLevels.map((manifest, index) => {
-              const art = SAMPLE_ART[manifest.levelId];
-              return <article key={manifest.levelId} className={`wk-world wk-world--${index === 0 ? "featured" : index === 3 ? "wide" : "standard"}`}>
-                <div className="wk-world__image">
-                  <img src={art?.src ?? `/samples/photo-${manifest.assets[0]?.url.includes("rodin") ? 4 : 2}.jpg`} alt={art?.alt ?? ""} loading="lazy" />
-                </div>
-                <div className="wk-world__body">
-                  <p className="wk-world__meta">{sampleModeLabel(manifest)}{art?.look ? <span> · Shown in the {art.look} look</span> : null}</p>
-                  <h3>{sampleTitle(manifest)}</h3>
-                  <p className="wk-world__summary">{sampleSummary(manifest)}</p>
-                  <div className="wk-world__actions"><Button onClick={() => onPlaySample(manifest)}><Icon name="play" />Play now</Button><Button variant="ghost" onClick={() => onEditSample(manifest)}>Edit course</Button></div>
-                </div>
-              </article>;
-            })}</div>}
-        </section>
-        <div className="oq-kit-container">
-        {/* The library: each world is its picture first, then its name, then
-            one clear way in. Status is a badge and a rim colour, never a
-            different layout. */}
-        <section className="wk-library" id="my-worlds" aria-labelledby="worlds-heading" ref={worldsRef} tabIndex={-1}>
-          <div className="wk-section-head"><h2 id="worlds-heading">Your worlds</h2><p>Everything you have made, saved on this machine.</p></div>
-          {savedError ? <p role="alert" className="oq-kit-error wk-library__notice">Your saved worlds couldn’t load. Check your connection and refresh to try again.</p>
-            : !savedLevels ? <p role="status" className="oq-kit-muted">Finding your saved worlds…</p>
-            : worldItems.length === 0 ? <div className="wk-library-empty">
-              <div className="wk-library-empty__scene" aria-hidden="true">
-                <img src="/samples/photo-3.jpg" alt="" loading="lazy" />
-                <PortalArch className="wk-library-empty__arch" />
-                <TinyExplorer className="wk-library-empty__explorer" />
-              </div>
-              <div className="wk-library-empty__copy">
-                <h3>Your first world starts with a photo</h3>
-                <p className="oq-kit-muted">Pick something familiar. Make somewhere new.</p>
-                <Button onClick={onCreateFromPhotos}>Create my world</Button>
-              </div>
+        {/* Product: choosing a world, like choosing a game. One featured
+            world, then the rest; image first, then title, mode, Play. */}
+        <section className="wk-section wk-worlds" aria-labelledby="samples-heading">
+          <div className="oq-kit-container">
+            <div className="wk-section__head">
+              <h2 id="samples-heading">Worlds to borrow</h2>
+              <p>Built in and ready to play, no photo needed. Keyboard and mouse controls.</p>
             </div>
-            : <div className="wk-library__grid">{worldItems.map(item => {
-              if (item.kind === "pending") return <WorldTile key={`pending-${item.id}`} status="pending" badge="In progress" title={item.title || "Untitled world"}
-                meta={item.statusText ?? `Generation is ${item.job.state}. Leaving this page does not cancel it.`}
-                actions={onResumePendingWorld ? <Button onClick={() => onResumePendingWorld(item.job.id)}>{item.actionLabel ?? "Resume"}</Button> : null} />;
-              if (item.kind === "failed") return <WorldTile key={`failed-${item.id}`} status="failed" badge="Needs attention" title={item.title || "Untitled world"}
-                notice={<p className="oq-kit-error">{item.statusText ?? item.job.uiMessage ?? "This generation stage needs another try."}</p>}
-                actions={onRetryFailedWorld && (item.job.lastError?.retryable || item.actionLabel === "Review choices")
-                  ? <Button onClick={() => onRetryFailedWorld(item.job.id)}>{item.actionLabel ?? "Retry"}</Button>
-                  : <p className="oq-kit-muted">This stage can’t be retried automatically.</p>} />;
-              if (item.kind === "draft") return <WorldTile key={`draft-${item.id}`} status="draft" badge="Draft" title={item.draft.manifest.name || "Untitled world"}
-                image={worldImage(item.draft.manifest)}
-                meta={`Unsaved course edits · ${item.draft.manifest.experience?.mode.kind ?? "explore"}`}
-                actions={<Button onClick={() => (onResumeDraft ?? ((next) => onEditSavedLevel(next)))(item.draft.manifest, false)}>Resume</Button>} />;
-              const { manifest, draft } = item;
-              return <WorldTile key={manifest.levelId} status={draft ? "draft" : "ready"}
-                badge={draft ? "Draft changes" : savedWorldOrigin(manifest) === "generated" ? "Generated world" : savedWorldOrigin(manifest) === "sample-copy" ? "Bundled sample copy" : "Imported world"}
-                title={manifest.name || "Untitled world"} image={worldImage(manifest)}
-                meta={`${manifest.experience?.style.id ?? "cartoon"} · ${manifest.experience?.mode.kind ?? "explore"} · ${manifest.checkpoints.length} checkpoints`}
-                notice={assetIssues[manifest.levelId] ? <p className="oq-kit-error" role="alert">{assetIssues[manifest.levelId]}</p> : null}
-                actions={<>
-                  {draft ? <Button onClick={() => (onResumeDraft ?? ((next) => onEditSavedLevel(next)))(draft.manifest, true)}>Resume</Button> : <Button className="wk-tile__play" onClick={() => handlePlaySaved(manifest)} loading={checkingLevelId === manifest.levelId} loadingLabel="Checking assets…"><Icon name="play" />Play</Button>}
-                  <span className="wk-tile__more">
-                    {draft ? <Button variant="ghost" onClick={() => handlePlaySaved(manifest)} loading={checkingLevelId === manifest.levelId} loadingLabel="Checking assets…">Play saved</Button> : null}
-                    {!draft ? <Button variant="ghost" onClick={() => onEditSavedLevel(manifest)}>Edit</Button> : null}
-                    <Button variant="ghost" onClick={() => handleExport(manifest)} disabled={exportingLevelId !== null} loading={exportingLevelId === manifest.levelId} loadingLabel="Exporting…">Export</Button>
-                  </span>
-                </>}>
-                <WorldPostcardPanel manifest={manifest} />
-              </WorldTile>;
-            })}</div>}
-          {exportError && <p className="oq-kit-error" role="alert">We couldn’t export this world. Try Export again.</p>}
+            {sampleError ? <p role="alert" className="oq-kit-error">The samples couldn’t load. Refresh to try again.</p>
+              : !sampleLevels ? <p role="status" className="oq-kit-muted">Opening the sample collection…</p>
+              : sampleLevels.length === 0 ? <EmptyState title="No samples available" description="You can still start a world from your own photo." action={<Button onClick={onCreateFromPhotos}>Create my world</Button>} />
+              : <div className="wk-worlds__grid">{sampleLevels.map((manifest, index) => {
+                const art = SAMPLE_ART[manifest.levelId];
+                return <article key={manifest.levelId} className={`wk-world${index === 0 ? " wk-world--featured" : ""}`}>
+                  <div className="wk-world__media">
+                    <img src={art?.src ?? `/samples/photo-${manifest.assets[0]?.url.includes("rodin") ? 4 : 2}.jpg`} alt={art?.alt ?? ""} loading="lazy" />
+                    <span className="wk-world__mode">{sampleModeLabel(manifest)}</span>
+                  </div>
+                  <div className="wk-world__body">
+                    <h3>{sampleTitle(manifest)}</h3>
+                    <p className="wk-world__meta">{sampleSummary(manifest)}{art?.look ? <span> · Shown in the {art.look} look</span> : null}</p>
+                    <div className="wk-world__actions"><Button onClick={() => onPlaySample(manifest)}><Icon name="play" />Play now</Button><Button variant="ghost" onClick={() => onEditSample(manifest)}>Edit course</Button></div>
+                  </div>
+                </article>;
+              })}</div>}
+          </div>
         </section>
-        </div>
-        {/* The page ends where it began: something ordinary, and a lit
-            doorway standing on its floor, with the explorer walking in. */}
-        <section className="wk-finale" aria-labelledby="finale-heading">
+        {/* Product: the library. White cards on the tint; the picture leads,
+            status is a badge on it, one clear way in. */}
+        <section className="wk-section wk-section--tint wk-library" id="my-worlds" aria-labelledby="worlds-heading" ref={worldsRef} tabIndex={-1}>
+          <div className="oq-kit-container">
+            <div className="wk-section__head">
+              <h2 id="worlds-heading">Your worlds</h2>
+              <p>Everything you have made, saved on this machine.</p>
+            </div>
+            {savedError ? <p role="alert" className="oq-kit-error wk-library__notice">Your saved worlds couldn’t load. Check your connection and refresh to try again.</p>
+              : !savedLevels ? <p role="status" className="oq-kit-muted">Finding your saved worlds…</p>
+              : worldItems.length === 0 ? <div className="wk-library-empty">
+                <div className="wk-library-empty__scene" aria-hidden="true">
+                  <PortalArch className="wk-library-empty__arch" />
+                  <TinyExplorer className="wk-library-empty__explorer" />
+                </div>
+                <div className="wk-library-empty__copy">
+                  <h3>Your first world starts with a photo</h3>
+                  <p className="oq-kit-muted">Pick something familiar. Make somewhere new.</p>
+                  <Button onClick={onCreateFromPhotos}>Create my world</Button>
+                </div>
+              </div>
+              : <div className="wk-library__grid">{worldItems.map(item => {
+                if (item.kind === "pending") return <WorldTile key={`pending-${item.id}`} status="pending" badge="In progress" title={item.title || "Untitled world"}
+                  meta={item.statusText ?? `Generation is ${item.job.state}. Leaving this page does not cancel it.`}
+                  actions={onResumePendingWorld ? <Button onClick={() => onResumePendingWorld(item.job.id)}>{item.actionLabel ?? "Resume"}</Button> : null} />;
+                if (item.kind === "failed") return <WorldTile key={`failed-${item.id}`} status="failed" badge="Needs attention" title={item.title || "Untitled world"}
+                  notice={<p className="oq-kit-error">{item.statusText ?? item.job.uiMessage ?? "This generation stage needs another try."}</p>}
+                  actions={onRetryFailedWorld && (item.job.lastError?.retryable || item.actionLabel === "Review choices")
+                    ? <Button onClick={() => onRetryFailedWorld(item.job.id)}>{item.actionLabel ?? "Retry"}</Button>
+                    : <p className="oq-kit-muted">This stage can’t be retried automatically.</p>} />;
+                if (item.kind === "draft") return <WorldTile key={`draft-${item.id}`} status="draft" badge="Draft" title={item.draft.manifest.name || "Untitled world"}
+                  image={worldImage(item.draft.manifest)}
+                  meta={`Unsaved course edits · ${item.draft.manifest.experience?.mode.kind ?? "explore"}`}
+                  actions={<Button onClick={() => (onResumeDraft ?? ((next) => onEditSavedLevel(next)))(item.draft.manifest, false)}>Resume</Button>} />;
+                const { manifest, draft } = item;
+                return <WorldTile key={manifest.levelId} status={draft ? "draft" : "ready"}
+                  badge={draft ? "Draft changes" : savedWorldOrigin(manifest) === "generated" ? "Generated world" : savedWorldOrigin(manifest) === "sample-copy" ? "Bundled sample copy" : "Imported world"}
+                  title={manifest.name || "Untitled world"} image={worldImage(manifest)}
+                  meta={`${manifest.experience?.style.id ?? "cartoon"} · ${manifest.experience?.mode.kind ?? "explore"} · ${manifest.checkpoints.length} checkpoints`}
+                  notice={assetIssues[manifest.levelId] ? <p className="oq-kit-error" role="alert">{assetIssues[manifest.levelId]}</p> : null}
+                  actions={<>
+                    {draft ? <Button onClick={() => (onResumeDraft ?? ((next) => onEditSavedLevel(next)))(draft.manifest, true)}>Resume</Button> : <Button className="wk-tile__play" onClick={() => handlePlaySaved(manifest)} loading={checkingLevelId === manifest.levelId} loadingLabel="Checking assets…"><Icon name="play" />Play</Button>}
+                    <span className="wk-tile__more">
+                      {draft ? <Button variant="ghost" onClick={() => handlePlaySaved(manifest)} loading={checkingLevelId === manifest.levelId} loadingLabel="Checking assets…">Play saved</Button> : null}
+                      {!draft ? <Button variant="ghost" onClick={() => onEditSavedLevel(manifest)}>Edit</Button> : null}
+                      <Button variant="ghost" onClick={() => handleExport(manifest)} disabled={exportingLevelId !== null} loading={exportingLevelId === manifest.levelId} loadingLabel="Exporting…">Export</Button>
+                    </span>
+                  </>}>
+                  <WorldPostcardPanel manifest={manifest} />
+                </WorldTile>;
+              })}</div>}
+            {exportError && <p className="oq-kit-error" role="alert">We couldn’t export this world. Try Export again.</p>}
+          </div>
+        </section>
+        {/* The close: back to the ordinary, with a lit doorway in it. */}
+        <section className="wk-section wk-finale" aria-labelledby="finale-heading">
           <div className="oq-kit-container wk-finale__inner">
             <div className="wk-finale__copy">
               <h2 id="finale-heading">Point your camera at something ordinary.</h2>
               <p>{BRAND_NAME} turns it into a world you can stand in, climb and explore.</p>
               <div className="oq-kit-row">
                 <Button onClick={onCreateFromPhotos}>Make my world <Icon name="arrow" /></Button>
-                <Button variant="secondary" disabled={!sampleLevels?.[0]} onClick={() => { if (sampleLevels?.[0]) onPlaySample(sampleLevels[0]); }}><Icon name="play" />Play a sample</Button>
+                <Button variant="ghost" disabled={!sampleLevels?.[0]} onClick={() => { if (sampleLevels?.[0]) onPlaySample(sampleLevels[0]); }}><Icon name="play" />Play a sample</Button>
               </div>
             </div>
-            <div className="wk-finale__scene" aria-hidden="true">
-              <img src="/samples/photo-1.jpg" alt="" loading="lazy" />
-              <PortalArch className="wk-finale__arch" />
-              <TinyExplorer className="wk-finale__explorer" />
+            <div className="wk-finale__frame" aria-hidden="true">
+              <div className="wk-finale__scene">
+                <img src="/samples/photo-1.jpg" alt="" loading="lazy" />
+                <PortalArch className="wk-finale__arch" />
+                <TinyExplorer className="wk-finale__explorer" />
+              </div>
             </div>
           </div>
         </section>
-        <div className="oq-kit-container">
-        <details className="oq-welcome__imports"><summary>Already have a world? Import it here.</summary>
-          <div className="oq-kit-row"><Button variant="secondary" loading={importingGlb} loadingLabel="Importing 3D object…" disabled={importingBundle} onClick={() => glbInputRef.current?.click()}>Import a 3D object</Button><Button variant="secondary" loading={importingBundle} loadingLabel="Importing world…" disabled={importingGlb} onClick={() => bundleInputRef.current?.click()}>Import a world bundle</Button></div>
-          <p className="oq-kit-muted">3D objects use .glb files. World bundles use the .json files {BRAND_NAME} exports.</p>
-          <input hidden ref={glbInputRef} type="file" accept=".glb,model/gltf-binary" disabled={importingGlb || importingBundle} aria-label="Choose a 3D object" onChange={event => handleImportGlb(event.target.files?.[0] ?? null)} />
-          <input hidden ref={bundleInputRef} type="file" accept=".json,.objectquest.json,application/json,application/octet-stream" disabled={importingGlb || importingBundle} aria-label="Choose a world bundle" onChange={event => handleImportBundle(event.target.files?.[0] ?? null)} />
-          {glbImportError && <p className="oq-kit-error" role="alert">We couldn’t import this 3D object. Check the file and try again.</p>}
-          {bundleImportError && <p className="oq-kit-error" role="alert">We couldn’t import this world. Choose an exported {BRAND_NAME} bundle and try again.</p>}
-        </details>
-        <footer className="oq-welcome__footer"><span>{BRAND_TAGLINE}</span>{import.meta.env.DEV && <a href="/design-kit/">Explore the design kit</a>}</footer>
+        <div className="oq-kit-container wk-welcome-foot">
+          <details className="oq-welcome__imports"><summary>Already have a world? Import it here.</summary>
+            <div className="oq-kit-row"><Button variant="secondary" loading={importingGlb} loadingLabel="Importing 3D object…" disabled={importingBundle} onClick={() => glbInputRef.current?.click()}>Import a 3D object</Button><Button variant="secondary" loading={importingBundle} loadingLabel="Importing world…" disabled={importingGlb} onClick={() => bundleInputRef.current?.click()}>Import a world bundle</Button></div>
+            <p className="oq-kit-muted">3D objects use .glb files. World bundles use the .json files {BRAND_NAME} exports.</p>
+            <input hidden ref={glbInputRef} type="file" accept=".glb,model/gltf-binary" disabled={importingGlb || importingBundle} aria-label="Choose a 3D object" onChange={event => handleImportGlb(event.target.files?.[0] ?? null)} />
+            <input hidden ref={bundleInputRef} type="file" accept=".json,.objectquest.json,application/json,application/octet-stream" disabled={importingGlb || importingBundle} aria-label="Choose a world bundle" onChange={event => handleImportBundle(event.target.files?.[0] ?? null)} />
+            {glbImportError && <p className="oq-kit-error" role="alert">We couldn’t import this 3D object. Check the file and try again.</p>}
+            {bundleImportError && <p className="oq-kit-error" role="alert">We couldn’t import this world. Choose an exported {BRAND_NAME} bundle and try again.</p>}
+          </details>
+          <footer className="oq-welcome__footer"><span>{BRAND_TAGLINE}</span>{import.meta.env.DEV && <a href="/design-kit/">Explore the design kit</a>}</footer>
         </div>
       </main>
     </WorldStyleScope>
