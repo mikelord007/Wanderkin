@@ -59,10 +59,10 @@ export function FriendLandingScreen({ shareId, onPlay, onHome }: FriendLandingSc
 
   return (
     <main className="oq-screen oq-friend">
-      <header className="oq-friend__brand"><Logo size={30} /></header>
+      <header className="oq-friend__brand"><Logo size={30} tone="mono" /></header>
       <section className="oq-panel oq-friend__card">
         <div className="oq-friend__copy">
-          <p className="oq-friend__eyebrow">A friend shared a little world</p>
+          <p className="oq-friend__eyebrow wk-chip">A friend shared a little world</p>
           <h1>{manifest.experience.quest.title || manifest.name}</h1>
           <p className="oq-subtitle">{manifest.experience.quest.intro}</p>
           <dl className="oq-friend__details">

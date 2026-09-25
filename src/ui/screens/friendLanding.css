@@ -1,15 +1,24 @@
-.oq-friend { max-width: 1100px; }
+/* A friend's first sight of Wanderkin: the same planetrise as the landing,
+   rising behind the shared world's live preview. `main` lifts these over the
+   generic `.oq-screen` horizon in styles.css, which loads after this file. */
+.oq-friend { max-width: 1140px; }
+main.oq-friend.oq-screen::before {
+  background:
+    radial-gradient(ellipse 30% 44% at 70% 104%, var(--wk-night) 0%, var(--wk-night) 82%, #12072600 100%),
+    radial-gradient(ellipse 90% 42% at 70% 106%, #fbf8ff 0%, #e6dcff 18%, #bba2ff 30%, #8b6cff 42%, #4a2bb8 58%, #24115e 74%, #12072600 90%),
+    var(--wk-night);
+}
 .oq-friend__brand { display: flex; }
-.oq-friend__card { display: grid; grid-template-columns: minmax(280px,.82fr) minmax(0,1.18fr); gap: 28px; align-items: center; }
+.oq-friend__brand .mh-logo { color: var(--wk-ink); }
+.oq-friend__card { display: grid; grid-template-columns: minmax(280px,.82fr) minmax(0,1.18fr); gap: 32px; align-items: center; padding: clamp(20px, 3vw, 32px); border-radius: var(--oq-round-xl); }
 .oq-friend__copy { display: flex; flex-direction: column; align-items: flex-start; gap: 18px; }
 .oq-friend__copy h1, .oq-friend__copy p { margin: 0; }
-.oq-friend__copy h1 { font-size: clamp(2.2rem,4vw,3.6rem); line-height: 1; }
-.oq-friend__eyebrow { color: var(--oq-accent-ink); font-weight: 700; font-size: .8125rem; }
-.oq-friend__details { width: 100%; display: grid; gap: 10px; margin: 0; }
-.oq-friend__details div { display: flex; justify-content: space-between; gap: 16px; padding-block: 10px; border-bottom: 1px solid var(--oq-border); }
+.oq-friend__copy h1 { font-size: clamp(2.4rem,4.4vw,3.9rem); font-weight: 300; letter-spacing: -.04em; line-height: .98; }
+.oq-friend__details { width: 100%; display: grid; gap: 0; margin: 0; }
+.oq-friend__details div { display: flex; justify-content: space-between; gap: 16px; padding-block: 11px; border-bottom: 1px solid var(--oq-line); }
 .oq-friend__details dt { color: var(--oq-text-dim); }
 .oq-friend__details dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
-.oq-friend__privacy { color: var(--oq-text-dim); font-size: .86rem; line-height: 1.5; }
-.oq-friend__preview { height: min(62vh,580px); min-height: 380px; border-radius: var(--oq-radius-lg); overflow: hidden; background: var(--oq-bg-elevated); border: 1px solid var(--oq-border); }
+.oq-friend__privacy { color: var(--oq-text-dim); font-size: .875rem; line-height: 1.5; }
+.oq-friend__preview { height: min(62vh,580px); min-height: 380px; border-radius: var(--oq-round-lg); overflow: hidden; background: #0e061f; border: 1px solid var(--wk-rim); }
 .oq-friend__preview-fallback { height: 100%; display: grid; place-content: center; padding: 32px; color: var(--oq-text-dim); text-align: center; }
-@media(max-width:800px) { .oq-friend__card { grid-template-columns: 1fr; } .oq-friend__preview { min-height: 320px; height: 45vh; } }
+@media(max-width:800px) { .oq-friend__card { grid-template-columns: 1fr; } .oq-friend__preview { min-height: 320px; height: 45vh; } main.oq-friend.oq-screen::before { background: var(--wk-ambient); } }

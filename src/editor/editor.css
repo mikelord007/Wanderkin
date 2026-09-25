@@ -1,10 +1,8 @@
 /*
  * World editor.
  *
- * The editor used to be the one room in the app with its own decor: dark
- * violet panels, amber outlines, a different type scale. It now shares the
- * Mousehold tokens with everything else, so moving from "Edit" into the editor
- * no longer feels like leaving the product.
+ * The editor shares the planetrise tokens with everything else, so moving
+ * from "Edit" into the editor never feels like leaving the product.
  *
  * Two things deliberately stay dark: the 3D stage and the notes that float on
  * top of it. Those sit over a rendered scene, not over the page.
@@ -20,7 +18,7 @@
 
 .oq-editor__banner {
   background: var(--oq-surface);
-  border: 1px solid var(--oq-line);
+  border: 1px solid var(--wk-rim);
   border-left: 4px solid var(--oq-control-line);
   border-radius: var(--oq-round-md);
   padding: var(--oq-space-4) var(--oq-space-5);
@@ -75,10 +73,10 @@
 
 .oq-editor__preview {
   position: relative;
-  border-radius: var(--oq-round-lg);
+  border-radius: var(--oq-round-xl);
   overflow: hidden;
-  border: 1px solid var(--oq-line);
-  background: var(--oq-inset);
+  border: 1px solid var(--wk-rim);
+  background: #14101f;
   height: clamp(420px, 60vh, 640px);
   min-height: 420px;
 }
@@ -101,20 +99,20 @@
   bottom: 12px;
   left: 12px;
   right: 12px;
-  background: #16241fe6;
-  border: 1px solid var(--mh-marigold);
+  background: #120726e6;
+  border: 1px solid var(--wk-marigold);
   border-radius: var(--oq-round-sm);
   padding: 10px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--oq-space-3);
-  color: #eef2ea;
+  color: var(--wk-ink);
   font-size: .875rem;
 }
 
 .oq-editor__placement-hint .oq-button--ghost {
-  color: var(--mh-marigold);
+  color: var(--wk-marigold);
 }
 
 .oq-editor__placement-hint .oq-button--ghost:not(:disabled):hover {
@@ -122,7 +120,7 @@
 }
 
 .oq-editor__placement-hint .oq-error-text {
-  color: #f6b3a8;
+  color: var(--oq-error-ink);
 }
 
 .oq-editor__preview-note {
@@ -131,11 +129,12 @@
   left: 10px;
   right: 10px;
   margin: 0;
-  background: #16241fcc;
+  background: #120726d9;
+  border: 1px solid var(--wk-rim);
   border-radius: var(--oq-round-sm);
   padding: 7px 12px;
   font-size: .8125rem;
-  color: #f4d9a4;
+  color: var(--wk-halo);
 }
 
 .oq-editor__panels {
@@ -157,7 +156,8 @@
 
 .oq-editor-panel h2 {
   margin: 0;
-  font-size: 1.125rem;
+  font-size: 1.1875rem;
+  font-weight: 400;
 }
 
 /* A quiet sub-heading, sentence case. The old uppercase tracked labels made
@@ -165,7 +165,7 @@
 .oq-editor-panel h3 {
   margin: var(--oq-space-2) 0 0;
   font-size: .9375rem;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--oq-accent-ink);
 }
 
@@ -177,7 +177,7 @@
   padding: 4px 11px;
   border-radius: 999px;
   font-size: .8125rem;
-  font-weight: 700;
+  font-weight: 500;
   margin: 0;
 }
 
@@ -198,7 +198,7 @@
 
 .oq-editor__status-badge--unvalidated {
   background: var(--oq-inset);
-  color: var(--oq-muted);
+  color: var(--oq-ink);
 }
 
 .oq-editor__meta {
@@ -223,7 +223,7 @@
   display: flex;
   align-items: center;
   color: var(--oq-accent-ink);
-  font-weight: 650;
+  font-weight: 500;
 }
 
 .oq-editor__technical-content {
@@ -251,7 +251,7 @@
 
 .oq-editor__field input,
 .oq-editor__field select {
-  background: var(--oq-surface);
+  background: var(--oq-inset);
   border: 1px solid var(--oq-control-line);
   border-radius: var(--oq-round-sm);
   color: var(--oq-ink);
@@ -295,7 +295,7 @@
 }
 
 .oq-editor__checkpoint-item {
-  background: var(--oq-paper);
+  background: #ffffff06;
   border: 1px solid var(--oq-line);
   border-radius: var(--oq-round-sm);
   padding: var(--oq-space-3);
@@ -321,7 +321,7 @@
   color: var(--oq-success-ink);
   margin: 0;
   font-size: .875rem;
-  font-weight: 650;
+  font-weight: 500;
 }
 
 /* The toggled-on state of a mode button — placing a spawn, editing a
@@ -347,8 +347,8 @@
   gap: var(--oq-space-3);
   padding: var(--oq-space-3) var(--oq-space-4);
   padding-bottom: max(var(--oq-space-3), env(safe-area-inset-bottom));
-  border: 1px solid var(--oq-line);
-  border-radius: var(--oq-round-md);
+  border: 1px solid var(--wk-rim);
+  border-radius: var(--oq-round-pill);
   /* Opaque rather than translucent: the 3D stage can scroll underneath it,
      and a blurred pane over a moving scene is hard to read. */
   background: var(--oq-surface);
@@ -372,6 +372,8 @@
   .oq-editor__actionbar {
     padding: var(--oq-space-2) var(--oq-space-3);
     gap: var(--oq-space-2);
+    /* Two rows here, so a capsule would pinch; a card corner instead. */
+    border-radius: var(--oq-round-lg);
   }
 
   .oq-editor__actionbar-notes {
@@ -421,10 +423,10 @@
 .oq-world-ready__preview {
   height: clamp(360px, 55vh, 580px);
   min-height: 360px;
-  border: 1px solid var(--oq-line);
-  border-radius: var(--oq-round-lg);
+  border: 1px solid var(--wk-rim);
+  border-radius: var(--oq-round-xl);
   overflow: hidden;
-  background: var(--oq-inset);
+  background: #14101f;
 }
 
 @media (max-width: 960px) {

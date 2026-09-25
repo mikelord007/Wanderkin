@@ -110,7 +110,7 @@ export function FinishScreen({
       </section>
 
       <section className="oq-finish__card">
-        <p className="oq-finish__eyebrow">Adventure complete</p>
+        <p className="oq-finish__eyebrow wk-chip">Adventure complete</p>
         <h1 id="completion-title">{isCollect ? "You brought the colors back." : isRace ? "Race finished!" : "What a wonderful little adventure."}</h1>
         <p className="oq-finish__copy">
           {isCollect

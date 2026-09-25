@@ -3,6 +3,7 @@
      but short desktop window doesn't spend its height on empty margin. */
   --oq-finish-pad: clamp(16px, 4dvh, 40px);
   position: relative;
+  isolation: isolate;
   height: max-content;
   min-height: 100dvh;
   display: grid;
@@ -12,17 +13,27 @@
   overflow: visible;
   padding: var(--oq-finish-pad) clamp(20px, 4vw, 56px);
   color: var(--oq-ink);
-  /* Late afternoon through a window: plaster, warmed, settling into the same
-     green the rest of the app is built on. The old lilac middle stop was left
-     over from the violet palette and now fights the brand. */
-  background: linear-gradient(145deg, #fdf9ef 0%, #f6f2e4 48%, #e4efe4 100%);
+  font-family: var(--oq-font-body);
+  letter-spacing: .006em;
+  background: var(--wk-night);
 }
-.oq-finish__glow { position: absolute; width: 58vw; aspect-ratio: 1; left: -14vw; top: -20vw; border-radius: 50%; background: radial-gradient(circle, #e8a33d5c, transparent 66%); pointer-events: none; }
+/* The restored world gets the planetrise: it rises behind the island on the
+   left, so the island reads as standing on the lit rim of its own planet. */
+.oq-finish__glow {
+  position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(ellipse 22% 40% at 27% 100%, var(--wk-night) 0%, var(--wk-night) 82%, #12072600 100%),
+    radial-gradient(ellipse 70% 50% at 27% 104%, #ffffff 0%, #f3edff 16%, #cdb9ff 28%, #8b6cff 42%, #4a2bb8 58%, #24115e 74%, #12072600 90%),
+    radial-gradient(ellipse 50% 60% at 27% 55%, #2a1570 0%, #12072600 70%);
+}
 .oq-finish__world, .oq-finish__card { position: relative; z-index: 1; }
 .oq-finish__world { min-height: 420px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; }
-.oq-finish__world p { display: flex; align-items: center; gap: 8px; margin: 22px 0 0; color: var(--oq-accent-ink); font-weight: 700; }
-.oq-finish__world strong { font-family: var(--oq-font-display); font-size: clamp(1.35rem, 3vw, 2.1rem); }
-.oq-finish__island { position: relative; width: min(360px, 76vw); aspect-ratio: 1.35; border-radius: 50% 50% 42% 42%; background: radial-gradient(circle at 30% 25%, #ffe783 0 5%, transparent 6%), linear-gradient(155deg, #78d99a 0 45%, #4ba977 46% 58%, #8c684d 59% 100%); box-shadow: 0 34px 58px #49345f32, inset 0 8px 0 #ffffff54; transform: perspective(700px) rotateX(16deg) rotateZ(-3deg); }
+.oq-finish__world p { display: flex; align-items: center; gap: 8px; margin: 22px 0 0; color: var(--oq-accent-ink); font-weight: 500; }
+.oq-finish__world p svg { color: var(--wk-marigold); }
+.oq-finish__world strong { font-family: var(--oq-font-display); font-weight: 300; letter-spacing: -.03em; font-size: clamp(1.6rem, 3.2vw, 2.4rem); line-height: 1.1; }
+/* The island is an illustration of the finished world, so it keeps its own
+   colours; only its shadow picks up the night's violet. */
+.oq-finish__island { position: relative; width: min(360px, 76vw); aspect-ratio: 1.35; border-radius: 50% 50% 42% 42%; background: radial-gradient(circle at 30% 25%, #ffe783 0 5%, transparent 6%), linear-gradient(155deg, #78d99a 0 45%, #4ba977 46% 58%, #8c684d 59% 100%); box-shadow: 0 34px 70px #05010fcc, 0 0 80px -10px #8b6cff66, inset 0 8px 0 #ffffff54; transform: perspective(700px) rotateX(16deg) rotateZ(-3deg); }
 .oq-finish__portal { position: absolute; width: 76px; height: 112px; right: 16%; top: 10%; border: 12px solid #9b5de5; border-bottom-width: 18px; border-radius: 50% 50% 16px 16px; background: #d8b8ff80; box-shadow: 0 0 28px #9b5de5aa; }
 .oq-finish__fragment { position: absolute; width: 22px; height: 22px; rotate: 45deg; box-shadow: 0 0 18px currentColor; }
 .oq-finish__fragment--red { left: 18%; top: 33%; color: #ff4d6d; background: currentColor; }
@@ -30,26 +41,36 @@
 .oq-finish__fragment--blue { left: 48%; bottom: 18%; color: #4d96ff; background: currentColor; }
 /* Bounded to the viewport (accounting for .oq-finish's own padding, so the
    two together can't exceed 100dvh) and internally scrollable, so a tall
-   stack of optional media cards can't push the primary actions off-screen. */
-.oq-finish__card { width: min(560px, 100%); max-height: calc(100dvh - (2 * var(--oq-finish-pad))); overflow-y: auto; padding: clamp(18px, 3vw, 30px); border: 1px solid #ffffffc4; border-radius: var(--oq-round-xl); background: #fbf9f3dc; box-shadow: 0 28px 80px #1d3a2e26; backdrop-filter: blur(18px); }
-/* Sentence case, like every other label in the app now — a tracked-out
-   uppercase eyebrow was the one shouting thing left on this screen. */
-.oq-finish__eyebrow { margin: 0 0 8px; color: var(--oq-accent-ink); font-size: .8125rem; font-weight: 700; }
-/* Was clamp(2.6rem, 5.4vw, 4.4rem) — a card meant to fit one screen can't
-   spend ~140px of height on a two-line display headline. */
-.oq-finish__card h1 { margin: 0; max-width: 16ch; font-family: var(--oq-font-display); font-variation-settings: var(--oq-display-variation); font-weight: 600; letter-spacing: -.02em; font-size: clamp(1.6rem, 3vw, 2.25rem); line-height: 1.1; }
-.oq-finish__copy { margin: 10px 0 16px; max-width: 44ch; color: var(--oq-muted); font-size: .95rem; line-height: 1.55; }
-.oq-finish__results { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: -4px 0 16px; }
-.oq-finish__results div { padding: 10px 12px; border-radius: var(--oq-round-sm); background: var(--oq-wash); }
-.oq-finish__results dt { color: var(--oq-muted); font-size: .75rem; }
-.oq-finish__results dd { margin: 2px 0 0; font-size: 1.2rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+   stack of optional media cards can't push the primary actions off-screen.
+   Opaque dusk rather than blurred glass: nothing behind it needs to show. */
+.oq-finish__card { width: min(560px, 100%); max-height: calc(100dvh - (2 * var(--oq-finish-pad))); overflow-y: auto; padding: clamp(20px, 3vw, 32px); border: 1px solid var(--wk-rim); border-radius: var(--oq-round-xl); background: var(--wk-dusk); box-shadow: var(--wk-highlight), 0 30px 80px #05010fb3; scrollbar-color: var(--oq-control-line) transparent; }
+/* The eyebrow wears the shared chip (.wk-chip); this only sets its spacing. */
+.oq-finish__eyebrow { margin: 0 0 14px; }
+/* A card meant to fit one screen can't spend ~140px of height on a two-line
+   display headline. */
+.oq-finish__card h1 { margin: 0; max-width: 16ch; font-family: var(--oq-font-display); font-weight: 300; letter-spacing: -.035em; font-size: clamp(1.9rem, 3.4vw, 2.6rem); line-height: 1.04; }
+.oq-finish__copy { margin: 12px 0 18px; max-width: 44ch; color: var(--oq-muted); font-size: .98rem; line-height: 1.55; }
+.oq-finish__results { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: -4px 0 18px; }
+.oq-finish__results div { padding: 10px 14px; border-radius: var(--oq-round-md); background: var(--wk-veil); border: 1px solid var(--oq-line); }
+.oq-finish__results dt { color: var(--oq-muted); font-size: .78rem; }
+.oq-finish__results dd { margin: 2px 0 0; font-size: 1.5rem; font-weight: 300; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .oq-finish__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .oq-finish__actions .oq-kit-button:first-child { grid-column: 1 / -1; }
-.oq-finish__note { margin: 10px 0 0; color: var(--oq-muted); font-size: .76rem; line-height: 1.4; }
+.oq-finish__note { margin: 12px 0 0; color: var(--oq-muted); font-size: .8rem; line-height: 1.45; }
+.oq-finish__note a { color: var(--oq-accent-ink); overflow-wrap: anywhere; }
 /* Stacked layout: the hero and card are two rows, not side-by-side columns,
    so capping the card to "100dvh minus the page padding" (the desktop
    formula) would still let hero + card together run well past one screen.
    70dvh keeps the card's own scroll-to-reach-actions bounded regardless. */
-@media (max-width: 760px) { .oq-finish { grid-template-columns: 1fr; padding: 28px 18px 48px; } .oq-finish__world { min-height: 280px; } .oq-finish__card { margin: 0 auto; max-height: 70dvh; border-radius: 24px; } }
+@media (max-width: 760px) {
+  .oq-finish { grid-template-columns: 1fr; padding: 28px 18px 48px; }
+  .oq-finish__glow {
+    background:
+      radial-gradient(ellipse 34% 16% at 50% 38%, var(--wk-night) 0%, var(--wk-night) 80%, #12072600 100%),
+      radial-gradient(ellipse 110% 20% at 50% 40%, #f3edff 0%, #cdb9ff 20%, #8b6cff 38%, #4a2bb8 56%, #12072600 86%);
+  }
+  .oq-finish__world { min-height: 280px; }
+  .oq-finish__card { margin: 0 auto; max-height: 70dvh; border-radius: 24px; }
+}
 @media (max-width: 440px) { .oq-finish__actions { grid-template-columns: 1fr; } .oq-finish__actions .oq-kit-button:first-child { grid-column: auto; } }
 @media (prefers-reduced-motion: reduce) { .oq-finish__island { transform: none; } }
