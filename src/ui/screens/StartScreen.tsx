@@ -77,7 +77,7 @@ export function StartScreen({
             <div className="oq-welcome__intro">
               <p className="wk-chip">{BRAND_TAGLINE}</p>
               <TypingHeadline id="welcome-heading" />
-              <p className="oq-welcome__lede">Photograph something ordinary. {BRAND_NAME} rebuilds it in 3D and shrinks you down until the cushions are cliffs.</p>
+              <p className="oq-welcome__lede">Photograph something ordinary. {BRAND_NAME} rebuilds it in 3D and shrinks you down until it towers over you.</p>
               <div className="oq-kit-row oq-welcome__ctas">
                 <Button onClick={onCreateFromPhotos}>Make my world <Icon name="arrow" /></Button>
                 <Button variant="secondary" disabled={!sampleLevels?.[0]} onClick={() => { if (sampleLevels?.[0]) onPlaySample(sampleLevels[0]); }}><Icon name="play" />Play a sample</Button>

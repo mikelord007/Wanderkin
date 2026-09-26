@@ -22,4 +22,9 @@ describe("StartScreen hero", () => {
     expect(html).toContain('<span class="wk-typing__word">sofa</span>');
     expect(html).toContain('<span class="wk-typing__word">mountain range</span>');
   });
+
+  it("keeps the lede still and true for any object the headline names", () => {
+    expect(html).toContain('<p class="oq-welcome__lede">Photograph something ordinary. Wanderkin rebuilds it in 3D and shrinks you down until it towers over you.</p>');
+    expect(html).not.toContain("cushions");
+  });
 });
