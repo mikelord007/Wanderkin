@@ -1,9 +1,10 @@
 /*
  * Creation flow (v3, light product system). Product screens: tighter headings
  * than the landing, white frames on the page, one visual per step that carries
- * it (the capture stage with its doorway, the object on a lavender floor with
- * the explorer for scale, image-led look tiles, the preview beside the photo,
- * the doorway filling while the world is built). All values are tokens.
+ * it (the capture stage with a blank print waiting for the photo, the object
+ * on a lavender floor with the explorer for scale, image-led look tiles, the
+ * preview beside the photo, the approved look framed while the world is
+ * built). All values are tokens.
  */
 .oq-creation { align-self: flex-start; width: 100%; min-height: 100vh; background: var(--wk-page); }
 .oq-creation__container { width: min(100%, calc(1040px + 2 * var(--wk-page-x))); margin-inline: auto; padding: var(--oq-space-5) var(--wk-page-x) var(--wk-section-y); }
@@ -29,8 +30,7 @@
 /* --- Step 1: capture ---------------------------------------------------- */
 .oq-capture { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(260px,.8fr); gap: var(--wk-gap-group); align-items: start; }
 .oq-capture__card { display: grid; gap: var(--wk-gap-sm); }
-/* The drop zone is a pale stage with the doorway standing in it and a blank
-   print waiting for the photo. */
+/* The drop zone is a pale stage with a blank print waiting for the photo. */
 .oq-capture__drop {
   position: relative; isolation: isolate; overflow: hidden;
   min-height: 420px; display: grid; place-items: center; align-content: center; gap: var(--wk-gap-sm);
@@ -40,7 +40,6 @@
   transition: border-color var(--oq-duration) var(--oq-ease), background var(--oq-duration) var(--oq-ease);
 }
 .oq-capture__drop--active { border-color: var(--oq-action); background: radial-gradient(ellipse 64% 26% at 50% 94%, rgba(123, 92, 250, .28), transparent 72%), linear-gradient(#fbf9ff, #ebe1ff); }
-.oq-capture__arch { position: absolute; z-index: -1; left: 50%; bottom: 5%; height: 86%; width: auto; transform: translateX(-50%); opacity: .3; }
 /* The drop zone's heading answers the page heading, one step down. */
 .oq-capture__drop :is(h2, h3) { font-size: clamp(1.3rem, 1.15rem + .6vw, 1.6rem); font-weight: 400; }
 .oq-capture__drop p { color: var(--wk-text-2); max-inline-size: 40ch; }
@@ -136,12 +135,12 @@
 .oq-style-preview__actions { display: flex; flex-wrap: wrap; gap: 10px; }
 
 /* --- Step 4: the world is being built ----------------------------------
-   The approved look inside a doorway frame; the progress beside it. */
+   The approved look, framed; the progress beside it. */
 .oq-world-progress { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(320px,.9fr); gap: var(--wk-gap-group); align-items: start; }
 .oq-world-progress__preview { display: grid; gap: var(--wk-gap-sm); }
 .oq-world-progress__preview > img, .oq-world-progress__placeholder {
   width: 100%; aspect-ratio: 4 / 4.2; object-fit: cover;
-  border-radius: 999px 999px var(--wk-r-card) var(--wk-r-card);
+  border-radius: var(--wk-r-card);
   border: 1px solid #d6c9f8; background: var(--wk-tint); box-shadow: var(--wk-shadow-md), var(--wk-shadow-glow);
 }
 .oq-world-progress__placeholder { background: radial-gradient(ellipse 60% 30% at 50% 100%, rgba(123, 92, 250, .22), transparent 72%), linear-gradient(#ffffff, var(--wk-tint)); }

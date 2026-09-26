@@ -107,6 +107,10 @@
   content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background: linear-gradient(to top, rgba(36, 20, 61, .38), rgba(36, 20, 61, 0) 55%);
 }
+/* No picture yet: no shade to read against, and the blank print moves into
+   the open space beside the card. */
+.wk-resume:has(.wk-no-picture)::after { display: none; }
+.wk-resume .wk-no-picture { padding-left: min(460px, 40%); }
 .wk-resume__card {
   display: grid; gap: 6px; width: min(100%, 420px);
   padding: var(--wk-card-pad);
@@ -181,6 +185,7 @@
   .wk-resume { min-height: 0; flex-direction: column; align-items: stretch; padding: 0; background: var(--wk-surface); }
   .wk-resume__picture { position: relative; inset: auto; z-index: auto; aspect-ratio: 16 / 9; min-height: 0; overflow: hidden; }
   .wk-resume__picture img { position: absolute; inset: 0; }
+  .wk-resume .wk-no-picture { padding-left: 0; }
   .wk-resume::after { display: none; }
   .wk-resume__card { width: 100%; border-radius: 0; box-shadow: none; }
 }

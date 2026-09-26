@@ -686,6 +686,3 @@ a {
   .oq-button:not(:disabled):active { transform: none; }
   .oq-progressbar__fill { transition: none; }
 }
-
-/* v2: loading is the doorway with a line of text, not a box. */
-.oq-loading__arch { width: 56px; height: auto; margin-bottom: var(--oq-space-2); }

@@ -1,5 +1,3 @@
-import { PortalArch } from "./Scenery.js";
-
 interface LoadingScreenProps {
   stage: string;
   detail?: string;
@@ -13,7 +11,6 @@ export function LoadingScreen({ stage, detail, percent }: LoadingScreenProps) {
   const known = typeof percent === "number" && Number.isFinite(percent);
   return (
     <div className="oq-loading" role="status" aria-live="polite">
-      <PortalArch className="oq-loading__arch" />
       <div className="oq-loading__spinner" aria-hidden="true">
         <div className="oq-loading__spinner-dot" />
         <div className="oq-loading__spinner-dot" />

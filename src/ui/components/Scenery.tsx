@@ -9,23 +9,6 @@ import type { CSSProperties } from "react";
  */
 
 /**
- * The portal arch: the hero's lit rim, stood upright as a doorway. The glow is
- * three stacked strokes (wide and faint, medium, bright core) instead of a
- * blur filter.
- */
-export function PortalArch({ className = "", style }: { className?: string; style?: CSSProperties }) {
-  const d = "M14 158V62a36 36 0 0 1 72 0v96";
-  return (
-    <svg className={`wk-arch ${className}`} style={style} viewBox="0 0 100 160" aria-hidden="true" focusable="false" preserveAspectRatio="xMidYMax meet">
-      <path className="wk-arch__fill" d="M14 158V62a36 36 0 0 1 72 0v96Z" />
-      <path className="wk-arch__halo" d={d} />
-      <path className="wk-arch__glow" d={d} />
-      <path className="wk-arch__core" d={d} />
-    </svg>
-  );
-}
-
-/**
  * The tiny explorer, as in the logo and the game: teal beanie, marigold suit,
  * one arm up. `shadow` lays a long low-sun shadow across the floor, which is
  * what makes a small figure read as small in a big place.

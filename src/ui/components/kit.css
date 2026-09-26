@@ -122,7 +122,7 @@
   border: 1px solid var(--wk-rim); border-radius: var(--oq-round-xl);
   width: min(560px,calc(100% - 32px)); max-height: 88dvh; padding: 28px; overflow-y: auto;
   box-shadow: var(--oq-elevation-lift);
-  /* A soft purple line along the top edge: the portal rim, in miniature. */
+  /* A soft purple line along the top edge, the one accent on the dialog. */
   background-image: linear-gradient(90deg, transparent 12%, var(--wk-purple) 50%, transparent 88%);
   background-size: 100% 2px; background-repeat: no-repeat; background-position: top;
 }
@@ -172,13 +172,6 @@
 @media (max-width: 699px) { .oq-kit-dialog { padding: 20px; } .oq-kit-dialog--sheet { margin: auto auto 0; width: 100%; height: auto; max-height: 88dvh; border-radius: 28px 28px 0 0; } .oq-kit-play-frame__top .oq-kit-button { padding: 10px 14px; } }
 
 /* --- Scenery (Scenery.tsx). Light by default; dark moments re-tint. ---- */
-.wk-arch { display: block; overflow: visible; }
-.wk-arch path { fill: none; stroke-linecap: round; }
-.wk-arch .wk-arch__fill { fill: var(--wk-arch-fill, #7b5cfa); fill-opacity: var(--wk-arch-fill-opacity, .06); }
-.wk-arch .wk-arch__halo { stroke: var(--wk-arch-halo, #7b5cfa); stroke-opacity: .12; stroke-width: 16; }
-.wk-arch .wk-arch__glow { stroke: var(--wk-arch-glow, #a58cff); stroke-opacity: .5; stroke-width: 6; }
-.wk-arch .wk-arch__core { stroke: var(--wk-arch-core, #7b5cfa); stroke-width: 2.2; }
-.oq-shade .wk-arch, .wk-dark .wk-arch { --wk-arch-fill: #8b6cff; --wk-arch-fill-opacity: .09; --wk-arch-halo: #8b6cff; --wk-arch-glow: #b79cff; --wk-arch-core: #f4eeff; }
 .wk-explorer .wk-explorer__shadow { fill: var(--wk-explorer-shadow, #24143d); fill-opacity: .22; }
 .oq-shade .wk-explorer, .wk-dark .wk-explorer { --wk-explorer-shadow: #05010f; }
 .wk-giant-button { display: block; }

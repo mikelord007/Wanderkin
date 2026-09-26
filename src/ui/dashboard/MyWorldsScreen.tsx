@@ -5,7 +5,6 @@ import { listDrafts } from "../../editor/draftStorage.js";
 import { missingAssetUrls, savedWorldItems, savedWorldOrigin, type WorldListItem } from "../worlds.js";
 import { describeApiError, downloadLevelBundle, importAsset, importLevelBundle, listLevels } from "../api.js";
 import { WorldPostcardPanel } from "../../capture/MediaCards.js";
-import { PortalArch, TinyExplorer } from "../components/Scenery.js";
 import { BRAND_NAME } from "../../brand.js";
 import "../theme/welcome.css";
 import "./dashboard.css";
@@ -14,7 +13,7 @@ import "./dashboard.css";
  * The best picture a saved world already has, without generating anything:
  * its animated postcard's poster frame, else the photo it was made from, else
  * the source photo of the bundled sample it copies. Null means the tile draws
- * its own lavender stage instead.
+ * its "No picture yet" print instead.
  */
 function worldImage(manifest: SceneManifest): string | null {
   const poster = manifest.media?.video.find((asset) => asset.kind === "animated-postcard")?.posterUrl;
@@ -31,6 +30,15 @@ function modeLabel(manifest: SceneManifest): string {
   return kind === "collect" ? "Lost Colors" : kind === "race" ? "Race" : kind === "explore" ? "Explore" : "Checkpoint course";
 }
 
+/** A world with no picture yet: a blank print on the lavender stage, saying so
+ * plainly, so the tile never pretends to show something it doesn't have. */
+function NoPicture() {
+  return <div className="wk-no-picture" aria-hidden="true">
+    <span className="wk-print"><Icon name="photo" /></span>
+    <span className="wk-no-picture__label">No picture yet</span>
+  </div>;
+}
+
 type TileStatus = "ready" | "draft" | "pending" | "failed";
 
 /** One world in the library: a 16:9 picture with a status badge on it, then
@@ -41,7 +49,7 @@ function WorldTile({ status, badge, title, image = null, meta, notice, actions, 
 }) {
   return <article className="wk-tile" data-status={status}>
     <div className="wk-tile__image">
-      {image ? <img src={image} alt="" loading="lazy" /> : <div className="wk-tile__scene" aria-hidden="true"><PortalArch className="wk-tile__arch" /><TinyExplorer className="wk-tile__explorer" /></div>}
+      {image ? <img src={image} alt="" loading="lazy" /> : <NoPicture />}
       <p className="wk-tile__badge">{badge}</p>
     </div>
     <div className="wk-tile__info">
@@ -200,7 +208,7 @@ export function MyWorldsScreen({
       {latest ? (
         <section className="wk-resume" aria-labelledby="resume-heading">
           <div className="wk-resume__picture">
-            {latestImage ? <img src={latestImage} alt="" /> : <div className="wk-tile__scene" aria-hidden="true"><PortalArch className="wk-tile__arch" /><TinyExplorer className="wk-tile__explorer" /></div>}
+            {latestImage ? <img src={latestImage} alt="" /> : <NoPicture />}
           </div>
           <div className="wk-resume__card">
             <p className="wk-resume__kicker">Jump back in</p>
@@ -230,9 +238,9 @@ export function MyWorldsScreen({
           </div>
         ) : worldItems.length === 0 ? (
           <div className="wk-library-empty">
+            {/* The blank print the first photo will fill, as on the capture step. */}
             <div className="wk-library-empty__scene" aria-hidden="true">
-              <PortalArch className="wk-library-empty__arch" />
-              <TinyExplorer className="wk-library-empty__explorer" />
+              <span className="wk-print wk-print--large"><Icon name="photo" /></span>
             </div>
             <div className="wk-library-empty__copy">
               <h3>Your first world starts with a photo</h3>

@@ -5,7 +5,7 @@ import "../theme/welcome.css";
 import type { SceneManifest } from "@shared/index.js";
 import type { AuthMode } from "../../auth/types.js";
 import { SampleWorlds, useSampleLevels } from "../library/SampleWorlds.js";
-import { GiantButton, PortalArch, TinyExplorer } from "../components/Scenery.js";
+import { GiantButton, TinyExplorer } from "../components/Scenery.js";
 
 const SampleWorldPreview = lazy(() => import("../components/SampleWorldPreview.js"));
 
@@ -78,7 +78,8 @@ export function StartScreen({
       </div>
       <main>
         {/* Explanatory: the transformation, read at a glance. Two equal
-            frames, a quiet connector, and the portal behind the world. */}
+            frames and a quiet connector; the rebuilt corner stands on its
+            own floor shadow. */}
         <section className="wk-section wk-transform" aria-labelledby="transform-heading">
           <div className="oq-kit-container">
             <div className="wk-section__head wk-section__head--center">
@@ -97,7 +98,7 @@ export function StartScreen({
               </div>
               <figure className="wk-transform__item">
                 <div className="wk-frame wk-transform__media wk-transform__stage">
-                  <PortalArch className="wk-transform__arch" />
+                  <span className="wk-transform__floor" aria-hidden="true" />
                   <div className="oq-welcome__render">
                     <Suspense fallback={<p className="oq-welcome__preview-status" role="status">Opening the little world…</p>}><SampleWorldPreview /></Suspense>
                   </div>
@@ -161,9 +162,11 @@ export function StartScreen({
         <section className="wk-section wk-section--tint wk-library" id="my-worlds" aria-labelledby="worlds-heading">
           <div className="oq-kit-container">
             <div className="wk-library-invite">
+              {/* What "your worlds" are: two saved worlds, real in-game
+                  renders in the Autumn Forest and Snowy Alpine looks. */}
               <div className="wk-library-invite__scene" aria-hidden="true">
-                <PortalArch className="wk-library-empty__arch" />
-                <TinyExplorer className="wk-library-empty__explorer" />
+                <img className="wk-library-invite__print wk-library-invite__print--back" src="/landing/library-autumn.webp" alt="" loading="lazy" />
+                <img className="wk-library-invite__print wk-library-invite__print--front" src="/landing/library-alpine.webp" alt="" loading="lazy" />
               </div>
               <div className="wk-library-invite__copy">
                 <h2 id="worlds-heading">{signedIn ? "Your worlds are waiting" : "Keep every world you make"}</h2>
@@ -180,7 +183,8 @@ export function StartScreen({
             </div>
           </div>
         </section>
-        {/* The close: back to the ordinary, with a lit doorway in it. */}
+        {/* The close: back to the ordinary room, with the tiny explorer
+            standing in a pool of light on its floor. */}
         <section className="wk-section wk-finale" aria-labelledby="finale-heading">
           <div className="oq-kit-container wk-finale__inner">
             <div className="wk-finale__copy">
@@ -194,7 +198,6 @@ export function StartScreen({
             <div className="wk-finale__frame" aria-hidden="true">
               <div className="wk-finale__scene">
                 <img src="/samples/photo-1.jpg" alt="" loading="lazy" />
-                <PortalArch className="wk-finale__arch" />
                 <TinyExplorer className="wk-finale__explorer" />
               </div>
             </div>

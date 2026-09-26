@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import type { PublishedLevelVersion, SceneManifest, VideoAssetReference } from "@shared/index.js";
 import { Button } from "../components/Button.js";
 import { Icon } from "../components/Icon.js";
-import { PortalArch } from "../components/Scenery.js";
 import type { GameCompletionResult } from "../../game/types.js";
 import { sharePath } from "../shareRouting.js";
 import { CompletionMediaCards } from "../../capture/MediaCards.js";
@@ -112,7 +111,6 @@ export function FinishScreen({
       <section className="oq-finish__world" aria-label={`${manifest.name}, fully restored`}>
         {postcardUrl ? (
           <figure className="oq-finish__postcard">
-            <PortalArch className="oq-finish__arch" />
             <img src={postcardUrl} alt={`${manifest.name}, the moment you finished`} />
           </figure>
         ) : (

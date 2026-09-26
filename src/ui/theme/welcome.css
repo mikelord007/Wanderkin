@@ -14,7 +14,7 @@
 .oq-welcome { min-height: 100vh; width: 100%; align-self: flex-start; background: var(--wk-page); }
 
 /* === Hero ================================================================
-   Kept: huge light type, the portal/planet language, a clear CTA pair. The
+   Kept: huge light type, the planet language, a clear CTA pair. The
    planetrise is translated to light: a pale world rising at the foot of the
    screen, with purple light strongest just beside its limb. Gradients only. */
 .oq-welcome__band {
@@ -82,10 +82,11 @@
 .wk-transform__media { aspect-ratio: 4 / 3; }
 .wk-transform__item figcaption { font-size: 1.0625rem; font-weight: 500; color: var(--wk-text); }
 .wk-transform__item figcaption span { display: block; font-size: var(--wk-type-small); font-weight: 400; color: var(--wk-text-2); }
-/* The generated world stands on a pale stage with the portal behind it. */
-.wk-transform__stage { background: radial-gradient(ellipse 70% 30% at 50% 94%, var(--wk-glow), transparent 72%), linear-gradient(#fbf9ff, var(--wk-tint)); }
-.wk-transform__arch { position: absolute; left: 50%; bottom: 5%; height: 93%; width: auto; transform: translateX(-50%); }
-.wk-transform__stage .oq-welcome__render { position: absolute; inset: 16% 0 0 0; }
+/* The generated world stands on a pale stage, grounded by a soft contact
+   shadow on the floor beneath it. */
+.wk-transform__stage { background: linear-gradient(#fbf9ff, var(--wk-tint)); }
+.wk-transform__floor { position: absolute; left: 24%; right: 22%; top: 61%; height: 15%; border-radius: 50%; background: radial-gradient(closest-side, rgba(36, 20, 61, .2), rgba(36, 20, 61, .07) 60%, transparent); }
+.wk-transform__stage .oq-welcome__render { position: absolute; inset: 4% 0 0 0; }
 .oq-welcome__model { height: 100%; width: 100%; }
 .oq-welcome__photo { object-fit: cover; object-position: 63% center; }
 .oq-welcome__preview-status { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; padding: 16px; font-size: var(--wk-type-small); color: var(--wk-text-2); }
@@ -183,10 +184,23 @@
 }
 .wk-tile__image { position: relative; overflow: hidden; aspect-ratio: 16 / 9; background: var(--wk-tint); }
 .wk-tile__image img { width: 100%; height: 100%; object-fit: cover; transition: transform 600ms var(--oq-ease); }
-/* A world without a picture yet: a small lavender stage with the doorway. */
-.wk-tile__scene { position: absolute; inset: 0; background: radial-gradient(ellipse 60% 30% at 50% 96%, var(--wk-glow), transparent 72%), linear-gradient(#fbf9ff, var(--wk-tint)); }
-.wk-tile__arch { position: absolute; left: 50%; bottom: 10%; height: 72%; width: auto; transform: translateX(-50%); }
-.wk-tile__explorer { position: absolute; width: 46px; height: auto; left: calc(50% - 12px); bottom: calc(10% - 3px); }
+/* A world without a picture yet: a blank print on the lavender stage, and a
+   plain line saying so. */
+.wk-no-picture {
+  position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px;
+  background: linear-gradient(#fbf9ff, var(--wk-tint));
+}
+.wk-no-picture__label { font-size: var(--wk-type-small); color: var(--wk-text-2); }
+/* The blank print: a white photo frame, slightly tilted, with a photo glyph.
+   The same object the capture step shows while it waits for a photo. */
+.wk-print {
+  display: grid; place-items: center; width: 84px; height: 64px; border-radius: 8px;
+  color: var(--wk-purple-ink); background: var(--wk-surface); border: 1px solid var(--wk-border);
+  box-shadow: var(--wk-shadow-md); transform: rotate(-4deg);
+}
+.wk-print svg { width: 26px; height: 26px; }
+.wk-print--large { width: 150px; height: 114px; border-radius: 10px; }
+.wk-print--large svg { width: 40px; height: 40px; }
 /* Status is a badge on the picture plus a quiet border colour. */
 .wk-tile__badge {
   position: absolute; left: 12px; top: 12px; display: inline-flex; align-items: center; gap: 7px;
@@ -220,25 +234,31 @@
 .wk-tile .oq-saved-postcard .oq-media-card__label { margin: 0; color: var(--wk-text-3) !important; }
 .wk-tile .oq-saved-postcard .oq-kit-button { width: auto; min-height: 36px; padding: 6px 10px; font-size: var(--wk-type-small); }
 .wk-library__notice { padding: 14px 18px; border-radius: var(--wk-r-inner); border: 1px solid #f2c3bf; background: var(--oq-error-wash); }
-/* The empty library: one white card, a lavender stage with the doorway. */
+/* The empty library: one white card, a lavender stage with the blank print
+   the first photo will fill. */
 .wk-library-empty {
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: var(--wk-gap-group);
   padding: var(--wk-card-pad); background: var(--wk-surface); border: 1px solid var(--wk-border); border-radius: var(--wk-r-stage); box-shadow: var(--wk-shadow-sm);
 }
-.wk-library-empty__scene { position: relative; aspect-ratio: 16 / 10; border-radius: var(--wk-r-card); overflow: hidden; background: radial-gradient(ellipse 60% 30% at 50% 94%, var(--wk-glow), transparent 72%), linear-gradient(#fbf9ff, var(--wk-tint)); }
-.wk-library-empty__arch { position: absolute; left: 50%; bottom: 10%; height: 70%; width: auto; transform: translateX(-50%); }
-.wk-library-empty__explorer { position: absolute; width: 56px; height: auto; left: calc(50% - 15px); bottom: calc(10% - 4px); }
+.wk-library-empty__scene { position: relative; display: grid; place-items: center; aspect-ratio: 16 / 10; border-radius: var(--wk-r-card); overflow: hidden; background: linear-gradient(#fbf9ff, var(--wk-tint)); }
 .wk-library-empty__copy { display: grid; gap: var(--wk-gap-sm); justify-items: start; padding-right: var(--wk-card-pad); }
 .wk-library-empty__copy h3 { font-size: var(--wk-type-h2-product); font-weight: 400; letter-spacing: -.025em; line-height: 1.1; }
 .wk-library-empty__copy .oq-kit-button { margin-top: var(--oq-space-2); }
 
 /* Signed out (or in), the landing invites you to the library rather than
-   showing it: one white card, the lavender stage with the doorway. */
+   showing it: one white card, and on its lavender stage two saved worlds as
+   prints (real renders), the newer one in front. */
 .wk-library-invite {
   display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); align-items: center; gap: var(--wk-gap-group);
   padding: var(--wk-card-pad); background: var(--wk-surface); border: 1px solid var(--wk-border); border-radius: var(--wk-r-stage); box-shadow: var(--wk-shadow-sm);
 }
-.wk-library-invite__scene { position: relative; aspect-ratio: 16 / 10; border-radius: var(--wk-r-card); overflow: hidden; background: radial-gradient(ellipse 60% 30% at 50% 94%, var(--wk-glow), transparent 72%), linear-gradient(#fbf9ff, var(--wk-tint)); }
+.wk-library-invite__scene { position: relative; aspect-ratio: 16 / 10; border-radius: var(--wk-r-card); overflow: hidden; background: linear-gradient(#fbf9ff, var(--wk-tint)); }
+.wk-library-invite__print {
+  position: absolute; width: 56%; aspect-ratio: 4 / 3; height: auto; object-fit: cover;
+  padding: 7px; border-radius: 12px; background: var(--wk-surface); border: 1px solid var(--wk-border);
+}
+.wk-library-invite__print--back { left: 8%; top: 9%; transform: rotate(-5deg); box-shadow: var(--wk-shadow-sm); }
+.wk-library-invite__print--front { right: 8%; bottom: 9%; transform: rotate(3deg); box-shadow: var(--wk-shadow-lg); }
 .wk-library-invite__copy { display: grid; gap: var(--wk-gap-sm); justify-items: start; padding-right: var(--wk-card-pad); }
 .wk-library-invite__copy p { color: var(--wk-text-2); max-inline-size: 44ch; }
 .wk-library-invite__copy .oq-kit-row { margin-top: var(--oq-space-2); }
@@ -249,15 +269,14 @@
 .wk-finale__copy h2 { font-size: clamp(2.4rem, 1.3rem + 3.8vw, 4.6rem); font-weight: 300; letter-spacing: -.045em; line-height: .98; max-inline-size: 12ch; }
 .wk-finale__copy p { color: var(--wk-text-2); font-size: var(--wk-type-lede); max-inline-size: 40ch; }
 /* A white frame holding the one dark picture on the page: a real room at
-   night with the portal glowing on its floor. */
+   night, and the tiny explorer standing in a pool of light on its floor. */
 .wk-finale__frame { justify-self: center; width: min(100%, 460px); padding: 12px; background: var(--wk-surface); border: 1px solid var(--wk-border); border-radius: var(--wk-r-stage); box-shadow: var(--wk-shadow-lg); }
 .wk-finale__scene { position: relative; aspect-ratio: 4 / 5; border-radius: var(--wk-r-card); overflow: hidden; background: var(--wk-cinema); }
 .wk-finale__scene img { width: 100%; height: 100%; object-fit: cover; filter: saturate(.6) brightness(.55); }
 .wk-finale__scene::before { content: ""; position: absolute; inset: 0; z-index: 1; background: #3b1f9a; mix-blend-mode: multiply; opacity: .45; }
-.wk-finale__scene::after { content: ""; position: absolute; z-index: 1; left: 14%; right: 14%; bottom: 4%; height: 22%; border-radius: 50%; background: radial-gradient(closest-side, #e9e0ffb3, #8b6cff55 45%, transparent); }
-.wk-finale__scene .wk-arch { --wk-arch-fill: #8b6cff; --wk-arch-fill-opacity: .1; --wk-arch-halo: #8b6cff; --wk-arch-glow: #b79cff; --wk-arch-core: #f4eeff; }
-.wk-finale__arch { position: absolute; z-index: 2; left: 50%; bottom: 13%; height: 48%; width: auto; transform: translateX(-50%); }
-.wk-finale__explorer { position: absolute; z-index: 3; width: 58px; height: auto; left: calc(50% - 16px); bottom: calc(13% - 4px); }
+/* The floor glow is centred on the explorer's feet (13% up the picture). */
+.wk-finale__scene::after { content: ""; position: absolute; z-index: 1; left: 24%; right: 24%; bottom: 6%; height: 14%; border-radius: 50%; background: radial-gradient(closest-side, #f4eeffcc, #b79cff66 40%, #8b6cff22 70%, transparent); }
+.wk-finale__explorer { position: absolute; z-index: 3; width: 76px; height: auto; left: calc(50% - 21px); bottom: calc(13% - 3px); }
 .wk-finale__scene .wk-explorer { --wk-explorer-shadow: #05010f; }
 
 /* === Import + footer. Quiet by design. ================================= */

@@ -1,7 +1,7 @@
 /*
  * Finish (v3, light). The celebration is the world itself: the postcard
  * captured the moment you finished, framed like a print in front of a soft
- * lavender horizon and the portal. The result and actions sit on one white
+ * lavender horizon. The result and actions sit on one white
  * card beside it. All values are tokens.
  */
 .oq-finish {
@@ -36,15 +36,14 @@
 .oq-finish__world p { display: flex; align-items: center; gap: 8px; margin: var(--oq-space-5) 0 0; color: var(--wk-purple-ink); font-weight: 600; }
 .oq-finish__world p svg { color: var(--wk-purple); }
 .oq-finish__world strong { font-family: var(--oq-font-display); font-weight: 300; letter-spacing: -.03em; font-size: clamp(1.6rem, 3.2vw, 2.4rem); line-height: 1.1; }
-/* The finished world, captured at the moment you finished, held up as a print
-   in front of the doorway. */
+/* The finished world, captured at the moment you finished, held up as a print. */
 .oq-finish__postcard { position: relative; margin: 0; width: min(560px, 92%); display: grid; place-items: center; }
 .oq-finish__postcard img { position: relative; z-index: 1; width: 100%; height: auto; padding: 10px; border-radius: var(--wk-r-card); background: var(--wk-surface); border: 1px solid var(--wk-border); transform: rotate(-2deg); box-shadow: var(--wk-shadow-lg); }
-.oq-finish__arch { position: absolute; z-index: 0; left: 50%; bottom: 16%; height: 140%; width: auto; transform: translateX(-50%); }
 /* The illustrated island, used when no postcard was captured. It keeps its
-   own colours; only its shadow picks up the plum. */
+   own colours; only its shadow picks up the plum. The portal is a ring, the
+   shape it has in the game. */
 .oq-finish__island { position: relative; width: min(360px, 76vw); aspect-ratio: 1.35; border-radius: 50% 50% 42% 42%; background: radial-gradient(circle at 30% 25%, #ffe783 0 5%, transparent 6%), linear-gradient(155deg, #78d99a 0 45%, #4ba977 46% 58%, #8c684d 59% 100%); box-shadow: 0 34px 60px rgba(36, 20, 61, .22), 0 0 70px -10px rgba(123, 92, 250, .45), inset 0 8px 0 #ffffff54; transform: perspective(700px) rotateX(16deg) rotateZ(-3deg); }
-.oq-finish__portal { position: absolute; width: 76px; height: 112px; right: 16%; top: 10%; border: 12px solid #7b5cfa; border-bottom-width: 18px; border-radius: 50% 50% 16px 16px; background: #d8ccfe99; box-shadow: 0 0 28px #7b5cfa88; }
+.oq-finish__portal { position: absolute; width: 88px; height: 88px; right: 15%; top: 12%; border: 11px solid #7b5cfa; border-radius: 50%; background: #d8ccfe66; box-shadow: 0 0 28px #7b5cfa88, inset 0 0 18px #7b5cfa55; }
 .oq-finish__fragment { position: absolute; width: 22px; height: 22px; rotate: 45deg; box-shadow: 0 0 18px currentColor; }
 .oq-finish__fragment--red { left: 18%; top: 33%; color: #ff4d6d; background: currentColor; }
 .oq-finish__fragment--yellow { left: 46%; top: 15%; color: #ffd93d; background: currentColor; }
@@ -77,7 +76,6 @@
   .oq-finish__world { min-height: 280px; }
   .oq-finish__card { margin: 0 auto; max-height: 70dvh; }
   .oq-finish__postcard { width: 100%; }
-  .oq-finish__arch { height: 120%; }
 }
 @media (max-width: 440px) { .oq-finish__actions { grid-template-columns: 1fr; } .oq-finish__actions .oq-kit-button:first-child { grid-column: auto; } }
 @media (prefers-reduced-motion: reduce) { .oq-finish__island { transform: none; } }
