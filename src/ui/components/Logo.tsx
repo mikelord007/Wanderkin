@@ -89,6 +89,18 @@ const STANCE = {
   monoSmall: "translate(24 15.6) scale(.98)",
 } as const;
 
+/**
+ * How the drawing sits inside the purple tile: scaled about the centre line and
+ * lifted, so the planet clears the tile's bottom edge by about as much as its
+ * glow clears the sides (about 11 units on the full cut) instead of resting on
+ * it. The small cut shrinks less, so it still reads at 16px. Mono has no tile
+ * and keeps the drawing at full size.
+ */
+const TILE_FIT = {
+  full: "translate(5.28 -.28) scale(.78)",
+  small: "translate(4.32 .47) scale(.82)",
+} as const;
+
 /** The mono rim: an arc over the top of the planet, clear of its edge. */
 const MONO_RIM = {
   full: { r: 16.2, width: 2.2 },
@@ -122,27 +134,29 @@ function FullMark() {
   return (
     <>
       <rect x="0" y="0" width="48" height="48" rx="12" fill={MARK_COLORS.night} />
-      <circle cx={p.cx} cy={p.haze.cy} r={p.haze.r} fill={MARK_COLORS.violet} fillOpacity=".28" />
-      <circle cx={p.cx} cy={p.band.cy} r={p.band.r} fill={MARK_COLORS.violet} />
-      <circle cx={p.cx} cy={p.rim.cy} r={p.rim.r} fill={MARK_COLORS.rim} />
-      <circle cx={p.cx} cy={p.cy} r={p.r} fill={MARK_COLORS.planet} />
-      <path
-        d={`M${tl[0]} ${tl[1]} ${br[0]} ${br[1]}M${tr[0]} ${tr[1]} ${bl[0]} ${bl[1]}`}
-        stroke={MARK_COLORS.thread}
-        strokeWidth="1.3"
-        strokeLinecap="round"
-      />
-      {holes(p).map(([x, y]) => (
-        <circle key={`${x},${y}`} cx={x} cy={y} r={p.holeR} fill={MARK_COLORS.hole} />
-      ))}
-      <g transform={STANCE.full}>
-        <path d={LEGS} fill={MARK_COLORS.marigold} />
-        <rect {...TORSO} fill={MARK_COLORS.marigold} />
-        <path d={ARM} stroke={MARK_COLORS.marigold} strokeWidth="1.6" strokeLinecap="round" />
-        <circle {...HEAD} fill={MARK_COLORS.face} />
-        <path d={BEANIE} fill={MARK_COLORS.beanie} />
-        <rect {...BEANIE_BAND} fill={MARK_COLORS.beanieBand} />
-        <circle {...POMPOM} fill={MARK_COLORS.beanie} />
+      <g transform={TILE_FIT.full}>
+        <circle cx={p.cx} cy={p.haze.cy} r={p.haze.r} fill={MARK_COLORS.violet} fillOpacity=".28" />
+        <circle cx={p.cx} cy={p.band.cy} r={p.band.r} fill={MARK_COLORS.violet} />
+        <circle cx={p.cx} cy={p.rim.cy} r={p.rim.r} fill={MARK_COLORS.rim} />
+        <circle cx={p.cx} cy={p.cy} r={p.r} fill={MARK_COLORS.planet} />
+        <path
+          d={`M${tl[0]} ${tl[1]} ${br[0]} ${br[1]}M${tr[0]} ${tr[1]} ${bl[0]} ${bl[1]}`}
+          stroke={MARK_COLORS.thread}
+          strokeWidth="1.3"
+          strokeLinecap="round"
+        />
+        {holes(p).map(([x, y]) => (
+          <circle key={`${x},${y}`} cx={x} cy={y} r={p.holeR} fill={MARK_COLORS.hole} />
+        ))}
+        <g transform={STANCE.full}>
+          <path d={LEGS} fill={MARK_COLORS.marigold} />
+          <rect {...TORSO} fill={MARK_COLORS.marigold} />
+          <path d={ARM} stroke={MARK_COLORS.marigold} strokeWidth="1.6" strokeLinecap="round" />
+          <circle {...HEAD} fill={MARK_COLORS.face} />
+          <path d={BEANIE} fill={MARK_COLORS.beanie} />
+          <rect {...BEANIE_BAND} fill={MARK_COLORS.beanieBand} />
+          <circle {...POMPOM} fill={MARK_COLORS.beanie} />
+        </g>
       </g>
     </>
   );
@@ -153,16 +167,18 @@ function SmallMark() {
   return (
     <>
       <rect x="0" y="0" width="48" height="48" rx="11" fill={MARK_COLORS.night} />
-      <circle cx={p.cx} cy={p.band.cy} r={p.band.r} fill={MARK_COLORS.violet} />
-      <circle cx={p.cx} cy={p.rim.cy} r={p.rim.r} fill={MARK_COLORS.rim} />
-      <circle cx={p.cx} cy={p.cy} r={p.r} fill={MARK_COLORS.planet} />
-      {holes(p).map(([x, y]) => (
-        <circle key={`${x},${y}`} cx={x} cy={y} r={p.holeR} fill={MARK_COLORS.hole} />
-      ))}
-      <g transform={STANCE.small}>
-        <rect {...SMALL_BODY} fill={MARK_COLORS.marigold} />
-        <circle {...HEAD} fill={MARK_COLORS.face} />
-        <path d={BEANIE} fill={MARK_COLORS.beanie} />
+      <g transform={TILE_FIT.small}>
+        <circle cx={p.cx} cy={p.band.cy} r={p.band.r} fill={MARK_COLORS.violet} />
+        <circle cx={p.cx} cy={p.rim.cy} r={p.rim.r} fill={MARK_COLORS.rim} />
+        <circle cx={p.cx} cy={p.cy} r={p.r} fill={MARK_COLORS.planet} />
+        {holes(p).map(([x, y]) => (
+          <circle key={`${x},${y}`} cx={x} cy={y} r={p.holeR} fill={MARK_COLORS.hole} />
+        ))}
+        <g transform={STANCE.small}>
+          <rect {...SMALL_BODY} fill={MARK_COLORS.marigold} />
+          <circle {...HEAD} fill={MARK_COLORS.face} />
+          <path d={BEANIE} fill={MARK_COLORS.beanie} />
+        </g>
       </g>
     </>
   );
