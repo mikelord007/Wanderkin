@@ -20,3 +20,5 @@ nimbalyst-local/env-upgrade/
 nimbalyst-local/screenshots/
 nimbalyst-local/design/shots/
 nimbalyst-local/tmp-*/
+.vercel
+.env*

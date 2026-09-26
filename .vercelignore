@@ -1,0 +1,12 @@
+.nimbalyst
+nimbalyst-local
+storage
+dist
+dist-server
+test-results
+playwright-report
+tests
+docs
+deploy
+Dockerfile
+*.log
