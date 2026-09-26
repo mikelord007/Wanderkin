@@ -1,9 +1,10 @@
 /**
  * Geometry-safe biome decoration: where props and surface patches may go.
  *
- * Decoration never changes gameplay. Props are non-colliding and never enter
- * `manifest.entities`; this module only proposes placements the renderer may
- * draw. What it guarantees is that a drawn prop:
+ * Decoration never changes the mission. Props never enter `manifest.entities`;
+ * this module only proposes placements the renderer may draw. Drawn props
+ * are solid for the character (primitive colliders inside each footprint,
+ * see `PROP_SOLID`). What it guarantees is that a drawn prop:
  *
  *  - stands on an upward-facing, supported surface. Rays cast down across its
  *    footprint must all land on that surface, so it never floats over an edge
@@ -13,7 +14,9 @@
  *  - stays out of every gameplay exclusion: spawn, checkpoints, objectives and
  *    exit, the verified route between them, including jump takeoffs, landings
  *    and mantle climbs, and generated structures;
- *  - is sized from the runtime character's height, never from assumed metres.
+ *  - is sized from the runtime character's height, never from assumed metres;
+ *  - being solid, keeps a capsule's width clear of every node of the verified
+ *    route, so it can never block a path the mission needs.
  *
  * When the route cannot be proven the layout goes sparse instead of guessing.
  */
@@ -53,6 +56,33 @@ import type {
 export const PROP_FOOTPRINT_RATIO: Readonly<Record<BiomePropKind, number>> = Object.fromEntries(
   (Object.keys(PROP_UNIT_RADIUS) as BiomePropKind[]).map((kind) => [kind, PROP_UNIT_RADIUS[kind] + 0.02]),
 ) as Record<BiomePropKind, number>;
+
+/**
+ * Solid-prop contract. A solid kind blocks the character: the renderer
+ * derives cheap primitive colliders (trunk capsules, rock boxes, bush
+ * cylinders) from the members it draws (`assets/colliders.ts`), and every one
+ * of them stays inside this placement's footprint cylinder (`radius` ×
+ * `scale`). The footprint is therefore also the solid envelope: every
+ * clearance proved for it (spawn, checkpoints, objectives, route corridors,
+ * structures) holds for the colliders. Grass, pebbles and other micro
+ * dressing inside a cluster are never solid, whatever the kind.
+ */
+export const PROP_SOLID: Readonly<Record<BiomePropKind, boolean>> = {
+  palm: true,
+  shrub: true,
+  rock: true,
+  wood: true,
+  cactus: true,
+  "dry-plant": true,
+  windsock: true,
+};
+
+/**
+ * Extra horizontal gap, in character radii, a solid footprint keeps from
+ * every path node on top of the footprint itself: a capsule standing on the
+ * node plus a hair of controller skin.
+ */
+export const SOLID_NODE_CLEARANCE_RATIO = 1.25;
 
 /** Which part of the biome's `scaleRange` (character heights) a kind uses. */
 const KIND_SCALE_SHARE: Readonly<Record<BiomePropKind, readonly [number, number]>> = {
@@ -100,6 +130,9 @@ export interface ExclusionAnalysis {
   certain: boolean;
   /** Surface points of the mission's waypoints (spawn first). */
   waypoints: Vec3[];
+  /** Every surface point the verified route stands on: waypoints, and each
+   * walk, jump and mantle transition's ends. Solid props keep clear of them. */
+  pathNodes: Vec3[];
   notes: string[];
 }
 
@@ -125,13 +158,18 @@ export function prepareBiomeLayout(input: BiomePreparationInput): BiomeLayout {
     .filter((entity) => entity.kind !== "floor")
     .map((entity) => computeBounds(helperEntityTriangles(entity)));
 
-  const props = placeProps(analysis, exclusion, definition, {
+  const placed = placeProps(analysis, exclusion, definition, {
     seed,
     bodyHeight,
     budget: propBudget,
     helperBoxes,
     allowTall: exclusion.certain,
   });
+  // Solid props: a last, independent check against the route's own nodes.
+  const props = keepPathNodesClear(placed, exclusion.pathNodes, input.movement.characterRadius * SOLID_NODE_CLEARANCE_RATIO, bodyHeight);
+  if (props.length < placed.length) {
+    diagnostics.push(`${placed.length - props.length} solid props dropped: too close to a route node.`);
+  }
   const patches = placeSurfacePatches(analysis, definition, seed, patchBudget);
   const water = definition.ambient.water ? waterRing(manifest, analysis, geometry, diagnostics) : null;
 
@@ -262,6 +300,7 @@ export function computeGameplayExclusions(manifest: SceneManifest, analysis: Sce
   const { respawn, objectives } = missionWaypoints(manifest, analysis);
   const exclusions: BiomeExclusion[] = [];
   const notes: string[] = [];
+  const pathNodes: Vec3[] = [...respawn, ...objectives].map((waypoint) => waypoint.surface);
   let certain = true;
 
   const point = (waypoint: Waypoint) => {
@@ -293,6 +332,7 @@ export function computeGameplayExclusions(manifest: SceneManifest, analysis: Sce
         return;
       }
       exclusions.push(...transitionExclusions(segment.transitions));
+      for (const transition of segment.transitions) pathNodes.push(transition.from, transition.to);
     });
     if (!report.allReachable) {
       notes.push("Part of the current route could not be proven reachable; decoration keeps a wide berth and stays sparse.");
@@ -308,6 +348,7 @@ export function computeGameplayExclusions(manifest: SceneManifest, analysis: Sce
     exclusions,
     certain,
     waypoints: objectives.map((waypoint) => waypoint.surface),
+    pathNodes,
     notes,
   };
 }
@@ -380,6 +421,30 @@ function structureExclusion(helper: HelperEntity): BiomeExclusion {
     radius,
     reason: "route",
   };
+}
+
+/**
+ * Drops any solid prop whose footprint comes within `clearance` of a path
+ * node a capsule would stand on (horizontally, where the prop's height and
+ * the standing capsule overlap). `testAnchor` already keeps footprints out of
+ * the route corridors, which are far wider than a capsule, so this removes
+ * nothing on a sound layout; it is the placement layer's own guarantee that a
+ * solid prop can never sit on the route, whatever the corridors become.
+ */
+export function keepPathNodesClear(
+  props: readonly BiomePropPlacement[],
+  nodes: readonly Vec3[],
+  clearance: number,
+  bodyHeight: number,
+): BiomePropPlacement[] {
+  return props.filter((prop) => {
+    if (!PROP_SOLID[prop.kind]) return true;
+    const [x, y, z] = prop.position;
+    return nodes.every((node) => {
+      const overlaps = node[1] < y + prop.scale && node[1] + bodyHeight > y;
+      return !overlaps || Math.hypot(node[0] - x, node[2] - z) >= prop.radius + clearance;
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------

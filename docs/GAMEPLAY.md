@@ -112,6 +112,35 @@ have to be jumped, which the 0.6 m jump height covers comfortably. Closing
 it would mean lowering `minLedgeHeight` in `shared/movement.ts`, which is
 not owned here.
 
+### Solid biome props
+
+In a themed look (Tropical, Desert, Alpine, Autumn, Ember) the trees, cacti,
+rocks, stumps, bushes and the windsock pole are solid. Each drawn member
+gets one cheap primitive collider measured from its own mesh: trunks, cacti
+and poles are capsules, rocks and logs are boxes, and bushes are cylinders.
+Grass, pebbles, flowers and fallen fronds stay walk-through. The colliders
+are attached to the running world when a look is shown, and removed when it
+changes (`GameSimulation.setPropColliders`). Level collision is never touched.
+
+| Prop height (runtime body 0.175 m) | Result |
+| --- | --- |
+| Below the autostep height (~2.5 cm) | Not solid; walked over |
+| Up to 2 body heights (0.35 m) | Solid; jump onto it (boulders, stumps, bushes), or mantle it when it is inside the envelope |
+| Taller | Solid wall; never a mantle target (trunks, cacti, poles) |
+
+Pushing within 25° of straight into a round prop (a trunk or cactus) stops
+the character against it. Without that, the controller's slide would glide
+round a thin trunk in a fifth of a second, which reads as walking through
+it. A glancing push still slides smoothly round. Box props (rocks, logs)
+behave exactly like level walls. A prop that would appear around the player
+on a look switch waits until they walk clear, so the capsule can never be
+trapped inside one.
+
+Placement keeps every solid footprint off the verified route. It stays
+clear of the spawn, checkpoints, objectives and every walk, jump and mantle
+node, so props can never block the mission. At most 400 prop colliders are
+installed. Real layouts use 60–160.
+
 ### Jump
 
 `jumpHeight` (0.6 m) is converted to an impulse velocity of
@@ -230,7 +259,9 @@ camera position and shortens the boom to the first hit, clamped to a
 minimum of 1.6 × the character radius. It pulls in **instantly** when
 something gets in the way — a frame spent inside a sofa is very obvious —
 and eases back out afterwards, so the view does not snap every time the
-player brushes a table leg.
+player brushes a table leg. Biome prop colliders are ignored by this sweep
+(a trunk between the camera and the player fades out instead), so the boom
+never pumps in and out past a grove.
 
 The camera near plane is 2 cm, because at toy scale the boom can
 legitimately be under 30 cm long.
@@ -301,6 +332,9 @@ and mantling flags, whether a mantle is currently offered and the rejection
 reason when it is not, checkpoint progress and the next checkpoint's
 position, camera yaw/pitch/distance and whether it is occluded, fixed steps
 run, scene bounds, collision triangle count, and any level-data warnings.
+In a themed look, `biome.propColliders` / `biome.propCollidersDeferred`
+count the solid props live in physics and those still waiting for the
+player to move clear.
 
 This surface is **strictly observational**. There is deliberately no way to
 move the player, skip to a checkpoint, or mark the course complete from it,
@@ -326,6 +360,14 @@ Covered by the automated game tests:
   checkpoint; reset for replay.
 - Collision matching rendered geometry, transform baking, helper collider
   override warnings.
+- Solid biome props: a trunk stops the capsule dead with no horizontal
+  jitter. A glancing hit slides round without back-and-forth. A rock face
+  slides exactly like a wall. Sub-step props are walked over, and a boulder
+  can be jumped onto. Tall props are never mantle targets. The camera
+  ignores props. On both real scans, in every themed look (standard and
+  reduced), no prop collider touches the capsule on any route node or
+  corridor. Generated adventures are driven to completion through every
+  look's solid props.
 - Both bundled GLBs: decode, collider triangle count matching the rendered
   mesh, normalisation to the documented game scale, standing stably beside
   the furniture, landing on the furniture from above without falling

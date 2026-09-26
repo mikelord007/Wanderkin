@@ -8,12 +8,13 @@
  * written straight to a DOM node or a ref instead of to state.
  */
 
-import { useEffect, useMemo, useRef, type MutableRefObject, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, type MutableRefObject, type RefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { PerspectiveCamera } from "three";
 import type { MovementConfig, SceneManifest, StyleDefinition } from "@shared/index.js";
 import type { LoadedSceneAsset } from "../assets/loadSceneAsset.js";
 import type { RapierModule } from "../core/physicsWorld.js";
+import type { PropCollider } from "../core/propColliders.js";
 import type { GameSimulation, SimulationEvent } from "../core/simulation.js";
 import type { InputController } from "../input/inputController.js";
 import type { GameDiagnostics } from "../diagnostics.js";
@@ -127,6 +128,12 @@ export function GameStage({
   const config = simulation.config;
 
   const rig = useMemo(() => new CameraRig(rapier, config), [rapier, config]);
+
+  // The solid props of the drawn look (`BiomeLayer` hands over `[]` when it
+  // stops drawing them). A world being replaced may already be freed.
+  const setPropColliders = useCallback((colliders: readonly PropCollider[]) => {
+    if (!simulation.isDisposed) simulation.setPropColliders(colliders);
+  }, [simulation]);
 
   // Widen the field of view for gameplay, so more of the room is visible
   // around the now much-smaller character instead of the character simply
@@ -262,6 +269,8 @@ export function GameStage({
         props: biomeLayout?.props.length ?? 0, patches: biomeLayout?.patches.length ?? 0,
         drawCalls: renderer.info.render.calls, geometries: renderer.info.memory.geometries,
         textures: renderer.info.memory.textures,
+        propColliders: simulation.propColliderStats.installed,
+        propCollidersDeferred: simulation.propColliderStats.deferred,
         fragments: modeState?.requiredFragmentsCollected ?? 0,
         destinations: modeState?.destinationsReached.size ?? 0 },
     };
@@ -284,7 +293,7 @@ export function GameStage({
         reducedMotion={reducedMotion}
       /> : null}
       {themed && biomeLayout ? <BiomeLayer definition={biomeDefinition} layout={biomeLayout}
-        quality={effectsQuality} reducedMotion={reducedMotion} /> : null}
+        quality={effectsQuality} reducedMotion={reducedMotion} onColliders={setPropColliders} /> : null}
       <SceneEntities
         manifest={manifest}
         assets={assets}

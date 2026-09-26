@@ -1,9 +1,10 @@
 /**
  * Framework-free biome decoration layer: everything the Tropical/Desert
  * themes draw on top of the untouched scan, owned by one handle with one
- * `dispose()`. Nothing here is ever given to physics, and every mesh opts out
- * of three.js raycasts, so decoration can never block movement, the camera
- * or picking.
+ * `dispose()`. Every mesh opts out of three.js raycasts, so decoration never
+ * blocks the camera or picking. What blocks the character is separate data:
+ * `colliders`, primitive shapes for the solid props this layer draws, which
+ * the game installs in its physics world (`assets/colliders.ts`).
  *
  * Draw calls are planned up front against the biome's budget, in priority
  * order: props (each placement becomes a cluster from the biome's art, all
@@ -13,6 +14,7 @@
  */
 import * as THREE from "three";
 import { effectiveBudget } from "../presets.js";
+import type { PropCollider } from "../../game/core/propColliders.js";
 import type { BiomeDefinition, BiomeLayout, BiomePropKind, EffectsQuality } from "../types.js";
 import {
   createParticleField,
@@ -22,7 +24,8 @@ import {
 } from "./atmosphereEffects.js";
 import { bakeBucket, groupMembers, type BucketKey } from "../assets/batch.js";
 import { getBiomeArt } from "../assets/biomes/index.js";
-import { composeLayout } from "../assets/compose.js";
+import { clusterColliders, windsockCollider } from "../assets/colliders.js";
+import { composeLayout, type ComposedMember } from "../assets/compose.js";
 import { createContactDecals } from "./contactDecals.js";
 import { resolveBiomeLighting } from "../assets/lighting.js";
 import type { AssetShading } from "../assets/types.js";
@@ -63,6 +66,8 @@ export interface BiomeLayerStats {
   trimmed: number;
   /** Ground contact decals (blobs and soil patches) under clusters. */
   contacts: number;
+  /** Solid-prop colliders offered to physics (before its step-height skip). */
+  colliders: number;
   dropped: { invalid: number; kind: number; budget: number; clamped: number };
   skipped: string[];
 }
@@ -70,6 +75,8 @@ export interface BiomeLayerStats {
 export interface BiomeLayerHandle {
   readonly root: THREE.Group;
   readonly stats: Readonly<BiomeLayerStats>;
+  /** Primitive colliders for the solid props drawn; plain data, never disposed. */
+  readonly colliders: readonly PropCollider[];
   /** World yaw of the windsock heading, or null when none is drawn. */
   readonly windsockYaw: number | null;
   readonly disposed: boolean;
@@ -110,6 +117,7 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
     unstyled: 0,
     trimmed: 0,
     contacts: 0,
+    colliders: 0,
     dropped: { invalid: 0, kind: 0, budget: 0, clamped: 0 },
     skipped: [],
   };
@@ -118,6 +126,7 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
   let particles: ParticleField | null = null;
   let windsock: Windsock | null = null;
   let disposed = false;
+  const colliders: PropCollider[] = [];
   let motion = reducedMotion ? 0 : 1;
   const wind = createWindUniforms(definition.wind, reducedMotion);
   root.userData.biomeStats = stats;
@@ -125,6 +134,7 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
   const handle: BiomeLayerHandle = {
     root,
     stats,
+    colliders,
     get windsockYaw() {
       return windsock ? windsock.baseYaw : null;
     },
@@ -207,9 +217,11 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
     );
     stats.unstyled = composed.unstyled;
     stats.trimmed = composed.trimmed;
+    const undrawn = new Set<ComposedMember>();
     for (const [key, members] of groupMembers(composed.clusters, castShadows)) {
       if (!canDraw(`props:${key}`, 1)) {
         stats.dropped.budget += members.length;
+        for (const member of members) undrawn.add(member);
         continue;
       }
       const bucket = bakeBucket(key, members);
@@ -240,6 +252,8 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
         for (const material of contact.materials) material.dispose();
       }
     }
+    // What is drawn is what blocks: only members of drawn buckets collide.
+    colliders.push(...clusterColliders(composed.clusters, (member) => !undrawn.has(member)).colliders);
     for (const cluster of composed.clusters) {
       stats.clusters += 1;
       stats.propInstances += 1;
@@ -259,10 +273,13 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
     windsock.group.scale.setScalar(height);
     windsock.update(0, motion);
     stats.windsock = true;
+    colliders.unshift(windsockCollider(placement, height));
     stats.propInstances += 1;
     stats.propsByKind.windsock = 1;
     track(windsock.group);
   }
+
+  stats.colliders = colliders.length;
 
   // ---- Support patches -----------------------------------------------------
   const patches = selectSurfacePatches(definition, layout, quality);

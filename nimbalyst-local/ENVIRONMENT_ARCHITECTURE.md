@@ -636,3 +636,83 @@ Building the layer takes 14–85 ms, after a one-time template build of about 0.
 - Desert scrub and the pad cactus are serviceable baselines, not finished designs.
 - Tropical rocks use the shared grey ramp.
 - Flowers are a single simple design.
+
+---
+
+## 13. Solid props (physics worker, 2026-09-26)
+
+Props used to be non-colliding: the character walked through trees, cacti and rocks. Since this change, every drawn prop of meaningful size blocks the character. §9's "everything drawn stays inside a geometry-approved footprint" is what keeps that safe.
+
+### Pipeline
+
+- `placement.ts` gains the solid half of the footprint contract:
+  - **`PROP_SOLID`:** a per-kind flag. Every kind is solid today: palm, shrub, rock, wood, cactus, dry-plant and windsock.
+  - **`ExclusionAnalysis.pathNodes`:** the waypoints plus the ends of every verified walk, jump and mantle transition.
+  - **`keepPathNodesClear`:** drops any solid prop whose footprint comes within `SOLID_NODE_CLEARANCE_RATIO` (1.25) character radii of a node. It removes nothing on a sound layout, because `testAnchor` already keeps footprints out of the far wider route corridors. It is the placement layer's own guarantee, not a new rule.
+- **`assets/colliders.ts`** turns composed clusters into colliders. Each hero or supporting member is measured once from its unit mesh (cached per template) and gets one primitive in its own world transform:
+
+  | Category | Collider |
+  |---|---|
+  | tree | capsule; radius = narrowest 5% slice between 2% and 42% of its height (above root flare, below the crown) |
+  | cactus, marker | capsule; radius = column or post near the ground |
+  | rock | box; 80% of the mesh's horizontal extent |
+  | bush | cylinder; 80th-percentile body radius, 85% of the height |
+  | dressing | box if flat (logs), else a cylinder like a bush |
+  | grass, micro | none |
+
+  Every collider is checked to stay inside its cluster's footprint radius. One that pokes out is trimmed horizontally by at most 35%, or dropped.
+- **`decorLayer.ts`** exposes `handle.colliders`, for the members of drawn buckets plus the windsock pole. `BiomeLayer` hands them to `onColliders`, and `GameStage` passes them on to `GameSimulation.setPropColliders`. Switching the look replaces the set; Original, or unmounting, installs `[]`.
+- **`game/core/propColliders.ts`** is the physics side. It holds the data type, the collision groups, and the three height classes (runtime body 0.175 m):
+  - below autostep (~2.5 cm): skipped;
+  - up to 2 body heights: a **ledge**, which can be jumped onto or mantled;
+  - taller: a **wall**, which the mantle landing search ignores, so it is never a destination.
+- Other physics behaviour:
+  - A push within 25° of head-on into a round prop stops the character; a glancing push slides.
+  - The camera boom ignores props.
+  - A prop that would appear around the player waits until they walk clear.
+
+### Budgets and cost
+
+- **Collider budget:** `PROP_COLLIDER_BUDGET` = **400** per layout. Primaries come first, then companions tallest first, so a cut only loses the smallest companions.
+- **Measured counts:** 63–155 colliders per layout on both bundled scans, across all five themed looks, standard and reduced:
+  - Tropical standard is about 130–145;
+  - Autumn standard is 155;
+  - reduced layouts are 63–104.
+- **Build time:** under 1 ms per layout (template profiles are cached).
+- **Proximity activation:** Rapier charges about 1 µs per step for every *enabled* static collider, even with nothing near it. With 114 enabled colliders, `world.step` went from 7 to 120 µs.
+  - So only props within `propActivationRadius(config)` of the character are enabled: mantle reach + landing inset + 6 steps of walking + 0.5 m, about 1.43 m.
+  - The set is refreshed every 6 fixed steps and on every teleport. Disabled colliders cost nothing.
+  - Typically 6–11 props are enabled, and `world.step` is back to baseline (about 12 µs versus 4–19 µs with no props).
+- **Frame time:** `tmp-biome-integration/perf.mjs` on sample 0 (Rodin), p50 before → after:
+
+  | Look | Before | After |
+  |---|---|---|
+  | Original | 16.7 ms | 16.7 ms |
+  | Tropical | 16.7 ms | 16.7 ms |
+  | Desert | 16.7 ms | 16.7 ms |
+  | Desert reduced | 16.7 ms | 16.7 ms |
+
+  There were 0 frames over 50 ms. During a stretch where Chrome was capped at 30 Hz, an A/B against a clean HEAD worktree read 33.3 ms for both builds in every look. The logs are in `nimbalyst-local/physics-collision/`.
+
+### Tests
+
+- `game/core/propColliders.test.ts` covers the controller:
+  - trunk stop and jitter;
+  - glancing slide;
+  - rock face against a wall;
+  - step-over, and jumping onto a boulder;
+  - mantle onto a ledge but not a wall;
+  - the camera;
+  - deferred install;
+  - replacement and the budget;
+  - proximity activation.
+- `assets/colliders.test.ts` runs both scans × five looks × standard and reduced:
+  - checks primitives and footprints;
+  - installs the colliders in the real world, then checks that the capsule standing on every path node, and swept along every route corridor, touches no prop.
+- `adventureController.test.ts` drives generated adventures on both scans to completion through every look's solid props.
+
+### For future biomes
+
+- A new look's props become solid automatically, through `category`.
+- A family whose mesh would make a poor collider can only be tuned in `assets/colliders.ts`, never by exceeding `PROP_UNIT_RADIUS`.
+- Add the look to the two test loops above.

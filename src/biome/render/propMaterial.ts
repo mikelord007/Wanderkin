@@ -1,8 +1,8 @@
 /**
  * The materials every biome prop shares: vertex colours, a wind sway driven
  * by the shared wind uniforms, and a dithered fade for props that come
- * between the chase camera and the player (the camera's occlusion test is
- * physics-only, so non-colliding decor never pulls it in).
+ * between the chase camera and the player (the camera's occlusion sweep
+ * ignores prop colliders, so solid decor never pulls it in).
  *
  * Two shadings exist: `faceted` (flat, for rock, wood and stone) and
  * `smooth` (vertex normals, for foliage, trunks and cacti).

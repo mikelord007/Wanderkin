@@ -5,16 +5,23 @@
  * the actual Rapier `GameSimulation` at the runtime (miniature) body size
  * along the validated route of each generated adventure — over generated
  * stairs, stepping platforms and jumps — and checks that every objective's
- * real trigger fires, in order, without falling out of the level.
+ * real trigger fires, in order, without falling out of the level. The same
+ * drive runs again with every themed look's props solid, so decoration can
+ * never make an adventure uncompletable.
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_MOVEMENT_CONFIG, type SceneManifest, type Vec3 } from "@shared/index.js";
 import { toMiniatureScale } from "../game/core/characterScale.js";
 import { initRapier } from "../game/core/physicsWorld.js";
+import type { PropCollider } from "../game/core/propColliders.js";
 import { GameSimulation, NEUTRAL_INPUT } from "../game/core/simulation.js";
 import type { Transition } from "../scene/route.js";
 import { DEFAULT_ADVENTURE_BUDGET, generateAdventure, type AdventureGenerationDetail } from "./adventures.js";
 import { bedFixture, countertopFixture, deskFixture, poorFixture, sampleScanFixture, type GeometryFixture } from "./geometryFixtures.js";
+import { prepareBiomeLayout } from "./placement.js";
+import { getBiomeDefinition } from "./presets.js";
+import { createBiomeLayer } from "./render/decorLayer.js";
+import type { BiomeId } from "./types.js";
 import { ADVENTURE_TIME_BUDGET_MS, WorkDeadline } from "./workBudget.js";
 
 const RUNTIME = toMiniatureScale(DEFAULT_MOVEMENT_CONFIG);
@@ -55,13 +62,14 @@ function triggersOf(manifest: SceneManifest): Trigger[] {
  * Walks the validated transitions: steer at each next surface point, jump on
  * jump legs, take the mantle the controller offers on mantle legs.
  */
-async function drive(fixture: GeometryFixture, detail: AdventureGenerationDetail) {
+async function drive(fixture: GeometryFixture, detail: AdventureGenerationDetail, props: readonly PropCollider[] = []) {
   const simulation = await GameSimulation.create({
     manifest: detail.manifest,
     config: DEFAULT_MOVEMENT_CONFIG,
     assetGeometry: new Map([...fixture.assets].map(([id, asset]) => [id, asset.collision])),
     miniature: true,
   });
+  if (props.length > 0) simulation.setPropColliders(props);
   const reached: string[] = [];
   let respawns = 0;
   let failure = "";
@@ -211,4 +219,26 @@ describe("generated adventures are completable by the real controller at miniatu
     const result = await drive(fixture, detail);
     expect(result.reached, result.failure).toEqual(result.triggers);
   }, 120_000);
+});
+
+describe("generated adventures stay completable with every look's props solid", () => {
+  const LOOKS: readonly BiomeId[] = ["tropical", "desert", "alpine", "autumn", "ember"];
+  const SCANS: [string, () => GeometryFixture][] = [
+    ["real Rodin scan", () => sampleScanFixture("sample-rodin-room-corner")],
+    ["real Tripo scan", () => sampleScanFixture("sample-tripo-room-corner")],
+  ];
+  it.each(SCANS)("%s — restore the portal through solid trees, cacti and rocks", async (_label, make) => {
+    const fixture = make();
+    const detail = generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template: "restore-portal", seed: `controller-${fixture.name}` }, DEFAULT_ADVENTURE_BUDGET, unhurried());
+    for (const biome of LOOKS) {
+      const definition = getBiomeDefinition(biome);
+      const layout = prepareBiomeLayout({ manifest: detail.manifest, assets: fixture.assets, movement: RUNTIME, definition, seed: `controller-${biome}`, quality: "standard" });
+      const layer = createBiomeLayer({ definition, layout, quality: "standard", reducedMotion: false });
+      layer.dispose();
+      expect(layer.colliders.length, biome).toBeGreaterThan(0);
+      const result = await drive(fixture, detail, layer.colliders);
+      expect(result.reached, `${biome}: ${result.failure}`).toEqual(result.triggers);
+      expect(result.respawns, biome).toBe(0);
+    }
+  }, 300_000);
 });
