@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import type { PhotoReference, SceneManifest } from "@shared/index.js";
-import { describeApiError, getAsset } from "../api.js";
+import { attachWorldMusic, type PhotoReference, type SceneManifest } from "@shared/index.js";
+import { describeApiError, getAsset, getJob } from "../api.js";
+import { creationWorldName } from "../worldName.js";
 import { LoadingScreen } from "../components/LoadingScreen.js";
 import { courseCandidateOptions, replaceSavedCandidate } from "../courseCandidates.js";
 import { attachProvenance, resolveAssetForManifest } from "../manifestProvenance.js";
@@ -116,22 +117,28 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
         const { prepareAsset } = await scenePreparationModule();
         if (cancelled) return;
 
+        // A world from Create is named after its quest, not "Imported level".
+        const creation = loadActiveCreation();
+        const name = await creationWorldName(creation, getJob);
+        if (cancelled) return;
+
         // The scene loader evicts failed cache entries on its own, so a
         // plain retry with the real, stable asset URL is enough — no
         // client-side cache-busting needed.
         const result = await prepareAsset(
           asset.url,
-          {},
+          name ? { name } : {},
           (nextStage: "downloading" | "decoding" | "analyzing" | "validating") => {
             if (!cancelled) setStage(STAGE_TEXT[nextStage]);
           },
         );
         if (cancelled) return;
 
-        const creation = loadActiveCreation();
         const workflow = creation ? toWorldWorkflow(creation) : null;
         const basePrimary = attachProvenance(result.manifest, cleanAsset, resolvedSourcePhotos);
-        const primary = workflow ? { ...basePrimary, workflow } : basePrimary;
+        // The world's own soundtrack, if it is ready; the server attaches a
+        // later one when the world is saved or opened.
+        const primary = workflow ? await attachWorldMusic({ ...basePrimary, workflow }, getJob) : basePrimary;
         const candidateManifests = (result.courseCandidates ?? []).map((candidate: SceneManifest) =>
           workflow ? { ...attachProvenance(candidate, cleanAsset, resolvedSourcePhotos), workflow } : attachProvenance(candidate, cleanAsset, resolvedSourcePhotos),
         );
