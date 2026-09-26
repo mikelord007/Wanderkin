@@ -56,6 +56,22 @@ export function handOffBuild(record: CreationRecord, now = new Date().toISOStrin
   if (loadActiveCreation(storage)?.id === record.id) clearActiveCreationId(storage);
 }
 
+/** Where Create goes once a build's 3D shape job exists. */
+export type StartedBuildDestination = { name: "worlds"; notice: string } | { name: "generation"; jobId: string };
+
+/**
+ * Signed in (with Google through Supabase or the local stub alike), the
+ * build is handed over to My worlds, with a note saying so, so another world
+ * can be started at once. Otherwise, or when this device has no record of
+ * the creation, its progress screen opens instead.
+ */
+export function destinationForStartedBuild(jobId: string, signedIn: boolean, now = new Date().toISOString(), storage: Storage | null = storageOrNull()): StartedBuildDestination {
+  const creation = findCreationByShapeJob(jobId, storage);
+  if (!signedIn || !creation) return { name: "generation", jobId };
+  handOffBuild(creation, now, storage);
+  return { name: "worlds", notice: "Building your world. Watch it here." };
+}
+
 /** The creation whose 3D build is this job, if this device has it. */
 export function findCreationByShapeJob(jobId: string, storage: Storage | null = storageOrNull()): CreationRecord | null {
   return loadCreationRecords(storage).find((record) => record.jobs.shape?.id === jobId) ?? null;

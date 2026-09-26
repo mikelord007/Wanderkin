@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { STYLE_DEFINITIONS, type ImageEditGenerationRequest, type ImageTo3dGenerationRequest } from "@shared/index.js";
 import { approvePreview, describeApiError, getJob, retryJob, submitGeneration, submitPreview, uploadPhotos } from "../api.js";
 import { canBuildWorld,createCreationRecord, visiblePreviewUrl, withCreationUpdate, withNewPhoto, withoutPhoto, withReadyPreview, type CreationRecord } from "../creationFlow.js";
-import { loadActiveCreation, saveCreationRecord, setActiveCreationId, updateCreationJob } from "../creationStorage.js";
+import { loadActiveCreation, loadCreationRecords, saveCreationRecord, setActiveCreationId, updateCreationJob } from "../creationStorage.js";
 import { saveActiveSource } from "../jobStorage.js";
 import { startWorldBuild } from "../worldBuild.js";
 import { CaptureScreen } from "./CaptureScreen.js";
@@ -124,14 +124,15 @@ export function CreationJourneyScreen({ onJobStarted, onBack }: CreationJourneyS
     const request: ImageTo3dGenerationRequest = { schemaVersion: 1, kind: "image-to-3d", capability: "rodin-i3d", idempotencyKey: newKey("shape"), purpose: "world-mesh", photos: [{ photoId: record.photo.id, sourceIndex: 1 }], sourceImageAssetIds: [reviewedImageAssetId], styleReferenceAssetId: record.preview.asset.id, scenePrompt: `${STYLE_DEFINITIONS[record.selection.style].imagePrompts.geometryReference} ${record.selection.atmosphere}`.trim() };
     const photo = record.photo;
     try {
-      // Story and music start with the shape, so they are made even if nobody
-      // opens the progress screen (the build now continues from My worlds).
-      // The build moves on only once they are recorded: claiming the shape
-      // before the first save keeps the step-4 effect above from navigating
-      // early, which let the progress screen ask for them a second time.
+      // The build moves on to My worlds as soon as the shape exists. Story and
+      // music start with it, so they are made even if nobody opens the progress
+      // screen; they land in the stored record after Create has been left.
+      // Claiming the shape before the save keeps the step-4 effect above from
+      // handing it over a second time.
       await startWorldBuild(record, request, {
         submit: generation => submitGeneration({ request: generation, worldId: record.id }),
         save: next => { if (next.jobs.shape) navigatedJob.current = next.jobs.shape.id; persist(next); },
+        record: (stage, job) => { const current = loadCreationRecords().find(candidate => candidate.id === record.id); if (current) saveCreationRecord(updateCreationJob(current, stage, job)); },
         key: newKey,
         navigate: next => { const shapeId = next.jobs.shape!.id; saveActiveSource({ kind: "job", jobId: shapeId, photos: [photo] }); onJobStarted(shapeId); },
       });

@@ -43,7 +43,7 @@ import {
 import { LegalScreen } from "./ui/legal/LegalScreen.js";
 import type { LegalDocumentId } from "./ui/legal/legalDocuments.js";
 import { supportEmail } from "./ui/legal/supportContact.js";
-import { findCreationByShapeJob, handOffBuild } from "./ui/pendingWorldStore.js";
+import { destinationForStartedBuild, findCreationByShapeJob } from "./ui/pendingWorldStore.js";
 import type { PendingWorld } from "./ui/pendingWorlds.js";
 import {
   clearActiveSource,
@@ -503,17 +503,12 @@ export function App() {
     // Signed in, the build leaves Create and continues as a card in My
     // worlds, so another world can be started at once. Create forgets it
     // (step 1 next time); the creation record and its jobs stay durable.
-    const creation = findCreationByShapeJob(jobId);
-    if (signedInRef.current && creation) {
-      handOffBuild(creation);
-      clearActiveSource();
-      go({ name: "worlds", notice: "Building your world. Watch it here." });
-      return;
-    }
     // Otherwise, as before: PhotosScreen already persisted the ActiveSource
     // record (kind "job", with its source photos) and cleared the
     // PendingSubmission once the POST confirmed a durable job id.
-    go({ name: "generation", jobId });
+    const destination = destinationForStartedBuild(jobId, signedInRef.current);
+    if (destination.name === "worlds") clearActiveSource();
+    go(destination);
   }, [go]);
 
   const handleJobReady = useCallback((job: GenerationJob) => {

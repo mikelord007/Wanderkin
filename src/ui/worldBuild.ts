@@ -10,6 +10,8 @@ export const EXTRAS_REASK_MS = 20_000;
 export const EXTRAS_MAX_ASKS = 10;
 
 const asked = new Map<string, { at: number; count: number }>();
+/** Worlds whose first story and music requests are still on their way. */
+const startingExtras = new Set<string>();
 
 export interface ReaskDeps {
   submit: (request: GenerationRequest) => Promise<GenerationJob>;
@@ -26,8 +28,8 @@ export interface ReaskDeps {
  * the two never ask at once. A refusal is simply tried again later; it never
  * marks the stage failed.
  */
-export async function reaskMissingExtras(record: CreationRecord, deps: ReaskDeps, state: Map<string, { at: number; count: number }> = asked): Promise<void> {
-  if (!isBuildRecord(record)) return;
+export async function reaskMissingExtras(record: CreationRecord, deps: ReaskDeps, state: Map<string, { at: number; count: number }> = asked, starting: ReadonlySet<string> = startingExtras): Promise<void> {
+  if (!isBuildRecord(record) || starting.has(record.id)) return;
   const missing = extrasToSubmit(record, deps.key);
   if (!missing.length) return;
   const now = deps.now ?? Date.now();
@@ -39,27 +41,37 @@ export async function reaskMissingExtras(record: CreationRecord, deps: ReaskDeps
 
 export interface WorldBuildDeps {
   submit: (request: GenerationRequest) => Promise<GenerationJob>;
+  /** Saves the build once its shape exists. */
   save: (record: CreationRecord) => void;
+  /** Records a story or music job the server accepted. By then Create has
+   * been left, so this writes to the stored record, not the screen. */
+  record: (stage: ExtraStage, job: GenerationJob) => void;
   key: (prefix: string) => string;
-  /** Leaves Create for the build's progress (or My worlds). */
+  /** Leaves Create for My worlds (or the build's progress). */
   navigate: (record: CreationRecord) => void;
 }
 
 /**
  * Starts a world's build. The 3D shape is recorded the moment it exists, so
- * it is never lost; story and music are asked for next, and only once they
- * are recorded does the build move on. Whatever opens next (the progress
- * screen, a My worlds card) then sees every job started here and never asks
- * for them a second time. An extra the server turns away (busy, over budget)
- * stays unrecorded rather than failed: it is simply asked for again later.
+ * it is never lost, and the build moves on at once: the story request can
+ * take minutes (the server waits for the text), so nobody waits for it in
+ * Create. Story and music are asked for alongside, and until those first
+ * requests answer, the progress screen and My worlds leave them alone rather
+ * than asking a second time. An extra the server turns away (busy, over
+ * budget) stays unrecorded rather than failed: it is simply asked for again
+ * later.
  */
-export async function startWorldBuild(record: CreationRecord, shapeRequest: ImageTo3dGenerationRequest, deps: WorldBuildDeps): Promise<CreationRecord> {
+export async function startWorldBuild(record: CreationRecord, shapeRequest: ImageTo3dGenerationRequest, deps: WorldBuildDeps, starting: Set<string> = startingExtras): Promise<CreationRecord> {
   const shape = await deps.submit(shapeRequest);
-  let next = updateCreationJob(withCreationUpdate(record, { step: "building" }), "shape", shape);
-  deps.save(next);
-  const extras = await Promise.allSettled(extrasToSubmit(next, deps.key).map(([stage, request]) => deps.submit(request).then((job) => [stage, job] as const)));
-  for (const result of extras) if (result.status === "fulfilled") next = updateCreationJob(next, result.value[0], result.value[1]);
-  deps.save(next);
-  deps.navigate(next);
+  const next = updateCreationJob(withCreationUpdate(record, { step: "building" }), "shape", shape);
+  const extras = extrasToSubmit(next, deps.key);
+  if (extras.length) starting.add(next.id);
+  try {
+    deps.save(next);
+    deps.navigate(next);
+    await Promise.allSettled(extras.map(([stage, request]) => deps.submit(request).then((job) => deps.record(stage, job))));
+  } finally {
+    starting.delete(next.id);
+  }
   return next;
 }

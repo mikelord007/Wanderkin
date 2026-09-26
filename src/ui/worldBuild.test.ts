@@ -78,46 +78,83 @@ describe("reaskMissingExtras", () => {
 });
 
 describe("startWorldBuild", () => {
-  it("hands the build on only once story and music are recorded, so they are never asked for twice", async () => {
-    const saved: CreationRecord[] = [];
+  /** Keeps the stored record the way the screen's deps do. */
+  function recorder() {
+    let stored: CreationRecord | null = null;
+    return {
+      get stored() { return stored; },
+      save: (record: CreationRecord) => { stored = record; },
+      record: (stage: "story" | "music", accepted: GenerationJob) => { if (stored) stored = updateCreationJob(stored, stage, accepted); },
+    };
+  }
+
+  it("moves on as soon as the shape exists, then records story and music", async () => {
+    const store = recorder();
     const submit = vi.fn(async (request: GenerationRequest) => job(`job-${request.kind}`, request.kind));
     const navigate = vi.fn((record: CreationRecord) => {
-      // Whoever opens next (the progress screen, a My worlds card) sees every
-      // job this build started, so it has nothing left to submit.
-      expect(saved.at(-1)).toBe(record);
-      expect(extrasToSubmit(record, (prefix) => `${prefix}-again`)).toEqual([]);
+      // The shape is recorded before the build moves on, so it is never lost.
+      expect(store.stored).toBe(record);
+      expect(record).toMatchObject({ step: "building", jobs: { shape: { id: "job-image-to-3d" } } });
     });
 
-    await startWorldBuild(approved, shapeRequest, { submit, save: (record) => saved.push(record), key: (prefix) => `${prefix}-1`, navigate });
+    await startWorldBuild(approved, shapeRequest, { submit, ...store, key: (prefix) => `${prefix}-1`, navigate });
 
     expect(navigate).toHaveBeenCalledTimes(1);
     expect(submit.mock.calls.map(([request]) => request.kind)).toEqual(["image-to-3d", "text", "music"]);
-    // The shape is recorded before anything else is asked for, so it is never lost.
-    expect(saved[0]).toMatchObject({ step: "building", jobs: { shape: { id: "job-image-to-3d" } } });
-    expect(saved.at(-1)?.jobs).toMatchObject({ shape: { id: "job-image-to-3d" }, story: { id: "job-text" }, music: { id: "job-music" } });
+    expect(store.stored?.jobs).toMatchObject({ shape: { id: "job-image-to-3d" }, story: { id: "job-text" }, music: { id: "job-music" } });
+    expect(extrasToSubmit(store.stored!, (prefix) => `${prefix}-again`)).toEqual([]);
+  });
+
+  it("never waits for the story: the server can take minutes to answer it", async () => {
+    const store = recorder();
+    const submit = vi.fn((request: GenerationRequest) => request.kind === "text" ? new Promise<GenerationJob>(() => undefined) : Promise.resolve(job(`job-${request.kind}`, request.kind)));
+    const navigate = vi.fn();
+
+    void startWorldBuild(approved, shapeRequest, { submit, ...store, key: (prefix) => `${prefix}-1`, navigate }, new Set());
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledTimes(1));
+
+    expect(submit.mock.calls.map(([request]) => request.kind)).toEqual(["image-to-3d", "text", "music"]);
+  });
+
+  it("while its first story and music requests are out, nothing else asks for them again", async () => {
+    const starting = new Set<string>();
+    let answerStory: (accepted: GenerationJob) => void = () => undefined;
+    const submit = vi.fn((request: GenerationRequest) => request.kind === "text"
+      ? new Promise<GenerationJob>((resolve) => { answerStory = resolve; })
+      : Promise.resolve(job(`job-${request.kind}`, request.kind)));
+    const store = recorder();
+    const built = startWorldBuild(approved, shapeRequest, { submit, ...store, key: (prefix) => `${prefix}-1`, navigate: vi.fn() }, starting);
+    await vi.waitFor(() => expect(submit).toHaveBeenCalledTimes(3));
+
+    // My worlds or the progress screen opening meanwhile.
+    const reask = vi.fn(async () => job("again", "text"));
+    await reaskMissingExtras(store.stored!, { submit: reask, record: vi.fn(), key: (prefix) => prefix, now: 0 }, new Map(), starting);
+    expect(reask).not.toHaveBeenCalled();
+
+    answerStory(job("job-text", "text"));
+    await built;
+    expect(starting.size).toBe(0);
+    expect(store.stored?.jobs.story?.id).toBe("job-text");
   });
 
   it("leaves a turned-away extra unrecorded, never failed, so it is simply asked for again later", async () => {
-    const saved: CreationRecord[] = [];
+    const store = recorder();
     const submit = vi.fn(async (request: GenerationRequest) => {
       if (request.kind === "music") throw Object.assign(new Error("The generation service is at capacity. Please retry shortly."), { status: 429 });
       return job(`job-${request.kind}`, request.kind);
     });
-    const navigate = vi.fn();
 
-    await startWorldBuild(approved, shapeRequest, { submit, save: (record) => saved.push(record), key: (prefix) => `${prefix}-1`, navigate });
+    await startWorldBuild(approved, shapeRequest, { submit, ...store, key: (prefix) => `${prefix}-1`, navigate: vi.fn() });
 
-    const final = saved.at(-1)!;
-    expect(navigate).toHaveBeenCalledWith(final);
-    expect(final.jobs.music).toBeUndefined();
-    expect(extrasToSubmit(final, (prefix) => `${prefix}-2`).map(([stage]) => stage)).toEqual(["music"]);
+    expect(store.stored?.jobs.music).toBeUndefined();
+    expect(extrasToSubmit(store.stored!, (prefix) => `${prefix}-2`).map(([stage]) => stage)).toEqual(["music"]);
   });
 
   it("does not start story or music when the shape itself is refused", async () => {
     const submit = vi.fn(async () => { throw new Error("Invalid generation request"); });
     const save = vi.fn();
     const navigate = vi.fn();
-    await expect(startWorldBuild(approved, shapeRequest, { submit, save, key: (prefix) => prefix, navigate })).rejects.toThrow("Invalid generation request");
+    await expect(startWorldBuild(approved, shapeRequest, { submit, save, record: vi.fn(), key: (prefix) => prefix, navigate })).rejects.toThrow("Invalid generation request");
     expect(submit).toHaveBeenCalledTimes(1);
     expect(save).not.toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
