@@ -13,6 +13,10 @@
  *     head clearance (this is what makes a low ceiling block a mantle).
  *  4. The capsule can actually sweep up and then forward without passing
  *     through anything (this is what stops mantling through walls).
+ *
+ * Tall biome props (trunks, cacti, poles) are walls, never ledges: the
+ * landing search looks straight through them, so their tops are never a
+ * destination, while the clearance and path sweeps still see them.
  */
 
 import type { MovementConfig } from "@shared/index.js";
@@ -23,6 +27,7 @@ import {
   MAX_LEDGE_FACE_NORMAL_Y,
   MIN_STANDABLE_NORMAL_Y,
 } from "./constants.js";
+import { QUERY_WITHOUT_WALL_PROPS } from "./propColliders.js";
 import { addScaled, normalize, type Vec3Like } from "./vec.js";
 
 type RapierWorld = InstanceType<RapierModule["World"]>;
@@ -166,7 +171,7 @@ export function probeMantle(
       IDENTITY_ROTATION,
       probePoint,
       undefined,
-      undefined,
+      QUERY_WITHOUT_WALL_PROPS,
       playerCollider,
     );
     if (!occupied) {
@@ -186,7 +191,7 @@ export function probeMantle(
     originY - feetY + capsuleHeight,
     true,
     undefined,
-    undefined,
+    QUERY_WITHOUT_WALL_PROPS,
     playerCollider,
   );
 

@@ -37,7 +37,19 @@ import {
   type CheckpointState,
 } from "./checkpoints.js";
 import { probeMantle, type MantleProbeResult, type MantleTarget } from "./mantle.js";
-import { reseatCapsuleCentre, toMiniatureScale } from "./characterScale.js";
+import { capsuleHeight, reseatCapsuleCentre, toMiniatureScale } from "./characterScale.js";
+import {
+  HEAD_ON_PROP_DEGREES,
+  LEDGE_PROP_GROUPS,
+  PROP_ACTIVATION_INTERVAL_STEPS,
+  PROP_COLLIDER_BUDGET,
+  WALL_PROP_GROUPS,
+  classifyPropCollider,
+  isPropGroups,
+  isValidPropCollider,
+  propActivationRadius,
+  type PropCollider,
+} from "./propColliders.js";
 import {
   createPhysicsScene,
   initRapier,
@@ -62,6 +74,19 @@ import {
 
 type RapierWorld = InstanceType<RapierModule["World"]>;
 type CharacterController = ReturnType<RapierWorld["createCharacterController"]>;
+type RapierCollider = ReturnType<RapierWorld["createCollider"]>;
+type RapierRigidBody = ReturnType<RapierWorld["createRigidBody"]>;
+
+const HEAD_ON_PROP_COS = Math.cos((HEAD_ON_PROP_DEGREES * Math.PI) / 180);
+
+/** How many prop colliders are installed, how many of those are enabled near
+ * the player, and how many wait for the player to move clear. */
+export interface PropColliderStats {
+  installed: number;
+  active: number;
+  walls: number;
+  deferred: number;
+}
 
 export interface SimulationInput {
   /** -1 (back) .. 1 (forward), camera-relative. */
@@ -158,6 +183,14 @@ export class GameSimulation {
   private pendingRespawn = false;
 
   private measuredSpeed = 0;
+  private propEntries: { collider: RapierCollider; data: PropCollider; enabled: boolean }[] = [];
+  /** One fixed body owns every prop collider, so a set is removed in one call. */
+  private propBody: RapierRigidBody | null = null;
+  private readonly propActiveRadius: number;
+  private propStepsSinceRefresh = 0;
+  private propWalls = 0;
+  /** Props that would have spawned around the player; installed once clear. */
+  private deferredProps: { data: PropCollider; wall: boolean }[] = [];
   private events: SimulationEvent[] = [];
   private stepCount = 0;
   private elapsedSeconds = 0;
@@ -199,6 +232,7 @@ export class GameSimulation {
     this.controller.enableAutostep(radius * AUTOSTEP_MAX_HEIGHT_RATIO, radius * AUTOSTEP_MIN_WIDTH_RATIO, false);
     this.controller.enableSnapToGround(radius * SNAP_TO_GROUND_RATIO);
     this.controller.setApplyImpulsesToDynamicBodies(false);
+    this.propActiveRadius = propActivationRadius(this.config);
 
     this.position = this.seat(fromTuple(options.manifest.spawn.position));
     this.previousPosition = copy(this.position);
@@ -281,6 +315,121 @@ export class GameSimulation {
 
   get triangleCount(): number {
     return this.scene.triangleCount;
+  }
+
+  get propColliderStats(): PropColliderStats {
+    return {
+      installed: this.propEntries.length,
+      active: this.propEntries.reduce((count, entry) => count + (entry.enabled ? 1 : 0), 0),
+      walls: this.propWalls,
+      deferred: this.deferredProps.length,
+    };
+  }
+
+  /**
+   * Replaces the solid biome props with `colliders` (an empty list removes
+   * them). Called whenever the drawn look changes; the level's own collision
+   * is never touched. Props lower than the autostep height are skipped, tall
+   * ones become walls the mantle probe will not climb (`propColliders.ts`).
+   * A prop that would appear around the player waits until they move clear,
+   * so a look switch can never trap the capsule inside a trunk. Only props
+   * near the player are enabled (`propActivationRadius`).
+   */
+  setPropColliders(colliders: readonly PropCollider[]): PropColliderStats {
+    if (this.disposed) return { installed: 0, active: 0, walls: 0, deferred: 0 };
+    const world = this.scene.world;
+    if (this.propBody) world.removeRigidBody(this.propBody);
+    this.propBody = null;
+    this.propEntries = [];
+    this.propWalls = 0;
+    this.deferredProps = [];
+    this.propStepsSinceRefresh = 0;
+
+    const stepHeight = this.config.characterRadius * AUTOSTEP_MAX_HEIGHT_RATIO;
+    const bodyHeight = capsuleHeight(this.config);
+    let accepted = 0;
+    for (const data of colliders) {
+      if (accepted >= PROP_COLLIDER_BUDGET) break;
+      if (!isValidPropCollider(data)) continue;
+      const kind = classifyPropCollider(data.height, stepHeight, bodyHeight);
+      if (kind === "skip") continue;
+      accepted += 1;
+      const wall = kind === "wall";
+      if (this.propOverlapsPlayer(data)) this.deferredProps.push({ data, wall });
+      else this.installProp(data, wall);
+    }
+    world.updateSceneQueries();
+    return this.propColliderStats;
+  }
+
+  private propShape(data: PropCollider) {
+    const { shape } = data;
+    return shape.kind === "cuboid"
+      ? new this.RAPIER.Cuboid(shape.halfExtents.x, shape.halfExtents.y, shape.halfExtents.z)
+      : shape.kind === "capsule"
+        ? new this.RAPIER.Capsule(shape.halfHeight, shape.radius)
+        : new this.RAPIER.Cylinder(shape.halfHeight, shape.radius);
+  }
+
+  private installProp(data: PropCollider, wall: boolean): void {
+    const { position, rotation } = data;
+    const enabled = this.propNearPlayer(data);
+    const desc = new this.RAPIER.ColliderDesc(this.propShape(data));
+    desc
+      .setTranslation(position.x, position.y, position.z)
+      .setRotation(rotation)
+      .setCollisionGroups(wall ? WALL_PROP_GROUPS : LEDGE_PROP_GROUPS)
+      .setEnabled(enabled);
+    this.propBody ??= this.scene.world.createRigidBody(this.RAPIER.RigidBodyDesc.fixed());
+    this.propEntries.push({ collider: this.scene.world.createCollider(desc, this.propBody), data, enabled });
+    if (wall) this.propWalls += 1;
+  }
+
+  private propNearPlayer(data: PropCollider): boolean {
+    const gap = Math.hypot(this.position.x - data.position.x, this.position.z - data.position.z);
+    return gap - data.reach <= this.propActiveRadius;
+  }
+
+  /**
+   * Enables the props within reach of the character and disables the rest:
+   * an enabled static collider costs Rapier about a microsecond every step
+   * whether or not anything is near it, a disabled one nothing.
+   */
+  private refreshPropActivation(): void {
+    let changed = false;
+    for (const entry of this.propEntries) {
+      const near = this.propNearPlayer(entry.data);
+      if (near === entry.enabled) continue;
+      entry.collider.setEnabled(near);
+      entry.enabled = near;
+      changed = true;
+    }
+    if (changed) this.scene.world.updateSceneQueries();
+  }
+
+  /** True when the prop's shape touches the capsule, grown by half a radius. */
+  private propOverlapsPlayer(data: PropCollider): boolean {
+    const { characterRadius, characterHalfHeight } = this.config;
+    const margin = characterRadius * 0.5;
+    const gap = Math.hypot(this.position.x - data.position.x, this.position.z - data.position.z);
+    if (gap > data.reach + characterRadius + margin) return false;
+    const capsule = new this.RAPIER.Capsule(characterHalfHeight, characterRadius + margin);
+    return this.propShape(data).intersectsShape(data.position, data.rotation, capsule, this.position, { x: 0, y: 0, z: 0, w: 1 });
+  }
+
+  private installClearedProps(): void {
+    const waiting = this.deferredProps;
+    this.deferredProps = [];
+    let installed = false;
+    for (const entry of waiting) {
+      if (this.propOverlapsPlayer(entry.data)) {
+        this.deferredProps.push(entry);
+      } else {
+        this.installProp(entry.data, entry.wall);
+        installed = true;
+      }
+    }
+    if (installed) this.scene.world.updateSceneQueries();
   }
 
   /**
@@ -381,6 +530,12 @@ export class GameSimulation {
       this.respawn("fell");
     }
 
+    if (this.deferredProps.length > 0) this.installClearedProps();
+    if (this.propEntries.length > 0 && ++this.propStepsSinceRefresh >= PROP_ACTIVATION_INTERVAL_STEPS) {
+      this.propStepsSinceRefresh = 0;
+      this.refreshPropActivation();
+    }
+
     const update = updateCheckpoints(this.checkpointState, this.position);
     if (update.collectedId) {
       this.events.push({
@@ -459,6 +614,14 @@ export class GameSimulation {
       this.RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
     );
     const movement = this.controller.computedMovement();
+    if (moveMagnitude > 0.01 && this.propEntries.length > 0) {
+      const contact = this.headOnPropContact(moveX / moveMagnitude, moveZ / moveMagnitude);
+      if (contact) {
+        // Up to the trunk, and no further round it.
+        movement.x = contact.x;
+        movement.z = contact.z;
+      }
+    }
     const nextPosition = {
       x: this.position.x + movement.x,
       y: this.position.y + movement.y,
@@ -518,6 +681,30 @@ export class GameSimulation {
     if (this.stepCount % MANTLE_PROBE_INTERVAL_STEPS === 0) {
       this.lastProbe = probeMantle(this.mantleContext(), this.position, facingDir);
     }
+  }
+
+  /**
+   * When this step's move pressed the capsule nearly head-on into the side of
+   * a round prop (`propColliders.ts`), the move made before touching it;
+   * otherwise null. Flat prop faces are left to the controller: their
+   * contact is stable, so it only ever slides along them as it does walls.
+   */
+  private headOnPropContact(dirX: number, dirZ: number): Vec3Like | null {
+    const { Capsule, Cylinder } = this.RAPIER.ShapeType;
+    const collisions = this.controller.numComputedCollisions();
+    for (let i = 0; i < collisions; i += 1) {
+      const collision = this.controller.computedCollision(i);
+      const collider = collision?.collider;
+      if (!collision || !collider || !isPropGroups(collider.collisionGroups())) continue;
+      const shape = collider.shapeType();
+      if (shape !== Capsule && shape !== Cylinder) continue;
+      const { x, z } = collision.normal1;
+      const side = Math.hypot(x, z);
+      // Standing on a prop's top, or brushing its rounded crown, is not a push.
+      if (side < 0.7) continue;
+      if (-(x * dirX + z * dirZ) / side >= HEAD_ON_PROP_COS) return collision.translationDeltaApplied;
+    }
+    return null;
   }
 
   /**
@@ -658,11 +845,16 @@ export class GameSimulation {
     this.scene.playerBody.setNextKinematicTranslation(position);
     this.scene.world.propagateModifiedBodyPositionsToColliders();
     this.scene.world.updateSceneQueries();
+    // A teleport can land far from the enabled props.
+    if (this.propEntries.length > 0) this.refreshPropActivation();
   }
 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.propEntries = [];
+    this.propBody = null;
+    this.deferredProps = [];
     this.scene.world.removeCharacterController(this.controller);
     this.scene.dispose();
   }

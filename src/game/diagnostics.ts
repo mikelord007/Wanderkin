@@ -47,7 +47,9 @@ export interface GameDiagnostics {
   readonly warnings: readonly string[];
   readonly biome?: { readonly id: string; readonly seed: string; readonly props: number;
     readonly patches: number; readonly drawCalls: number; readonly geometries: number;
-    readonly textures: number; readonly fragments: number; readonly destinations: number };
+    readonly textures: number; readonly fragments: number; readonly destinations: number;
+    /** Solid biome props live in physics, and those waiting for the player to move clear. */
+    readonly propColliders?: number; readonly propCollidersDeferred?: number };
 }
 
 export interface GameDiagnosticsApi {

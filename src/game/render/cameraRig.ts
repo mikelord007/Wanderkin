@@ -12,6 +12,7 @@
 import type { MovementConfig } from "@shared/index.js";
 import type { RapierModule } from "../core/physicsWorld.js";
 import { CAMERA_EXTEND_RATE, CAMERA_MIN_DISTANCE_RATIO, CAMERA_TARGET_LIFT_RATIO } from "../core/constants.js";
+import { QUERY_WITHOUT_PROPS } from "../core/propColliders.js";
 import { approach, clamp, type Vec3Like } from "../core/vec.js";
 
 type RapierWorld = InstanceType<RapierModule["World"]>;
@@ -81,7 +82,9 @@ export class CameraRig {
       1,
       true,
       this.RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
-      undefined,
+      // Biome props are solid for the character but not for the boom: their
+      // own camera fade handles a trunk in the way (`propColliders.ts`).
+      QUERY_WITHOUT_PROPS,
       playerCollider,
     );
 
