@@ -9,6 +9,7 @@ import { formatElapsed, useElapsedSeconds } from "../useElapsedSeconds.js";
 import { useJobPolling } from "../useJobPolling.js";
 import { EXTRAS_REASK_MS, reaskMissingExtras } from "../worldBuild.js";
 import { CreationFrame } from "./CreationFrame.js";
+import { buildStageNote } from "../buildStageNotes.js";
 
 interface WorldProgressScreenProps { jobId: string; onReady: (job: GenerationJob) => void; onCancel: () => void; }
 function key(prefix: string) { return `${prefix}-${"randomUUID" in crypto ? crypto.randomUUID() : Date.now()}`; }
@@ -93,7 +94,7 @@ export function WorldProgressScreen({ jobId, onReady, onCancel }: WorldProgressS
           <p className="oq-kit-muted">Sound plays only when you press play.</p>
         </div> : null}
       </Card>
-      <ProgressPanel title="Making your world" detail={shapeJob ? `Elapsed ${formatElapsed(elapsed)}` : "Finding your world’s progress"} stages={stages} actions={<>
+      <ProgressPanel title="Making your world" detail={shapeJob ? `Elapsed ${formatElapsed(elapsed)}` : "Finding your world’s progress"} stages={stages} activeNote={buildStageNote} actions={<>
         {shapeState === "ready" ? <Button onClick={() => shapeJob && onReady(shapeJob)}>Prepare my course</Button> : null}
         {shapeState === "failed" ? <Button onClick={() => void retry("shape")} loading={retrying === "shape"} loadingLabel="Retrying 3D shape…">Retry 3D shape</Button> : null}
         <Button variant="secondary" onClick={onCancel}>My worlds</Button>
