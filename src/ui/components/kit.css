@@ -95,8 +95,20 @@
 /* --- Stepper / progress ------------------------------------------------ */
 .oq-kit-stepper { display: flex; flex-direction: column; gap: 20px; list-style: none; padding: 0; margin: 0; }
 .oq-kit-stepper li { display: flex; align-items: flex-start; gap: 12px; }
-.oq-kit-stepper__marker { flex: 0 0 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--oq-control-line); background: transparent; color: var(--oq-muted); font-weight: 500; font-variant-numeric: tabular-nums; }
-.oq-kit-stepper [data-status="active"] .oq-kit-stepper__marker { background: var(--oq-action-fill); border-color: var(--oq-action); color: var(--oq-on-action); box-shadow: 0 0 0 4px color-mix(in srgb, var(--oq-action) 18%, transparent); }
+.oq-kit-stepper__marker { position: relative; flex: 0 0 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--oq-control-line); background: transparent; color: var(--oq-muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.oq-kit-stepper [data-status="active"] .oq-kit-stepper__marker { background: var(--oq-action-fill); border-color: var(--oq-action); color: var(--oq-on-action); }
+/* The stage running now: a ring turning around its number. CSS only. */
+.oq-kit-stepper [data-status="active"] .oq-kit-stepper__marker::before {
+  content: ""; position: absolute; inset: -6px; border-radius: 50%;
+  border: 2.5px solid color-mix(in srgb, var(--oq-action) 18%, transparent); border-top-color: var(--oq-action);
+  animation: oq-kit-spin 1s linear infinite;
+}
+.oq-kit-stepper [data-status="active"] .oq-kit-stepper__status { color: var(--oq-accent-ink); font-weight: 500; }
+/* Compact: the circles alone, in a row, for a world card. */
+.oq-kit-stepper--compact { flex-direction: row; gap: 14px; }
+.oq-kit-stepper--compact li { gap: 0; }
+.oq-kit-stepper--compact .oq-kit-stepper__marker { flex-basis: 26px; height: 26px; width: 26px; font-size: .78rem; }
+.oq-kit-stepper--compact [data-status="active"] .oq-kit-stepper__marker::before { inset: -5px; border-width: 2px; }
 .oq-kit-stepper [data-status="complete"] .oq-kit-stepper__marker { background: var(--oq-success-wash); border-color: var(--oq-success-ink); color: var(--oq-success-ink); }
 .oq-kit-stepper [data-status="error"] .oq-kit-stepper__marker { background: var(--oq-error-wash); border-color: var(--oq-error-ink); color: var(--oq-error-ink); }
 .oq-kit-stepper strong { font-weight: 500; }
@@ -115,6 +127,17 @@
 
 @media (max-width: 699px) { .oq-kit-card { padding: 20px; } .oq-kit-choices__grid { grid-template-columns: 1fr; } .oq-kit-choice__image { aspect-ratio: 2.5; } }
 @media (prefers-reduced-motion: reduce) { .oq-kit-spinner { animation: none; } .oq-kit-button:not(:disabled):active { transform: none; } }
+/* Reduced motion: no turning ring. The running stage keeps a still halo and
+   a small dot that only fades in and out. */
+@keyframes oq-kit-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) {
+  .oq-kit-stepper [data-status="active"] .oq-kit-stepper__marker::before { animation: none; border-top-color: color-mix(in srgb, var(--oq-action) 18%, transparent); }
+  .oq-kit-stepper [data-status="active"] .oq-kit-stepper__marker::after {
+    content: ""; position: absolute; top: -3px; right: -3px; width: 9px; height: 9px; border-radius: 50%;
+    background: var(--wk-warm, #f2b24d); box-shadow: 0 0 0 2px var(--oq-surface);
+    animation: oq-kit-pulse 1.6s ease-in-out infinite;
+  }
+}
 
 /* --- Dialog ------------------------------------------------------------ */
 .oq-kit-dialog {

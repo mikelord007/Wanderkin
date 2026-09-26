@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Button, Icon } from "../components/index.js";
+import { Button, Icon, Stepper } from "../components/index.js";
+import { buildStageNote } from "../buildStageNotes.js";
 import { LOOK_LABELS, MODE_LABELS, startedHint, type PendingWorld } from "../pendingWorlds.js";
 import { WorldTile } from "./WorldTile.js";
 
@@ -23,6 +24,7 @@ export function PendingWorldTile({ world, now, retrying = false, retryError, onO
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const meta = `${LOOK_LABELS[world.style]} look · ${MODE_LABELS[world.mode]}`;
   const stepIndex = world.stages.findIndex((stage) => stage.id === world.currentStage.id) + 1;
+  const note = buildStageNote(world.currentStage);
 
   if (world.state === "done") {
     return <WorldTile status="ready" badge="New world" title={world.title} image={world.previewUrl ?? world.photoUrl ?? null}
@@ -37,6 +39,7 @@ export function PendingWorldTile({ world, now, retrying = false, retryError, onO
     return <WorldTile status="failed" badge="Needs attention" title={world.title} image={world.photoUrl ?? null} meta={meta}
       onOpen={onOpen} openLabel="see what happened"
       notice={<>
+        <div className="wk-build-status"><Stepper compact stages={world.stages} label={`${world.title}: build progress`} /></div>
         <p className="oq-kit-error">{world.currentStage.label} didn’t finish. {world.error}</p>
         {retryError ? <p className="oq-kit-error" role="alert">{retryError}</p> : null}
       </>}
@@ -59,7 +62,9 @@ export function PendingWorldTile({ world, now, retrying = false, retryError, onO
       <span className="wk-build-strip__fill" style={{ width: `${percent}%` }} />
     </div>}
     notice={<div className="wk-build-status">
+      <Stepper compact stages={world.stages} activeNote={buildStageNote} label={`${world.title}: build progress`} />
       <p className="wk-build-status__stage">{world.currentStage.label}<span> · Step {stepIndex} of {world.stages.length}</span></p>
+      {note ? <p className="wk-build-status__note">{note}</p> : null}
       <p className="wk-build-status__time">{startedHint(world.startedAt, now)}. You can start another world meanwhile.</p>
     </div>}
     actions={<Button variant="secondary" onClick={onOpen}>View progress</Button>} />;

@@ -37,6 +37,13 @@ describe("PendingWorldTile", () => {
     expect(html).not.toContain(">Play<");
   });
 
+  it("building: the same stage circles as the progress screen, with the running one named", () => {
+    const html = render({ world: world({}) });
+    expect(html).toContain('class="oq-kit-stepper oq-kit-stepper--compact"');
+    expect(html).toMatch(/<li data-status="active" aria-current="step"/);
+    expect(html).toContain("Livepeer is building your 3D world now");
+  });
+
   it("done: the same tile as a saved world, with Play first", () => {
     const html = render({ world: world({ state: "done", progress: 1, previewUrl: "/preview.png", resultAssetId: "a1" }) });
     expect(html).toContain('data-status="ready"');
