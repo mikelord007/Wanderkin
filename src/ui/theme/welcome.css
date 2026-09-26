@@ -96,10 +96,8 @@
 .wk-transform__note { margin-top: var(--wk-gap); text-align: center; font-size: var(--wk-type-small); color: var(--wk-text-3); }
 
 /* === How it works (explanatory, tint) ===================================
-   Three identical cards on one checkpoint track: a dotted purple line runs
-   behind the cards and shows in the gaps; each number sits on it. */
-.wk-steps__list { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--wk-grid-gap); list-style: none; margin: 0; padding: 18px 0 0; }
-.wk-steps__list::before { content: ""; position: absolute; left: 10%; right: 10%; top: 18px; border-top: 2px dotted var(--wk-purple); opacity: .55; }
+   Three identical cards, each with its step number on its top edge. */
+.wk-steps__list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--wk-grid-gap); list-style: none; margin: 0; padding: 18px 0 0; }
 .wk-step-card {
   position: relative; display: grid; grid-template-rows: auto auto 1fr; gap: var(--wk-gap-sm);
   padding: var(--wk-card-pad); padding-top: calc(var(--wk-card-pad) + 8px);
@@ -109,7 +107,7 @@
   position: absolute; top: 0; left: var(--wk-card-pad); transform: translateY(-50%);
   width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%;
   background: var(--wk-surface); color: var(--wk-purple-ink); border: 2px solid var(--wk-purple);
-  font-size: .875rem; font-weight: 600; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 5px var(--wk-tint);
+  font-size: .875rem; font-weight: 600; font-variant-numeric: tabular-nums;
 }
 .wk-step-card__media { aspect-ratio: 4 / 3; overflow: hidden; border-radius: var(--wk-r-inner); background: var(--wk-tint); margin-bottom: 6px; }
 .wk-step-card__media img { width: 100%; height: 100%; object-fit: cover; }
@@ -119,24 +117,33 @@
 .wk-step-card p { color: var(--wk-text-2); max-inline-size: 36ch; }
 
 /* === Scale interlude ====================================================
-   Breaks the rhythm without stopping the page: 50-65vh, a big statement on
-   the left, a huge sewing button entering from the right edge. */
+   Breaks the rhythm without stopping the page: a 50-65vh band with room
+   above and below, a big statement on the left, a huge sewing button
+   entering from the right edge. */
 .wk-interlude {
+  /* Breathing room from its neighbours: a section's space above, half as much
+     again below. The 50-65vh band sits between them. */
+  --interlude-top: var(--wk-section-y);
+  --interlude-bottom: calc(var(--wk-section-y) * 1.5);
+  --interlude-mid: calc(50% - var(--wk-section-y) * .25);
   position: relative; overflow: hidden; display: grid; align-items: center;
-  min-height: clamp(360px, 56vh, 580px);
-  /* The page colour, with the tint pooled only behind the giant button, so it
-     separates cleanly from the tinted section above it. */
-  background: radial-gradient(ellipse 48% 80% at 96% 50%, #ece3ff 0%, #f4efff 45%, #faf7ff00 75%), var(--wk-page);
+  min-height: calc(clamp(360px, 56vh, 580px) + var(--interlude-top) + var(--interlude-bottom));
+  padding-block: var(--interlude-top) var(--interlude-bottom);
+  /* The page colour, with the tint pooled only behind the giant button and
+     faded out before either edge, so it never meets the next section. */
+  background: radial-gradient(ellipse 44% 40% at 96% var(--interlude-mid), #ece3ff 0%, #f4efff 45%, #faf7ff00 75%), var(--wk-page);
 }
 .wk-interlude__inner { position: relative; z-index: 1; }
 .wk-interlude__line {
   max-inline-size: 13ch; font-size: clamp(2.2rem, 1.3rem + 3.4vw, 4.2rem);
   font-weight: 300; letter-spacing: -.04em; line-height: 1.02; color: var(--wk-text);
 }
+/* Centred on the band, and sized so the whole disc (and the explorer on its
+   rim) stays clear of the section's top and bottom edges. */
 .wk-interlude__scene {
-  --s: clamp(360px, 46vw, 700px);
-  position: absolute; top: 50%; right: calc(var(--s) * -.26); width: var(--s); aspect-ratio: 1;
-  transform: translateY(-44%);
+  --s: clamp(340px, 40vw, 580px);
+  position: absolute; top: var(--interlude-mid); right: calc(var(--s) * -.26); width: var(--s); aspect-ratio: 1;
+  transform: translateY(-50%);
 }
 .wk-interlude__button { width: 100%; height: 100%; filter: drop-shadow(0 30px 40px rgba(36, 20, 61, .14)); }
 /* Standing on the button's rim (radius 92 of 100, so 4% down from the top). */
@@ -311,12 +318,10 @@
   .wk-transform__pair { grid-template-columns: 1fr; justify-items: stretch; }
   .wk-transform__link { justify-self: center; transform: rotate(90deg); width: 48px; height: 48px; }
   .wk-steps__list { grid-template-columns: 1fr; gap: calc(var(--wk-grid-gap) + 16px); padding-top: 16px; }
-  /* One column: the track runs down the left edge through each number. */
-  .wk-steps__list::before { left: calc(var(--wk-card-pad) + 15px); right: auto; top: 16px; bottom: 0; border-top: 0; border-left: 2px dotted var(--wk-purple); }
   .wk-library-empty, .wk-library-invite { grid-template-columns: 1fr; }
   .wk-library-invite__copy { padding: 0 var(--oq-space-2) var(--oq-space-2); }
   .wk-library-empty__copy { padding: 0 var(--oq-space-2) var(--oq-space-2); }
-  .wk-interlude { min-height: 0; padding-block: var(--wk-section-y) 0; align-items: start; }
+  .wk-interlude { min-height: 0; padding-block: var(--interlude-top) var(--interlude-bottom); align-items: start; background: radial-gradient(ellipse 70% 30% at 90% 70%, #ece3ff 0%, #f4efff 45%, #faf7ff00 75%), var(--wk-page); }
   .wk-interlude__scene { position: relative; top: auto; right: auto; transform: none; --s: min(80vw, 380px); margin: var(--wk-gap) -14vw 0 auto; }
 }
 @media (max-width: 620px) {
