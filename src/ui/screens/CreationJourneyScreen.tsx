@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { STYLE_DEFINITIONS, type ImageEditGenerationRequest, type ImageTo3dGenerationRequest } from "@shared/index.js";
 import { approvePreview, describeApiError, getJob, retryJob, submitGeneration, submitPreview, uploadPhotos } from "../api.js";
-import { canBuildWorld, createCreationRecord, withCreationUpdate, type CreationRecord } from "../creationFlow.js";
+import { buildWorldExtrasRequests, canBuildWorld, createCreationRecord, withCreationUpdate, type CreationRecord } from "../creationFlow.js";
 import { loadActiveCreation, saveCreationRecord, setActiveCreationId, updateCreationJob } from "../creationStorage.js";
 import { saveActiveSource } from "../jobStorage.js";
 import { CaptureScreen } from "./CaptureScreen.js";
@@ -11,7 +11,9 @@ import { StylePreviewScreen } from "./StylePreviewScreen.js";
 
 interface CreationJourneyScreenProps { onJobStarted: (jobId: string) => void; onBack: () => void; }
 function newKey(prefix: string): string { const suffix = "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`; return `${prefix}-${suffix}`; }
-function initialRecord(): CreationRecord { const restored = loadActiveCreation(); if (restored) return restored; const record = createCreationRecord(newKey("world")); saveCreationRecord(record); setActiveCreationId(record.id); return record; }
+/** Resumes the creation in progress, but never one whose build has started:
+ * that one lives in My worlds now, so Create starts again at step 1. */
+function initialRecord(): CreationRecord { const restored = loadActiveCreation(); if (restored && restored.step !== "building" && restored.step !== "ready") return restored; const record = createCreationRecord(newKey("world")); saveCreationRecord(record); setActiveCreationId(record.id); return record; }
 
 export function CreationJourneyScreen({ onJobStarted, onBack }: CreationJourneyScreenProps) {
   const [record, setRecord] = useState<CreationRecord>(initialRecord);
@@ -105,7 +107,18 @@ export function CreationJourneyScreen({ onJobStarted, onBack }: CreationJourneyS
     if (!canBuildWorld(record) || !record.photo) return; setBusy(true); setError(null);
     const reviewedImageAssetId = record.reviewedImageAssetId ?? record.objectImage?.id ?? record.photo.id;
     const request: ImageTo3dGenerationRequest = { schemaVersion: 1, kind: "image-to-3d", capability: "rodin-i3d", idempotencyKey: newKey("shape"), purpose: "world-mesh", photos: [{ photoId: record.photo.id, sourceIndex: 1 }], sourceImageAssetIds: [reviewedImageAssetId], styleReferenceAssetId: record.preview.asset.id, scenePrompt: `${STYLE_DEFINITIONS[record.selection.style].imagePrompts.geometryReference} ${record.selection.atmosphere}`.trim() };
-    try { const job = await submitGeneration({ request, worldId: record.id }); const next = updateCreationJob(withCreationUpdate(record, { step: "building" }), "shape", job); persist(next); saveActiveSource({ kind: "job", jobId: job.id, photos: [record.photo] }); navigatedJob.current = job.id; onJobStarted(job.id); }
+    try {
+      const job = await submitGeneration({ request, worldId: record.id });
+      let next = updateCreationJob(withCreationUpdate(record, { step: "building" }), "shape", job); persist(next);
+      // Story and music start with the shape, so they are made even if nobody
+      // opens the progress screen (the build now continues from My worlds).
+      // A failure here is not fatal: the progress screen submits whatever is
+      // still missing when it opens.
+      const extras = await Promise.allSettled(buildWorldExtrasRequests(next, newKey).map(([stage, extra]) => submitGeneration({ request: extra, worldId: next.id }).then(extraJob => [stage, extraJob] as const)));
+      for (const result of extras) if (result.status === "fulfilled") next = updateCreationJob(next, result.value[0], result.value[1]);
+      persist(next);
+      saveActiveSource({ kind: "job", jobId: job.id, photos: [record.photo] }); navigatedJob.current = job.id; onJobStarted(job.id);
+    }
     catch (caught) { setError(describeApiError(caught)); } finally { setBusy(false); }
   }
 

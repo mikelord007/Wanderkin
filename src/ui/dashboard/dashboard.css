@@ -142,6 +142,44 @@
 .wk-tile--skeleton .wk-tile__info span:last-child { width: 85%; }
 @keyframes wk-shimmer { to { background-position: -150% 0; } }
 
+/* === Worlds being built ================================================= *
+ * The same tile as a saved world. While it builds: the source photo, a slim
+ * progress strip along its foot, the stage in progress and when it started.
+ * The title stretches over the whole card, so any click opens the progress;
+ * the buttons sit above it. */
+.wk-tile[data-status="building"] { --tile-border: #cbbcf9; --tile-light: var(--wk-purple); }
+.wk-tile--openable { position: relative; cursor: pointer; }
+.wk-tile__open {
+  padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit; text-align: left; cursor: pointer;
+}
+.wk-tile__open::after { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
+.wk-tile__open:focus-visible { outline: none; }
+.wk-tile--openable:has(.wk-tile__open:focus-visible) { outline: 3px solid var(--wk-purple); outline-offset: 3px; }
+.wk-tile--openable .wk-tile__actions, .wk-tile--openable .oq-kit-error { position: relative; z-index: 2; }
+
+.wk-build-strip { position: absolute; left: 0; right: 0; bottom: 0; height: 6px; overflow: hidden; background: #ffffffcc; }
+.wk-build-strip__fill {
+  position: relative; display: block; height: 100%; overflow: hidden;
+  background: var(--wk-purple); border-radius: 0 3px 3px 0;
+  transition: width 600ms var(--oq-ease);
+}
+/* A soft light travelling along the filled part: the build is alive. */
+.wk-build-strip__fill::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, #ffffff00 0%, #ffffff8c 50%, #ffffff00 100%) 0 0 / 40% 100% no-repeat;
+  animation: wk-build-sheen 1.8s linear infinite;
+}
+@keyframes wk-build-sheen { from { background-position: -40% 0; } to { background-position: 140% 0; } }
+.wk-build-status { display: grid; gap: 2px; margin-top: 2px; }
+.wk-build-status__stage { font-size: var(--wk-type-small); font-weight: 500; color: var(--wk-text); }
+.wk-build-status__stage span { font-weight: 400; color: var(--wk-text-3); }
+.wk-build-status__time { font-size: var(--wk-type-small); color: var(--wk-text-2); }
+.wk-tile__confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; font-size: var(--wk-type-small); color: var(--wk-text); }
+.wk-tile__confirm span { margin-right: auto; }
+.wk-tile__confirm .oq-kit-button { min-height: 40px; padding: 8px 14px; }
+.wk-tile .wk-tile__discard { color: var(--oq-error-ink); }
+.wk-page__toast .oq-kit-toast { margin-top: calc(var(--wk-gap-group) * -.5); }
+
 /* === Account ============================================================ */
 .wk-account {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--wk-gap);
@@ -201,4 +239,6 @@
   .wk-shell__link, .wk-resume__picture img { transition: none; }
   .wk-resume:hover .wk-resume__picture img, .wk-resume:focus-within .wk-resume__picture img { transform: none; }
   .wk-tile--skeleton .wk-tile__image, .wk-tile--skeleton .wk-tile__info span { animation: none; }
+  .wk-build-strip__fill { transition: none; }
+  .wk-build-strip__fill::after { animation: none; display: none; }
 }

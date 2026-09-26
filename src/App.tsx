@@ -43,6 +43,8 @@ import {
 import { LegalScreen } from "./ui/legal/LegalScreen.js";
 import type { LegalDocumentId } from "./ui/legal/legalDocuments.js";
 import { supportEmail } from "./ui/legal/supportContact.js";
+import { findCreationByShapeJob, handOffBuild } from "./ui/pendingWorldStore.js";
+import type { PendingWorld } from "./ui/pendingWorlds.js";
 import {
   clearActiveSource,
   clearPendingSubmission,
@@ -70,7 +72,8 @@ type Screen =
   /** The public landing. `signInPrompt` asks a signed-out visitor to sign in
    * for the account-only page they opened (kept in the URL as `returnTo`). */
   | { name: "start"; signInPrompt?: SignInPrompt }
-  | { name: "worlds" }
+  /** `notice`: a one-off message, e.g. after a build moves here from Create. */
+  | { name: "worlds"; notice?: string }
   | { name: "samples" }
   | { name: "account" }
   | { name: "auth-callback" }
@@ -157,7 +160,8 @@ function resolveSyncScreen(route: ParsedRoute, signedIn: boolean): Screen | null
       }
       if (resume.screen === "photos") return { name: "photos" };
       const creation = loadActiveCreation();
-      if (creation && creation.step !== "ready") return { name: "photos" };
+      // A creation whose build has started lives in My worlds, not Create.
+      if (creation && creation.step !== "ready" && creation.step !== "building") return { name: "photos" };
       return { name: "worlds" };
     }
     case "create":
@@ -496,16 +500,29 @@ export function App() {
   }, [goStart]);
 
   const handleJobStarted = useCallback((jobId: string) => {
-    // PhotosScreen already persisted the ActiveSource record (kind "job",
-    // with its source photos) and cleared the PendingSubmission the moment
-    // the POST response confirmed a durable job id — navigation is all
-    // that's left.
+    // Signed in, the build leaves Create and continues as a card in My
+    // worlds, so another world can be started at once. Create forgets it
+    // (step 1 next time); the creation record and its jobs stay durable.
+    const creation = findCreationByShapeJob(jobId);
+    if (signedInRef.current && creation) {
+      handOffBuild(creation);
+      clearActiveSource();
+      go({ name: "worlds", notice: "Building your world. Watch it here." });
+      return;
+    }
+    // Otherwise, as before: PhotosScreen already persisted the ActiveSource
+    // record (kind "job", with its source photos) and cleared the
+    // PendingSubmission once the POST confirmed a durable job id.
     go({ name: "generation", jobId });
   }, [go]);
 
   const handleJobReady = useCallback((job: GenerationJob) => {
     const current = loadActiveSource();
-    const sourcePhotos = current?.kind === "job" ? current.photos : [];
+    // A build opened from My worlds has no reload-recovery record; its
+    // creation still knows the photo it came from.
+    const creation = findCreationByShapeJob(job.id);
+    if (creation) setActiveCreationId(creation.id);
+    const sourcePhotos = current?.kind === "job" ? current.photos : creation?.photo ? [creation.photo] : [];
     if (!job.resultAssetId) {
       clearActiveSource();
       go({ name: "start" });
@@ -529,9 +546,38 @@ export function App() {
 
   const handleJobCancelled = useCallback(() => {
     // Leaving progress never cancels or forgets durable work. My worlds can
-    // reopen the same application job without another submission.
+    // reopen the same application job without another submission. Signed in,
+    // the "My worlds" button goes there, and Create no longer points at a
+    // world that is already building.
+    if (signedInRef.current) {
+      const active = loadActiveCreation();
+      if (active?.step === "building") clearActiveCreationId();
+      go({ name: "worlds" });
+      return;
+    }
     go({ name: "start" });
   }, [go]);
+
+  /** Opens the full progress of a world building on My worlds. */
+  const openBuild = useCallback((world: PendingWorld) => {
+    setActiveCreationId(world.id);
+    go({ name: "generation", jobId: world.shapeJobId });
+  }, [go]);
+
+  /** Plays a world whose build finished: the course is prepared from the new
+   * shape, exactly as "Prepare my course" does on the progress screen. */
+  const playBuiltWorld = useCallback((world: PendingWorld) => {
+    if (!world.resultAssetId) { openBuild(world); return; }
+    setActiveCreationId(world.id);
+    const creation = findCreationByShapeJob(world.shapeJobId);
+    go({
+      name: "preparation",
+      source: creation?.photo
+        ? { kind: "asset", assetId: world.resultAssetId, sourcePhotos: [creation.photo] }
+        : { kind: "asset", assetId: world.resultAssetId },
+      isNew: true,
+    });
+  }, [go, openBuild]);
 
   const handleSavePreparedLevel = useCallback(
     async (manifest: SceneManifest) => {
@@ -641,6 +687,10 @@ export function App() {
             setActiveCreationId(creationId);
             go({ name: "photos" });
           }}
+          onOpenBuild={openBuild}
+          onPlayBuiltWorld={playBuiltWorld}
+          notice={screen.notice ?? null}
+          onDismissNotice={() => go({ name: "worlds" }, { replace: true })}
         />
       ));
 

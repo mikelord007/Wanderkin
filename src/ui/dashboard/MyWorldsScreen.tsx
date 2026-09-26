@@ -1,11 +1,15 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { SceneManifest } from "@shared/index.js";
-import { Button, Icon } from "../components/index.js";
+import { Button, Icon, Toast } from "../components/index.js";
 import { listDrafts } from "../../editor/draftStorage.js";
 import { missingAssetUrls, savedWorldItems, savedWorldOrigin, type WorldListItem } from "../worlds.js";
 import { describeApiError, downloadLevelBundle, importAsset, importLevelBundle, listLevels } from "../api.js";
 import { WorldPostcardPanel } from "../../capture/MediaCards.js";
 import { BRAND_NAME } from "../../brand.js";
+import type { PendingWorld } from "../pendingWorlds.js";
+import { NoPicture, WorldTile } from "./WorldTile.js";
+import { PendingWorldTile } from "./PendingWorldTile.js";
+import { usePendingWorlds } from "./usePendingWorlds.js";
 import "../theme/welcome.css";
 import "./dashboard.css";
 
@@ -30,38 +34,6 @@ function modeLabel(manifest: SceneManifest): string {
   return kind === "collect" ? "Lost Colors" : kind === "race" ? "Race" : kind === "explore" ? "Explore" : "Checkpoint course";
 }
 
-/** A world with no picture yet: a blank print on the lavender stage, saying so
- * plainly, so the tile never pretends to show something it doesn't have. */
-function NoPicture() {
-  return <div className="wk-no-picture" aria-hidden="true">
-    <span className="wk-print"><Icon name="photo" /></span>
-    <span className="wk-no-picture__label">No picture yet</span>
-  </div>;
-}
-
-type TileStatus = "ready" | "draft" | "pending" | "failed";
-
-/** One world in the library: a 16:9 picture with a status badge on it, then
- * its name and details, then one primary action and quiet secondary ones. */
-function WorldTile({ status, badge, title, image = null, meta, notice, actions, children }: {
-  status: TileStatus; badge: string; title: string; image?: string | null;
-  meta?: string; notice?: ReactNode; actions?: ReactNode; children?: ReactNode;
-}) {
-  return <article className="wk-tile" data-status={status}>
-    <div className="wk-tile__image">
-      {image ? <img src={image} alt="" loading="lazy" /> : <NoPicture />}
-      <p className="wk-tile__badge">{badge}</p>
-    </div>
-    <div className="wk-tile__info">
-      <h3>{title}</h3>
-      {meta ? <p className="wk-tile__meta">{meta}</p> : null}
-      {notice}
-      {actions ? <div className="wk-tile__actions">{actions}</div> : null}
-      {children}
-    </div>
-  </article>;
-}
-
 export interface MyWorldsScreenProps {
   onPlaySavedLevel: (manifest: SceneManifest) => void;
   onEditSavedLevel: (manifest: SceneManifest) => void;
@@ -73,6 +45,13 @@ export interface MyWorldsScreenProps {
   onResumePendingWorld?: (jobId: string) => void;
   onRetryFailedWorld?: (jobId: string) => void;
   onBrowseSamples: () => void;
+  /** A world still being built: open its full progress. */
+  onOpenBuild?: (world: PendingWorld) => void;
+  /** A world whose build just finished: go and play it. */
+  onPlayBuiltWorld?: (world: PendingWorld) => void;
+  /** A one-off message, e.g. "Building your world. Watch it here." */
+  notice?: string | null;
+  onDismissNotice?: () => void;
 }
 
 /**
@@ -91,7 +70,12 @@ export function MyWorldsScreen({
   onResumePendingWorld,
   onRetryFailedWorld,
   onBrowseSamples,
+  onOpenBuild,
+  onPlayBuiltWorld,
+  notice = null,
+  onDismissNotice,
 }: MyWorldsScreenProps) {
+  const builds = usePendingWorlds();
   const [savedLevels, setSavedLevels] = useState<SceneManifest[] | null>(null);
   const [savedError, setSavedError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -116,9 +100,12 @@ export function MyWorldsScreen({
     return () => { cancelled = true; };
   }, [attempt]);
 
+  // Creations being built show as their own cards (above), so they are left
+  // out of the older creation list here rather than shown twice.
+  const buildIds = useMemo(() => new Set(builds.cards.map((card) => card.id)), [builds.cards]);
   const worldItems = useMemo(
-    () => (savedLevels ? [...additionalWorldItems, ...savedWorldItems(savedLevels, drafts)] : []),
-    [additionalWorldItems, drafts, savedLevels],
+    () => (savedLevels ? [...additionalWorldItems.filter((item) => !buildIds.has(item.id)), ...savedWorldItems(savedLevels, drafts)] : []),
+    [additionalWorldItems, buildIds, drafts, savedLevels],
   );
   // The world to jump back into: the most recently saved finished world.
   const latest = useMemo(() => {
@@ -188,7 +175,11 @@ export function MyWorldsScreen({
     }
   }
 
-  const count = savedLevels ? worldItems.length : null;
+  const count = savedLevels ? worldItems.length + builds.cards.length : null;
+  const buildTiles = builds.cards.map((world) => <PendingWorldTile key={`build-${world.id}`} world={world} now={builds.now}
+    retrying={builds.retrying === world.id} retryError={builds.errors[world.id]}
+    onOpen={() => onOpenBuild?.(world)} onPlay={() => onPlayBuiltWorld?.(world)}
+    onRetry={() => void builds.retry(world)} onDiscard={() => builds.discard(world)} />);
   const latestImage = latest ? worldImage(latest) : null;
 
   return (
@@ -204,6 +195,7 @@ export function MyWorldsScreen({
         </div>
         <Button onClick={onCreateFromPhotos}><Icon name="plus" />Create a world</Button>
       </header>
+      {notice ? <div className="wk-page__toast"><Toast message={notice} tone="info" onDismiss={() => onDismissNotice?.()} /></div> : null}
 
       {latest ? (
         <section className="wk-resume" aria-labelledby="resume-heading">
@@ -234,9 +226,10 @@ export function MyWorldsScreen({
           </div>
         ) : !savedLevels ? (
           <div className="wk-library__grid" role="status" aria-label="Loading your worlds">
-            {[0, 1, 2].map((index) => <div key={index} className="wk-tile wk-tile--skeleton" aria-hidden="true"><div className="wk-tile__image" /><div className="wk-tile__info"><span /><span /></div></div>)}
+            {buildTiles}
+            {[0, 1, 2].slice(buildTiles.length).map((index) => <div key={index} className="wk-tile wk-tile--skeleton" aria-hidden="true"><div className="wk-tile__image" /><div className="wk-tile__info"><span /><span /></div></div>)}
           </div>
-        ) : worldItems.length === 0 ? (
+        ) : worldItems.length === 0 && buildTiles.length === 0 ? (
           <div className="wk-library-empty">
             {/* The blank print the first photo will fill, as on the capture step. */}
             <div className="wk-library-empty__scene" aria-hidden="true">
@@ -252,7 +245,7 @@ export function MyWorldsScreen({
             </div>
           </div>
         ) : (
-          <div className="wk-library__grid">{worldItems.map((item) => {
+          <div className="wk-library__grid">{buildTiles}{worldItems.map((item) => {
             if (item.kind === "pending") return <WorldTile key={`pending-${item.id}`} status="pending" badge="In progress" title={item.title || "Untitled world"}
               meta={item.statusText ?? `Generation is ${item.job.state}. Leaving this page does not cancel it.`}
               actions={onResumePendingWorld ? <Button onClick={() => onResumePendingWorld(item.job.id)}>{item.actionLabel ?? "Resume"}</Button> : null} />;
