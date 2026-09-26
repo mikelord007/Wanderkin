@@ -22,7 +22,7 @@ import type { BiomeId, BiomeLayout, EffectsQuality } from "../types.js";
 import { ADVENTURE_TIME_BUDGET_MS, WorkDeadline } from "../workBudget.js";
 
 const RUNTIME = toMiniatureScale(DEFAULT_MOVEMENT_CONFIG);
-const THEMED: readonly BiomeId[] = ["tropical", "desert", "alpine", "autumn", "ember"];
+const THEMED: readonly BiomeId[] = ["tropical", "desert", "alpine", "autumn", "ember", "monsoon"];
 const SCANS = ["sample-rodin-room-corner", "sample-tripo-room-corner"] as const;
 const IDENTITY = { x: 0, y: 0, z: 0, w: 1 };
 const onlyProps = (collider: { collisionGroups(): number }) => isPropGroups(collider.collisionGroups());

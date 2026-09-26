@@ -222,7 +222,7 @@ describe("generated adventures are completable by the real controller at miniatu
 });
 
 describe("generated adventures stay completable with every look's props solid", () => {
-  const LOOKS: readonly BiomeId[] = ["tropical", "desert", "alpine", "autumn", "ember"];
+  const LOOKS: readonly BiomeId[] = ["tropical", "desert", "alpine", "autumn", "ember", "monsoon"];
   const SCANS: [string, () => GeometryFixture][] = [
     ["real Rodin scan", () => sampleScanFixture("sample-rodin-room-corner")],
     ["real Tripo scan", () => sampleScanFixture("sample-tripo-room-corner")],
