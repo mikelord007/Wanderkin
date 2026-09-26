@@ -9,6 +9,7 @@ import { ALPINE_ART } from "./alpine.js";
 import { AUTUMN_ART } from "./autumn.js";
 import { DESERT_ART } from "./desert.js";
 import { EMBER_ART } from "./ember.js";
+import { MONSOON_ART } from "./monsoon.js";
 import { TROPICAL_ART } from "./tropical.js";
 
 /**
@@ -21,6 +22,7 @@ const FACTORIES: Partial<Record<BiomeId, () => BiomeArt>> = {
   alpine: () => ALPINE_ART,
   autumn: () => AUTUMN_ART,
   ember: () => EMBER_ART,
+  monsoon: () => MONSOON_ART,
 };
 
 const cache = new Map<BiomeId, BiomeArt>();

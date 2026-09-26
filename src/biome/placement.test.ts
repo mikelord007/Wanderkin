@@ -120,7 +120,7 @@ describe("prepareBiomeLayout", () => {
 
   it.each(FIXTURES.map((make) => [make().name, make] as const))("%s: every themed look's props are supported, fitted and apart", (_name, make) => {
     const fixture = make();
-    for (const biome of ["tropical", "desert", "alpine", "autumn", "ember"] as const) {
+    for (const biome of ["tropical", "desert", "alpine", "autumn", "ember", "monsoon"] as const) {
       const layout = layoutFor(fixture, biome);
       expect(layout.props.length).toBeGreaterThan(0);
       assertPropsSafe(fixture, layout);
@@ -132,7 +132,7 @@ describe("prepareBiomeLayout", () => {
     for (const template of ["restore-portal", "reach-beacon"] as const) {
       const adventure = generateAdventure({ manifest: fixture.manifest, assets: fixture.assets, movement: RUNTIME, template, seed: "route" }, DEFAULT_ADVENTURE_BUDGET, unhurried());
       const played = { manifest: adventure.manifest, assets: fixture.assets };
-      for (const biome of ["tropical", "desert", "alpine", "autumn", "ember"] as const) {
+      for (const biome of ["tropical", "desert", "alpine", "autumn", "ember", "monsoon"] as const) {
         const layout = layoutFor(played, biome);
         expect(layout.props.length).toBeGreaterThan(0);
         assertPropsSafe(played, layout);
@@ -173,7 +173,7 @@ describe("prepareBiomeLayout", () => {
       const fixture = sampleScanFixture(id, true);
       const boxes = helperEntitiesOf(fixture.manifest).filter((entity) => entity.kind !== "floor").map((entity) => computeBounds(helperEntityTriangles(entity)));
       expect(boxes.length).toBeGreaterThan(0);
-      for (const biome of ["tropical", "desert", "alpine", "autumn", "ember"] as const) {
+      for (const biome of ["tropical", "desert", "alpine", "autumn", "ember", "monsoon"] as const) {
         const layout = layoutFor(fixture, biome);
         const skirts = layout.props.filter((prop) => prop.id.includes("-skirt-"));
         expect(skirts.length, `${id} ${biome} skirts`).toBeGreaterThan(0);
@@ -206,7 +206,7 @@ describe("prepareBiomeLayout", () => {
   it("gives every requested kind a share of the layout on real scans, standard and reduced", () => {
     for (const id of ["sample-rodin-room-corner", "sample-tripo-room-corner"]) {
       const fixture = sampleScanFixture(id, true);
-      for (const biome of ["tropical", "desert", "alpine", "autumn", "ember"] as const) {
+      for (const biome of ["tropical", "desert", "alpine", "autumn", "ember", "monsoon"] as const) {
         const standard = layoutFor(fixture, biome);
         const reduced = layoutFor(fixture, biome, "layout", "reduced");
         for (const kind of getBiomeDefinition(biome).props.kinds) {

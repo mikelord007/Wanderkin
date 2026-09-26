@@ -27,7 +27,7 @@
 .oq-adventure__option-label { font-weight: 600; font-size: .9rem; }
 .oq-adventure__option-description { font-size: .78rem; line-height: 1.4; color: #5a4c74; }
 
-/* --- The look picker: six looks in a 3 x 2 grid of compact tiles. Each tile
+/* --- The look picker: seven looks in a grid of three columns of compact tiles. Each tile
    is a tiny landscape (sky fading to its horizon over the ground, with one
    glint of the look's collectible colour) beside the name and one short line.
    The swatches are content, a preview of each place's colours, so they keep
@@ -86,7 +86,7 @@
 .oq-adventure .oq-adventure__error p { margin: 0; font-size: .875rem; color: #8a1f18; }
 
 /* Narrow cards (phones, and the pause card below ~600px): two columns keep
-   all six looks visible in three short rows. */
+   all seven looks visible in four short rows. */
 @media (max-width: 600px) {
   .oq-adventure__looks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* Each tile stacks: the landscape becomes a strip across the top. */

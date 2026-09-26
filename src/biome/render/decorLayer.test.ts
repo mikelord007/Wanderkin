@@ -71,7 +71,7 @@ describe("biome decoration layer", () => {
     expect(missing.root.children).toHaveLength(0);
   });
 
-  for (const id of ["tropical", "desert", "alpine", "autumn", "ember"] as const) {
+  for (const id of ["tropical", "desert", "alpine", "autumn", "ember", "monsoon"] as const) {
     it(`${id}: props merged into a few buckets, only its own kinds, inside every budget`, () => {
       const definition = getBiomeDefinition(id);
       const layer = createBiomeLayer({ definition, layout: fixtureLayout(id), quality: "standard", reducedMotion: false });
@@ -161,7 +161,7 @@ describe("biome decoration layer", () => {
   });
 
   it("grounds every cluster with contact decals that stay inside its footprint", () => {
-    for (const id of ["tropical", "desert", "alpine", "autumn", "ember"] as const) {
+    for (const id of ["tropical", "desert", "alpine", "autumn", "ember", "monsoon"] as const) {
       const layout = fixtureLayout(id);
       const layer = createBiomeLayer({ definition: getBiomeDefinition(id), layout, quality: "standard", reducedMotion: false });
       const contact = layer.root.getObjectByName("biome-contact") as THREE.InstancedMesh;

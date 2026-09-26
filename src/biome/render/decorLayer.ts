@@ -31,6 +31,7 @@ import { resolveBiomeLighting } from "../assets/lighting.js";
 import type { AssetShading } from "../assets/types.js";
 import { PROP_UNIT_RADIUS } from "./propGeometry.js";
 import { createPropMaterial } from "./propMaterial.js";
+import { createRain, type RainLayer } from "./rain.js";
 import { layoutMatchesDefinition, selectProps, selectSurfacePatches } from "./selection.js";
 import { createWindsock, type Windsock } from "./windsock.js";
 import { createWindUniforms } from "./wind.js";
@@ -68,6 +69,8 @@ export interface BiomeLayerStats {
   contacts: number;
   /** Solid-prop colliders offered to physics (before its step-height skip). */
   colliders: number;
+  /** Rain drops simulated at full motion (0 = no rain). */
+  rainDrops: number;
   dropped: { invalid: number; kind: number; budget: number; clamped: number };
   skipped: string[];
 }
@@ -80,7 +83,8 @@ export interface BiomeLayerHandle {
   /** World yaw of the windsock heading, or null when none is drawn. */
   readonly windsockYaw: number | null;
   readonly disposed: boolean;
-  update(elapsedSeconds: number, deltaSeconds: number): void;
+  /** `camera` places the rain around the view; everything else ignores it. */
+  update(elapsedSeconds: number, deltaSeconds: number, camera?: THREE.Camera | null): void;
   setReducedMotion(reduced: boolean): void;
   /**
    * Marks the layer live again after a `dispose()` (React StrictMode runs
@@ -118,6 +122,7 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
     trimmed: 0,
     contacts: 0,
     colliders: 0,
+    rainDrops: 0,
     dropped: { invalid: 0, kind: 0, budget: 0, clamped: 0 },
     skipped: [],
   };
@@ -125,6 +130,7 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
   const materials: THREE.Material[] = [];
   let particles: ParticleField | null = null;
   let windsock: Windsock | null = null;
+  let rain: RainLayer | null = null;
   let disposed = false;
   const colliders: PropCollider[] = [];
   let motion = reducedMotion ? 0 : 1;
@@ -141,17 +147,19 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
     get disposed() {
       return disposed;
     },
-    update(elapsed, delta) {
+    update(elapsed, delta, camera) {
       if (disposed) return;
       wind.uWindTime.value = elapsed;
       particles?.advance(delta, motion);
       windsock?.update(elapsed, motion);
+      rain?.update(delta, elapsed, camera ?? null);
     },
     setReducedMotion(reduced) {
       motion = reduced ? 0 : 1;
       wind.uWindMotion.value = motion;
       if (particles) particles.object.visible = !reduced;
       windsock?.update(0, motion);
+      rain?.setReducedMotion(reduced);
     },
     retain() {
       disposed = false;
@@ -198,10 +206,13 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
   const clustered = selection.props.filter(({ placement }) => placement.kind !== "windsock");
   const sockPlacement = selection.props.find(({ placement }) => placement.kind === "windsock");
   const shadingMaterials = new Map<AssetShading, THREE.MeshStandardMaterial>();
+  // Rainy looks: a wet sheen (uniform only; the prop program is unchanged).
+  const wetness = Math.min(1, Math.max(0, art?.atmosphere?.rain?.wetness ?? 0));
   const materialFor = (shading: AssetShading) => {
     let material = shadingMaterials.get(shading);
     if (!material) {
       material = createPropMaterial(wind, shading);
+      if (wetness > 0) material.roughness *= 1 - 0.45 * wetness;
       shadingMaterials.set(shading, material);
       materials.push(material);
     }
@@ -286,6 +297,8 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
   if (patches.length > 0 && canDraw("patches", 1)) {
     const owned = createSupportPatches(patches, definition, layout.seed, art?.ground.patches);
     if (owned) {
+      // Wet looks: patches become glossy puddles that catch the light.
+      if (wetness > 0) for (const material of owned.materials) (material as THREE.MeshStandardMaterial).roughness = 1 - 0.7 * wetness;
       geometries.push(...owned.geometries);
       materials.push(...owned.materials);
       stats.patches = patches.length;
@@ -319,6 +332,20 @@ export function createBiomeLayer({ definition, layout, quality, reducedMotion }:
     materials.push(...particles.materials);
     stats.particles = particleCount;
     track(particles.object);
+  }
+
+  // ---- Rain (art opt-in; splashes need geometry's ground heights) -----------
+  const rainStyle = art?.atmosphere?.rain;
+  if (rainStyle && definition.ambient.rain && layout.ground && canDraw("rain", 2)) {
+    rain = createRain({ style: rainStyle, ground: layout.ground, water: layout.water, wind: definition.wind, quality, reducedMotion, seed: layout.seed });
+    if (rain) {
+      geometries.push(...rain.geometries);
+      materials.push(...rain.materials);
+      stats.rainDrops = rain.simulation.maxDrops;
+      track(rain.object);
+    } else {
+      stats.drawCalls -= 2;
+    }
   }
 
   return handle;

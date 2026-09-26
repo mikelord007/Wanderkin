@@ -37,6 +37,7 @@ import {
   surfaceFromAuthoredCentre,
   type SceneAnalysis,
 } from "./geometry.js";
+import { sampleGroundHeights } from "./groundHeights.js";
 import { PROP_UNIT_RADIUS } from "./render/propGeometry.js";
 import type {
   BiomeDefinition,
@@ -172,6 +173,10 @@ export function prepareBiomeLayout(input: BiomePreparationInput): BiomeLayout {
   }
   const patches = placeSurfacePatches(analysis, definition, seed, patchBudget);
   const water = definition.ambient.water ? waterRing(manifest, analysis, geometry, diagnostics) : null;
+  // Rain looks only: where drops land (render/rain.ts). Read-only rays.
+  const ground = definition.ambient.rain
+    ? sampleGroundHeights(analysis.grid, analysis.surfaces.bounds, bodyHeight, bodyHeight * 2)
+    : null;
 
   diagnostics.push(
     `${props.length} props (budget ${propBudget}), ${patches.length} surface patches, ${exclusion.exclusions.length} gameplay exclusions${
@@ -187,6 +192,7 @@ export function prepareBiomeLayout(input: BiomePreparationInput): BiomeLayout {
     exclusions: exclusion.exclusions,
     bounds: { min: analysis.surfaces.bounds.min, max: analysis.surfaces.bounds.max },
     water,
+    ...(ground ? { ground } : {}),
     diagnostics,
   };
 }

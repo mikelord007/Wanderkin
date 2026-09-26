@@ -10,7 +10,7 @@ const withAdventure = (template: "restore-portal" | "reach-beacon"): SceneManife
 
 describe("adventureHudCopy", () => {
   it("leaves authored worlds alone", () => {
-    for (const id of ["original", "tropical", "desert", "alpine", "autumn", "ember"] as const) {
+    for (const id of ["original", "tropical", "desert", "alpine", "autumn", "ember", "monsoon"] as const) {
       expect(adventureHudCopy(source, getBiomeDefinition(id))).toBeNull();
     }
   });
@@ -42,7 +42,7 @@ describe("adventureHudCopy", () => {
   });
 
   it("never mentions recognised objects or internal terms", () => {
-    for (const id of ["original", "tropical", "desert", "alpine", "autumn", "ember"] as const) {
+    for (const id of ["original", "tropical", "desert", "alpine", "autumn", "ember", "monsoon"] as const) {
       for (const template of ["restore-portal", "reach-beacon"] as const) {
         const copy = adventureHudCopy(withAdventure(template), getBiomeDefinition(id))!;
         const text = [copy.title, copy.objective, copy.exitOpenHint, copy.counterLabel, copy.pickup(1, 3)].join(" ");

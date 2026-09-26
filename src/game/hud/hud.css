@@ -718,7 +718,7 @@
 }
 
 /* A short window (1280x720 and similar): with the look picker open, the card
-   tightens its own spacing so the whole card, six looks included, fits
+   tightens its own spacing so the whole card, all seven looks included, fits
    without scrolling. Only the settings-open card changes. */
 @media (max-height: 820px) {
   .oq-hud__card:has(> .oq-hud__settings[open]) {
@@ -734,4 +734,11 @@
   .oq-hud__card:has(> .oq-hud__settings[open]) .oq-adventure__options { margin-top: .4rem; }
   .oq-hud__card:has(> .oq-hud__settings[open]) .oq-adventure__options .oq-adventure__option-body { padding: .45rem .7rem; gap: .1rem; }
   .oq-hud__card:has(> .oq-hud__settings[open]) .oq-adventure__actions .oq-adventure__hint { margin: 0; }
+  /* Seven looks take a third row of tiles: slimmer tiles keep the card whole. */
+  .oq-hud__card:has(> .oq-hud__settings[open]) .oq-adventure { gap: .35rem; }
+  .oq-hud__card:has(> .oq-hud__settings[open]) .oq-adventure__looks { gap: .3rem; margin-top: .35rem; }
+  .oq-hud__card:has(> .oq-hud__settings[open]) .oq-adventure__look .oq-adventure__option-body { min-height: 2.3rem; padding-block: .18rem; }
+  .oq-hud__card:has(> .oq-hud__settings[open]) .oq-adventure__look .oq-adventure__option-label { line-height: 1.12; }
+  .oq-hud__card:has(> .oq-hud__settings[open]) .oq-adventure__look .oq-adventure__option-description { line-height: 1.18; }
+  .oq-hud__card:has(> .oq-hud__settings[open]) .oq-adventure__look .oq-adventure__swatch { width: 1.95rem; height: 1.95rem; }
 }

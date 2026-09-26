@@ -6,13 +6,14 @@ const HEX = /^#[0-9a-f]{6}$/i;
 
 describe("biome presets", () => {
   it("ships Original, Tropical Island, Desert, Alpine, Autumn and Ember with their own ids", () => {
-    expect(BIOME_IDS).toEqual(["original", "tropical", "desert", "alpine", "autumn", "ember"]);
+    expect(BIOME_IDS).toEqual(["original", "tropical", "desert", "alpine", "autumn", "ember", "monsoon"]);
     for (const id of BIOME_IDS) expect(getBiomeDefinition(id).id).toBe(id);
     expect(getBiomeDefinition("tropical").name).toBe("Tropical Island");
     expect(getBiomeDefinition("desert").name).toBe("Desert");
     expect(getBiomeDefinition("alpine").name).toBe("Snowy Alpine");
     expect(getBiomeDefinition("autumn").name).toBe("Autumn Forest");
     expect(getBiomeDefinition("ember").name).toBe("Volcanic Ember");
+    expect(getBiomeDefinition("monsoon").name).toBe("Monsoon Marsh");
   });
 
   it("keeps the shared manifest schema ids and the renderer ids identical", async () => {
@@ -59,7 +60,7 @@ describe("biome presets", () => {
   });
 
   it("reduced quality lowers every budget", () => {
-    for (const id of ["tropical", "desert", "alpine", "autumn", "ember"] as const) {
+    for (const id of ["tropical", "desert", "alpine", "autumn", "ember", "monsoon"] as const) {
       const d = getBiomeDefinition(id);
       const reduced = effectiveBudget(d, "reduced");
       expect(effectiveBudget(d, "standard")).toEqual(d.budget);
@@ -71,7 +72,7 @@ describe("biome presets", () => {
   });
 
   it("themed budgets stay inside the architecture caps (ENVIRONMENT_ARCHITECTURE.md §8)", () => {
-    for (const id of ["tropical", "desert", "alpine", "autumn", "ember"] as const) {
+    for (const id of ["tropical", "desert", "alpine", "autumn", "ember", "monsoon"] as const) {
       const { budget, props } = getBiomeDefinition(id);
       expect(budget.drawCalls).toBeLessThanOrEqual(14);
       expect(budget.props).toBeLessThanOrEqual(160);

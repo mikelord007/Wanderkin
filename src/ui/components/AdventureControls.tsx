@@ -49,6 +49,7 @@ export const LOOK_LABELS: Record<BiomeId, AdventureOption<BiomeId> & { swatch: L
   alpine: { value: "alpine", label: "Snowy Alpine", description: "Snow, pines, cold light", swatch: { zenith: "#6fa8dc", horizon: "#e8f1f8", ground: "#f2f6fa", glint: "#ffb020" } },
   autumn: { value: "autumn", label: "Autumn Forest", description: "Russet leaves, low sun", swatch: { zenith: "#86a9c9", horizon: "#f0e2c8", ground: "#b3864f", glint: "#3fc9d6" } },
   ember: { value: "ember", label: "Volcanic Ember", description: "Ash, glow and dusk", swatch: { zenith: "#4a4a6e", horizon: "#e7a37a", ground: "#6a5650", glint: "#62d8ff" } },
+  monsoon: { value: "monsoon", label: "Monsoon Marsh", description: "Rain, reeds and puddles", swatch: { zenith: "#6d7f8c", horizon: "#b9c6cb", ground: "#5f6e68", glint: "#ffc23a" } },
 };
 
 /** Every look, in the shared biome order ("Original" is always first). */

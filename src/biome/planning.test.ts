@@ -110,11 +110,12 @@ describe("fallbackAdventurePlan", () => {
     expect(unknown.flavor).toEqual({ title: null, intro: null, fragmentName: null, destinationName: null });
   });
 
-  it("hints alpine, autumn and ember from clear scene words, without stealing earlier rooms", () => {
+  it("hints alpine, autumn, ember and monsoon from clear scene words, without stealing earlier rooms", () => {
     const snowy = { seed: "x", description: "a snowy mountain poster above the ski boots" };
     expect(fallbackAdventurePlan(snowy).biomeId).toBe("alpine");
     expect(fallbackAdventurePlan({ seed: "x", labels: ["pumpkin", "maple leaves", "wool blanket"] }).biomeId).toBe("autumn");
     expect(fallbackAdventurePlan({ seed: "x", description: "candles on the fireplace, glowing coal" }).biomeId).toBe("ember");
+    expect(fallbackAdventurePlan({ seed: "x", description: "rain on the window, an umbrella by the puddle" }).biomeId).toBe("monsoon");
     // A clear lead is required: one newer-look word against one desert word keeps the original rule.
     expect(fallbackAdventurePlan({ seed: "x", description: "a stone fireplace" }).biomeId).toBe("desert");
     // One material word is not a theme: a pine desk keeps the original rule.
@@ -142,7 +143,7 @@ describe("buildAdventurePlanPrompt", () => {
     expect(scene.description.length).toBeLessThanOrEqual(PLAN_LIMITS.descriptionInput);
     expect(scene.labels).toEqual(["desk", "mug"]);
     expect(prompt).toContain("untrusted data");
-    expect(prompt).toContain('["original","tropical","desert","alpine","autumn","ember"]');
+    expect(prompt).toContain('["original","tropical","desert","alpine","autumn","ember","monsoon"]');
     expect(prompt).toContain('["restore-portal","reach-beacon"]');
   });
 

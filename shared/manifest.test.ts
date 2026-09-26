@@ -43,7 +43,7 @@ describe("legacy manifest compatibility", () => {
     expect(parsed.entities).toEqual(input.entities);
     expect(parsed.experience).toEqual(input.experience);
     expect(sceneManifestReaderSchema.safeParse({ ...input, biome: { id: "unknown", seed: "a" } }).success).toBe(false);
-    for (const id of ["alpine", "autumn", "ember"]) {
+    for (const id of ["alpine", "autumn", "ember", "monsoon"]) {
       const themed = { ...lostColorsFixture, biome: { id, seed: "safe-seed" } };
       expect(migrateSceneManifest(themed).biome).toEqual(themed.biome);
     }

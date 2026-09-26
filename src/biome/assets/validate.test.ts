@@ -23,6 +23,7 @@ const REQUIRED: Record<string, AssetCategory[]> = {
   alpine: ["tree", "bush", "rock"],
   autumn: ["tree", "bush", "rock"],
   ember: ["rock", "bush"],
+  monsoon: ["tree", "bush", "rock"],
 };
 /** §3.5 layer caps on art triangles (a new biome may declare anything up to these). */
 const TRIANGLE_CAPS = { standard: 110_000, reduced: 45_000 };
@@ -33,6 +34,7 @@ const APPROVED_TRIANGLES: Record<string, { standard: number; reduced: number }> 
   alpine: { standard: 80_000, reduced: 35_000 },
   autumn: { standard: 90_000, reduced: 45_000 },
   ember: { standard: 75_000, reduced: 32_000 },
+  monsoon: { standard: 80_000, reduced: 35_000 },
 };
 
 function luminance(hex: string): number {
@@ -186,6 +188,23 @@ describe.each(arts.map((art) => [art.id, art] as const))("art guardrails: %s", (
       expect(c.l, `particleTint ${tint} lightness`).toBeLessThanOrEqual(0.88);
       // Drifting specks must never read as collectibles.
       if (c.s > 0.15) expect(hueGap(c.h, collectible), `particleTint ${tint} hue`).toBeGreaterThanOrEqual(30);
+    }
+    const rain = art.atmosphere?.rain;
+    if (rain) {
+      // Rain splashes need the ground heights geometry only bakes for `ambient.rain`.
+      expect(definition.ambient.rain, "rain style without ambient.rain").toBe(true);
+      expect(rain.intensity).toBeGreaterThan(0);
+      expect(rain.intensity).toBeLessThanOrEqual(1);
+      if (rain.wetness !== undefined) {
+        expect(rain.wetness).toBeGreaterThanOrEqual(0);
+        expect(rain.wetness).toBeLessThanOrEqual(1);
+      }
+      if (rain.tint !== undefined) {
+        expect(rain.tint).toMatch(/^#[0-9a-f]{6}$/i);
+        const c = hsl(rain.tint);
+        expect(c.s, `rain tint ${rain.tint} saturation`).toBeLessThanOrEqual(0.78);
+        if (c.s > 0.15) expect(hueGap(c.h, collectible), `rain tint ${rain.tint} hue`).toBeGreaterThanOrEqual(30);
+      }
     }
     const { ground } = art;
     if (ground.crackGlow) {

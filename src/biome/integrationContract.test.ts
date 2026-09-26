@@ -94,7 +94,7 @@ describe.each(GEOMETRY_FIXTURES.map((make) => [make().name, make] as const))("fi
   it("decoration scales props from the runtime body, and the look never changes gameplay data", () => {
     const fixture = make();
     const before = JSON.stringify(fixture.manifest);
-    for (const id of ["tropical", "desert", "alpine", "autumn", "ember"] as const) {
+    for (const id of ["tropical", "desert", "alpine", "autumn", "ember", "monsoon"] as const) {
       const definition = getBiomeDefinition(id);
       let layout;
       try {

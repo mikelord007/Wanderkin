@@ -202,6 +202,25 @@ export interface AtmosphereStyle {
    * collectible hue.
    */
   particleTint?: string;
+  /**
+   * Falling rain with ground splashes around the camera (one streak draw and
+   * one splash draw). Needs `ambient.rain` in the definition, which makes
+   * geometry bake the ground heights the splashes land on.
+   */
+  rain?: RainStyle;
+}
+
+/** Renderer-only rain (see `render/rain.ts`). */
+export interface RainStyle {
+  /** 0–1 share of the maximum drop count (2,000 at standard quality). */
+  intensity: number;
+  /**
+   * 0–1 wet sheen: lowers the roughness of the props and the ground
+   * patches, so leaves, rocks and puddles catch soft highlights. Default 0.
+   */
+  wetness?: number;
+  /** Streak and splash colour (hex). Default a pale blue-grey. */
+  tint?: string;
 }
 
 /**

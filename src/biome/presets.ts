@@ -23,6 +23,7 @@ import { ALPINE } from "./definitions/alpine.js";
 import { AUTUMN } from "./definitions/autumn.js";
 import { DESERT } from "./definitions/desert.js";
 import { EMBER } from "./definitions/ember.js";
+import { MONSOON } from "./definitions/monsoon.js";
 import { TROPICAL } from "./definitions/tropical.js";
 
 const ORIGINAL: BiomeDefinition = {
@@ -60,9 +61,10 @@ const DEFINITIONS: Readonly<Record<BiomeId, BiomeDefinition>> = {
   alpine: ALPINE,
   autumn: AUTUMN,
   ember: EMBER,
+  monsoon: MONSOON,
 };
 
-export const BIOME_IDS: readonly BiomeId[] = ["original", "tropical", "desert", "alpine", "autumn", "ember"];
+export const BIOME_IDS: readonly BiomeId[] = ["original", "tropical", "desert", "alpine", "autumn", "ember", "monsoon"];
 
 export function isBiomeId(value: unknown): value is BiomeId {
   return typeof value === "string" && (BIOME_IDS as readonly string[]).includes(value);

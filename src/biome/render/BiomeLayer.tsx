@@ -32,7 +32,7 @@ export function BiomeLayer({ definition, layout, quality, reducedMotion, onColli
     onColliders(handle.colliders);
     return () => onColliders([]);
   }, [handle, onColliders]);
-  useFrame((state, delta) => handle.update(state.clock.elapsedTime, delta));
+  useFrame((state, delta) => handle.update(state.clock.elapsedTime, delta, state.camera));
 
   if (handle.root.children.length === 0) return null;
   // dispose={null}: the handle owns every resource; R3F must not free the

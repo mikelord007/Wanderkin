@@ -18,7 +18,12 @@ export interface BiomeDefinition {
   surface: { color: string; blend: number; upwardNormalMin: number; patchCoverage: number };
   props: { kinds: readonly BiomePropKind[]; density: number; scaleRange: readonly [number, number] };
   wind: { direction: readonly [number, number]; strength: number };
-  ambient: { effect: "none" | "motes" | "dust"; water: boolean };
+  /**
+   * `rain` asks geometry to bake a ground height field into the layout
+   * (`BiomeLayout.ground`) so the renderer's rain can splash on real
+   * surfaces; the art's `atmosphere.rain` styles it. Omitted = no rain.
+   */
+  ambient: { effect: "none" | "motes" | "dust"; water: boolean; rain?: boolean };
   mission: { portalTitle: string; beaconTitle: string; fragmentName: string; collectibleColor: string };
   budget: { props: number; patches: number; particles: number; drawCalls: number };
 }
@@ -57,7 +62,27 @@ export interface BiomeLayout {
   bounds: { min: Vec3; max: Vec3 };
   /** Optional surrounding ring, below ALL playable support surfaces. */
   water: { center: Vec3; innerRadius: number; outerRadius: number } | null;
+  /** Topmost-surface heights for rain splashes; only when `ambient.rain`. */
+  ground?: BiomeGroundHeights | null;
   diagnostics: readonly string[];
+}
+
+/**
+ * A coarse grid of the highest collision surface under each cell centre,
+ * sampled once per layout by vertical rays over the same collision grid
+ * geometry uses (never per drop). Row-major, `x` fastest. `NaN` = nothing
+ * below (open sky). `edge` = 1 where a neighbour differs by more than a
+ * step, so a splash there could float beside a ledge.
+ */
+export interface BiomeGroundHeights {
+  origin: readonly [number, number];
+  cell: number;
+  cols: number;
+  rows: number;
+  heights: Float32Array;
+  edge: Uint8Array;
+  /** Runtime character height (world units): the scale rain is sized in. */
+  unit: number;
 }
 
 export interface BiomePreparationInput {

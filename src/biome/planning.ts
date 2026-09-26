@@ -185,9 +185,10 @@ const THEME_WORDS: readonly (readonly [BiomeId, RegExp])[] = [
   ["alpine", /\b(?:alpine|snow(?:y|man|flake)?|ice|icy|frost(?:y)?|winter|mountains?|ski(?:s|ing)?|pines?|fir|glacier|sled|igloo|penguin)\b/gi],
   ["autumn", /\b(?:autumn|fall|leaf|leaves|forest|woods|woodland|maple|oak|acorns?|pumpkins?|mushrooms?|harvest|cozy|cosy|knit|wool)\b/gi],
   ["ember", /\b(?:ember|embers|volcano(?:es)?|volcanic|lava|magma|fire|fireplace|flames?|candles?|coal|charcoal|obsidian|basalt|ash)\b/gi],
+  ["monsoon", /\b(?:monsoon|rain(?:y|ing|drops?|coat|forest)?|storm(?:y)?|umbrellas?|puddles?|marsh(?:es)?|swamp|wetlands?|reeds?|banana|lotus|jungle|paddy|drizzle)\b/gi],
 ];
 
-/** The newer look (alpine, autumn, ember) with a unique top distinct-word score, if any. */
+/** The newer look (alpine, autumn, ember, monsoon) with a unique top distinct-word score, if any. */
 function hintedNewerLook(words: string): BiomeId | null {
   let best: BiomeId | null = null;
   let bestScore = 0;

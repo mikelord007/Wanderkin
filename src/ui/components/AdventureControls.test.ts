@@ -57,10 +57,10 @@ function html(props: Partial<AdventureControlsProps> = {}) {
 }
 
 describe("AdventureControls", () => {
-  it("offers all six looks in the shared biome order, with Original first, and both adventures", () => {
+  it("offers all seven looks in the shared biome order, with Original first, and both adventures", () => {
     expect(THEME_OPTIONS.map((o) => [o.value, o.label])).toEqual([
       ["original", "Original"], ["tropical", "Tropical Island"], ["desert", "Desert"],
-      ["alpine", "Snowy Alpine"], ["autumn", "Autumn Forest"], ["ember", "Volcanic Ember"],
+      ["alpine", "Snowy Alpine"], ["autumn", "Autumn Forest"], ["ember", "Volcanic Ember"], ["monsoon", "Monsoon Marsh"],
     ]);
     expect(THEME_OPTIONS.map((o) => o.value)).toEqual([...BIOME_IDS]);
     expect(ADVENTURE_OPTIONS.map((o) => o.value)).toEqual(["restore-portal", "reach-beacon"]);
@@ -86,7 +86,7 @@ describe("AdventureControls", () => {
     const markup = html({ biomeId: "ember" });
     expect(markup).toMatch(/<div class="oq-adventure__looks" role="radiogroup" aria-labelledby="[^"]+-theme-legend">/);
     for (const id of BIOME_IDS) expect(markup).toContain(`data-theme="${id}"`);
-    const lookRadios = [...markup.matchAll(/<input type="radio" name="([^"]+)"[^>]*value="(original|tropical|desert|alpine|autumn|ember)"/g)];
+    const lookRadios = [...markup.matchAll(/<input type="radio" name="([^"]+)"[^>]*value="(original|tropical|desert|alpine|autumn|ember|monsoon)"/g)];
     expect(lookRadios).toHaveLength(BIOME_IDS.length);
     expect(new Set(lookRadios.map((m) => m[1])).size).toBe(1);
     expect(markup).toContain(ADVENTURE_COPY.themeHint);
