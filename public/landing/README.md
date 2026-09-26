@@ -8,6 +8,11 @@ for the light (v3) landing with the disposable harness
 raised camera so the explorer and the furniture fill the frame), then cropped
 and encoded to WebP with Chrome's own encoder.
 
+Since 2026-09-27 the landing's sample cards show the owner's four worlds,
+with their art in `public/samples/<slug>/card.webp` (see
+`public/samples/README.md`). The four `world-*.webp` files below are no
+longer used by the app.
+
 | File | Size | What it shows | World / look |
 |---|---|---|---|
 | `step-reconstruction.webp` | 800×600, transparent | The bundled desk-and-sofa 3D reconstruction (`/samples/rodin.glb`) as the landing preview renders it | n/a |

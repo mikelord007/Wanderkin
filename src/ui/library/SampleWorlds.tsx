@@ -1,23 +1,17 @@
 import { useEffect, useState } from "react";
 import type { SceneManifest } from "@shared/index.js";
 import { Button, EmptyState, Icon } from "../components/index.js";
+import { lookName, manifestBiomeId } from "../../biome/lookCatalog.js";
 import "../theme/welcome.css";
 
-/** Real in-game renders of each bundled sample (captured from the app, see
- * public/landing/README.md). Two are shown in a theme look, and say so. */
-const SAMPLE_ART: Record<string, { src: string; alt: string; look?: string }> = {
-  "sample-lost-colors-rodin": { src: "/landing/world-lost-colors.webp", alt: "In the game: the tiny explorer between the portal ring, a golden color fragment and a sofa leg as tall as a tower", look: "Tropical Island" },
-  "sample-explore-rodin": { src: "/landing/world-teacup-wander.webp", alt: "In the game: the explorer on a sandy shore under the sofa, among island shrubs and palms", look: "Tropical Island" },
-  "sample-rodin-room-corner": { src: "/landing/world-desk-sofa.webp", alt: "In the game: the explorer on desert sand beside a color fragment and a towering sofa leg", look: "Desert" },
-  "sample-tripo-room-corner": { src: "/landing/world-different-perspective.webp", alt: "In the game: the explorer on a green floor under the dark underside of a sofa" },
+/** The owner's own in-game screenshots of each world, cropped to the card
+ * (see public/samples/README.md). */
+const SAMPLE_ART: Record<string, { src: string; alt: string }> = {
+  "sample-desk-beach": { src: "/samples/desk/card.webp", alt: "In the game: the tiny explorer on white sand before a wooden desk as big as a building, with a lamp on top, among palm trees and rocks" },
+  "sample-plane-snow": { src: "/samples/plane/card.webp", alt: "In the game: the tiny explorer in the snow in front of a giant airliner, among snowy pine trees and boulders" },
+  "sample-boot-rain": { src: "/samples/shoe/card.webp", alt: "In the game: the tiny explorer on a rainy green marsh under a huge brown leather boot, among reeds and palms" },
+  "sample-car-dunes": { src: "/samples/car/card.webp", alt: "In the game: the tiny explorer on desert sand beside the wheel of a towering red sports car, with cacti and rocks" },
 };
-
-function sampleTitle(manifest: SceneManifest): string {
-  return manifest.levelId === "sample-lost-colors-rodin" ? "The Lost Colors of Teacup Island"
-    : manifest.levelId === "sample-explore-rodin" ? "Teacup Island Wander"
-    : manifest.levelId === "sample-rodin-room-corner" ? "The desk & sofa adventure"
-    : "A different perspective";
-}
 
 function sampleSummary(manifest: SceneManifest): string {
   const mode = manifest.experience?.mode;
@@ -31,15 +25,17 @@ function sampleModeLabel(manifest: SceneManifest): string {
   return kind === "collect" ? "Lost Colors" : kind === "explore" ? "Explore" : kind === "race" ? "Race" : "Checkpoint course";
 }
 
-/** The bundled samples, loaded on demand (they pull in the game modules). */
+/** The worlds to borrow, loaded on demand (they pull in the game modules).
+ * The older bundled samples stay registered for their /play/ links but are
+ * not offered here. */
 export function useSampleLevels(): { samples: SceneManifest[] | null; error: string | null } {
   const [samples, setSamples] = useState<SceneManifest[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
-    Promise.all([import("../../scene/samples.js"), import("../../game/bundledSamples.js")])
-      .then(([sceneSamples, gameSamples]) => {
-        if (!cancelled) setSamples([gameSamples.LOST_COLORS_SAMPLE, gameSamples.EXPLORE_SAMPLE, ...sceneSamples.SAMPLE_LEVELS]);
+    import("../../game/landingWorlds.js")
+      .then(({ LANDING_WORLDS }) => {
+        if (!cancelled) setSamples([...LANDING_WORLDS]);
       })
       .catch((cause) => {
         if (!cancelled) setError(cause instanceof Error ? cause.message : "Bundled samples are unavailable.");
@@ -68,12 +64,12 @@ export function SampleWorlds({ samples, error, onPlaySample, onEditSample, onCre
     const art = SAMPLE_ART[manifest.levelId];
     return <article key={manifest.levelId} className={`wk-world${index === 0 ? " wk-world--featured" : ""}`}>
       <div className="wk-world__media">
-        <img src={art?.src ?? `/samples/photo-${manifest.assets[0]?.url.includes("rodin") ? 4 : 2}.jpg`} alt={art?.alt ?? ""} loading="lazy" />
+        {art ? <img src={art.src} alt={art.alt} loading="lazy" /> : null}
         <span className="wk-world__mode">{sampleModeLabel(manifest)}</span>
       </div>
       <div className="wk-world__body">
-        <h3>{sampleTitle(manifest)}</h3>
-        <p className="wk-world__meta">{sampleSummary(manifest)}{art?.look ? <span> · Shown in the {art.look} look</span> : null}</p>
+        <h3>{manifest.name}</h3>
+        <p className="wk-world__meta">{sampleSummary(manifest)}<span> · {lookName(manifestBiomeId(manifest))}</span></p>
         <div className="wk-world__actions">
           <Button onClick={() => onPlaySample(manifest)}><Icon name="play" />Play now</Button>
           {onEditSample ? <Button variant="ghost" onClick={() => onEditSample(manifest)}>Edit course</Button> : null}
