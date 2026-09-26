@@ -44,6 +44,14 @@ describe("creation flow", () => {
     }
   });
 
+  it("requests only the story and music for world extras — no narration voice", () => {
+    const requests = buildWorldExtrasRequests(createCreationRecord("world-1", "2026-09-24T00:00:00.000Z"), prefix => `${prefix}-key`);
+    expect(requests.map(([stage]) => stage)).toEqual(["story", "music"]);
+    expect(requests.some(([, request]) => request.kind === "tts")).toBe(false);
+    const story = requests.find(([stage]) => stage === "story")?.[1];
+    expect(story?.kind === "text" && story.prompt).not.toMatch(/narration/i);
+  });
+
   it("allows building only from the approved preview matching the current selection", () => {
     const draft = createCreationRecord("world-1", "2026-09-24T00:00:00.000Z");
     const approved = withCreationUpdate(draft, {

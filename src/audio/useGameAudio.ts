@@ -5,26 +5,17 @@ import type { AudioSettings } from "../ui/components/index.js";
 import { GameAudioEngine } from "./engine.js";
 import { loadAudioSettings, saveAudioSettings } from "./settings.js";
 
-export interface SubtitleState { text: string; speaker: string; visible: boolean }
-
 export function useGameAudio(options: {
-  worldId: string;
   media?: LevelMedia;
-  narrationScript?: string;
   eventBus: GameplayEventBus;
 }) {
   const [settings, setSettingsState] = useState<AudioSettings>(loadAudioSettings);
-  const [subtitle, setSubtitle] = useState<SubtitleState>({ text: "", speaker: "Your guide", visible: false });
   const engineRef = useRef<GameAudioEngine | null>(null);
-  const subtitleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   if (!engineRef.current) engineRef.current = new GameAudioEngine(settings);
   const engine = engineRef.current;
 
   useEffect(() => { engine.configure(options.media); }, [engine, options.media]);
-  useEffect(() => () => {
-    if (subtitleTimer.current) clearTimeout(subtitleTimer.current);
-    engine.stop();
-  }, [engine]);
+  useEffect(() => () => engine.stop(), [engine]);
 
   const setSettings = useCallback((next: AudioSettings) => {
     setSettingsState(next);
@@ -32,26 +23,15 @@ export function useGameAudio(options: {
     engine.setSettings(next);
   }, [engine]);
 
-  useEffect(() => options.eventBus.on("*", (event) => {
-    handleEvent(engine, event);
-    if (event.type === "introShown") {
-      const text = options.narrationScript?.trim();
-      if (!text) return;
-      setSubtitle({ text, speaker: "Your guide", visible: true });
-      if (subtitleTimer.current) clearTimeout(subtitleTimer.current);
-      const milliseconds = Math.max(3200, Math.min(12_000, text.split(/\s+/).length * 420));
-      subtitleTimer.current = setTimeout(() => setSubtitle((current) => ({ ...current, visible: false })), milliseconds);
-    }
-  }), [engine, options.eventBus, options.narrationScript]);
+  useEffect(() => options.eventBus.on("*", (event) => handleEvent(engine, event)), [engine, options.eventBus]);
 
   const unlock = useCallback(() => engine.unlockAndStart(), [engine]);
   const getDiagnostics = useCallback(() => engine.diagnostics(), [engine]);
-  return { settings, setSettings, subtitle, unlock, getDiagnostics };
+  return { settings, setSettings, unlock, getDiagnostics };
 }
 
-function handleEvent(engine: GameAudioEngine, event: GameplayEvent): void {
+export function handleEvent(engine: Pick<GameAudioEngine, "play">, event: GameplayEvent): void {
   switch (event.type) {
-    case "introShown": void engine.playNarrationOnce(event.worldId); break;
     case "fragmentCollected": void engine.play("fragment-pickup"); break;
     case "portalActivated": void engine.play("portal-activate"); break;
     case "checkpointReached": void engine.play("checkpoint"); break;

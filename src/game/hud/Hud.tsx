@@ -12,8 +12,7 @@ import { useState, type ReactNode, type RefObject } from "react";
 import type { GameLoadStage } from "../types.js";
 import type { AdventureHudCopy } from "../../biome/missionCopy.js";
 import type { GameplaySessionSnapshot } from "../modes/session.js";
-import { AudioControls, Icon, SubtitleBar, type AudioSettings } from "../../ui/components/index.js";
-import type { SubtitleState } from "../../audio/useGameAudio.js";
+import { AudioControls, Icon, type AudioSettings } from "../../ui/components/index.js";
 import "./hud.css";
 
 export interface HudProps {
@@ -48,7 +47,6 @@ export interface HudProps {
   feedback: string | null;
   audioSettings: AudioSettings;
   onAudioSettingsChange: (settings: AudioSettings) => void;
-  subtitle: SubtitleState;
   /** Called before any HUD control that needs a real cursor (Sound) opens —
    * a click on an overlay control is not reliably delivered while the
    * pointer is locked, so this always runs first. Never re-requests the
@@ -277,7 +275,6 @@ export function Hud(props: HudProps) {
             <span>Use WASD to move, Space to jump, and E to climb ledges.</span>
           </div> : null}
           {props.feedback ? <div className="oq-hud__feedback" role="status" aria-live="polite">{props.feedback}</div> : null}
-          <div className="oq-hud__subtitle"><SubtitleBar {...props.subtitle} /></div>
           {props.modeState?.mode === "race" && props.modeState.race.phase === "countdown" ? (
             <div className="oq-hud__countdown" role="status" aria-live="assertive">
               {props.modeState.race.countdownSecondsRemaining || "Go!"}

@@ -39,7 +39,7 @@ export type GameplayEventListener<Type extends GameplayEventType = GameplayEvent
 ) => void;
 
 /**
- * Small synchronous bus shared by gameplay, audio, subtitles, and QA.
+ * Small synchronous bus shared by gameplay, audio, and QA.
  * Callers may subscribe to one event or to the full stream; listener errors
  * never prevent the remaining consumers from receiving the event.
  */

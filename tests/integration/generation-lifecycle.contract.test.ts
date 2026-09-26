@@ -45,7 +45,7 @@ describe("ObjectQuest v2 generation lifecycle integration contracts", () => {
   });
 
   it("preserves the playable level and successful assets when one optional asset fails", async () => {
-    // Given a ready mesh/course plus independent music, narration, SFX, and
+    // Given a ready mesh/course plus independent music, ambience, SFX, and
     // postcard jobs, make one optional job fail after another optional asset succeeds.
 
     // When the failure is persisted, the world remains playable, editable,
@@ -65,20 +65,19 @@ describe("ObjectQuest v2 generation lifecycle integration contracts", () => {
       worldId: stored.levelId,
       style: "cartoon",
       objectDescription: "a blue teacup",
-      narrationScript: stored.experience!.quest.narrationScript,
     });
     expect(started.playable).toBe(true);
-    expect(started.failedCues).toContain("narration");
+    expect(started.failedCues).toContain("ambience");
     expect(started.readyAssets.map((asset) => asset.id)).toContain("music-ready");
     await orchestrator.persist(stored.levelId, started);
 
-    const narrationJob = started.jobs.find((entry) => entry.cue === "narration")!.job!;
-    const retried = await orchestrator.retry("narration", narrationJob.id);
+    const ambienceJob = started.jobs.find((entry) => entry.cue === "ambience")!.job!;
+    const retried = await orchestrator.retry("ambience", ambienceJob.id);
     await orchestrator.persist(stored.levelId, retried);
     expect(stored.assets.map((asset) => asset.id)).toEqual(meshIds);
-    expect(stored.media?.audio.map((asset) => asset.id)).toEqual(expect.arrayContaining(["music-ready", "narration-ready"]));
-    expect(gateway.requests.some((request) => request.kind === "image-to-3d")).toBe(false);
-    expect(gateway.retryIds).toEqual([narrationJob.id]);
+    expect(stored.media?.audio.map((asset) => asset.id)).toEqual(expect.arrayContaining(["music-ready", "ambience-ready"]));
+    expect(gateway.requests.some((request) => request.kind === "image-to-3d" || request.kind === "tts")).toBe(false);
+    expect(gateway.retryIds).toEqual([ambienceJob.id]);
   });
 
   it.skip("rejects per-request and per-world budget excess before provider submission", () => {
@@ -111,31 +110,31 @@ describe("ObjectQuest v2 generation lifecycle integration contracts", () => {
 const now = "2026-09-24T00:00:00.000Z";
 const provenance = { providerId: "fixture", requestedCapability: "music", servedCapability: "music", servedModel: "fixture", applicationJobId: "fixture", providerJobId: "provider", timings: { requestedAt: now }, reportedCost: null } as const;
 
-function audioAsset(id: string, kind: "music" | "narration"): AudioAssetReference {
-  return { schemaVersion: 1, mediaType: "audio", kind, id, url: `/${id}.wav`, sha256: id === "music-ready" ? "1".repeat(64) : "2".repeat(64), sizeBytes: 100, mimeType: "audio/wav", durationSeconds: 2, provenance: { ...provenance, requestedCapability: kind === "music" ? "music" : "chatterbox-tts", servedCapability: kind === "music" ? "music" : "chatterbox-tts" }, loop: kind === "music", defaultGain: 1 };
+function audioAsset(id: string, kind: "music" | "ambience"): AudioAssetReference {
+  return { schemaVersion: 1, mediaType: "audio", kind, id, url: `/${id}.wav`, sha256: id === "music-ready" ? "1".repeat(64) : "2".repeat(64), sizeBytes: 100, mimeType: "audio/wav", durationSeconds: 2, provenance: { ...provenance, requestedCapability: kind === "music" ? "music" : "mirelo-sfx", servedCapability: kind === "music" ? "music" : "mirelo-sfx" }, loop: true, defaultGain: 1 };
 }
 
 function generationJob(request: GenerationRequest, state: GenerationJob["state"], asset?: AudioAssetReference): GenerationJob {
   const result = asset
     ? request.kind === "music" ? { kind: "music" as const, asset: { ...asset, kind: "music" as const } }
-      : { kind: "tts" as const, asset: { ...asset, kind: "narration" as const } }
+      : { kind: "sfx" as const, asset: { ...asset, kind: "ambience" as const } }
     : undefined;
-  return { schemaVersion: 1, id: `job-${request.purpose}`, idempotencyKey: request.idempotencyKey, providerId: "fixture", providerJobId: `provider-${request.purpose}`, capabilityRequested: request.capability, capabilityUsed: request.capability, fallbackFired: null, state, photoOrder: [], createdAt: now, updatedAt: now, retryCount: 0, maxRetries: 1, kind: request.kind, request, ...(result ? { result } : {}), ...(state === "failed" ? { lastError: { message: "Optional narration unavailable.", retryable: true, occurredAt: now } } : {}) };
+  return { schemaVersion: 1, id: `job-${request.purpose}`, idempotencyKey: request.idempotencyKey, providerId: "fixture", providerJobId: `provider-${request.purpose}`, capabilityRequested: request.capability, capabilityUsed: request.capability, fallbackFired: null, state, photoOrder: [], createdAt: now, updatedAt: now, retryCount: 0, maxRetries: 1, kind: request.kind, request, ...(result ? { result } : {}), ...(state === "failed" ? { lastError: { message: "Optional ambience unavailable.", retryable: true, occurredAt: now } } : {}) };
 }
 
 class PartialFailureGateway implements AudioGateway {
   requests: GenerationRequest[] = [];
   retryIds: string[] = [];
-  private narrationRequest: GenerationRequest | undefined;
+  private ambienceRequest: GenerationRequest | undefined;
   async submitGenerationOrReconcile(request: GenerationRequest): Promise<SubmitOutcome> {
     this.requests.push(request);
     if (request.kind === "music") return { status: "created", job: generationJob(request, "ready", audioAsset("music-ready", "music")) };
-    if (request.kind === "tts") { this.narrationRequest = request; return { status: "created", job: generationJob(request, "failed") }; }
+    if (request.purpose === "audio:ambience") { this.ambienceRequest = request; return { status: "created", job: generationJob(request, "failed") }; }
     return { status: "created", job: generationJob(request, "generating") };
   }
   async getPublic(): Promise<GenerationJob | undefined> { return undefined; }
   async retry(jobId: string): Promise<GenerationJob | undefined> {
     this.retryIds.push(jobId);
-    return this.narrationRequest ? generationJob(this.narrationRequest, "ready", audioAsset("narration-ready", "narration")) : undefined;
+    return this.ambienceRequest ? generationJob(this.ambienceRequest, "ready", audioAsset("ambience-ready", "ambience")) : undefined;
   }
 }

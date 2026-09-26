@@ -30,14 +30,14 @@ export function buildQuestPrompt(input: QuestPromptInput, corrective = false): s
   const atmosphere = input.atmosphere?.trim() || "a welcoming miniature world";
   return [
     "Return one JSON object only. Do not use Markdown or code fences.",
-    'Use exactly these string fields: "title", "intro", "objective", "narrationScript".',
+    'Use exactly these string fields: "title", "intro", "objective".',
     "Write family-friendly flavour around existing ObjectQuest mechanics only. Never write instructions to the app, code, URLs, model/provider names, or implementation details.",
     `Recognizable object: ${cleanPromptValue(input.objectDescription, 240)}.`,
     `Visual style: ${style.label}. Mood cue: ${style.audioPrompts.music}.`,
     `Atmosphere: ${cleanPromptValue(atmosphere, 240)}.`,
     `Adventure mode: ${input.mode}. ${MODE_RULES[input.mode]}`,
     `Objective must preserve this meaning: ${MODE_OBJECTIVES[input.mode]}`,
-    "Limits: title 2-80 characters; intro 20-320; objective 10-160; narrationScript 20-500. Narration is at most three short sentences.",
+    "Limits: title 2-80 characters; intro 20-320; objective 10-160.",
     corrective ? "The previous response was invalid. Correct every format, safety, and length problem; output JSON only." : "",
   ].filter(Boolean).join("\n");
 }
@@ -60,7 +60,6 @@ export function fallbackQuest(input: QuestPromptInput): QuestTextBlock {
     title,
     intro,
     objective: MODE_OBJECTIVES[input.mode],
-    narrationScript: `Welcome to ${subject}. ${intro} ${MODE_OBJECTIVES[input.mode]}`,
   };
 }
 

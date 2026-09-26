@@ -3,10 +3,11 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { LevelMedia } from "@shared/index.js";
-import { BUNDLED_AUDIO_URLS, EFFECT_CUES, resolveAudioUrls } from "./assets.js";
+import { BUNDLED_AUDIO_URLS, EFFECT_CUES, resolveAudioUrls, type EffectCue } from "./assets.js";
 import { loadAudioSettings, saveAudioSettings } from "./settings.js";
 import { GameAudioEngine, trimAndNormalize } from "./engine.js";
 import { LOST_COLORS_BUNDLED_MEDIA } from "./bundledMedia.js";
+import { handleEvent } from "./useGameAudio.js";
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>();
@@ -20,17 +21,26 @@ class MemoryStorage implements Storage {
 
 const provenance = { providerId: "fixture", requestedCapability: "music", servedCapability: "music", servedModel: null, applicationJobId: "job", providerJobId: "provider", timings: { requestedAt: "2026-09-24T00:00:00.000Z" }, reportedCost: null } as const;
 
+/** Media as saved before narration was removed: the bundled set plus a voice line. */
+const LEGACY_NARRATED_MEDIA: LevelMedia = {
+  audio: [
+    ...LOST_COLORS_BUNDLED_MEDIA.audio,
+    { schemaVersion: 1, mediaType: "audio", kind: "narration", id: "bundled-narration", url: "/audio/narration-intro.wav", sha256: "9".repeat(64), sizeBytes: 17644, mimeType: "audio/wav", durationSeconds: 1.1, provenance, loop: false, defaultGain: .72, transcript: "Welcome to Teacup Island." },
+  ],
+  video: [],
+};
+
 describe("client audio", () => {
   it("persists mute and independent bus settings", () => {
     const storage = new MemoryStorage();
-    saveAudioSettings({ master: 62, music: 21, effects: 73, voice: 88, muted: true }, storage);
-    expect(loadAudioSettings(storage)).toEqual({ master: 62, music: 21, effects: 73, voice: 88, muted: true });
+    saveAudioSettings({ master: 62, music: 21, effects: 73, muted: true }, storage);
+    expect(loadAudioSettings(storage)).toEqual({ master: 62, music: 21, effects: 73, muted: true });
   });
 
-  it("clamps corrupt persisted volume values", () => {
+  it("clamps corrupt persisted volume values and drops the retired voice level", () => {
     const storage = new MemoryStorage();
     storage.setItem("objectquest:audio-settings:v1", JSON.stringify({ master: 900, music: -4, effects: "loud", voice: 20, muted: false }));
-    expect(loadAudioSettings(storage)).toMatchObject({ master: 100, music: 0, effects: 75, voice: 20 });
+    expect(loadAudioSettings(storage)).toEqual({ master: 100, music: 0, effects: 75, muted: false });
   });
 
   it("uses generated assets where present and bundled fallbacks for missing optional cues", () => {
@@ -42,7 +52,15 @@ describe("client audio", () => {
     expect(urls.checkpoint).toBe(BUNDLED_AUDIO_URLS.checkpoint);
   });
 
-  it("never repeats narration for the same world after respawn/restart events", async () => {
+  it("ignores a narration asset carried by an older manifest", () => {
+    const narration = { schemaVersion: 1 as const, mediaType: "audio" as const, kind: "narration" as const, id: "old-voice", url: "/generated/old-voice.wav", sha256: "9".repeat(64), sizeBytes: 20, mimeType: "audio/wav", durationSeconds: 2, provenance, loop: false, defaultGain: 1, transcript: "Welcome back." };
+    const urls = resolveAudioUrls({ audio: [narration], video: [] });
+    expect(urls).toEqual(BUNDLED_AUDIO_URLS);
+    expect(Object.values(urls)).not.toContain(narration.url);
+  });
+
+  it("plays only music, ambience and event cues — the intro and every other event trigger no voice", async () => {
+    const fetched: string[] = [];
     let starts = 0;
     const samples = new Float32Array([.2, .1]);
     const buffer = { length: 2, numberOfChannels: 1, sampleRate: 8000, duration: 1, getChannelData: () => samples } as unknown as AudioBuffer;
@@ -57,15 +75,23 @@ describe("client audio", () => {
       createBuffer: () => buffer,
     } as unknown as AudioContext;
     const engine = new GameAudioEngine(
-      { master: 80, music: 50, effects: 75, voice: 90, muted: false },
+      { master: 80, music: 50, effects: 75, muted: false },
       () => context,
-      async () => new Response(new Uint8Array([1])),
+      async (url) => { fetched.push(String(url)); return new Response(new Uint8Array([1])); },
     );
+    engine.configure(LEGACY_NARRATED_MEDIA);
     await engine.unlockAndStart();
-    const loopStarts = starts;
-    await engine.playNarrationOnce("world-1");
-    await engine.playNarrationOnce("world-1");
-    expect(starts - loopStarts).toBe(1);
+    expect(starts).toBe(2);
+    const played: string[] = [];
+    const recorder = { play: async (cue: EffectCue) => { played.push(cue); } };
+    handleEvent(recorder, { type: "introShown", worldId: "world-1" });
+    expect(played).toEqual([]);
+    handleEvent(recorder, { type: "respawned", reason: "fell", checkpointId: null });
+    handleEvent(recorder, { type: "introShown", worldId: "world-1" });
+    expect(played).toEqual(["fall-respawn"]);
+    for (const cue of EFFECT_CUES) await engine.play(cue);
+    expect(fetched.length).toBeGreaterThan(0);
+    expect(fetched.some((url) => /narration|old-voice/.test(url))).toBe(false);
     engine.stop();
   });
 

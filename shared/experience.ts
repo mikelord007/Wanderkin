@@ -20,7 +20,9 @@ export interface QuestTextBlock {
   title: string;
   intro: string;
   objective: string;
-  narrationScript: string;
+  /** @deprecated Narration was removed from the game. Older saved worlds and
+   * shares may still carry this text; it is accepted on read and never used. */
+  narrationScript?: string;
 }
 
 export interface ColorFragmentEntity {

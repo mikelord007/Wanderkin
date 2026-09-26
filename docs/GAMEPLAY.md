@@ -26,7 +26,7 @@ never keep simulating while the player has lost control of the camera.
 ## Gameplay event bus
 
 `src/game/events.ts` exports `GameplayEventBus` and the default
-`gameplayEvents` instance. Audio, subtitles, analytics and browser QA consume
+`gameplayEvents` instance. Audio, analytics and browser QA consume
 this typed event stream; none of them infer rewards from rendered objects.
 Events are synchronous and carry immutable primitive payloads. A subscriber
 returns an unsubscribe function and may listen to a named event or `*`.

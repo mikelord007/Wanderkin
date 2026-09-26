@@ -20,7 +20,6 @@ export function WorldReadyScreen({ manifest, onEnter, onAdjustCourse, onBack }: 
 }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [audio, setAudio] = useState<AudioSettings>(DEFAULT_AUDIO_SETTINGS);
-  const [subtitles, setSubtitles] = useState(true);
   const [previewFailures, setPreviewFailures] = useState(0);
   const status = statusFor(manifest);
   const style = manifest.experience?.style.id ?? "cartoon";
@@ -50,7 +49,6 @@ export function WorldReadyScreen({ manifest, onEnter, onAdjustCourse, onBack }: 
     </section>
     <Sheet open={settingsOpen} onClose={() => setSettingsOpen(false)} title="World settings">
       <p><strong>Look:</strong> {style === "hand-painted" ? "Hand-painted" : style === "watercolor" ? "Watercolor" : "Cartoon"}</p>
-      <label className="oq-world-ready__toggle"><input type="checkbox" checked={subtitles} onChange={event => setSubtitles(event.target.checked)} /> Show subtitles</label>
       <AudioControls value={audio} onChange={setAudio} />
       <Button onClick={() => setSettingsOpen(false)}>Done</Button>
     </Sheet>

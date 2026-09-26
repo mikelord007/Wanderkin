@@ -38,12 +38,12 @@ export function WorldProgressScreen({ jobId, onReady, onCancel }: WorldProgressS
 
   useEffect(() => {
     if (!record) return;
-    const refs = (["story", "music", "narration"] as const).map(stage => [stage, record.jobs[stage]] as const).filter(([, ref]) => ref && ref.state !== "ready" && ref.state !== "failed");
+    const refs = (["story", "music"] as const).map(stage => [stage, record.jobs[stage]] as const).filter(([, ref]) => ref && ref.state !== "ready" && ref.state !== "failed");
     if (!refs.length) return; let cancelled = false;
     const timer = window.setInterval(() => { for (const [stage, ref] of refs) if (ref) void getJob(ref.id).then(job => { if (!cancelled) persistJob(stage, job); }).catch(() => undefined); }, 1200);
     return () => { cancelled = true; window.clearInterval(timer); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [record?.jobs.story?.state, record?.jobs.music?.state, record?.jobs.narration?.state]);
+  }, [record?.jobs.story?.state, record?.jobs.music?.state]);
 
   async function retry(stage: CreationAttentionStage) {
     const ref = stage === "shape" ? shapeJob : record?.jobs[stage] ? jobs[stage] ?? record.jobs[stage] : undefined;
@@ -57,14 +57,13 @@ export function WorldProgressScreen({ jobId, onReady, onCancel }: WorldProgressS
   const title = typeof structured?.title === "string" ? structured.title : record?.title ?? "Your little world";
   const intro = typeof structured?.intro === "string" ? structured.intro : typeof structured?.objective === "string" ? structured.objective : record?.questIntro;
   const music = jobs.music?.result?.kind === "music" ? jobs.music.result.asset : null;
-  const narration = jobs.narration?.result?.kind === "tts" ? jobs.narration.result.asset : null;
   const shapeState = shapeJob?.state;
-  const optionalFailed = (["story", "music", "narration"] as const).find(stage => record?.jobs[stage]?.state === "failed");
+  const optionalFailed = (["story", "music"] as const).find(stage => record?.jobs[stage]?.state === "failed");
   const stages: ProgressStage[] = [
     { id: "object", label: "Preparing your object", status: record?.jobs.object?.state === "failed" ? "error" : "complete" },
     { id: "shape", label: "Building its 3D shape", status: shapeState === "failed" ? "error" : shapeState === "ready" ? "complete" : "active", ...(shapeJob?.uiMessage ? { detail: shapeJob.uiMessage } : {}) },
     { id: "course", label: "Creating your course", status: shapeState === "ready" ? "active" : "pending", detail: shapeState === "ready" ? "The shape is ready for course preparation." : "Begins when the shape is ready." },
-    { id: "story", label: "Adding its story and sound", status: optionalFailed ? "error" : record?.jobs.story?.state === "ready" && record.jobs.music?.state === "ready" && record.jobs.narration?.state === "ready" ? "complete" : record?.jobs.story || record?.jobs.music || record?.jobs.narration ? "active" : "pending", ...(optionalFailed ? { detail: "Your world stays playable. Sound can be added later." } : {}) },
+    { id: "story", label: "Adding its story and sound", status: optionalFailed ? "error" : record?.jobs.story?.state === "ready" && record.jobs.music?.state === "ready" ? "complete" : record?.jobs.story || record?.jobs.music ? "active" : "pending", ...(optionalFailed ? { detail: "Your world stays playable. Sound can be added later." } : {}) },
   ];
 
   return <CreationFrame activeStep={3} eyebrow="Step 4 of 4 · World" title="Your world is taking shape." style={record?.selection.style ?? "cartoon"}>
@@ -72,9 +71,8 @@ export function WorldProgressScreen({ jobId, onReady, onCancel }: WorldProgressS
       <Card className="oq-world-progress__preview">
         {record?.preview?.asset.url ? <img src={record.preview.asset.url} alt="Approved visual direction for your world" /> : <div className="oq-world-progress__placeholder" />}
         <div><p className="oq-kit-eyebrow">A first glimpse</p><h2>{title}</h2>{intro ? <p>{intro}</p> : <p className="oq-kit-muted">Your title and mission will appear here when they are ready.</p>}</div>
-        {(music || narration) ? <div className="oq-world-progress__audio">
-          {music ? <label>Music preview<audio controls preload="none" src={music.url} /></label> : null}
-          {narration ? <label>Narration preview<audio controls preload="none" src={narration.url} /></label> : null}
+        {music ? <div className="oq-world-progress__audio">
+          <label>Music preview<audio controls preload="none" src={music.url} /></label>
           <p className="oq-kit-muted">Sound plays only when you press play.</p>
         </div> : null}
       </Card>
@@ -84,7 +82,7 @@ export function WorldProgressScreen({ jobId, onReady, onCancel }: WorldProgressS
         <Button variant="secondary" onClick={onCancel}>My worlds</Button>
       </>} />
     </section>
-    {optionalFailed ? <Card className="oq-world-progress__optional-error"><strong>Your world is still safe.</strong><p>{optionalFailed === "story" ? "The story" : optionalFailed === "music" ? "Music" : "Narration"} needs another try. The finished shape will not be regenerated.</p><Button variant="secondary" onClick={() => void retry(optionalFailed)} loading={retrying === optionalFailed}>Retry {optionalFailed}</Button></Card> : null}
+    {optionalFailed ? <Card className="oq-world-progress__optional-error"><strong>Your world is still safe.</strong><p>{optionalFailed === "story" ? "The story" : "Music"} needs another try. The finished shape will not be regenerated.</p><Button variant="secondary" onClick={() => void retry(optionalFailed)} loading={retrying === optionalFailed}>Retry {optionalFailed}</Button></Card> : null}
     {connectionIssue ? <p className="oq-world-progress__notice" role="status">{connectionIssue}</p> : null}
     {actionError ? <p className="oq-kit-error" role="alert">{actionError}</p> : null}
     <p className="oq-world-progress__leave-note">You can leave this page. Work continues, and My worlds will bring you back to this same progress.</p>

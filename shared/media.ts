@@ -12,6 +12,8 @@ interface MediaAssetBase {
   provenance: GenerationProvenance;
 }
 
+/** `"narration"` is deprecated: the game no longer requests or plays it, but
+ * older manifests and generic TTS job results may still carry one. */
 export type AudioAssetKind = "music" | "ambience" | "sfx" | "narration";
 
 export interface AudioAssetReference extends MediaAssetBase {

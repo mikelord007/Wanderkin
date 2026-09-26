@@ -8,7 +8,7 @@ function raceManifest(checkpointX: number): SceneManifest {
     schemaVersion: 1,
     style: { id: "cartoon", definitionVersion: 1 },
     mode: { kind: "race", countdownSeconds: 3, orderedCheckpointIds: ["checkpoint-1"], restartPolicy: "full-reset" },
-    quest: { schemaVersion: 1, title: "Race", intro: "Race.", objective: "Reach the checkpoint.", narrationScript: "Race." },
+    quest: { schemaVersion: 1, title: "Race", intro: "Race.", objective: "Reach the checkpoint." },
     collectibles: [], finishPortal: null, initialColorRestoration: 1,
   };
   return {

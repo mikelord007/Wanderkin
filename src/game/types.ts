@@ -68,7 +68,7 @@ export interface GameViewProps {
   atmosphere?: string;
   /** Progressive Lost Colors hook. Worker 5 drives this from collected fragments. */
   colorRestoration?: number;
-  /** Audio/subtitle consumers can supply an isolated bus; defaults globally. */
+  /** Audio consumers can supply an isolated bus; defaults globally. */
   eventBus?: GameplayEventBus;
   /** Immutable published version used to scope Race comparisons and bests. */
   publishedVersionId?: PublishedLevelVersion["versionId"];

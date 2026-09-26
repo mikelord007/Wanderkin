@@ -220,7 +220,7 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
   test.skip("B7 restarts and respawns without duplicate rewards or stale race time", async ({ page }) => {
     // 1. Collect one fragment, record reward count, then fall out of bounds and
     //    manually respawn from a later safe checkpoint.
-    // 2. Assert progress is preserved and reward/narration do not repeat.
+    // 2. Assert progress is preserved and rewards do not repeat.
     // 3. Start a Race, advance timer/checkpoints, choose Restart, and assert a
     //    fresh countdown, zero elapsed time, initial progress, and no stale result.
     void page;
@@ -301,7 +301,7 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
 
   test("B11 keeps the level usable when an optional audio or video job fails", async ({ page }) => {
     // 1. Begin with a playable saved level and successful mesh/one media asset.
-    // 2. Induce or observe a narration/postcard failure and inspect honest UI.
+    // 2. Induce or observe a music/postcard failure and inspect honest UI.
     // 3. Enter/replay, edit, save, and share the level while that asset is failed.
     // 4. Retry only the failed kind and assert the mesh/course/successful asset
     //    IDs remain unchanged and no image-to-3D request is submitted.
@@ -365,11 +365,11 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
     await challengerContext.close();
   });
 
-  test("B14 supports mute, subtitles, keyboard focus, and reduced motion", async ({ page }) => {
+  test("B14 supports mute, keyboard focus, and reduced motion without narration", async ({ page }) => {
     // 1. Navigate creation, game HUD, pause, and results with keyboard only;
     //    focus remains visible, ordered, untrapped, and returns after dialogs.
-    // 2. Toggle master/music/SFX/narration mute and verify channel behavior.
-    // 3. Enable subtitles and observe timed narration/event copy.
+    // 2. Toggle master/music/SFX mute and verify channel behavior.
+    // 3. Narration was removed: no subtitle and no narration audio at any point.
     // 4. Emulate reduced motion before load; verify non-essential motion/effects
     //    reduce without hiding state or preventing completion.
     const audioRequests: string[] = [];
@@ -381,7 +381,8 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
     await runB14(page);
 
     const narration = page.getByText(/Welcome to Teacup Island\. Find the three lost colors/);
-    await expect(narration).toHaveCount(1);
+    await expect(narration).toHaveCount(0);
+    await expect(page.locator(".oq-hud__subtitle, .oq-kit-subtitle")).toHaveCount(0);
     await expect.poll(() => page.evaluate(() => window.__objectquest?.audio() ?? null)).toMatchObject({
       unlocked: true,
       contextState: "running",
@@ -393,16 +394,15 @@ test.describe("ObjectQuest v2 real-browser acceptance contracts", () => {
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await page.keyboard.press("r");
     await expect.poll(() => audioRequests).toContain("/audio/fall-respawn.wav");
-    expect(audioRequests.filter((path) => path === "/audio/narration-intro.wav")).toHaveLength(1);
+    expect(audioRequests.filter((path) => /narration/.test(path))).toHaveLength(0);
 
-    await expect(narration).toBeHidden({ timeout: 12_000 });
     await page.getByRole("button", { name: "Pause game" }).focus();
     await page.keyboard.press("Enter");
     await page.getByRole("button", { name: "Restart course" }).focus();
     await page.keyboard.press("Enter");
     await page.waitForTimeout(500);
-    await expect(narration).toBeHidden();
-    expect(audioRequests.filter((path) => path === "/audio/narration-intro.wav")).toHaveLength(1);
+    await expect(narration).toHaveCount(0);
+    expect(audioRequests.filter((path) => /narration/.test(path))).toHaveLength(0);
   });
 
   test("B15 recovers from camera denial and gives useful invalid-input errors", async ({ page, context }) => {

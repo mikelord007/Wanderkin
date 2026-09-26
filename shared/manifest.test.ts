@@ -70,6 +70,30 @@ describe("legacy manifest compatibility", () => {
     expect(migrated.experience.mode.kind).toBe("explore");
     expect(migrated.experience.quest.title).toBe(legacyFixture.name);
     expect(migrated.experience.collectibles).toEqual([]);
+    expect(migrated.experience.quest).not.toHaveProperty("narrationScript");
+  });
+
+  it("still loads a world saved with narration text and a narration asset, keeping both untouched", () => {
+    const narrated = {
+      ...lostColorsFixture,
+      experience: {
+        ...lostColorsFixture.experience,
+        quest: { ...lostColorsFixture.experience.quest, narrationScript: "Welcome to Teacup Island. Find the three lost colors." },
+      },
+      media: {
+        audio: [{
+          schemaVersion: 1, mediaType: "audio", kind: "narration", id: "old-voice", url: "/audio/narration-intro.wav",
+          sha256: "9".repeat(64), sizeBytes: 17644, mimeType: "audio/wav", durationSeconds: 1.1, loop: false, defaultGain: .72,
+          transcript: "Welcome to Teacup Island.",
+          provenance: { providerId: "fixture", requestedCapability: "chatterbox-tts", servedCapability: "chatterbox-tts", servedModel: null, applicationJobId: "job", providerJobId: null, timings: { requestedAt: "2026-09-24T00:00:00.000Z" }, reportedCost: null },
+        }],
+        video: [],
+      },
+    };
+    const migrated = migrateSceneManifest(JSON.parse(JSON.stringify(narrated)));
+    expect(migrated.schemaVersion).toBe(SCENE_MANIFEST_SCHEMA_VERSION);
+    expect(migrated.experience.quest.narrationScript).toBe(narrated.experience.quest.narrationScript);
+    expect(migrated.media?.audio.map((asset) => asset.kind)).toEqual(["narration"]);
   });
 
   it("loads both original bundled sample manifests through the compatible reader", () => {

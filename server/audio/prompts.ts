@@ -10,7 +10,6 @@ export const AUDIO_CUES = [
   "race-start",
   "race-finish",
   "completion",
-  "narration",
 ] as const;
 
 export type AudioCue = typeof AUDIO_CUES[number];
@@ -20,14 +19,13 @@ export interface AudioPromptInput {
   style: StyleId;
   objectDescription: string;
   atmosphere?: string;
-  narrationScript: string;
 }
 
 export function buildAudioRequests(input: AudioPromptInput): ReadonlyArray<{ cue: AudioCue; request: GenerationRequest }> {
   const definition = STYLE_DEFINITIONS[input.style];
   const context = [input.objectDescription.trim(), input.atmosphere?.trim()].filter(Boolean).join(", ");
   const finish = (description: string) => `${description}. ${definition.label} miniature adventure; ${context}; clean game-ready sound, no speech, no copyrighted melody.`;
-  const requests: ReadonlyArray<{ cue: AudioCue; request: GenerationRequest }> = [
+  return [
     { cue: "music", request: { schemaVersion: 1, kind: "music", capability: "music", idempotencyKey: audioKey(input, "music"), purpose: "audio:music", prompt: finish(definition.audioPrompts.music), durationSeconds: 15, instrumental: true, loop: true } },
     { cue: "ambience", request: { schemaVersion: 1, kind: "sfx", capability: "mirelo-sfx", idempotencyKey: audioKey(input, "ambience"), purpose: "audio:ambience", prompt: finish(definition.audioPrompts.ambience), durationSeconds: 15, loop: true } },
     { cue: "fragment-pickup", request: sfx(input, "fragment-pickup", finish(definition.audioPrompts.collectSfx), 3) },
@@ -38,13 +36,9 @@ export function buildAudioRequests(input: AudioPromptInput): ReadonlyArray<{ cue
     { cue: "race-finish", request: sfx(input, "race-finish", finish("quick triumphant race finish fanfare"), 3) },
     { cue: "completion", request: sfx(input, "completion", finish("warm magical world completion flourish"), 3) },
   ];
-  const narration = input.narrationScript.trim();
-  return narration
-    ? [...requests, { cue: "narration", request: { schemaVersion: 1, kind: "tts", capability: "chatterbox-tts", idempotencyKey: audioKey(input, "narration"), purpose: "audio:narration", text: narration.slice(0, 500), language: "en" } }]
-    : requests;
 }
 
-function sfx(input: AudioPromptInput, cue: Exclude<AudioCue, "music" | "ambience" | "narration">, prompt: string, durationSeconds: number): GenerationRequest {
+function sfx(input: AudioPromptInput, cue: Exclude<AudioCue, "music" | "ambience">, prompt: string, durationSeconds: number): GenerationRequest {
   return { schemaVersion: 1, kind: "sfx", capability: "mirelo-sfx", idempotencyKey: audioKey(input, cue), purpose: `audio:${cue}`, prompt, durationSeconds, loop: false };
 }
 
@@ -54,7 +48,9 @@ export function audioKey(input: AudioPromptInput, cue: AudioCue): string {
     style: input.style,
     objectDescription: input.objectDescription.trim().replace(/\s+/g, " "),
     atmosphere: input.atmosphere?.trim().replace(/\s+/g, " ") ?? "",
-    narrationScript: cue === "narration" ? input.narrationScript.trim().replace(/\s+/g, " ") : "",
+    // Always empty since narration was removed; kept so every existing cue's
+    // key is unchanged and resubmitting a world reconciles its stored jobs.
+    narrationScript: "",
     cue,
   });
   // Browser-compatible FNV-1a is sufficient for deterministic idempotency;

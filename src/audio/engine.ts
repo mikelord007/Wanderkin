@@ -2,7 +2,7 @@ import type { AudioSettings } from "../ui/components/index.js";
 import { resolveAudioUrls, type AudioCue } from "./assets.js";
 import type { LevelMedia } from "@shared/index.js";
 
-type Bus = "music" | "effects" | "voice";
+type Bus = "music" | "effects";
 
 export interface GameAudioDiagnostics {
   readonly unlocked: boolean;
@@ -17,7 +17,6 @@ export class GameAudioEngine {
   private buses: Record<Bus, GainNode> | null = null;
   private readonly buffers = new Map<string, Promise<AudioBuffer | null>>();
   private readonly loops = new Map<AudioCue, AudioBufferSourceNode>();
-  private readonly narrationPlayed = new Set<string>();
   private urls = resolveAudioUrls();
   private unlocked = false;
 
@@ -45,7 +44,6 @@ export class GameAudioEngine {
     this.master.gain.value = settings.muted ? 0 : settings.master / 100;
     this.buses.music.gain.value = settings.music / 100;
     this.buses.effects.gain.value = settings.effects / 100;
-    this.buses.voice.gain.value = settings.voice / 100;
   }
 
   async unlockAndStart(): Promise<void> {
@@ -55,14 +53,8 @@ export class GameAudioEngine {
     await Promise.all([this.startLoop("music"), this.startLoop("ambience")]);
   }
 
-  async play(cue: Exclude<AudioCue, "music" | "ambience" | "narration">): Promise<void> {
+  async play(cue: Exclude<AudioCue, "music" | "ambience">): Promise<void> {
     await this.playOneShot(cue, "effects");
-  }
-
-  async playNarrationOnce(worldId: string): Promise<void> {
-    if (this.narrationPlayed.has(worldId)) return;
-    this.narrationPlayed.add(worldId);
-    await this.playOneShot("narration", "voice");
   }
 
   stop(): void {
@@ -80,11 +72,10 @@ export class GameAudioEngine {
     const master = context.createGain();
     const music = context.createGain();
     const effects = context.createGain();
-    const voice = context.createGain();
-    music.connect(master); effects.connect(master); voice.connect(master); master.connect(context.destination);
+    music.connect(master); effects.connect(master); master.connect(context.destination);
     this.context = context;
     this.master = master;
-    this.buses = { music, effects, voice };
+    this.buses = { music, effects };
     this.setSettings(this.settings);
     return context;
   }

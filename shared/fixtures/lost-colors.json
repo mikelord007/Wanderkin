@@ -109,8 +109,7 @@
       "schemaVersion": 1,
       "title": "The Lost Colors of Teacup Island",
       "intro": "Three colors have vanished from Teacup Island, leaving its tiny world pale and quiet.",
-      "objective": "Find all three color fragments, then enter the glowing portal.",
-      "narrationScript": "Welcome to Teacup Island. Find the three lost colors and carry them to the portal to bring this little world back to life."
+      "objective": "Find all three color fragments, then enter the glowing portal."
     },
     "collectibles": [
       {

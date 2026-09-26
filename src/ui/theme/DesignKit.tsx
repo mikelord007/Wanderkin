@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   AudioControls, Button, Card, ChoiceTiles, DEFAULT_AUDIO_SETTINGS, EmptyState, HUDChip, Icon,
-  Logo, LogoMark, Modal, PlayFrame, ProgressPanel, Sheet, Stepper, STYLE_EXAMPLES, SubtitleBar, TextField,
+  Logo, LogoMark, Modal, PlayFrame, ProgressPanel, Sheet, Stepper, STYLE_EXAMPLES, TextField,
   Toast, WORLD_STYLES, WorldStyleScope, type ProgressStage, type WorldStyle,
 } from "../components/index.js";
 import { BRAND_NAME } from "../../brand.js";
@@ -62,13 +62,11 @@ function StyleGallery({ style, label }: { style: WorldStyle; label: string }) {
       </Card><Card className="oq-kit-stack"><h3>05 · Empty state</h3><EmptyState icon={<Icon name="photo" />} title="Your first world starts with a photo" description="Find a familiar object. Give it a little adventure." action={<Button onClick={() => setToast(true)}>Create my world</Button>} />
         <p className="oq-kit-muted">Keyboard: Tab to controls, arrow keys to change choices and sliders, Escape to close overlays.</p>
       </Card></div>
-      <div className="oq-kit-stack"><h3>06 · PlayFrame, HUD & subtitles</h3><p className="oq-kit-muted">Layout demonstration using an original sample photo as a backdrop. This is not gameplay.</p>
+      <div className="oq-kit-stack"><h3>06 · PlayFrame & HUD</h3><p className="oq-kit-muted">Layout demonstration using an original sample photo as a backdrop. This is not gameplay.</p>
         <div className={fullPlay ? "oq-kit-demo-fullscreen" : ""}><PlayFrame embedded={!fullPlay}
           scene={<img src="/samples/photo-4.jpg" alt="Original desk and sofa photo; layout demonstration only" />}
           hud={<HUDChip announce>Colors found {colors}/3</HUDChip>}
-          actions={<><Button variant="secondary" onClick={() => setSheet(true)}>Sound</Button><Button variant="secondary" onClick={() => setFullPlay(!fullPlay)}>{fullPlay ? "Exit preview" : "Full-screen preview"}</Button></>}
-          subtitles={<SubtitleBar speaker="Your guide" text="Three colors are waiting to be found. Let’s bring this little world to life." />}
-          controls={<Button onClick={() => setColors((colors + 1) % 4)}>Demo: find a color</Button>} />
+          actions={<><Button variant="secondary" onClick={() => setSheet(true)}>Sound</Button><Button variant="secondary" onClick={() => setFullPlay(!fullPlay)}>{fullPlay ? "Exit preview" : "Full-screen preview"}</Button></>}          controls={<Button onClick={() => setColors((colors + 1) % 4)}>Demo: find a color</Button>} />
         </div>
       </div>
     </div>

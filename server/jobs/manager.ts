@@ -220,7 +220,7 @@ function parseQuestJson(text: string, alreadyParsed: unknown): Record<string, un
     throw new Error("Quest generation must return a JSON object");
   }
   const record = value as Record<string, unknown>;
-  for (const field of ["title", "intro", "objective", "narrationScript"]) {
+  for (const field of ["title", "intro", "objective"]) {
     if (record[field] !== undefined && typeof record[field] !== "string") {
       throw new Error(`Quest field "${field}" must be text`);
     }

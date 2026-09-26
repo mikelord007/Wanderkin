@@ -109,7 +109,6 @@ const files = new Map([
   ["race-start.wav", wav(1.15, (t, i, count) => tone(t < .35 ? 440 : t < .7 ? 440 : 880, t, .42) * envelope(i % Math.floor(RATE * .38), Math.floor(RATE * .38), .01, .1) * 32767)],
   ["race-finish.wav", wav(1.5, (t, i, count) => tone([523.25, 659.25, 783.99, 1046.5][Math.min(3, Math.floor(t / .3))], t, .38) * envelope(i, count, .02, .28) * 32767)],
   ["completion.wav", wav(1.8, (t, i, count) => (tone(392, t, .2) + tone(523.25, t, .18) + tone(659.25, t, .16)) * envelope(i, count, .04, .45) * 32767)],
-  ["narration-intro.wav", wav(1.1, (t, i, count) => (tone(440, t, .18) + tone(554.37, t, .14) + tone(659.25, t, .1)) * envelope(i, count, .08, .35) * 32767)],
 ]);
 
 for (const [name, bytes] of files) await writeFile(new URL(name, outDir), bytes);

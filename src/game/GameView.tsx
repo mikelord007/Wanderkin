@@ -38,7 +38,6 @@ import type { Vec3Like } from "./core/vec.js";
 import { useGameAudio } from "../audio/useGameAudio.js";
 import { useBiomeAdventure } from "../biome/useBiomeAdventure.js";
 import { adventureHudCopy } from "../biome/missionCopy.js";
-import { getBiomeDefinition } from "../biome/presets.js";
 import { AdventureControls } from "../ui/components/AdventureControls.js";
 
 interface Runtime {
@@ -97,18 +96,9 @@ export const GameView = forwardRef<GameViewHandle, GameViewProps>(function GameV
   manifestRef.current = manifest;
   const signature = useMemo(() => gameplaySignature(manifest), [manifest]);
   const resolvedEventBus = eventBus ?? gameplayEvents;
-  // Generated adventures carry theme-neutral quest text; the guide speaks the
-  // same themed objective the HUD shows, using the look saved with the world.
-  const narrationScript = useMemo(
-    () => adventureHudCopy(manifest, getBiomeDefinition(manifest.biome?.id ?? "original"))?.objective
-      ?? manifest.experience?.quest.narrationScript,
-    [manifest],
-  );
   const audio = useGameAudio({
-    worldId: manifest.levelId,
     eventBus: resolvedEventBus,
     ...(manifest.media ? { media: manifest.media } : {}),
-    ...(narrationScript ? { narrationScript } : {}),
   });
   // Read inside the `M` keyboard-shortcut handler below, which is wired
   // once per InputController construction rather than on every render.
@@ -701,7 +691,6 @@ export const GameView = forwardRef<GameViewHandle, GameViewProps>(function GameV
         feedback={feedback}
         audioSettings={audio.settings}
         onAudioSettingsChange={audio.setSettings}
-        subtitle={audio.subtitle}
         onRequestPointerRelease={handleReleaseForHud}
       />
     </div>

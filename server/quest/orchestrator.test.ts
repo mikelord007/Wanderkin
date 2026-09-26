@@ -31,7 +31,6 @@ const valid = {
   title: "The Lost Colors of Teacup Island",
   intro: "Three bright colors have drifted away from this tiny teacup world.",
   objective: "Find every lost color, then enter the glowing portal.",
-  narrationScript: "Welcome to Teacup Island. Find every lost color, then enter the glowing portal.",
 };
 
 describe("QuestOrchestrator", () => {

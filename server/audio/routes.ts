@@ -10,7 +10,6 @@ const startSchema = z.object({
   style: z.enum(["cartoon", "hand-painted", "watercolor"]),
   objectDescription: z.string().min(1).max(500),
   atmosphere: z.string().max(500).optional(),
-  narrationScript: z.string().max(500),
   levelId: z.string().min(1).optional(),
 });
 const refreshSchema = z.object({
@@ -57,7 +56,6 @@ export function createAudioRouter(orchestrator: AudioOrchestrator, security?: Ow
             worldId: parsed.data.worldId,
             style: parsed.data.style,
             objectDescription: parsed.data.objectDescription,
-            narrationScript: parsed.data.narrationScript,
             ...(parsed.data.atmosphere !== undefined ? { atmosphere: parsed.data.atmosphere } : {}),
           }, owner?.ownerId)
         : parsed.data.action === "refresh"

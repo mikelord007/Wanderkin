@@ -1150,7 +1150,6 @@ function assembleManifest(
       title: mission.portalTitle,
       intro: `${collectibles.length} ${mission.fragmentName}s are scattered around this place.`,
       objective,
-      narrationScript: objective,
     };
   } else {
     const beacon = picked.objectives[picked.objectives.length - 1]!;
@@ -1171,7 +1170,6 @@ function assembleManifest(
       title: mission.beaconTitle,
       intro: "A beacon is waiting at the end of the route.",
       objective,
-      narrationScript: objective,
     };
   }
 

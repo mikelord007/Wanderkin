@@ -11,7 +11,6 @@ export function loadAudioSettings(storage: Storage | null = safeStorage()): Audi
       master: percent(parsed.master, DEFAULT_AUDIO_SETTINGS.master),
       music: percent(parsed.music, DEFAULT_AUDIO_SETTINGS.music),
       effects: percent(parsed.effects, DEFAULT_AUDIO_SETTINGS.effects),
-      voice: percent(parsed.voice, DEFAULT_AUDIO_SETTINGS.voice),
       muted: typeof parsed.muted === "boolean" ? parsed.muted : DEFAULT_AUDIO_SETTINGS.muted,
     };
   } catch {

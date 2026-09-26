@@ -185,19 +185,6 @@
   user-select: auto;
 }
 
-/* ---- Narration subtitle: bottom centre, its own band ------------------ */
-
-.oq-hud__subtitle {
-  position: absolute;
-  left: 50%;
-  bottom: 2rem;
-  width: min(46rem, calc(100vw - 2rem));
-  transform: translateX(-50%);
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-}
-
 .oq-hud__pips {
   display: flex;
   gap: .3rem;
@@ -332,7 +319,7 @@
 
 /* ---- Intro and checkpoint feedback ------------------------------------
    The intro is a chip at the top centre (the mark in miniature, then the
-   words), out of the subtitle's band entirely. Feedback takes the row below. */
+   words), clear of the bottom edge. Feedback takes the row below. */
 
 .oq-hud__intro,
 .oq-hud__feedback {

@@ -10,8 +10,11 @@ const LIMITS = {
   title: [2, 80],
   intro: [20, 320],
   objective: [10, 160],
-  narrationScript: [20, 500],
 } as const;
+
+/** Older prompts asked for narration text; a model that still sends it is
+ * not penalised with a retry. The value is dropped unread. */
+const IGNORED_FIELDS = new Set(["narrationScript"]);
 
 const BLOCKED_PATTERNS: readonly [RegExp, string][] = [
   [/\b(?:openai|chatgpt|gemini|livepeer|anthropic|claude|gpt[-\s]?\d|provider|language model)\b/i, "provider or model name"],
@@ -27,7 +30,7 @@ export function validateQuestOutput(raw: unknown): QuestValidationResult {
   const record = parsed as Record<string, unknown>;
   const errors: string[] = [];
   const allowed = new Set(Object.keys(LIMITS));
-  for (const key of Object.keys(record)) if (!allowed.has(key)) errors.push(`Unexpected field: ${key}.`);
+  for (const key of Object.keys(record)) if (!allowed.has(key) && !IGNORED_FIELDS.has(key)) errors.push(`Unexpected field: ${key}.`);
 
   const text = {} as Record<keyof typeof LIMITS, string>;
   for (const [field, [min, max]] of Object.entries(LIMITS) as [keyof typeof LIMITS, readonly [number, number]][]) {
@@ -52,7 +55,6 @@ export function validateQuestOutput(raw: unknown): QuestValidationResult {
       title: text.title,
       intro: text.intro,
       objective: text.objective,
-      narrationScript: text.narrationScript,
     },
   };
 }

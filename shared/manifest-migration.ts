@@ -154,7 +154,8 @@ export const levelExperienceSchema = z
       title: z.string().min(1).max(200),
       intro: z.string().min(1).max(1000),
       objective: z.string().min(1).max(300),
-      narrationScript: z.string().min(1).max(2000),
+      /** Deprecated: read from older manifests, never produced or used. */
+      narrationScript: z.string().min(1).max(2000).optional(),
     }),
     collectibles: z.array(fragment),
     finishPortal: portal.nullable(),
@@ -317,7 +318,6 @@ function legacyExperience(manifest: SceneManifest): LevelExperience {
       title: manifest.name,
       intro: `Explore ${manifest.name}.`,
       objective,
-      narrationScript: `Welcome to ${manifest.name}. ${objective}`,
     },
     collectibles: [],
     finishPortal: null,

@@ -10,9 +10,8 @@ function audio(
   sizeBytes: number,
   durationSeconds: number,
   loop: boolean,
-  transcript?: string,
 ): AudioAssetReference {
-  const capability = kind === "music" ? "music" : kind === "narration" ? "chatterbox-tts" : "mirelo-sfx";
+  const capability = kind === "music" ? "music" : "mirelo-sfx";
   return {
     schemaVersion: 1,
     mediaType: "audio",
@@ -24,8 +23,7 @@ function audio(
     mimeType: "audio/wav",
     durationSeconds,
     loop,
-    defaultGain: kind === "music" ? .48 : kind === "ambience" ? .28 : kind === "narration" ? .72 : .75,
-    ...(transcript ? { transcript } : {}),
+    defaultGain: kind === "music" ? .48 : kind === "ambience" ? .28 : .75,
     provenance: {
       providerId: "objectquest-bundled-cc0",
       requestedCapability: capability,
@@ -39,7 +37,7 @@ function audio(
   };
 }
 
-/** Canonical order: music, ambience, seven EFFECT_CUES, narration. */
+/** Canonical order: music, ambience, seven EFFECT_CUES. */
 export const LOST_COLORS_BUNDLED_MEDIA: LevelMedia = {
   audio: [
     audio("bundled-music", "music", "lost-colors-loop.wav", "6261b557a54fe707bdbbc2e23adfba4d5b93e37307a912e1972c48ebc1c2da33", 176444, 4, true),
@@ -51,7 +49,6 @@ export const LOST_COLORS_BUNDLED_MEDIA: LevelMedia = {
     audio("bundled-race-start", "sfx", "race-start.wav", "3d0424d989e977a62ac803e61d23483a683bce4bb10c80371d7b93586fdd1ce2", 18444, 1.15, false),
     audio("bundled-race-finish", "sfx", "race-finish.wav", "d2b3238d2b0df6c835c2cc4394969494b37b4402eaf257ebabe7a00a7cda97bd", 24044, 1.5, false),
     audio("bundled-completion", "sfx", "completion.wav", "45c2000f5a37ff949d9d780f9a5856c6092a0703b2f8b892ba818961b60841c4", 28844, 1.8, false),
-    audio("bundled-narration", "narration", "narration-intro.wav", "95839594cea00d93f42e82cef10df3db365d601873262c3eeede83f05ed91c39", 17644, 1.1, false, "Welcome to Teacup Island. Find the three lost colors and carry them to the portal to bring this little world back to life."),
   ],
   video: [],
 };

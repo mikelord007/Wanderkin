@@ -29,9 +29,7 @@ export async function installCreationMock(page: Page, options: { shapeState?: "g
       if (requestBody?.kind === "image-edit") { states.set("object-job", job("object-job", "image-edit", "ready", { kind: "image-edit", asset: cutoutAsset })); return route.fulfill({ status: 201, json: job("object-job", "image-edit", "queued") }); }
       if (requestBody?.kind === "image-to-3d") return route.fulfill({ status: 201, json: states.get("shape-1") });
       if (requestBody?.kind === "text") { const value = job("story-1", "text", "ready", { kind: "text", output: { text: "Teacup Trails", structured: { title: "Teacup Trails", intro: "Bring the colors home.", objective: "Find three colors." } } }); states.set("story-1", value); return route.fulfill({ status: 201, json: value }); }
-      if (requestBody?.kind === "music") { const value = options.failMusic ? job("music-1", "music", "failed", undefined, true) : job("music-1", "music", "ready", { kind: "music", asset: { schemaVersion: 1, mediaType: "audio", kind: "music", id: "music", url: "/fixture.mp3", sha256: "3".repeat(64), sizeBytes: 10, mimeType: "audio/mpeg", durationSeconds: 60, loop: true, defaultGain: .7, provenance } }); states.set("music-1", value); return route.fulfill({ status: 201, json: value }); }
-      if (requestBody?.kind === "tts") { const value = job("narration-1", "tts", "ready", { kind: "tts", asset: { schemaVersion: 1, mediaType: "audio", kind: "narration", id: "voice", url: "/fixture.wav", sha256: "4".repeat(64), sizeBytes: 10, mimeType: "audio/wav", durationSeconds: 5, loop: false, defaultGain: 1, provenance } }); states.set("narration-1", value); return route.fulfill({ status: 201, json: value }); }
-    }
+      if (requestBody?.kind === "music") { const value = options.failMusic ? job("music-1", "music", "failed", undefined, true) : job("music-1", "music", "ready", { kind: "music", asset: { schemaVersion: 1, mediaType: "audio", kind: "music", id: "music", url: "/fixture.mp3", sha256: "3".repeat(64), sizeBytes: 10, mimeType: "audio/mpeg", durationSeconds: 60, loop: true, defaultGain: .7, provenance } }); states.set("music-1", value); return route.fulfill({ status: 201, json: value }); }    }
     const match = path.match(/^\/api\/jobs\/([^/]+)$/); if (match) return route.fulfill({ json: states.get(match[1]!) ?? states.get("shape-1") });
     if (/\/api\/jobs\/.+\/retry$/.test(path)) { const id = path.split("/")[3]!; const value = { ...(states.get(id) ?? job(id, "music", "queued")), state: "queued", lastError: undefined }; states.set(id, value); return route.fulfill({ json: value }); }
     if (path === "/api/assets/mesh-1") return route.fulfill({ json: meshAsset });
@@ -94,7 +92,7 @@ export async function runB14(page: Page) {
   await enterGame.focus();
   await page.keyboard.press("Enter");
 
-  await expect(page.getByText("Welcome to Teacup Island.")).toBeVisible();
+  await expect(page.locator(".oq-hud__intro")).toBeVisible();
   const sound = page.getByRole("button", { name: "Sound" });
   await sound.focus();
   await expect(sound).toBeFocused();
@@ -105,7 +103,8 @@ export async function runB14(page: Page) {
   await mute.focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("button", { name: "Unmute sound" })).toHaveAttribute("aria-pressed", "true");
-  for (const label of ["Master", "Music", "Effects", "Voice"]) await expect(page.getByLabel(label)).toBeVisible();
+  for (const label of ["Master", "Music", "Effects"]) await expect(page.getByLabel(label)).toBeVisible();
+  await expect(page.getByLabel("Voice")).toHaveCount(0);
   await page.getByLabel("Music").press("ArrowLeft");
   await expect(page.getByLabel("Music")).toHaveValue("49");
   const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem("objectquest:audio-settings:v1") ?? "null"));

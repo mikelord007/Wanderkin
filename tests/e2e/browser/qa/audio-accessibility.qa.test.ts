@@ -24,7 +24,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("B14 audio starts on gesture, settings persist, and narration/subtitles remain one-shot", async ({ page }, testInfo: TestInfo) => {
+test("B14 audio starts on gesture, settings persist, and no narration or subtitle ever plays", async ({ page }, testInfo: TestInfo) => {
   testInfo.setTimeout(120_000);
   const audioRequests: string[] = [];
   const runtimeErrors: string[] = [];
@@ -50,7 +50,9 @@ test("B14 audio starts on gesture, settings persist, and narration/subtitles rem
   await play.focus();
   await page.keyboard.press("Enter");
   const narration = page.getByText(/Welcome to Teacup Island\. Find the three lost colors/);
-  await expect(narration).toBeVisible();
+  await expect(page.locator(".oq-hud__intro")).toBeVisible();
+  await expect(narration).toHaveCount(0);
+  await expect(page.locator(".oq-hud__subtitle, .oq-kit-subtitle")).toHaveCount(0);
 
   const sound = page.getByRole("button", { name: "Sound" });
   await sound.focus();
@@ -58,9 +60,10 @@ test("B14 audio starts on gesture, settings persist, and narration/subtitles rem
   await expect(sound).toHaveCSS("outline-style", "solid");
   await page.keyboard.press("Enter");
   await expect(page.getByRole("group", { name: "Sound" })).toBeVisible();
-  for (const channel of ["Master", "Music", "Effects", "Voice"]) {
+  for (const channel of ["Master", "Music", "Effects"]) {
     await expect(page.getByLabel(channel)).toBeVisible();
   }
+  await expect(page.getByLabel("Voice")).toHaveCount(0);
 
   const mute = page.getByRole("button", { name: "Mute sound" });
   await mute.focus();
@@ -72,12 +75,11 @@ test("B14 audio starts on gesture, settings persist, and narration/subtitles rem
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("objectquest:audio-settings:v1") ?? "null")))
     .toMatchObject({ muted: true, music: 49 });
 
-  await page.screenshot({ path: testInfo.outputPath("audio-controls-subtitles-reduced-motion.png"), fullPage: true });
-  await expect(narration).toBeHidden({ timeout: 12_000 });
+  await page.screenshot({ path: testInfo.outputPath("audio-controls-reduced-motion.png"), fullPage: true });
 
   await page.keyboard.press("r");
   await page.waitForTimeout(800);
-  await expect(narration).toBeHidden();
+  await expect(narration).toHaveCount(0);
   const pause = page.getByRole("button", { name: "Pause game" });
   await pause.focus();
   await page.keyboard.press("Enter");
@@ -85,12 +87,12 @@ test("B14 audio starts on gesture, settings persist, and narration/subtitles rem
   await page.getByRole("button", { name: "Restart course" }).focus();
   await page.keyboard.press("Enter");
   await page.waitForTimeout(1_000);
-  await expect(narration).toBeHidden();
+  await expect(narration).toHaveCount(0);
 
   console.log("W11 audio requests", JSON.stringify(audioRequests));
   console.log("W11 audio runtime errors", JSON.stringify(runtimeErrors));
   expect(audioRequests.length, "bundled audio network requests after explicit Play").toBeGreaterThanOrEqual(3);
-  expect(audioRequests.filter((path) => path.endsWith("/narration-intro.wav")), "narration requests after respawn and restart")
-    .toHaveLength(1);
+  expect(audioRequests.filter((path) => /narration/.test(path)), "narration requests across play, respawn and restart")
+    .toHaveLength(0);
   expect(mcp.callsFor("run_capability")).toHaveLength(0);
 });

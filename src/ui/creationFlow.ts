@@ -11,7 +11,9 @@ import type {
 } from "@shared/index.js";
 
 export type CreationStep = "photo" | "review" | "customize" | "preview" | "building" | "ready";
-export type CreationAttentionStage = "object" | "preview" | "shape" | "story" | "music" | "narration";
+/** Creations saved before narration was removed may still carry a
+ * `jobs.narration` entry; it is kept as history and never shown or retried. */
+export type CreationAttentionStage = "object" | "preview" | "shape" | "story" | "music";
 
 export interface CropSettings {
   scale: number;
@@ -148,7 +150,7 @@ export function isUntouchedCreationRecord(record: CreationRecord): boolean {
 }
 
 export function creationNeedsAttention(record: CreationRecord): CreationAttentionStage | null {
-  const order: CreationAttentionStage[] = ["object", "preview", "shape", "story", "music", "narration"];
+  const order: CreationAttentionStage[] = ["object", "preview", "shape", "story", "music"];
   return order.find((stage) => record.jobs[stage]?.state === "failed") ?? null;
 }
 
@@ -156,9 +158,8 @@ export function buildWorldExtrasRequests(record: CreationRecord, key: (prefix: s
   const definition = STYLE_DEFINITIONS[record.selection.style];
   const titleSubject = record.selection.atmosphere.trim() || "a tiny object world";
   const requests: [CreationAttentionStage, GenerationRequest][] = [];
-  if (!record.jobs.story) requests.push(["story", { schemaVersion: 1, kind: "text", capability: "gemini-text", idempotencyKey: key("story"), purpose: "quest-text", prompt: `Write compact quest JSON with title, intro, objective, and narrationScript for ${titleSubject}. Mode: ${record.selection.mode}.`, output: "quest-json", maxCharacters: 1200 }]);
+  if (!record.jobs.story) requests.push(["story", { schemaVersion: 1, kind: "text", capability: "gemini-text", idempotencyKey: key("story"), purpose: "quest-text", prompt: `Write compact quest JSON with title, intro, and objective for ${titleSubject}. Mode: ${record.selection.mode}.`, output: "quest-json", maxCharacters: 1200 }]);
   if (!record.jobs.music) requests.push(["music", { schemaVersion: 1, kind: "music", capability: "music", idempotencyKey: key("music"), purpose: "world-soundtrack", prompt: definition.audioPrompts.music, durationSeconds: 15, instrumental: true, loop: true }]);
-  if (!record.jobs.narration) requests.push(["narration", { schemaVersion: 1, kind: "tts", capability: "chatterbox-tts", idempotencyKey: key("narration"), purpose: "quest-narration", text: `Welcome, explorer. Your ${record.selection.mode} adventure is taking shape.`, language: "en" }]);
   return requests;
 }
 
@@ -238,7 +239,6 @@ export function stageLabel(stage: CreationAttentionStage): string {
     case "shape": return "3D shape";
     case "story": return "Story";
     case "music": return "Music";
-    case "narration": return "Narration";
   }
 }
 
