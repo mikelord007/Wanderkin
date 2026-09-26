@@ -16,6 +16,19 @@ export const BUNDLED_AUDIO_URLS: Readonly<Record<AudioCue, string>> = {
   completion: "/audio/completion.wav",
 };
 
+/**
+ * Looks that bring their own ambience loop, replacing the world's while the
+ * look is shown (keyed by biome id; audio never imports biome code). Rainy
+ * looks play steady rain instead of the breeze.
+ */
+export const LOOK_AMBIENCE_URLS: Readonly<Record<string, string>> = {
+  monsoon: "/audio/monsoon-rain.wav",
+};
+
+export function lookAmbienceUrl(lookId: string | null | undefined): string | null {
+  return lookId ? LOOK_AMBIENCE_URLS[lookId] ?? null : null;
+}
+
 /** Shared media currently stores SFX as a flat array. The server writes them
  * in this documented canonical order; generated kind-specific assets win,
  * while a missing optional asset falls back to the tiny bundled sound.

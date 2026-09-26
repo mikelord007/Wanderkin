@@ -59,6 +59,46 @@ function windBed(seconds, peak, rate = RATE) {
 }
 const breeze = windBed(4, .05);
 
+/** Steady rain for rainy looks (Monsoon): a soft low-passed hiss (two one-pole
+ * low-passes at ~1.1 kHz, with a slow one subtracted so it never rumbles)
+ * plus a scatter of short, darker droplet ticks, all laid on one circular
+ * loop period exactly like `windBed`, so the loop is seamless at the seam. */
+function rainBed(seconds, peak, rate) {
+  const count = Math.floor(rate * seconds);
+  const period = count - 2 * Math.round(rate * .02);
+  const fast = 1 - Math.exp(-2 * Math.PI * 1100 / rate);
+  const slow = 1 - Math.exp(-2 * Math.PI * 180 / rate);
+  const cycle = new Float64Array(period);
+  let low = 0;
+  let lower = 0;
+  let floor = 0;
+  for (let pass = 0; pass < 2; pass += 1) {
+    for (let i = 0; i < period; i += 1) {
+      low += fast * (seedNoise(i + 400000) - low);
+      lower += fast * (low - lower);
+      floor += slow * (lower - floor);
+      cycle[i] = (lower - floor) * .55;
+    }
+  }
+  // Droplets: ~45 per second, each a quick decaying, low-passed noise tick.
+  const drops = Math.round(seconds * 45);
+  const tickLength = Math.round(rate * .03);
+  for (let k = 0; k < drops; k += 1) {
+    const start = Math.floor((seedNoise(900000 + k * 3) * .5 + .5) * period);
+    const gain = .25 + .75 * (seedNoise(900001 + k * 3) * .5 + .5);
+    const tone = 1 - Math.exp(-2 * Math.PI * (700 + 900 * (seedNoise(900002 + k * 3) * .5 + .5)) / rate);
+    let tick = 0;
+    for (let j = 0; j < tickLength; j += 1) {
+      tick += tone * (seedNoise(1200000 + k * 97 + j) - tick);
+      cycle[(start + j) % period] += tick * gain * Math.exp(-j / (rate * .006));
+    }
+  }
+  const loudest = cycle.reduce((max, value) => Math.max(max, Math.abs(value)), 0);
+  return Array.from({ length: count }, (_, i) => cycle[i % period] / loudest * peak);
+}
+const RAIN_RATE = 11025;
+const rain = rainBed(4, .07, RAIN_RATE);
+
 /** Short plucked/mallet note: fast attack, exponential decay, brighter fast-decaying 2nd
  * harmonic for a bell-like "ping" — deliberately no sustained tone, so notes leave silence
  * between them instead of blending into a drone. */
@@ -102,6 +142,7 @@ const files = new Map([
     return (melody + bass + percussion) * envelope(i, count, .03, .06, MUSIC_RATE) * 32767;
   }, MUSIC_RATE)],
   ["gentle-breeze.wav", wav(4, (t, i) => breeze[i] * 32767)],
+  ["monsoon-rain.wav", wav(4, (t, i) => rain[i] * 32767, RAIN_RATE)],
   ["fragment-pickup.wav", wav(.45, (t, i, count) => (tone(660 + t * 500, t, .42) + tone(990 + t * 250, t, .18)) * envelope(i, count, .01, .2) * 32767)],
   ["portal-activate.wav", wav(1.2, (t, i, count) => (tone(220 + t * 360, t, .26) + tone(440 + t * 520, t, .16)) * envelope(i, count, .04, .32) * 32767)],
   ["checkpoint.wav", wav(.35, (t, i, count) => tone(t < .16 ? 523.25 : 783.99, t, .45) * envelope(i, count, .01, .12) * 32767)],

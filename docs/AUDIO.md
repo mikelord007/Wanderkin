@@ -63,6 +63,8 @@ Worlds saved and shares published before narration was removed may still hold `e
 
 The Lost Colors sample includes nine mono 8 kHz PCM WAV files under `public/audio/`; every file is under 100 KB. They are generated deterministically by `node scripts/generate-bundled-audio.mjs`, authored for this repository, and released under CC0-1.0. The manifest stores each file's SHA-256, size, duration, and bundled provenance. They contain synthesized tones/noise only—no samples, voices, copyrighted melody, or third-party recording.
 
+The same script also writes `monsoon-rain.wav` (11 kHz, 4 s, low-passed rain hiss with droplet ticks, CC0-1.0). It is not part of the Lost Colors media: while the Monsoon look is shown, `LOOK_AMBIENCE_URLS` in `src/audio/assets.ts` swaps it in as the ambience loop, and switching away restores the world's own ambience.
+
 ## Bounded live validation requests (not executed)
 
 No paid call was made. If separately authorized, validate one minimal request per kind through `POST /api/jobs/generate` with a unique `Idempotency-Key` equal to the request field:

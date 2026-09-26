@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { LevelMedia } from "@shared/index.js";
-import { BUNDLED_AUDIO_URLS, EFFECT_CUES, resolveAudioUrls, type EffectCue } from "./assets.js";
+import { BUNDLED_AUDIO_URLS, EFFECT_CUES, lookAmbienceUrl, resolveAudioUrls, type EffectCue } from "./assets.js";
 import { loadAudioSettings, saveAudioSettings } from "./settings.js";
 import { GameAudioEngine, trimAndNormalize } from "./engine.js";
 import { LOST_COLORS_BUNDLED_MEDIA } from "./bundledMedia.js";
@@ -136,9 +136,88 @@ describe("client audio", () => {
     const rmsDb = (clip: Pcm) => 10 * Math.log10(meanSquare(clip.samples));
     expect(rmsDb(music) - rmsDb(ambience), "ambience headroom under the music (dB)").toBeGreaterThanOrEqual(8);
   });
+
+  it("plays steady low-passed rain as the Monsoon look's ambience, well under the music", () => {
+    expect(lookAmbienceUrl("monsoon")).toBe("/audio/monsoon-rain.wav");
+    expect(lookAmbienceUrl("alpine")).toBeNull();
+    expect(lookAmbienceUrl(null)).toBeNull();
+    const bytes = readFileSync(path.join(process.cwd(), "public/audio/monsoon-rain.wav"));
+    expect(bytes.byteLength).toBeLessThan(100_000);
+    const rain = throughEngine(readPcm(bytes));
+    const music = throughEngine(readBundledPcm("music"));
+    // Rain hiss, low-passed: little energy up high, no pitched line anywhere.
+    expect(bandShare(rain, 3000), "rain energy above 3 kHz").toBeLessThan(0.12);
+    const power = welchPower(rain.samples);
+    let worstLine = 0;
+    for (let bin = 1; bin < power.length - 1; bin += 1) {
+      const neighbours: number[] = [];
+      for (let offset = -16; offset <= 16; offset += 1) {
+        const other = bin + offset;
+        if (offset !== 0 && other >= 1 && other < power.length) neighbours.push(power[other]!);
+      }
+      neighbours.sort((a, b) => a - b);
+      worstLine = Math.max(worstLine, power[bin]! / neighbours[Math.floor(neighbours.length / 2)]!);
+    }
+    expect(worstLine).toBeLessThan(8);
+    const rmsDb = (clip: Pcm) => 10 * Math.log10(meanSquare(clip.samples));
+    expect(rmsDb(music) - rmsDb(rain), "rain headroom under the music (dB)").toBeGreaterThanOrEqual(8);
+  });
+
+  it("swaps the running ambience loop for a look's own and back, without restarting the music", async () => {
+    const started: string[] = [];
+    const stopped: string[] = [];
+    // Silent buffers pass through trimAndNormalize untouched, so each keeps its url tag.
+    const samples = new Float32Array([0, 0]);
+    const buffers = new Map<string, AudioBuffer>();
+    const context = {
+      state: "running",
+      destination: {},
+      resume: async () => undefined,
+      close: async () => undefined,
+      createGain: () => ({ gain: { value: 1 }, connect: () => undefined }),
+      createBufferSource: () => {
+        const source = { buffer: null as AudioBuffer | null, connect: () => undefined, loop: false, loopStart: 0, loopEnd: 0,
+          start: () => { started.push(String((source.buffer as unknown as { url: string }).url)); },
+          stop: () => { stopped.push(String((source.buffer as unknown as { url: string }).url)); } };
+        return source;
+      },
+      decodeAudioData: async (data: ArrayBuffer) => buffers.get(new TextDecoder().decode(data))!,
+      createBuffer: () => ({ length: 2, numberOfChannels: 1, sampleRate: 8000, duration: 1, getChannelData: () => samples }),
+    } as unknown as AudioContext;
+    const engine = new GameAudioEngine(
+      { master: 80, music: 50, effects: 75, muted: false },
+      () => context,
+      async (url) => {
+        const key = String(url);
+        buffers.set(key, { url: key, length: 2, numberOfChannels: 1, sampleRate: 8000, duration: 1, getChannelData: () => samples } as unknown as AudioBuffer);
+        return new Response(key);
+      },
+    );
+    await engine.unlockAndStart();
+    expect(started.sort()).toEqual([BUNDLED_AUDIO_URLS.ambience, BUNDLED_AUDIO_URLS.music].sort());
+    engine.setAmbienceOverride(lookAmbienceUrl("monsoon"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(stopped).toEqual([BUNDLED_AUDIO_URLS.ambience]);
+    expect(started.at(-1)).toBe("/audio/monsoon-rain.wav");
+    expect(engine.diagnostics().activeLoops.slice().sort()).toEqual(["ambience", "music"]);
+    // The world's media reconfigured mid-look keeps the look's loop.
+    engine.configure(undefined);
+    engine.setAmbienceOverride(null);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(stopped).toEqual([BUNDLED_AUDIO_URLS.ambience, "/audio/monsoon-rain.wav"]);
+    expect(started.at(-1)).toBe(BUNDLED_AUDIO_URLS.ambience);
+    expect(started.filter((url) => url === BUNDLED_AUDIO_URLS.music)).toHaveLength(1);
+    engine.stop();
+  });
 });
 
 interface Pcm { samples: Float32Array; sampleRate: number }
+
+function readPcm(bytes: Buffer): Pcm {
+  const samples = new Float32Array((bytes.byteLength - 44) / 2);
+  for (let i = 0; i < samples.length; i += 1) samples[i] = bytes.readInt16LE(44 + i * 2) / 32768;
+  return { samples, sampleRate: bytes.readUInt32LE(24) };
+}
 
 function readBundledPcm(kind: "music" | "ambience"): Pcm {
   const asset = LOST_COLORS_BUNDLED_MEDIA.audio.find((entry) => entry.kind === kind)!;

@@ -27,7 +27,11 @@ export function useGameAudio(options: {
 
   const unlock = useCallback(() => engine.unlockAndStart(), [engine]);
   const getDiagnostics = useCallback(() => engine.diagnostics(), [engine]);
-  return { settings, setSettings, unlock, getDiagnostics };
+  const mediaRef = useRef(options.media);
+  mediaRef.current = options.media;
+  /** The shown look's own ambience loop (null = the world's). */
+  const setLookAmbience = useCallback((url: string | null) => engine.setAmbienceOverride(url, mediaRef.current), [engine]);
+  return { settings, setSettings, unlock, getDiagnostics, setLookAmbience };
 }
 
 export function handleEvent(engine: Pick<GameAudioEngine, "play">, event: GameplayEvent): void {

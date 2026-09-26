@@ -18,6 +18,7 @@ export class GameAudioEngine {
   private readonly buffers = new Map<string, Promise<AudioBuffer | null>>();
   private readonly loops = new Map<AudioCue, AudioBufferSourceNode>();
   private urls = resolveAudioUrls();
+  private ambienceOverride: string | null = null;
   private unlocked = false;
 
   constructor(
@@ -26,7 +27,28 @@ export class GameAudioEngine {
     private readonly fetcher: typeof fetch = (...args) => fetch(...args),
   ) {}
 
-  configure(media?: LevelMedia): void { this.urls = resolveAudioUrls(media); }
+  configure(media?: LevelMedia): void {
+    const urls = { ...resolveAudioUrls(media) };
+    if (this.ambienceOverride) urls.ambience = this.ambienceOverride;
+    this.urls = urls;
+  }
+
+  /**
+   * Replaces the ambience loop while a look with its own ambience is shown
+   * (null restores the world's). A playing loop switches over right away.
+   */
+  setAmbienceOverride(url: string | null, media?: LevelMedia): void {
+    if (url === this.ambienceOverride) return;
+    this.ambienceOverride = url;
+    const next = url ?? resolveAudioUrls(media).ambience;
+    if (next === this.urls.ambience) return;
+    this.urls = { ...this.urls, ambience: next };
+    const playing = this.loops.get("ambience");
+    if (!playing) return;
+    try { playing.stop(); } catch { /* already stopped */ }
+    this.loops.delete("ambience");
+    void this.startLoop("ambience");
+  }
 
   diagnostics(): GameAudioDiagnostics {
     const contextState = this.context?.state ?? "uninitialized";
@@ -83,8 +105,10 @@ export class GameAudioEngine {
   private async startLoop(cue: "music" | "ambience"): Promise<void> {
     if (!this.unlocked || this.loops.has(cue)) return;
     const context = this.ensureContext();
-    const buffer = await this.load(this.urls[cue]);
-    if (!buffer || !this.unlocked || this.loops.has(cue)) return;
+    const url = this.urls[cue];
+    const buffer = await this.load(url);
+    // A newer loop was chosen while this one loaded (a look switch): drop it.
+    if (!buffer || !this.unlocked || this.loops.has(cue) || this.urls[cue] !== url) return;
     const source = context.createBufferSource();
     source.buffer = buffer;
     source.loop = true;

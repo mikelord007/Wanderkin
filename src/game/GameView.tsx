@@ -35,6 +35,7 @@ import { GameplaySession, type GameplaySessionSnapshot } from "./modes/session.j
 import { updateGameplayProximity } from "./modes/proximity.js";
 import { gameplayEvents } from "./events.js";
 import type { Vec3Like } from "./core/vec.js";
+import { lookAmbienceUrl } from "../audio/assets.js";
 import { useGameAudio } from "../audio/useGameAudio.js";
 import { useBiomeAdventure } from "../biome/useBiomeAdventure.js";
 import { adventureHudCopy } from "../biome/missionCopy.js";
@@ -147,6 +148,9 @@ export const GameView = forwardRef<GameViewHandle, GameViewProps>(function GameV
     movement: runtime?.simulation.config ?? null,
     onAdventure: onAdventurePrepared,
   });
+  // A look with its own soundscape (Monsoon's rain) replaces the ambience loop.
+  const { setLookAmbience } = audio;
+  useEffect(() => { setLookAmbience(lookAmbienceUrl(biome.presented.id)); }, [setLookAmbience, biome.presented.id]);
   const adventureCopy = useMemo(
     () => adventureHudCopy(manifest, biome.definition),
     [manifest, biome.definition],
