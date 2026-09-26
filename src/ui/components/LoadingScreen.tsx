@@ -3,14 +3,17 @@ interface LoadingScreenProps {
   detail?: string;
   /** Only pass when a real total is known (e.g. bytes downloaded / total). */
   percent?: number;
+  /** "page" (default) centres in the viewport; "inline" centres in its
+   * sized parent, e.g. a preview frame or a panel below a header. */
+  placement?: "page" | "inline";
 }
 
 /** Indeterminate by default — a percent is only ever shown when the caller
  * has an actual known total, never invented. */
-export function LoadingScreen({ stage, detail, percent }: LoadingScreenProps) {
+export function LoadingScreen({ stage, detail, percent, placement = "page" }: LoadingScreenProps) {
   const known = typeof percent === "number" && Number.isFinite(percent);
   return (
-    <div className="oq-loading" role="status" aria-live="polite">
+    <div className={`oq-loading${placement === "inline" ? " oq-loading--inline" : ""}`} role="status" aria-live="polite">
       <div className="oq-loading__spinner" aria-hidden="true">
         <div className="oq-loading__spinner-dot" />
         <div className="oq-loading__spinner-dot" />

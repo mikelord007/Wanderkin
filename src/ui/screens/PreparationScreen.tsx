@@ -267,7 +267,7 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
 
       {saveError ? <p className="oq-error-text">{saveError}</p> : null}
 
-      <Suspense fallback={<LoadingScreen stage="Loading the level editor…" />}>
+      <Suspense fallback={<LoadingScreen stage="Loading the level editor…" placement="inline" />}>
         <LevelEditor
           key={`${manifest.levelId}-${repairFocus?.message ?? "manual"}`}
           manifest={manifest}

@@ -70,6 +70,12 @@
 /* Screens that bring their own full-page frame (the creation journey) sit in
    the content column instead of the viewport. */
 .wk-shell__content > .oq-creation { min-height: 100vh; }
+/* Loading inside the dashboard fills the content column (the whole height
+   beside the sidebar, or below the top bar on narrow screens) and centres
+   there. The footer waits until there is a page to sit under. */
+.wk-shell__content:has(> .oq-loading) { display: grid; grid-template-rows: 1fr; }
+.wk-shell__content > .oq-loading { min-height: 0; }
+.wk-shell__content:has(> .oq-loading) > .wk-shell__foot { display: none; }
 /* The quiet foot of every dashboard page: the legal links, in the page's
    own column. */
 .wk-shell__foot {
@@ -205,7 +211,8 @@
 
 /* === Narrow screens: top bar + tab row ================================== */
 @media (max-width: 860px) {
-  .wk-shell { grid-template-columns: minmax(0, 1fr); }
+  /* The content row takes whatever height the top bar leaves. */
+  .wk-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
   .wk-shell__side {
     position: sticky; top: 0; z-index: 10; height: auto;
     display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "brand me" "nav nav";

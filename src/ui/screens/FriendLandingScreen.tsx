@@ -79,7 +79,7 @@ export function FriendLandingScreen({ shareId, onPlay, onHome }: FriendLandingSc
           {previewFailed ? (
             <div className="oq-friend__preview-fallback">The preview is unavailable, but you can still try to play the saved world.</div>
           ) : (
-            <Suspense fallback={<LoadingScreen stage="Loading the world preview…" />}>
+            <Suspense fallback={<LoadingScreen stage="Loading the world preview…" placement="inline" />}>
               <Preview3D
                 manifest={manifest}
                 selectedEntityId={null}

@@ -541,13 +541,32 @@ a {
 
 /* --- Loading / status --- */
 
+/* Loading fills the screen and sits in its middle, both ways, wherever it is
+   placed (straight under the app root, in the dashboard's content column, or
+   in a padded screen). The inline placement fills a sized box instead, e.g.
+   a preview frame. */
 .oq-loading {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: var(--oq-space-3);
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   padding: var(--oq-space-7) var(--oq-space-4);
   text-align: center;
+}
+
+.oq-loading--inline {
+  min-height: 0;
+  height: 100%;
+}
+
+/* A padded screen showing only its loading state gives the loading the whole
+   height, so it is centred in the viewport rather than below the padding. */
+.oq-screen:has(> .oq-loading:only-child) {
+  padding-block: 0;
 }
 
 .oq-loading__spinner {
