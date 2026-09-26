@@ -1,5 +1,5 @@
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
-import type { AuthProvider, AuthSession, AuthUser } from "./types.js";
+import type { AuthProvider, AuthSession, AuthUser, GoogleIdentitySignIn } from "./types.js";
 
 export const AUTH_CALLBACK_PATH = "/auth/callback";
 
@@ -26,8 +26,12 @@ export function userFromSupabaseSession(session: Pick<Session, "user">): AuthUse
  * automatic refresh, callback handled on this origin's `/auth/callback`.
  * The SDK is loaded on first use, so the stub build never downloads it. Only
  * the public anon key is ever used here.
+ *
+ * With a Google client id the provider also offers `googleIdentity`: the ID
+ * token comes from Google Identity Services on this origin and is exchanged
+ * here; the resulting session is the same kind the redirect produces.
  */
-export function createSupabaseAuthProvider(url: string, anonKey: string): AuthProvider {
+export function createSupabaseAuthProvider(url: string, anonKey: string, googleClientId: string | null = null): AuthProvider {
   let clientPromise: Promise<SupabaseClient> | null = null;
   let current: Session | null = null;
   const listeners = new Set<(session: AuthSession | null) => void>();
@@ -53,8 +57,25 @@ export function createSupabaseAuthProvider(url: string, anonKey: string): AuthPr
     return clientPromise;
   }
 
+  const googleIdentity: GoogleIdentitySignIn | undefined = googleClientId
+    ? {
+        clientId: googleClientId,
+        async signInWithIdToken(token, rawNonce) {
+          const supabase = await client();
+          // onAuthStateChange fires SIGNED_IN for the listeners as well.
+          const { data, error } = await supabase.auth.signInWithIdToken({ provider: "google", token, nonce: rawNonce });
+          if (error) throw error;
+          if (!data.session) throw new Error("Supabase returned no session.");
+          current = data.session;
+          return { user: userFromSupabaseSession(data.session) };
+        },
+        prepare() { void client(); },
+      }
+    : undefined;
+
   return {
     mode: "supabase",
+    ...(googleIdentity ? { googleIdentity } : {}),
     async init() {
       const params = new URLSearchParams(window.location.search);
       const callbackError = params.get("error_description") ?? params.get("error");

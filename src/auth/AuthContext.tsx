@@ -8,6 +8,7 @@ import {
 } from "./credentials.js";
 import { rememberReturnTo, takeReturnTo } from "./returnTo.js";
 import { createStubAuthProvider } from "./stubProvider.js";
+import { GoogleSignInCard } from "../ui/auth/GoogleSignInCard.js";
 import { createSupabaseAuthProvider } from "./supabaseProvider.js";
 import type { AuthMode, AuthProvider, AuthSession, AuthUser } from "./types.js";
 
@@ -19,8 +20,10 @@ export interface AuthState {
   user: AuthUser | null;
   /** A sign-in or callback problem worth showing on the landing. */
   error: string | null;
-  /** Stub: signs in and resolves the destination to open. Supabase: leaves
-   * for Google and never resolves a destination (null). */
+  /** Stub: signs in and resolves the destination to open. Supabase with a
+   * Google client id: opens the Google card and resolves the destination once
+   * signed in there (null if it is closed or falls back to the redirect).
+   * Supabase without one: leaves for Google and resolves null. */
   signIn: (returnTo?: string) => Promise<string | null>;
   signOut: () => Promise<void>;
 }
@@ -41,13 +44,19 @@ function unconfiguredProvider(): AuthProvider {
 export function createAuthProvider(): AuthProvider {
   const config = clientAuthConfig();
   if (config.mode === "supabase" && config.supabaseUrl && config.supabaseAnonKey) {
-    return createSupabaseAuthProvider(config.supabaseUrl, config.supabaseAnonKey);
+    return createSupabaseAuthProvider(config.supabaseUrl, config.supabaseAnonKey, config.googleClientId);
   }
   if (!import.meta.env.PROD && config.mode === "stub") return createStubAuthProvider();
   return unconfiguredProvider();
 }
 
 const AuthContext = createContext<AuthState | null>(null);
+
+/** One open Google card and the `signIn` call waiting on it. */
+interface GoogleCardRequest {
+  returnTo: string;
+  resolve: (destination: string | null) => void;
+}
 
 export function AuthSessionProvider({ children, provider: supplied }: { children: ReactNode; provider?: AuthProvider }) {
   const providerRef = useRef<AuthProvider | null>(null);
@@ -57,6 +66,8 @@ export function AuthSessionProvider({ children, provider: supplied }: { children
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<AuthUser | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [googleCard, setGoogleCard] = useState<GoogleCardRequest | null>(null);
+  const googleCardRef = useRef<GoogleCardRequest | null>(null);
 
   const apply = useCallback((session: AuthSession | null) => {
     setCurrentOwnerId(session?.user.id ?? null);
@@ -91,9 +102,25 @@ export function AuthSessionProvider({ children, provider: supplied }: { children
     };
   }, [apply, provider]);
 
+  const closeGoogleCard = useCallback((destination: string | null) => {
+    const request = googleCardRef.current;
+    googleCardRef.current = null;
+    setGoogleCard(null);
+    request?.resolve(destination);
+  }, []);
+
   const signIn = useCallback(async (returnTo?: string) => {
     setError(null);
     rememberReturnTo(returnTo ?? "/worlds");
+    if (provider.googleIdentity) {
+      provider.googleIdentity.prepare();
+      googleCardRef.current?.resolve(null);
+      return new Promise<string | null>((resolve) => {
+        const request = { returnTo: returnTo ?? "/worlds", resolve };
+        googleCardRef.current = request;
+        setGoogleCard(request);
+      });
+    }
     try {
       const session = await provider.signIn(returnTo ?? "/worlds");
       if (!session) return null;
@@ -105,6 +132,24 @@ export function AuthSessionProvider({ children, provider: supplied }: { children
       return null;
     }
   }, [apply, provider]);
+
+  const signInWithGoogleCredential = useCallback(async (token: string, rawNonce: string) => {
+    const session = await provider.googleIdentity!.signInWithIdToken(token, rawNonce);
+    await syncServerSession();
+    apply(session);
+    closeGoogleCard(takeReturnTo());
+  }, [apply, closeGoogleCard, provider]);
+
+  /** The standard redirect sign-in, from the card. */
+  const signInWithRedirect = useCallback(async () => {
+    const returnTo = googleCardRef.current?.returnTo ?? "/worlds";
+    try {
+      await provider.signIn(returnTo);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Sign-in didn’t start. Please try again.");
+      closeGoogleCard(null);
+    }
+  }, [closeGoogleCard, provider]);
 
   const signOut = useCallback(async () => {
     try {
@@ -119,7 +164,19 @@ export function AuthSessionProvider({ children, provider: supplied }: { children
     () => ({ status, mode: provider.mode, user, error, signIn, signOut }),
     [error, provider.mode, signIn, signOut, status, user],
   );
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+      {googleCard && provider.googleIdentity && (
+        <GoogleSignInCard
+          clientId={provider.googleIdentity.clientId}
+          onCredential={signInWithGoogleCredential}
+          onFallback={() => { void signInWithRedirect(); }}
+          onClose={() => closeGoogleCard(null)}
+        />
+      )}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthState {

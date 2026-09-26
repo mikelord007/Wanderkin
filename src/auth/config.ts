@@ -5,12 +5,16 @@ export interface ClientAuthEnv {
   VITE_SUPABASE_URL?: string | undefined;
   VITE_SUPABASE_ANON_KEY?: string | undefined;
   VITE_WANDERKIN_AUTH_MODE?: string | undefined;
+  VITE_GOOGLE_CLIENT_ID?: string | undefined;
 }
 
 export interface ClientAuthConfig {
   mode: AuthMode;
   supabaseUrl: string | null;
   supabaseAnonKey: string | null;
+  /** Public Google OAuth web client id. With it, Google sign-in runs on this
+   * origin (Google Identity Services); without it, the Supabase redirect. */
+  googleClientId: string | null;
 }
 
 function present(value: string | undefined): string | null {
@@ -35,7 +39,10 @@ export function resolveClientAuthConfig(env: ClientAuthEnv): ClientAuthConfig {
   else if (hasKeys) mode = "supabase";
   else mode = env.PROD ? "unconfigured" : "stub";
 
-  return { mode, supabaseUrl, supabaseAnonKey };
+  // Only meaningful for real sign-in: the stub never talks to Google.
+  const googleClientId = mode === "supabase" ? present(env.VITE_GOOGLE_CLIENT_ID) : null;
+
+  return { mode, supabaseUrl, supabaseAnonKey, googleClientId };
 }
 
 export function clientAuthConfig(): ClientAuthConfig {
@@ -44,5 +51,6 @@ export function clientAuthConfig(): ClientAuthConfig {
     VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL as string | undefined,
     VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined,
     VITE_WANDERKIN_AUTH_MODE: import.meta.env.VITE_WANDERKIN_AUTH_MODE as string | undefined,
+    VITE_GOOGLE_CLIENT_ID: import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined,
   });
 }

@@ -95,6 +95,20 @@ Other dev servers on 15173/18799 are separate and don't need touching.
 | "Sign-in is not configured" (503) | You're running with `NODE_ENV=production` and no Supabase URL. Production never uses the stand-in. |
 | Want the stand-in back for local testing | Remove or comment out the two `VITE_SUPABASE_*` lines and restart, or set `VITE_WANDERKIN_AUTH_MODE=stub` (dev only). |
 
+## Sign in from your own origin (Google names Wanderkin, not Supabase)
+With the redirect flow, Google's consent screen says "to continue to `<ref>.supabase.co`". With `VITE_GOOGLE_CLIENT_ID` set, **Sign in** opens a small card holding Google's own button (plus One Tap where the browser supports FedCM). Google then says "to continue to wanderkin-tau.vercel.app" (or localhost). The ID token it returns is exchanged with Supabase (`signInWithIdToken`), so the session, `wk_session` cookie and world ownership are exactly as before.
+
+1. **Env:** `VITE_GOOGLE_CLIENT_ID=<the Web client id>.apps.googleusercontent.com` in `.env`, and in Vercel for Production and Preview. It's public, and it's the **client id only**, never the secret. Restart the web app (and redeploy on Vercel) after changing it.
+2. **Google Cloud Console → Credentials → your Web OAuth client → Authorized JavaScript origins:** add all three:
+   - `https://wanderkin-tau.vercel.app`
+   - `http://localhost:5173`
+   - `http://localhost` (Google asks for the bare localhost too when testing on a local port)
+   Keep the existing Supabase redirect URI: the fallback still uses it.
+3. **Supabase → Authentication → Sign In / Providers → Google → Client IDs:** add the same client id (comma-separate it if others are there). Without it, Supabase rejects the token with an "audience" error, shown in the card.
+4. **Skip nonce checks** in the same Supabase panel stays **off**. Wanderkin sends a nonce.
+
+Fallback: without `VITE_GOOGLE_CLIENT_ID`, if Google's script can't load, or if its button doesn't appear within about 5 seconds, sign-in uses the Supabase redirect exactly as before. The card's **Use the standard sign-in** link always does the same.
+
 ## For later (production)
 - Add `https://<your-domain>/auth/callback` to Supabase Redirect URLs, and your domain to the Google client's JavaScript origins.
 - The Dockerfile already sets `NODE_ENV=production`. There the stand-in is impossible on both sides, and the media cookie gets `Secure`.

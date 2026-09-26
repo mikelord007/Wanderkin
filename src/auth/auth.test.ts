@@ -31,8 +31,26 @@ describe("client auth mode", () => {
   it("uses real Supabase sign-in as soon as both keys exist, in dev and production", () => {
     expect(resolveClientAuthConfig({ PROD: false, ...keys }).mode).toBe("supabase");
     expect(resolveClientAuthConfig({ PROD: true, ...keys })).toEqual({
-      mode: "supabase", supabaseUrl: "https://abc.supabase.co", supabaseAnonKey: "anon",
+      mode: "supabase", supabaseUrl: "https://abc.supabase.co", supabaseAnonKey: "anon", googleClientId: null,
     });
+  });
+
+  it("reads the Google client id for real sign-in, trimmed, and treats blank as absent", () => {
+    const googleClientId = "123-abc.apps.googleusercontent.com";
+    expect(resolveClientAuthConfig({ PROD: true, ...keys, VITE_GOOGLE_CLIENT_ID: ` ${googleClientId} ` }).googleClientId)
+      .toBe(googleClientId);
+    expect(resolveClientAuthConfig({ PROD: false, ...keys, VITE_GOOGLE_CLIENT_ID: googleClientId }).googleClientId)
+      .toBe(googleClientId);
+    expect(resolveClientAuthConfig({ PROD: true, ...keys, VITE_GOOGLE_CLIENT_ID: "  " }).googleClientId).toBeNull();
+    expect(resolveClientAuthConfig({ PROD: true, ...keys }).googleClientId).toBeNull();
+  });
+
+  it("ignores the Google client id when there is no real sign-in to use it with", () => {
+    const VITE_GOOGLE_CLIENT_ID = "123-abc.apps.googleusercontent.com";
+    expect(resolveClientAuthConfig({ PROD: false, VITE_GOOGLE_CLIENT_ID }).googleClientId).toBeNull();
+    expect(resolveClientAuthConfig({ PROD: true, VITE_GOOGLE_CLIENT_ID }).googleClientId).toBeNull();
+    expect(resolveClientAuthConfig({ PROD: false, VITE_WANDERKIN_AUTH_MODE: "stub", VITE_GOOGLE_CLIENT_ID, ...keys }).googleClientId)
+      .toBeNull();
   });
 
   it("falls back to the stub in development when keys are missing or blank", () => {
@@ -71,6 +89,8 @@ describe("stub auth provider", () => {
     const storage = memoryStorage();
     const provider = createStubAuthProvider(storage);
     expect(provider.mode).toBe("stub");
+    // The stub signs in on the spot; it never shows the Google card.
+    expect(provider.googleIdentity).toBeUndefined();
     expect(await provider.init()).toBeNull();
     expect(await provider.credentialHeaders()).toEqual({});
 

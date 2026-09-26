@@ -32,6 +32,18 @@ export interface AuthProvider {
   /** Headers that prove who is calling the Wanderkin API. */
   credentialHeaders(): Promise<Record<string, string>>;
   onChange(listener: (session: AuthSession | null) => void): () => void;
+  /** Present only for Supabase with a Google client id: Google sign-in runs
+   * on this origin and its ID token is exchanged for a Supabase session. */
+  readonly googleIdentity?: GoogleIdentitySignIn;
+}
+
+export interface GoogleIdentitySignIn {
+  readonly clientId: string;
+  /** Exchanges a Google ID token (and the raw nonce whose SHA-256 Google
+   * embedded in it) for a session. */
+  signInWithIdToken(token: string, rawNonce: string): Promise<AuthSession>;
+  /** Warms the auth SDK while the card is open, so the exchange is quick. */
+  prepare(): void;
 }
 
 /** Header the server trusts for the stub user, outside production only. */
