@@ -58,7 +58,13 @@ describe("creation storage", () => {
 
   it("adapts creation drafts, pending work, and failures to the shared My worlds union", () => {
     const storage = new MemoryStorage();
-    const draft = createCreationRecord("draft", "2026-09-24T00:00:00.000Z");
+    const draft = {
+      ...createCreationRecord("draft", "2026-09-24T00:00:00.000Z"),
+      step: "review" as const,
+      photo: { id: "draft-photo", url: "/photos/draft.jpg", order: 1 },
+    };
+    // Opened but never given a photo: not a world yet, so not listed.
+    const untouched = createCreationRecord("untouched", "2026-09-24T00:03:00.000Z");
     const pending = {
       ...createCreationRecord("pending", "2026-09-24T00:01:00.000Z"),
       step: "building" as const,
@@ -79,6 +85,7 @@ describe("creation storage", () => {
     saveCreationRecord(draft, storage);
     saveCreationRecord(pending, storage);
     saveCreationRecord(failed, storage);
+    saveCreationRecord(untouched, storage);
 
     expect(loadCreationWorldItems(storage).map(({ kind, id, actionLabel, job }) => ({
       kind,

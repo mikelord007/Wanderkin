@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { STYLE_DEFINITIONS, type ImageEditGenerationRequest, type ImageTo3dGenerationRequest } from "@shared/index.js";
 import { approvePreview, describeApiError, getJob, retryJob, submitGeneration, submitPreview, uploadPhotos } from "../api.js";
-import { canBuildWorld,createCreationRecord, visiblePreviewUrl, withCreationUpdate, withNewPhoto, withoutPhoto, withReadyPreview, type CreationRecord } from "../creationFlow.js";
-import { loadActiveCreation, loadCreationRecords, saveCreationRecord, setActiveCreationId, updateCreationJob } from "../creationStorage.js";
+import { canBuildWorld, visiblePreviewUrl, withCreationUpdate, withNewPhoto, withoutPhoto, withReadyPreview, type CreationRecord } from "../creationFlow.js";
+import { loadCreationRecords, resumeOrStartCreation, saveCreationRecord, setActiveCreationId, updateCreationJob } from "../creationStorage.js";
 import { saveActiveSource } from "../jobStorage.js";
 import { startWorldBuild } from "../worldBuild.js";
+import { LoadingScreen } from "../components/LoadingScreen.js";
 import { CaptureScreen } from "./CaptureScreen.js";
 import { ReviewObjectScreen } from "./ReviewObjectScreen.js";
 import { CustomizeScreen } from "./CustomizeScreen.js";
@@ -14,7 +15,7 @@ interface CreationJourneyScreenProps { onJobStarted: (jobId: string) => void; on
 function newKey(prefix: string): string { const suffix = "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`; return `${prefix}-${suffix}`; }
 /** Resumes the creation in progress, but never one whose build has started:
  * that one lives in My worlds now, so Create starts again at step 1. */
-function initialRecord(): CreationRecord { const restored = loadActiveCreation(); if (restored && restored.step !== "building" && restored.step !== "ready") return restored; const record = createCreationRecord(newKey("world")); saveCreationRecord(record); setActiveCreationId(record.id); return record; }
+function initialRecord(): CreationRecord { return resumeOrStartCreation(newKey("world")); }
 
 /** Step 3's preview slot: this creation's own preview, or an empty slot. */
 function previewProps(record: CreationRecord): { previewUrl?: string } { const url = visiblePreviewUrl(record); return url ? { previewUrl: url } : {}; }
@@ -144,5 +145,8 @@ export function CreationJourneyScreen({ onJobStarted, onBack }: CreationJourneyS
   if (record.step === "review" && record.photo) { const objectJob = record.jobs.object; const reviewDetail = error ?? objectJob?.error; return <ReviewObjectScreen originalUrl={record.photo.url} {...(record.objectImage?.url ? { cutoutUrl: record.objectImage.url } : {})} state={objectJob?.state === "failed" ? "broken" : record.objectImage ? "ready" : "loading"} {...(reviewDetail ? { detail: reviewDetail } : {})} crop={record.crop} onCropChange={crop => persist(withCreationUpdate(record, { crop }))} onAccept={() => record.objectImage && persist(withCreationUpdate(record, { step: "customize", useOriginalImage: false, reviewedImageAssetId: record.objectImage.id }))} onUseOriginal={() => persist(withCreationUpdate(record, { step: "customize", useOriginalImage: true, reviewedImageAssetId: record.photo!.id }))} onReplace={() => persist(withoutPhoto(record))} onRetryIsolation={() => void retryIsolation()} onBack={() => persist(withCreationUpdate(record, { step: "photo" }))} />; }
   if (record.step === "customize") return <CustomizeScreen selection={record.selection} onChange={selection => persist(withCreationUpdate(record, { selection }))} onPreview={() => { persist(withCreationUpdate(record, { step: "preview" })); void createPreview(); }} onBack={() => persist(withCreationUpdate(record, { step: "review" }))} submitting={busy} {...(error ? { error } : {})} />;
   if (record.step === "preview" && record.photo) { const previewJob = record.jobs.preview; const previewError = error ?? previewJob?.error; return <StylePreviewScreen originalUrl={(record.useOriginalImage ? record.photo : record.objectImage)?.url ?? record.photo.url} {...previewProps(record)} selection={record.selection} state={previewJob?.state === "failed" ? "failed" : previewJob?.state === "ready" && record.preview ? "ready" : "loading"} approved={canBuildWorld(record)} {...(previewError ? { error: previewError } : {})} approving={busy} building={busy} onApprove={() => void approveCurrentPreview()} onBuild={() => void buildWorld()} onChangeLook={() => persist(withCreationUpdate(record, { step: "customize" }))} onRetry={() => { const variant = previewVariant + 1; setPreviewVariant(variant); void createPreview(variant); }} onBack={() => persist(withCreationUpdate(record, { step: "customize" }))} />; }
+  // The moment between the shape job existing and the hand-over to My worlds:
+  // never an empty step 1, which read as a new world.
+  if (record.step === "building" || record.step === "ready") return <LoadingScreen stage="Starting your world…" placement="inline" />;
   return <CaptureScreen onUsePhoto={usePhoto} onBack={onBack} />;
 }

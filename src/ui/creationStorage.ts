@@ -1,5 +1,5 @@
 import type { GenerationJob } from "@shared/index.js";
-import { createCreationRecord, toPendingWorldItem, withCreationUpdate, type CreationRecord, type PendingWorldItem } from "./creationFlow.js";
+import { createCreationRecord, isUntouchedCreationRecord, toPendingWorldItem, withCreationUpdate, type CreationRecord, type PendingWorldItem } from "./creationFlow.js";
 import type { WorldListItem } from "./worlds.js";
 import { currentOwnerId, visibleToCurrentOwner } from "../auth/credentials.js";
 
@@ -58,6 +58,18 @@ export function loadActiveCreation(storage: Storage | null = storageOrNull()): C
   return record && visibleToCurrentOwner(record.ownerId) ? record : null;
 }
 
+/**
+ * The creation Create opens with: the active one if it is still before its
+ * build, at its saved step with its photo, look and preview. Otherwise (none
+ * active, or its build has started and it lives in My worlds now) a brand-new
+ * creation: no jobs, default choices, nothing carried over from another one.
+ */
+export function resumeOrStartCreation(newId: string, storage: Storage | null = storageOrNull(), now?: string): CreationRecord {
+  const active = loadActiveCreation(storage);
+  if (active && active.step !== "building" && active.step !== "ready") return active;
+  return createAndActivateCreation(newId, storage, now);
+}
+
 export function createAndActivateCreation(
   id: string,
   storage: Storage | null = storageOrNull(),
@@ -104,7 +116,9 @@ export function loadPendingWorlds(storage: Storage | null = storageOrNull()): Pe
 export function loadCreationWorldItems(
   storage: Storage | null = storageOrNull(),
 ): Extract<WorldListItem, { kind: "pending" | "failed" }>[] {
-  const visible = loadCreationRecords(storage).filter((record) => visibleToCurrentOwner(record.ownerId));
+  // A creation opened but never given a photo is not a world yet: listing it
+  // offered a Resume that could only land on an empty step 1.
+  const visible = loadCreationRecords(storage).filter((record) => visibleToCurrentOwner(record.ownerId) && !isUntouchedCreationRecord(record));
   return visible.flatMap<Extract<WorldListItem, { kind: "pending" | "failed" }>>((record) => {
     const item = toPendingWorldItem(record);
     if (!item) return [];

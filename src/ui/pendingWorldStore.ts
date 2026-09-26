@@ -1,6 +1,6 @@
 import { visibleToCurrentOwner } from "../auth/credentials.js";
 import type { CreationRecord } from "./creationFlow.js";
-import { clearActiveCreationId, loadActiveCreation, loadCreationRecords, removeCreationRecord } from "./creationStorage.js";
+import { clearActiveCreationId, loadActiveCreation, loadCreationRecords, removeCreationRecord, setActiveCreationId } from "./creationStorage.js";
 import { isBuildRecord, pendingWorldsFrom, type PendingWorld } from "./pendingWorlds.js";
 
 /*
@@ -70,6 +70,27 @@ export function destinationForStartedBuild(jobId: string, signedIn: boolean, now
   if (!signedIn || !creation) return { name: "generation", jobId };
   handOffBuild(creation, now, storage);
   return { name: "worlds", notice: "Building your world. Watch it here." };
+}
+
+/** Where a creation's My worlds tile (Resume, View progress, Retry, Review
+ * choices) goes. */
+export type CreationDestination = { name: "photos" } | { name: "generation"; jobId: string };
+
+/**
+ * Opens a creation from its My worlds tile, and never starts a new one. Still
+ * before its build, it reopens in Create at its saved step (it becomes the
+ * active creation, which Create resumes). Once its build has started, its
+ * progress opens instead, which offers Prepare my course when the shape is
+ * ready: Create would refuse to reopen it and start afresh. Null when this
+ * device no longer has the creation.
+ */
+export function destinationForCreation(id: string, storage: Storage | null = storageOrNull()): CreationDestination | null {
+  const record = loadCreationRecords(storage).find((candidate) => candidate.id === id);
+  if (!record) return null;
+  setActiveCreationId(record.id, storage);
+  const shape = record.jobs.shape;
+  if (shape && (record.step === "building" || record.step === "ready")) return { name: "generation", jobId: shape.id };
+  return { name: "photos" };
 }
 
 /** The creation whose 3D build is this job, if this device has it. */

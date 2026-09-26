@@ -43,7 +43,7 @@ import {
 import { LegalScreen } from "./ui/legal/LegalScreen.js";
 import type { LegalDocumentId } from "./ui/legal/legalDocuments.js";
 import { supportEmail } from "./ui/legal/supportContact.js";
-import { destinationForStartedBuild, findCreationByShapeJob } from "./ui/pendingWorldStore.js";
+import { destinationForCreation, destinationForStartedBuild, findCreationByShapeJob } from "./ui/pendingWorldStore.js";
 import type { PendingWorld } from "./ui/pendingWorlds.js";
 import {
   clearActiveSource,
@@ -553,6 +553,13 @@ export function App() {
     go({ name: "start" });
   }, [go]);
 
+  /** Resume (or View progress, Retry, Review choices) on a creation's My
+   * worlds tile: its saved step in Create, or its progress once its build has
+   * started. Never a new creation. */
+  const openCreation = useCallback((creationId: string) => {
+    go(destinationForCreation(creationId) ?? { name: "worlds" });
+  }, [go]);
+
   /** Opens the full progress of a world building on My worlds. */
   const openBuild = useCallback((world: PendingWorld) => {
     setActiveCreationId(world.id);
@@ -674,14 +681,8 @@ export function App() {
             go({ name: "preparation", source: { kind: "manifest", manifest }, isNew: false });
           }}
           additionalWorldItems={loadCreationWorldItems()}
-          onResumePendingWorld={(creationId) => {
-            setActiveCreationId(creationId);
-            go({ name: "photos" });
-          }}
-          onRetryFailedWorld={(creationId) => {
-            setActiveCreationId(creationId);
-            go({ name: "photos" });
-          }}
+          onResumePendingWorld={openCreation}
+          onRetryFailedWorld={openCreation}
           onOpenBuild={openBuild}
           onPlayBuiltWorld={playBuiltWorld}
           notice={screen.notice ?? null}
