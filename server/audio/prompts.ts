@@ -54,9 +54,10 @@ export function audioKey(input: AudioPromptInput, cue: AudioCue): string {
     // key is unchanged and resubmitting a world reconciles its stored jobs.
     narrationScript: "",
     cue,
-    // Music and ambience prompts were rewritten to ban vocals; a new key keeps
-    // a job stored under the old prompt from coming back as a conflict.
-    ...(cue === "music" || cue === "ambience" ? { promptRevision: 2 } : {}),
+    // A rewritten prompt needs a new key, or a job stored under the old prompt
+    // comes back as a conflict: 2 banned vocals (music and ambience), 3 made
+    // the music upbeat chiptune (music only).
+    ...(cue === "music" ? { promptRevision: 3 } : cue === "ambience" ? { promptRevision: 2 } : {}),
   });
   // Browser-compatible FNV-1a is sufficient for deterministic idempotency;
   // the gateway still compares the complete request before reconciliation.

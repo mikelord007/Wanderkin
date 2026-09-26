@@ -47,9 +47,20 @@ describe("audio orchestration", () => {
     expect(audioKey(input, "fragment-pickup")).toBe(audioKey({ ...input }, "fragment-pickup"));
   });
 
-  it("gives music and ambience new keys now that their prompts changed, so a stored job never conflicts", () => {
-    // Before the no-vocals prompts, music was keyed audio-music-e04d36a3.
+  it("gives music and ambience new keys whenever their prompts change, so a stored job never conflicts", () => {
+    // Music: audio-music-e04d36a3 before the no-vocals prompt, then
+    // audio-music-16798c14 until it became upbeat chiptune.
     expect(audioKey(input, "music")).not.toBe("audio-music-e04d36a3");
+    expect(audioKey(input, "music")).not.toBe("audio-music-16798c14");
+    // Ambience is unchanged since the no-vocals prompt.
+    expect(audioKey(input, "ambience")).toBe("audio-ambience-66ab8f7f");
+  });
+
+  it("asks for upbeat chiptune music, never sad", () => {
+    const music = buildAudioRequests(input).find((item) => item.cue === "music")!.request;
+    const prompt = music.kind === "music" ? music.prompt : "";
+    expect(prompt).toMatch(/^Upbeat, bright, bouncy major-key chiptune/);
+    expect(prompt).toContain("Never slow, melancholic, ambient or sad");
   });
 
   it("asks for instrumental background music and ambience with vocals banned in words", () => {
@@ -60,7 +71,7 @@ describe("audio orchestration", () => {
     }
     const music = requests.find((item) => item.cue === "music")!.request;
     expect(music).toMatchObject({ instrumental: true, durationSeconds: 15 });
-    expect(music.kind === "music" ? music.prompt : "").toMatch(/background bed/);
+    expect(music.kind === "music" ? music.prompt : "").toMatch(/seamless 15-second loop.*background music/);
     expect(music.kind === "music" ? music.prompt : "").toContain("a ceramic fox");
   });
 
