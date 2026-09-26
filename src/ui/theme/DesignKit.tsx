@@ -11,7 +11,7 @@ const stages: ProgressStage[] = [
   { id: "object", label: "Preparing your object", status: "complete" },
   { id: "shape", label: "Building its 3D shape", status: "active" },
   { id: "course", label: "Creating your course", status: "pending" },
-  { id: "sound", label: "Adding its story and sound", status: "pending" },
+  { id: "sound", label: "Adding its sound", status: "pending" },
 ];
 function StyleGallery({ style, label }: { style: WorldStyle; label: string }) {
   const [look, setLook] = useState<WorldStyle>(style);
@@ -52,7 +52,7 @@ function StyleGallery({ style, label }: { style: WorldStyle; label: string }) {
       </Card>
       <div className="oq-kit-grid">
         <ProgressPanel title="Your world is taking shape." detail="Stage-based progress · no estimated percentage" stages={stages} actions={<Button variant="secondary" onClick={() => setToast(true)}>My worlds</Button>} />
-        <Card className="oq-kit-stack"><h3>03 · Repair & known progress</h3><Stepper stages={[...stages.slice(0, 1), { id: "sound", label: "Adding its story and sound", status: "error", detail: "Your course is safe. Try sound again when you’re ready." }]} />
+        <Card className="oq-kit-stack"><h3>03 · Repair & known progress</h3><Stepper stages={[...stages.slice(0, 1), { id: "sound", label: "Adding its sound", status: "error", detail: "Your course is safe. Try sound again when you’re ready." }]} />
           <ProgressPanel title="Downloading a saved world" detail="Known byte total example: 64%" stages={[]} percent={64} />
           <Button variant="secondary" onClick={() => setToast(true)}>Retry sound</Button>
         </Card>

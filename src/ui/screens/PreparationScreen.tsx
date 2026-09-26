@@ -117,10 +117,9 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
         const { prepareAsset } = await scenePreparationModule();
         if (cancelled) return;
 
-        // A world from Create is named after its quest, not "Imported level".
+        // A world from Create keeps its own name, never "Imported level".
         const creation = loadActiveCreation();
-        const name = await creationWorldName(creation, getJob);
-        if (cancelled) return;
+        const name = creation ? creationWorldName(creation) : null;
 
         // The scene loader evicts failed cache entries on its own, so a
         // plain retry with the real, stable asset URL is enough — no

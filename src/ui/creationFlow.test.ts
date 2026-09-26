@@ -44,21 +44,15 @@ describe("creation flow", () => {
     }
   });
 
-  it("asks for the story as bare JSON with only the three fields and their limits", () => {
-    const story = buildWorldExtrasRequests(createCreationRecord("world-1", "2026-09-24T00:00:00.000Z"), prefix => `${prefix}-key`).find(([stage]) => stage === "story")?.[1];
-    expect(story?.kind).toBe("text");
-    const prompt = story?.kind === "text" ? story.prompt : "";
-    expect(prompt).toContain("Do not use Markdown or code fences.");
-    expect(prompt).toContain('"title" (2-80 characters), "intro" (20-320), "objective" (10-160)');
-    expect(prompt).not.toContain("narrationScript");
+  it("requests only the background music for world extras: no story, no narration voice", () => {
+    const requests = buildWorldExtrasRequests(createCreationRecord("world-1", "2026-09-24T00:00:00.000Z"), prefix => `${prefix}-key`);
+    expect(requests.map(([stage]) => stage)).toEqual(["music"]);
+    expect(requests.some(([, request]) => request.kind === "text" || request.kind === "tts")).toBe(false);
   });
 
-  it("requests only the story and music for world extras — no narration voice", () => {
-    const requests = buildWorldExtrasRequests(createCreationRecord("world-1", "2026-09-24T00:00:00.000Z"), prefix => `${prefix}-key`);
-    expect(requests.map(([stage]) => stage)).toEqual(["story", "music"]);
-    expect(requests.some(([, request]) => request.kind === "tts")).toBe(false);
-    const story = requests.find(([stage]) => stage === "story")?.[1];
-    expect(story?.kind === "text" && story.prompt).not.toMatch(/narration/i);
+  it("never asks again for a story, even on an older creation whose story failed", () => {
+    const record = { ...createCreationRecord("world-1", "2026-09-24T00:00:00.000Z"), jobs: { story: { id: "st", state: "failed" as const, kind: "text" as const } } };
+    expect(buildWorldExtrasRequests(record, prefix => `${prefix}-key`).map(([stage]) => stage)).toEqual(["music"]);
   });
 
   it("allows building only from the approved preview matching the current selection", () => {

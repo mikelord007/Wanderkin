@@ -39,7 +39,7 @@ export function usePendingWorlds() {
   useEffect(() => {
     if (!watchKey) return;
     const unwatch = watchKey.split("|").map((entry) => {
-      const [recordId, stage, jobId] = entry.split(":") as [string, "shape" | "story" | "music", string];
+      const [recordId, stage, jobId] = entry.split(":") as [string, "shape" | "music", string];
       return sharedPoller.watch(jobId, (job) => {
         const current = loadCreationRecords().find((record) => record.id === recordId);
         if (!current) return;
@@ -50,8 +50,8 @@ export function usePendingWorlds() {
     return () => unwatch.forEach((stop) => stop());
   }, [watchKey, reload]);
 
-  // Story and music a build is still missing (turned away while the service
-  // was busy, or never asked for) are asked for again from here too, so a
+  // Music a build is still missing (turned away while the service
+  // was busy, or never asked for) is asked for again from here too, so a
   // world gets its sound even if its progress screen is never opened.
   const anyBuild = cards.length > 0;
   useEffect(() => {

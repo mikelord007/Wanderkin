@@ -33,31 +33,30 @@ describe("reaskMissingExtras", () => {
     jobs: { shape: { id: "shape-1", state: "generating", kind: "image-to-3d" } },
   };
 
-  it("asks again for story and music the server turned away, throttled, until both are recorded", async () => {
+  it("asks again for music the server turned away, throttled, until it is recorded", async () => {
     let record = building;
     const state = new Map<string, { at: number; count: number }>();
     let busy = true;
     const submit = vi.fn(async (request: GenerationRequest) => {
-      if (busy && request.kind === "music") throw Object.assign(new Error("The generation service is at capacity."), { status: 429 });
+      if (busy) throw Object.assign(new Error("The generation service is at capacity."), { status: 429 });
       return job(`job-${request.kind}`, request.kind);
     });
-    const deps = (now: number) => ({ submit, key: (prefix: string) => `${prefix}-${now}`, now, record: (stage: "story" | "music", accepted: GenerationJob) => { record = updateCreationJob(record, stage, accepted); } });
+    const deps = (now: number) => ({ submit, key: (prefix: string) => `${prefix}-${now}`, now, record: (stage: "music", accepted: GenerationJob) => { record = updateCreationJob(record, stage, accepted); } });
 
     // Like creations B and C on the live server: the service was busy.
     await reaskMissingExtras(record, deps(0), state);
-    expect(record.jobs.story?.id).toBe("job-text");
     expect(record.jobs.music).toBeUndefined();
 
     await reaskMissingExtras(record, deps(EXTRAS_REASK_MS - 1), state);
-    expect(submit).toHaveBeenCalledTimes(2);
+    expect(submit).toHaveBeenCalledTimes(1);
 
     busy = false;
     await reaskMissingExtras(record, deps(EXTRAS_REASK_MS), state);
     expect(record.jobs.music?.id).toBe("job-music");
-    expect(submit.mock.calls.map(([request]) => request.kind)).toEqual(["text", "music", "music"]);
+    expect(submit.mock.calls.map(([request]) => request.kind)).toEqual(["music", "music"]);
 
     await reaskMissingExtras(record, deps(10 * EXTRAS_REASK_MS), state);
-    expect(submit).toHaveBeenCalledTimes(3);
+    expect(submit).toHaveBeenCalledTimes(2);
   });
 
   it("stops repeating a request the server keeps refusing", async () => {
@@ -66,13 +65,15 @@ describe("reaskMissingExtras", () => {
     for (let ask = 0; ask < EXTRAS_MAX_ASKS + 3; ask += 1) {
       await reaskMissingExtras(building, { submit, record: vi.fn(), key: (prefix) => prefix, now: ask * EXTRAS_REASK_MS }, state);
     }
-    expect(submit).toHaveBeenCalledTimes(EXTRAS_MAX_ASKS * 2);
+    expect(submit).toHaveBeenCalledTimes(EXTRAS_MAX_ASKS);
   });
 
-  it("leaves worlds that are not building, or have everything, alone", async () => {
+  it("leaves worlds that are not building, or have their music, alone, and never asks for a story", async () => {
     const submit = vi.fn();
     await reaskMissingExtras(approved, { submit, record: vi.fn(), key: (prefix) => prefix, now: 0 }, new Map());
-    await reaskMissingExtras({ ...building, jobs: { ...building.jobs, story: { id: "s", state: "ready", kind: "text" }, music: { id: "m", state: "generating", kind: "music" } } }, { submit, record: vi.fn(), key: (prefix) => prefix, now: 0 }, new Map());
+    await reaskMissingExtras({ ...building, jobs: { ...building.jobs, music: { id: "m", state: "generating", kind: "music" } } }, { submit, record: vi.fn(), key: (prefix) => prefix, now: 0 }, new Map());
+    // An older creation whose story failed or was never made.
+    await reaskMissingExtras({ ...building, jobs: { ...building.jobs, story: { id: "s", state: "failed", kind: "text" }, music: { id: "m", state: "ready", kind: "music" } } }, { submit, record: vi.fn(), key: (prefix) => prefix, now: 0 }, new Map());
     expect(submit).not.toHaveBeenCalled();
   });
 });
@@ -84,11 +85,11 @@ describe("startWorldBuild", () => {
     return {
       get stored() { return stored; },
       save: (record: CreationRecord) => { stored = record; },
-      record: (stage: "story" | "music", accepted: GenerationJob) => { if (stored) stored = updateCreationJob(stored, stage, accepted); },
+      record: (stage: "music", accepted: GenerationJob) => { if (stored) stored = updateCreationJob(stored, stage, accepted); },
     };
   }
 
-  it("moves on as soon as the shape exists, then records story and music", async () => {
+  it("moves on as soon as the shape exists, then records the music, and asks for no story", async () => {
     const store = recorder();
     const submit = vi.fn(async (request: GenerationRequest) => job(`job-${request.kind}`, request.kind));
     const navigate = vi.fn((record: CreationRecord) => {
@@ -100,41 +101,42 @@ describe("startWorldBuild", () => {
     await startWorldBuild(approved, shapeRequest, { submit, ...store, key: (prefix) => `${prefix}-1`, navigate });
 
     expect(navigate).toHaveBeenCalledTimes(1);
-    expect(submit.mock.calls.map(([request]) => request.kind)).toEqual(["image-to-3d", "text", "music"]);
-    expect(store.stored?.jobs).toMatchObject({ shape: { id: "job-image-to-3d" }, story: { id: "job-text" }, music: { id: "job-music" } });
+    expect(submit.mock.calls.map(([request]) => request.kind)).toEqual(["image-to-3d", "music"]);
+    expect(store.stored?.jobs).toMatchObject({ shape: { id: "job-image-to-3d" }, music: { id: "job-music" } });
+    expect(store.stored?.jobs.story).toBeUndefined();
     expect(extrasToSubmit(store.stored!, (prefix) => `${prefix}-again`)).toEqual([]);
   });
 
-  it("never waits for the story: the server can take minutes to answer it", async () => {
+  it("never waits for the music in Create", async () => {
     const store = recorder();
-    const submit = vi.fn((request: GenerationRequest) => request.kind === "text" ? new Promise<GenerationJob>(() => undefined) : Promise.resolve(job(`job-${request.kind}`, request.kind)));
+    const submit = vi.fn((request: GenerationRequest) => request.kind === "music" ? new Promise<GenerationJob>(() => undefined) : Promise.resolve(job(`job-${request.kind}`, request.kind)));
     const navigate = vi.fn();
 
     void startWorldBuild(approved, shapeRequest, { submit, ...store, key: (prefix) => `${prefix}-1`, navigate }, new Set());
     await vi.waitFor(() => expect(navigate).toHaveBeenCalledTimes(1));
 
-    expect(submit.mock.calls.map(([request]) => request.kind)).toEqual(["image-to-3d", "text", "music"]);
+    expect(submit.mock.calls.map(([request]) => request.kind)).toEqual(["image-to-3d", "music"]);
   });
 
-  it("while its first story and music requests are out, nothing else asks for them again", async () => {
+  it("while its first music request is out, nothing else asks for it again", async () => {
     const starting = new Set<string>();
-    let answerStory: (accepted: GenerationJob) => void = () => undefined;
-    const submit = vi.fn((request: GenerationRequest) => request.kind === "text"
-      ? new Promise<GenerationJob>((resolve) => { answerStory = resolve; })
+    let answerMusic: (accepted: GenerationJob) => void = () => undefined;
+    const submit = vi.fn((request: GenerationRequest) => request.kind === "music"
+      ? new Promise<GenerationJob>((resolve) => { answerMusic = resolve; })
       : Promise.resolve(job(`job-${request.kind}`, request.kind)));
     const store = recorder();
     const built = startWorldBuild(approved, shapeRequest, { submit, ...store, key: (prefix) => `${prefix}-1`, navigate: vi.fn() }, starting);
-    await vi.waitFor(() => expect(submit).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() => expect(submit).toHaveBeenCalledTimes(2));
 
     // My worlds or the progress screen opening meanwhile.
-    const reask = vi.fn(async () => job("again", "text"));
+    const reask = vi.fn(async () => job("again", "music"));
     await reaskMissingExtras(store.stored!, { submit: reask, record: vi.fn(), key: (prefix) => prefix, now: 0 }, new Map(), starting);
     expect(reask).not.toHaveBeenCalled();
 
-    answerStory(job("job-text", "text"));
+    answerMusic(job("job-music", "music"));
     await built;
     expect(starting.size).toBe(0);
-    expect(store.stored?.jobs.story?.id).toBe("job-text");
+    expect(store.stored?.jobs.music?.id).toBe("job-music");
   });
 
   it("leaves a turned-away extra unrecorded, never failed, so it is simply asked for again later", async () => {
@@ -150,7 +152,7 @@ describe("startWorldBuild", () => {
     expect(extrasToSubmit(store.stored!, (prefix) => `${prefix}-2`).map(([stage]) => stage)).toEqual(["music"]);
   });
 
-  it("does not start story or music when the shape itself is refused", async () => {
+  it("does not start the music when the shape itself is refused", async () => {
     const submit = vi.fn(async () => { throw new Error("Invalid generation request"); });
     const save = vi.fn();
     const navigate = vi.fn();

@@ -3,14 +3,14 @@ import { withCreationUpdate, type CreationRecord } from "./creationFlow.js";
 import { updateCreationJob } from "./creationStorage.js";
 import { extrasToSubmit, isBuildRecord, type ExtraStage } from "./pendingWorlds.js";
 
-/** How often a world's missing story and music are asked for again. */
+/** How often a world's missing music is asked for again. */
 export const EXTRAS_REASK_MS = 20_000;
 /** Asks per world per page load; past this, a request the server keeps
  * refusing (its reason is in the server log) stops being repeated. */
 export const EXTRAS_MAX_ASKS = 10;
 
 const asked = new Map<string, { at: number; count: number }>();
-/** Worlds whose first story and music requests are still on their way. */
+/** Worlds whose first music request is still on its way. */
 const startingExtras = new Set<string>();
 
 export interface ReaskDeps {
@@ -22,7 +22,7 @@ export interface ReaskDeps {
 }
 
 /**
- * Asks again for a building world's missing story and music: turned away
+ * Asks again for a building world's missing music: turned away
  * while the service was busy or over its limit, or never asked for. Shared by
  * the progress screen and My worlds, and throttled per world across both, so
  * the two never ask at once. A refusal is simply tried again later; it never
@@ -43,7 +43,7 @@ export interface WorldBuildDeps {
   submit: (request: GenerationRequest) => Promise<GenerationJob>;
   /** Saves the build once its shape exists. */
   save: (record: CreationRecord) => void;
-  /** Records a story or music job the server accepted. By then Create has
+  /** Records a music job the server accepted. By then Create has
    * been left, so this writes to the stored record, not the screen. */
   record: (stage: ExtraStage, job: GenerationJob) => void;
   key: (prefix: string) => string;
@@ -53,10 +53,9 @@ export interface WorldBuildDeps {
 
 /**
  * Starts a world's build. The 3D shape is recorded the moment it exists, so
- * it is never lost, and the build moves on at once: the story request can
- * take minutes (the server waits for the text), so nobody waits for it in
- * Create. Story and music are asked for alongside, and until those first
- * requests answer, the progress screen and My worlds leave them alone rather
+ * it is never lost, and the build moves on at once, so nobody waits in
+ * Create. The music is asked for alongside, and until that first request
+ * answers, the progress screen and My worlds leave them alone rather
  * than asking a second time. An extra the server turns away (busy, over
  * budget) stays unrecorded rather than failed: it is simply asked for again
  * later.

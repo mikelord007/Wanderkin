@@ -8,7 +8,7 @@ const stages: ProgressStage[] = [
   { id: "object", label: "Preparing your object", status: "complete" },
   { id: "shape", label: "Building its 3D shape", status: "active" },
   { id: "course", label: "Creating your course", status: "pending" },
-  { id: "story", label: "Adding its story and sound", status: "error", detail: "Your world stays playable." },
+  { id: "sound", label: "Adding its sound", status: "error", detail: "Your world stays playable." },
 ];
 
 const items = (html: string) => [...html.matchAll(/<li([^>]*)>(.*?)<\/li>/g)].map(([, attrs, body]) => ({ attrs: attrs!, body: body! }));
@@ -50,14 +50,15 @@ describe("Stepper", () => {
 
   it("the progress panel announces the running stage with its note", () => {
     const html = renderToStaticMarkup(createElement(ProgressPanel, { title: "Making your world", stages, activeNote: buildStageNote }));
-    expect(html).toMatch(/role="status">Building its 3D shape: Livepeer is building your 3D world now\. Adding its story and sound: Needs attention</);
+    expect(html).toMatch(/role="status">Building its 3D shape: Livepeer is building your 3D world now\. Adding its sound: Needs attention</);
   });
 });
 
 describe("buildStageNote", () => {
   it("names Livepeer for the stages it runs, and says nothing for stages not running", () => {
     expect(buildStageNote({ id: "shape", label: "", status: "active" })).toBe("Livepeer is building your 3D world now");
-    expect(buildStageNote({ id: "story", label: "", status: "active" })).toMatch(/^Livepeer/);
+    expect(buildStageNote({ id: "sound", label: "", status: "active" })).toBe("Livepeer is making its music");
+    expect(buildStageNote({ id: "story", label: "", status: "active" })).toBeUndefined();
     expect(buildStageNote({ id: "shape", label: "", status: "complete" })).toBeUndefined();
     expect(buildStageNote({ id: "unknown", label: "", status: "active" })).toBeUndefined();
   });

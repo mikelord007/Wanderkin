@@ -10,6 +10,7 @@ import { useJobPolling } from "../useJobPolling.js";
 import { EXTRAS_REASK_MS, reaskMissingExtras } from "../worldBuild.js";
 import { CreationFrame } from "./CreationFrame.js";
 import { buildStageNote } from "../buildStageNotes.js";
+import { creationWorldName } from "../worldName.js";
 
 interface WorldProgressScreenProps { jobId: string; onReady: (job: GenerationJob) => void; onCancel: () => void; }
 function key(prefix: string) { return `${prefix}-${"randomUUID" in crypto ? crypto.randomUUID() : Date.now()}`; }
@@ -48,12 +49,12 @@ export function WorldProgressScreen({ jobId, onReady, onCancel }: WorldProgressS
 
   useEffect(() => {
     if (!record) return;
-    const refs = (["story", "music"] as const).map(stage => [stage, record.jobs[stage]] as const).filter(([, ref]) => ref && ref.state !== "ready" && ref.state !== "failed");
+    const refs = (["music"] as const).map(stage => [stage, record.jobs[stage]] as const).filter(([, ref]) => ref && ref.state !== "ready" && ref.state !== "failed");
     if (!refs.length) return; let cancelled = false;
     const timer = window.setInterval(() => { for (const [stage, ref] of refs) if (ref) void getJob(ref.id).then(job => { if (!cancelled) persistJob(stage, job); }).catch(() => undefined); }, 1200);
     return () => { cancelled = true; window.clearInterval(timer); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [record?.jobs.story?.state, record?.jobs.music?.state]);
+  }, [record?.jobs.music?.state]);
 
   function submitExtra(stage: ExtraStage, request: Parameters<typeof submitGeneration>[0]["request"]) {
     if (!record) return Promise.resolve();
@@ -61,7 +62,7 @@ export function WorldProgressScreen({ jobId, onReady, onCancel }: WorldProgressS
   }
 
   async function retry(stage: CreationAttentionStage) {
-    if ((stage === "story" || stage === "music") && record && extraRetryMode(record.jobs[stage]) === "resubmit") {
+    if (stage === "music" && record && extraRetryMode(record.jobs[stage]) === "resubmit") {
       // The server would hand back the same failed job; ask for a fresh one.
       setRetrying(stage); setActionError(null);
       try { for (const [extraStage, request] of extrasToSubmit(record, key, [stage])) if (extraStage === stage) await submitExtra(stage, request); }
@@ -74,10 +75,7 @@ export function WorldProgressScreen({ jobId, onReady, onCancel }: WorldProgressS
     catch (error) { setActionError(describeApiError(error)); } finally { setRetrying(null); }
   }
 
-  const story = jobs.story;
-  const structured = story?.result?.kind === "text" && story.result.output.structured && typeof story.result.output.structured === "object" ? story.result.output.structured as Record<string, unknown> : null;
-  const title = typeof structured?.title === "string" ? structured.title : record?.title ?? "Your little world";
-  const intro = typeof structured?.intro === "string" ? structured.intro : typeof structured?.objective === "string" ? structured.objective : record?.questIntro;
+  const title = record ? creationWorldName(record) : "Your little world";
   const music = jobs.music?.result?.kind === "music" ? jobs.music.result.asset : null;
   const shapeState = shapeJob?.state;
   // The same stages and alarm rule a My worlds card uses (pendingWorlds.ts).
@@ -88,7 +86,8 @@ export function WorldProgressScreen({ jobId, onReady, onCancel }: WorldProgressS
     <section className="oq-world-progress">
       <Card className="oq-world-progress__preview">
         {record?.preview?.asset.url ? <img src={record.preview.asset.url} alt="Approved visual direction for your world" /> : <div className="oq-world-progress__placeholder" />}
-        <div><p className="oq-kit-eyebrow">A first glimpse</p><h2>{title}</h2>{record ? <p className="oq-world-progress__choices">{worldChoicesLine(record.selection.style, record.selection.mode, record.selection.biome)}</p> : null}{intro ? <p>{intro}</p> : <p className="oq-kit-muted">Your title and mission will appear here when they are ready.</p>}</div>
+        {/* No title or mission here while it builds: just what it is. */}
+        <div className="oq-world-progress__glimpse"><p className="oq-kit-eyebrow">A first glimpse</p><h2>{title}</h2>{record ? <p className="oq-world-progress__choices">{worldChoicesLine(record.selection.style, record.selection.mode, record.selection.biome)}</p> : null}</div>
         {music ? <div className="oq-world-progress__audio">
           <label>Music preview<audio controls preload="none" src={music.url} /></label>
           <p className="oq-kit-muted">Sound plays only when you press play.</p>
@@ -100,7 +99,7 @@ export function WorldProgressScreen({ jobId, onReady, onCancel }: WorldProgressS
         <Button variant="secondary" onClick={onCancel}>My worlds</Button>
       </>} />
     </section>
-    {optionalFailed ? <Card className="oq-world-progress__optional-error"><strong>Your world is still safe.</strong><p>{optionalFailed === "story" ? "The story" : "Music"} needs another try. The finished shape will not be regenerated.</p><Button variant="secondary" onClick={() => void retry(optionalFailed)} loading={retrying === optionalFailed}>Retry {optionalFailed}</Button></Card> : null}
+    {optionalFailed ? <Card className="oq-world-progress__optional-error"><strong>Your world is still safe.</strong><p>Its music needs another try. The finished shape will not be regenerated.</p><Button variant="secondary" onClick={() => void retry(optionalFailed)} loading={retrying === optionalFailed}>Retry music</Button></Card> : null}
     {connectionIssue ? <p className="oq-world-progress__notice" role="status">{connectionIssue}</p> : null}
     {actionError ? <p className="oq-kit-error" role="alert">{actionError}</p> : null}
     <p className="oq-world-progress__leave-note">You can leave this page. Work continues, and My worlds will bring you back to this same progress.</p>

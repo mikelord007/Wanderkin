@@ -1,9 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
-import type { GenerationJob } from "@shared/index.js";
+import { describe, expect, it } from "vitest";
 import { createCreationRecord, type CreationJobRef, type CreationRecord } from "./creationFlow.js";
 import { loadActiveCreation, loadCreationRecords, loadCreationWorldItems, resumeOrStartCreation, saveCreationRecord, setActiveCreationId } from "./creationStorage.js";
 import { destinationForCreation, destinationForStartedBuild, loadPendingWorldCards } from "./pendingWorldStore.js";
-import { creationWorldName, questTitle } from "./worldName.js";
+import { creationWorldName } from "./worldName.js";
 
 /*
  * My worlds → a creation's tile → where it goes. Resume must reopen the same
@@ -124,31 +123,26 @@ describe("a new creation", () => {
 });
 
 describe("a prepared world's name", () => {
-  const storyJob = (structured: unknown): GenerationJob => ({
-    schemaVersion: 1, id: "world-story", idempotencyKey: "k", providerId: "p", providerJobId: null, capabilityRequested: "gemini-text",
-    capabilityUsed: null, fallbackFired: null, state: "ready", photoOrder: [], createdAt: NOW, updatedAt: NOW, retryCount: 0, maxRetries: 1, kind: "text",
-    result: { kind: "text", output: { text: "", structured } } as NonNullable<GenerationJob["result"]>,
-  });
-  const withStory = { ...built("world", "ready"), jobs: { ...built("world", "ready").jobs, story: ref("world-story", "ready", "text") } };
+  const world = built("world", "ready");
 
-  it("is the quest title the story wrote", async () => {
-    const fetchJob = vi.fn(async () => storyJob({ title: "  The Kettle Isles ", intro: "x" }));
-    expect(await creationWorldName(withStory, fetchJob)).toBe("The Kettle Isles");
-    expect(fetchJob).toHaveBeenCalledWith("world-story");
+  it("is the creation's own title when it has one", () => {
+    expect(creationWorldName({ ...world, title: "  Teapot Peak " })).toBe("Teapot Peak");
   });
 
-  it("falls back to the creation's own title, but never to the scene default", async () => {
-    const unreadable = vi.fn(async () => { throw new Error("offline"); });
-    expect(await creationWorldName({ ...withStory, title: "Teapot Peak" }, unreadable)).toBe("Teapot Peak");
-    expect(await creationWorldName({ ...withStory, title: "Imported level" }, unreadable)).toBeNull();
-    expect(await creationWorldName(built("world", "ready"), unreadable)).toBeNull();
-    expect(unreadable).toHaveBeenCalledTimes(2);
-    expect(await creationWorldName(null, unreadable)).toBeNull();
+  it("otherwise comes from the first words of its atmosphere", () => {
+    expect(creationWorldName(world)).toBe("A Lot of Green Clouds");
+    expect(creationWorldName({ ...world, selection: { ...world.selection, atmosphere: "Forest region, surrounded by trees" } })).toBe("Forest Region");
   });
 
-  it("reads only a real title", () => {
-    expect(questTitle(storyJob({ title: "" }))).toBeNull();
-    expect(questTitle(storyJob("not an object"))).toBeNull();
-    expect(questTitle(null)).toBeNull();
+  it("otherwise names its biome, then its look, and never the scene default", () => {
+    const plain = { ...world, title: "Imported level", selection: { ...world.selection, atmosphere: "  " } };
+    expect(creationWorldName({ ...plain, selection: { ...plain.selection, biome: "monsoon" } })).toBe("Monsoon Marsh world");
+    expect(creationWorldName(plain)).toBe("Watercolor world");
+    expect(creationWorldName({ ...plain, title: "Untitled world" })).toBe("Watercolor world");
+  });
+
+  it("never waits for a story, even on an older creation that has one", () => {
+    const withStory = { ...world, jobs: { ...world.jobs, story: ref("world-story", "ready", "text") } };
+    expect(creationWorldName(withStory)).toBe("A Lot of Green Clouds");
   });
 });

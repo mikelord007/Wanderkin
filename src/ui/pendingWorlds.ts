@@ -2,6 +2,7 @@ import type { GameModeId, GenerationJob, GenerationRequest, SceneBiomeId, StyleI
 import { lookName } from "../biome/lookCatalog.js";
 import type { ProgressStage } from "./components/index.js";
 import { buildWorldExtrasRequests, type CreationAttentionStage, type CreationJobRef, type CreationRecord } from "./creationFlow.js";
+import { creationWorldName } from "./worldName.js";
 
 /*
  * Worlds being built. Once a creation reaches step 5 it leaves Create and
@@ -45,9 +46,10 @@ export interface PendingWorld {
  * the stored reference when the caller has one. */
 interface ShapeView { state: GenerationJob["state"]; uiMessage?: string | undefined }
 
-/** Story and music are optional. (Narration is no longer generated; older
- * records may still carry a narration job, which is ignored here.) */
-const OPTIONAL_STAGES = ["story", "music"] as const;
+/** Music is the one optional extra. (Story and narration are no longer
+ * generated; older records may still carry those jobs, which are ignored
+ * here: never polled, re-asked, retried or shown.) */
+const OPTIONAL_STAGES = ["music"] as const;
 export type ExtraStage = (typeof OPTIONAL_STAGES)[number];
 
 /**
@@ -60,16 +62,16 @@ function isSupersededExtra(ref: CreationJobRef | undefined): boolean {
   return ref?.state === "failed" && ref.kind === "music" && /duration/i.test(ref.error ?? "");
 }
 
-/** The story or music job that really failed, if any. Only this raises the
- * "still safe" alarm; a job never asked for or still running never does. */
+/** The music job, if it really failed. Only this raises the "still safe"
+ * alarm; a job never asked for or still running never does. */
 export function failedExtraStage(record: CreationRecord | null): ExtraStage | undefined {
   return OPTIONAL_STAGES.find((stage) => record?.jobs[stage]?.state === "failed" && !isSupersededExtra(record.jobs[stage]));
 }
 
 /**
- * The story and music requests a build still has to ask for: those never
- * asked for (or turned away before a job existed), a superseded soundtrack,
- * and any stage in `resubmit`. A real failure is never resubmitted unasked.
+ * The music request a build still has to ask for: never asked for (or
+ * turned away before a job existed), a superseded soundtrack, or a stage in
+ * `resubmit`. A real failure is never resubmitted unasked.
  */
 export function extrasToSubmit(record: CreationRecord, key: (prefix: string) => string, resubmit: readonly ExtraStage[] = []): [ExtraStage, GenerationRequest][] {
   const jobs = { ...record.jobs };
@@ -77,7 +79,7 @@ export function extrasToSubmit(record: CreationRecord, key: (prefix: string) => 
   return buildWorldExtrasRequests({ ...record, jobs }, key) as [ExtraStage, GenerationRequest][];
 }
 
-/** How Retry recovers a failed story or music job. The server only retries a
+/** How Retry recovers a failed music job. The server only retries a
  * job it marked retryable (otherwise it returns the same failed job), so any
  * other failure is asked for afresh. */
 export function extraRetryMode(ref: CreationJobRef | undefined): "retry-job" | "resubmit" {
@@ -85,8 +87,8 @@ export function extraRetryMode(ref: CreationJobRef | undefined): "retry-job" | "
 }
 
 /**
- * The four build stages, exactly as WorldProgressScreen shows them. Story
- * and music are optional: a failure there never stops the world.
+ * The four build stages, exactly as WorldProgressScreen shows them. Sound
+ * (the world's music) is optional: a failure there never stops the world.
  */
 export function worldBuildStages(record: CreationRecord | null, shape?: ShapeView | null): ProgressStage[] {
   const shapeState = shape?.state ?? record?.jobs.shape?.state;
@@ -98,7 +100,7 @@ export function worldBuildStages(record: CreationRecord | null, shape?: ShapeVie
     { id: "object", label: "Preparing your object", status: record?.jobs.object?.state === "failed" ? "error" : "complete" },
     { id: "shape", label: "Building its 3D shape", status: shapeState === "failed" ? "error" : shapeState === "ready" ? "complete" : "active", ...(shapeMessage ? { detail: shapeMessage } : {}) },
     { id: "course", label: record?.selection.biome ? `Creating your ${lookName(record.selection.biome)} course` : "Creating your course", status: shapeState === "ready" ? "active" : "pending", detail: shapeState === "ready" ? "The shape is ready for course preparation." : "Begins when the shape is ready." },
-    { id: "story", label: "Adding its story and sound", status: optionalFailed ? "error" : optionalReady ? "complete" : optionalStarted ? "active" : "pending", ...(optionalFailed ? { detail: "Your world stays playable. Sound can be added later." } : {}) },
+    { id: "sound", label: "Adding its sound", status: optionalFailed ? "error" : optionalReady ? "complete" : optionalStarted ? "active" : "pending", ...(optionalFailed ? { detail: "Your world stays playable. Its music can be added later." } : {}) },
   ];
 }
 
@@ -120,7 +122,7 @@ export function toPendingWorld(record: CreationRecord, buildStartedAt?: string):
   const requiredFailed: CreationAttentionStage | undefined =
     shape.state === "failed" ? "shape" : record.jobs.object?.state === "failed" ? "object" : undefined;
   const state: PendingWorldState = requiredFailed ? "failed" : shape.state === "ready" ? "done" : "building";
-  // Required stages only (object, shape, course): the optional story stage
+  // Required stages only (object, shape, course): the optional sound stage
   // never holds the bar back.
   const required = stages.slice(0, 3);
   const weight = required.reduce((sum, stage) => sum + (stage.status === "complete" ? 1 : stage.status === "active" ? 0.45 : 0), 0);
@@ -131,7 +133,7 @@ export function toPendingWorld(record: CreationRecord, buildStartedAt?: string):
   const failedRef = requiredFailed ? record.jobs[requiredFailed] : undefined;
   return {
     id: record.id,
-    title: record.title?.trim() || "Untitled world",
+    title: creationWorldName(record),
     style: record.selection.style,
     mode: record.selection.mode,
     ...(record.selection.biome ? { biome: record.selection.biome } : {}),

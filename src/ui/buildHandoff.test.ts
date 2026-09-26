@@ -9,8 +9,8 @@ import { startWorldBuild } from "./worldBuild.js";
 /*
  * Build world → My worlds, end to end below the React layer: the same deps
  * CreationJourneyScreen passes to startWorldBuild, and the same destination
- * App.handleJobStarted routes to. The story request never answers here, as
- * on the live server where the text is written before the request returns.
+ * App.handleJobStarted routes to. The music request never answers here: the
+ * hand-over must never wait on a world's extras.
  */
 
 class MemoryStorage implements Storage {
@@ -51,7 +51,7 @@ function job(id: string, kind: GenerationJob["kind"]): GenerationJob {
 async function buildWorld(storage: Storage, signedIn: boolean): Promise<StartedBuildDestination> {
   saveCreationRecord(approved, storage);
   setActiveCreationId(approved.id, storage);
-  const submit = vi.fn((request: GenerationRequest) => request.kind === "text"
+  const submit = vi.fn((request: GenerationRequest) => request.kind === "music"
     ? new Promise<GenerationJob>(() => undefined)
     : Promise.resolve(job(request.kind === "image-to-3d" ? "shape-job" : `job-${request.kind}`, request.kind)));
   let destination: StartedBuildDestination | null = null;

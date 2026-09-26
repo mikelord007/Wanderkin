@@ -13,8 +13,9 @@ import type {
 } from "@shared/index.js";
 
 export type CreationStep = "photo" | "review" | "customize" | "biome" | "preview" | "building" | "ready";
-/** Creations saved before narration was removed may still carry a
- * `jobs.narration` entry; it is kept as history and never shown or retried. */
+/** Creations saved before narration and the story were removed may still
+ * carry `jobs.narration` or `jobs.story`; both are kept as history and never
+ * shown, polled or retried. */
 export type CreationAttentionStage = "object" | "preview" | "shape" | "story" | "music";
 
 export interface CropSettings {
@@ -247,14 +248,15 @@ export function isUntouchedCreationRecord(record: CreationRecord): boolean {
 }
 
 export function creationNeedsAttention(record: CreationRecord): CreationAttentionStage | null {
-  const order: CreationAttentionStage[] = ["object", "preview", "shape", "story", "music"];
+  // A story job on an older creation is history: it never needs attention.
+  const order: CreationAttentionStage[] = ["object", "preview", "shape", "music"];
   return order.find((stage) => record.jobs[stage]?.state === "failed") ?? null;
 }
 
+/** The extras a world asks for beside its 3D shape: its background music
+ * only. (Worlds no longer get a generated story.) */
 export function buildWorldExtrasRequests(record: CreationRecord, key: (prefix: string) => string): [CreationAttentionStage, GenerationRequest][] {
-  const titleSubject = record.selection.atmosphere.trim() || "a tiny object world";
   const requests: [CreationAttentionStage, GenerationRequest][] = [];
-  if (!record.jobs.story) requests.push(["story", { schemaVersion: 1, kind: "text", capability: "gemini-text", idempotencyKey: key("story"), purpose: "quest-text", prompt: `Write a short, family-friendly quest for ${titleSubject}. Mode: ${record.selection.mode}.\nReturn one JSON object only. Do not use Markdown or code fences.\nUse exactly these string fields and nothing else: "title" (2-80 characters), "intro" (20-320), "objective" (10-160).`, output: "quest-json", maxCharacters: 1200 }]);
   if (!record.jobs.music) requests.push(["music", { schemaVersion: 1, kind: "music", capability: "music", idempotencyKey: key("music"), purpose: "world-soundtrack", prompt: worldMusicPrompt(record.selection), durationSeconds: 15, instrumental: true, loop: true }]);
   return requests;
 }

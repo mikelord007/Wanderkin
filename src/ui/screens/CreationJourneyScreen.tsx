@@ -130,9 +130,9 @@ export function CreationJourneyScreen({ onJobStarted, onBack }: CreationJourneyS
     const request: ImageTo3dGenerationRequest = { schemaVersion: 1, kind: "image-to-3d", capability: "rodin-i3d", idempotencyKey: newKey("shape"), purpose: "world-mesh", photos: [{ photoId: record.photo.id, sourceIndex: 1 }], sourceImageAssetIds: [reviewedImageAssetId], styleReferenceAssetId: record.preview.asset.id, scenePrompt: `${STYLE_DEFINITIONS[record.selection.style].imagePrompts.geometryReference} ${record.selection.atmosphere}`.trim() };
     const photo = record.photo;
     try {
-      // The build moves on to My worlds as soon as the shape exists. Story and
-      // music start with it, so they are made even if nobody opens the progress
-      // screen; they land in the stored record after Create has been left.
+      // The build moves on to My worlds as soon as the shape exists. Its music
+      // starts with it, so it is made even if nobody opens the progress
+      // screen; it lands in the stored record after Create has been left.
       // Claiming the shape before the save keeps the step-4 effect above from
       // handing it over a second time.
       await startWorldBuild(record, request, {
