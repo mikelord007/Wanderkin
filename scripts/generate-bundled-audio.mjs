@@ -143,7 +143,8 @@ const files = new Map([
   }, MUSIC_RATE)],
   ["gentle-breeze.wav", wav(4, (t, i) => breeze[i] * 32767)],
   ["monsoon-rain.wav", wav(4, (t, i) => rain[i] * 32767, RAIN_RATE)],
-  ["fragment-pickup.wav", wav(.45, (t, i, count) => (tone(660 + t * 500, t, .42) + tone(990 + t * 250, t, .18)) * envelope(i, count, .01, .2) * 32767)],
+  // fragment-pickup.wav is not generated here: it is the project's own
+  // generated collect sound, rebuilt by scripts/derive-collect-sfx.mjs.
   ["portal-activate.wav", wav(1.2, (t, i, count) => (tone(220 + t * 360, t, .26) + tone(440 + t * 520, t, .16)) * envelope(i, count, .04, .32) * 32767)],
   ["checkpoint.wav", wav(.35, (t, i, count) => tone(t < .16 ? 523.25 : 783.99, t, .45) * envelope(i, count, .01, .12) * 32767)],
   ["fall-respawn.wav", wav(.75, (t, i, count) => (tone(460 - t * 300, t, .28) + seedNoise(i) * .05) * envelope(i, count, .01, .18) * 32767)],
@@ -153,4 +154,4 @@ const files = new Map([
 ]);
 
 for (const [name, bytes] of files) await writeFile(new URL(name, outDir), bytes);
-console.log(`Generated ${files.size} CC0 procedural WAV files (${RATE} Hz, music at ${MUSIC_RATE} Hz).`);
+console.log(`Generated ${files.size} CC0 procedural WAV files (${RATE} Hz, music at ${MUSIC_RATE} Hz); fragment-pickup.wav comes from derive-collect-sfx.mjs.`);

@@ -67,7 +67,11 @@ Worlds saved and shares published before narration was removed may still hold `e
 
 ## Bundled sample and license
 
-The Lost Colors sample includes nine mono 8 kHz PCM WAV files under `public/audio/`; every file is under 100 KB. They are generated deterministically by `node scripts/generate-bundled-audio.mjs`, authored for this repository, and released under CC0-1.0. The manifest stores each file's SHA-256, size, duration, and bundled provenance. They contain synthesized tones/noise only—no samples, voices, copyrighted melody, or third-party recording.
+The Lost Colors sample includes nine mono PCM WAV files under `public/audio/`; every file is under 200 KB. The manifest stores each file's SHA-256, size, duration, and provenance.
+
+Eight of them are generated deterministically by `node scripts/generate-bundled-audio.mjs` (8 kHz; music at 22.05 kHz), authored for this repository, and released under CC0-1.0. They contain synthesized tones/noise only—no samples, voices, copyrighted melody, or third-party recording.
+
+The collect sound, `fragment-pickup.wav`, is different: it is this project's own generated output, not CC0. It is the Mirelo SFX (`mirelo-sfx`, model `Mirelo-AI/sfx1.6/text-to-audio`) from the 2026-09-24 live run: application job `job_1474ebee-fa65-4d4b-b411-0f8babbabb87`, provider job `mjob_9b4d5aa5632c`, asset `e8d567b4-7468-426f-9bff-f70e9860a522`, source SHA-256 `b79dd5c6f413025b5fe4086b2a57bb20df64ae74ad709171f6a530e430fe5092` (44.1 kHz, 3 s). It was the sparkle players heard on pickup in that run's hands-on world. `node scripts/derive-collect-sfx.mjs <source.wav>` rebuilds the bundled file from that source: it trims only the leading silence the engine trims anyway and resamples to 32 kHz (the source has no energy above 16 kHz). The result is 2.846 s, 182,162 bytes, SHA-256 `025ca35812fee34cf2acbfbb8a6922d55d9e38cb0e758d19dae794930f863316`. Its provenance in `src/audio/bundledMedia.ts` is the generated job's, not the bundled CC0 one. New worlds do not request generated SFX (cost); every world and look plays this bundled collect sound. Per-world generated SFX could be offered later as an opt-in.
 
 The same script also writes `monsoon-rain.wav` (11 kHz, 4 s, low-passed rain hiss with droplet ticks, CC0-1.0). It is not part of the Lost Colors media: while the Monsoon look is shown, `LOOK_AMBIENCE_URLS` in `src/audio/assets.ts` swaps it in as the ambience loop, and switching away restores the world's own ambience.
 
