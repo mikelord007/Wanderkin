@@ -129,33 +129,24 @@
 .wk-step-card p { color: var(--wk-text-2); max-inline-size: 36ch; }
 
 /* === Scale interlude ====================================================
-   Breaks the rhythm without stopping the page: a 50-65vh band with room
-   above and below, a big statement on the left, a huge sewing button
-   entering from the right edge. */
+   Breaks the rhythm without stopping the page: 50-65vh, a big statement on
+   the left, a huge sewing button entering from the right edge. */
 .wk-interlude {
-  /* Breathing room from its neighbours: a section's space above, half as much
-     again below. The 50-65vh band sits between them. */
-  --interlude-top: var(--wk-section-y);
-  --interlude-bottom: calc(var(--wk-section-y) * 1.5);
-  --interlude-mid: calc(50% - var(--wk-section-y) * .25);
   position: relative; overflow: hidden; display: grid; align-items: center;
-  min-height: calc(clamp(360px, 56vh, 580px) + var(--interlude-top) + var(--interlude-bottom));
-  padding-block: var(--interlude-top) var(--interlude-bottom);
-  /* The page colour, with the tint pooled only behind the giant button and
-     faded out before either edge, so it never meets the next section. */
-  background: radial-gradient(ellipse 44% 40% at 96% var(--interlude-mid), #ece3ff 0%, #f4efff 45%, #faf7ff00 75%), var(--wk-page);
+  min-height: clamp(360px, 56vh, 580px);
+  /* The page colour, with the tint pooled only behind the giant button, so it
+     separates cleanly from the tinted section above it. */
+  background: radial-gradient(ellipse 48% 80% at 96% 50%, #ece3ff 0%, #f4efff 45%, #faf7ff00 75%), var(--wk-page);
 }
 .wk-interlude__inner { position: relative; z-index: 1; }
 .wk-interlude__line {
   max-inline-size: 13ch; font-size: clamp(2.2rem, 1.3rem + 3.4vw, 4.2rem);
   font-weight: 300; letter-spacing: -.04em; line-height: 1.02; color: var(--wk-text);
 }
-/* Centred on the band, and sized so the whole disc (and the explorer on its
-   rim) stays clear of the section's top and bottom edges. */
 .wk-interlude__scene {
-  --s: clamp(340px, 40vw, 580px);
-  position: absolute; top: var(--interlude-mid); right: calc(var(--s) * -.26); width: var(--s); aspect-ratio: 1;
-  transform: translateY(-50%);
+  --s: clamp(360px, 46vw, 700px);
+  position: absolute; top: 50%; right: calc(var(--s) * -.26); width: var(--s); aspect-ratio: 1;
+  transform: translateY(-44%);
 }
 .wk-interlude__button { width: 100%; height: 100%; filter: drop-shadow(0 30px 40px rgba(36, 20, 61, .14)); }
 /* Standing on the button's rim (radius 92 of 100, so 4% down from the top). */
@@ -343,7 +334,7 @@
   .wk-library-empty, .wk-library-invite { grid-template-columns: 1fr; }
   .wk-library-invite__copy { padding: 0 var(--oq-space-2) var(--oq-space-2); }
   .wk-library-empty__copy { padding: 0 var(--oq-space-2) var(--oq-space-2); }
-  .wk-interlude { min-height: 0; padding-block: var(--interlude-top) var(--interlude-bottom); align-items: start; background: radial-gradient(ellipse 70% 30% at 90% 70%, #ece3ff 0%, #f4efff 45%, #faf7ff00 75%), var(--wk-page); }
+  .wk-interlude { min-height: 0; padding-block: var(--wk-section-y) 0; align-items: start; }
   .wk-interlude__scene { position: relative; top: auto; right: auto; transform: none; --s: min(80vw, 380px); margin: var(--wk-gap) -14vw 0 auto; }
 }
 @media (max-width: 620px) {
