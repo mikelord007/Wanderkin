@@ -44,6 +44,7 @@ import { LegalScreen } from "./ui/legal/LegalScreen.js";
 import type { LegalDocumentId } from "./ui/legal/legalDocuments.js";
 import { supportEmail } from "./ui/legal/supportContact.js";
 import { destinationForCreation, destinationForStartedBuild, findCreationByShapeJob } from "./ui/pendingWorldStore.js";
+import { playPreparedWorld } from "./ui/creationLevels.js";
 import type { PendingWorld } from "./ui/pendingWorlds.js";
 import {
   clearActiveSource,
@@ -736,18 +737,19 @@ export function App() {
         <PreparationScreen
           source={screen.source}
           isNew={screen.isNew}
-          onPlay={(manifest) =>
-            go(
-              screen.isNew
-                ? {
-                    name: "play",
-                    manifest,
-                    publishable: false,
-                    unsaved: screen.fromSample ? { kind: "sample" } : { kind: "draft", manifest },
-                  }
-                : { name: "play", manifest, publishable: true },
-            )
-          }
+          onPlay={(manifest) => {
+            if (!screen.isNew) { go({ name: "play", manifest, publishable: true }); return; }
+            if (screen.fromSample) { go({ name: "play", manifest, publishable: false, unsaved: { kind: "sample" } }); return; }
+            // A signed-in world from Create is saved before play starts, so
+            // leaving play can never lose it (see creationLevels.ts).
+            void playPreparedWorld(manifest, {
+              signedIn: signedInRef.current,
+              save: saveDraftOnce,
+              playSaved: (saved) => { if (currentScreenRef.current === screen) go({ name: "play", manifest: saved, publishable: true }); },
+              playDraft: (draft) => go({ name: "play", manifest: draft, publishable: false, unsaved: { kind: "draft", manifest: draft } }),
+              saveFailed: (message) => go({ name: "worlds", notice: `Your world couldn’t be saved yet (${message}). It’s still here: press Play to try again.` }),
+            });
+          }}
           onSave={handleSavePreparedLevel}
           onExport={(manifest) => downloadLevelBundle(manifest.levelId, manifest.name)}
           onBack={handlePreparationBack}
