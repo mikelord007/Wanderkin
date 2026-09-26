@@ -66,10 +66,40 @@
 }
 /* The headline is the page's type specimen: light, enormous and tightly led. */
 .oq-welcome__intro h1 {
-  max-inline-size: 11ch;
   font-size: clamp(3rem, 1.1rem + 7.2vw, 7.4rem);
   font-weight: 300; line-height: .94; letter-spacing: -.045em;
   color: var(--wk-text);
+}
+/* On phones the second line has to hold "is a mountain range." on one row. */
+@media (max-width: 520px) {
+  .oq-welcome__intro h1 { font-size: 10.4vw; }
+}
+
+/* The typed headline: two fixed lines, "Your ___" and "is a ___.", each
+   blank at the end of its line so a word grows rightwards from a still
+   start. Every word a slot can hold is stacked invisibly in it, so the lines
+   are always as wide as their longest pair: no rewrap, no jump. The block is
+   left-aligned inside and centred as a whole. */
+.wk-typing__lines { display: inline-grid; justify-items: start; text-align: start; }
+.wk-typing__line { white-space: nowrap; }
+.wk-typing__slot { display: inline-grid; justify-items: start; }
+.wk-typing__slot > * { grid-area: 1 / 1; }
+.wk-typing__sizer { visibility: hidden; user-select: none; }
+.wk-typing__live { transition: opacity .45s ease; }
+.wk-typing__live[data-faded] { opacity: 0; }
+.wk-typing__word { position: relative; }
+/* The caret: a 2px accent bar just after the last letter. It takes no width,
+   holds solid while letters change and blinks once a second while it waits. */
+.wk-typing__word[data-caret]::after {
+  content: ""; position: absolute; inset-inline-start: calc(100% + .06em); inset-block: .24em .2em;
+  inline-size: 2px; background: var(--wk-purple); border-radius: 1px;
+}
+.wk-typing__word[data-caret="blink"]::after { animation: wk-caret-blink 1s steps(1, end) infinite; }
+@keyframes wk-caret-blink { 50% { opacity: 0; } }
+/* Optional: a quiet accent underline under the object. */
+.wk-typing--underline .wk-typing__slot--object .wk-typing__word {
+  text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--wk-purple) 55%, transparent);
+  text-decoration-thickness: .045em; text-underline-offset: .1em;
 }
 .oq-welcome__lede { max-inline-size: 44ch; font-size: clamp(1.0625rem, 1rem + .35vw, 1.25rem); line-height: 1.55; color: var(--wk-text-2); }
 .oq-welcome__ctas { justify-content: center; margin-top: var(--oq-space-2); }

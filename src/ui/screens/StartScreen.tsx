@@ -7,6 +7,7 @@ import type { AuthMode } from "../../auth/types.js";
 import { SampleWorlds, useSampleLevels } from "../library/SampleWorlds.js";
 import { GiantButton, TinyExplorer } from "../components/Scenery.js";
 import { useInView } from "../components/useInView.js";
+import { TypingHeadline } from "../components/TypingHeadline.js";
 import { LegalLinks, SignInConsent } from "../legal/LegalScreen.js";
 
 // Loaded only when the card comes near the viewport, with its model.
@@ -75,7 +76,7 @@ export function StartScreen({
           <section className="oq-welcome__hero" aria-labelledby="welcome-heading">
             <div className="oq-welcome__intro">
               <p className="wk-chip">{BRAND_TAGLINE}</p>
-              <h1 id="welcome-heading">Your sofa is a mountain range.</h1>
+              <TypingHeadline id="welcome-heading" />
               <p className="oq-welcome__lede">Photograph something ordinary. {BRAND_NAME} rebuilds it in 3D and shrinks you down until the cushions are cliffs.</p>
               <div className="oq-kit-row oq-welcome__ctas">
                 <Button onClick={onCreateFromPhotos}>Make my world <Icon name="arrow" /></Button>
