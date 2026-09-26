@@ -4,6 +4,8 @@ import { basename, dirname, join } from "node:path";
 import express, { Router } from "express";
 import { z } from "zod";
 import type { SceneManifest } from "../shared/manifest.js";
+import type { GenerationJob } from "../shared/job.js";
+import { attachWorldMusic } from "../shared/worldMusic.js";
 import {
   migrateSceneManifest,
   sceneManifestReaderSchema,
@@ -645,12 +647,29 @@ const publishRequestSchema = z.object({
   includesSourcePhotos: z.boolean().optional().default(false),
 });
 
+export interface LevelsRouterOptions {
+  /** Looks up a generation job, so a world's soundtrack (a separate job that
+   * often finishes after the world is saved) is attached on save and open. */
+  getJob?: (jobId: string) => Promise<GenerationJob | undefined>;
+}
+
 export function createLevelsRouter(
   store: LevelStore,
   publications = new PublicationStore(store.storageDir),
   security?: OwnerSecurity,
+  options: LevelsRouterOptions = {},
 ): Router {
   const router = Router();
+
+  /** The manifest with its ready soundtrack in `media.audio`. Only a job the
+   * requester may see is used, so a hand-written workflow can't borrow
+   * someone else's music. */
+  function withReadyMusic(req: express.Request, manifest: SceneManifest): Promise<SceneManifest> {
+    const getJob = options.getJob;
+    if (!getJob) return Promise.resolve(manifest);
+    return attachWorldMusic(manifest, async (jobId) =>
+      security && !(await security.canAccess("job", jobId, req)) ? undefined : getJob(jobId));
+  }
 
   async function canAccessManifestResources(req: express.Request, manifest: SceneManifest): Promise<boolean> {
     if (!security) return true;
@@ -701,7 +720,7 @@ export function createLevelsRouter(
       if (!(await canAccessManifestResources(req, parsed.data as SceneManifest))) {
         res.status(400).json({ message: "Level references an unavailable private asset" }); return;
       }
-      const created = await store.create(parsed.data as SceneManifest);
+      const created = await store.create(await withReadyMusic(req, parsed.data as SceneManifest));
       if (owner) await security?.claim("level", created.levelId, owner.ownerId);
       res.status(201).json(created);
     }),
@@ -718,7 +737,9 @@ export function createLevelsRouter(
         res.status(404).json({ message: "Level not found" });
         return;
       }
-      res.json(level);
+      // Music that finished after the world was saved is stored now, once.
+      const withMusic = await withReadyMusic(req, level);
+      res.json(withMusic === level ? level : await store.save(level.levelId, withMusic).catch(() => withMusic));
     }),
   );
 
@@ -747,7 +768,7 @@ export function createLevelsRouter(
       if (!(await canAccessManifestResources(req, parsed.data as SceneManifest))) {
         res.status(400).json({ message: "Level references an unavailable private asset" }); return;
       }
-      const saved = await store.save(id, parsed.data as SceneManifest);
+      const saved = await store.save(id, await withReadyMusic(req, parsed.data as SceneManifest));
       if (owner) await security?.claim("level", saved.levelId, owner.ownerId);
       res.json(saved);
     }),

@@ -132,7 +132,9 @@ app.use(createPostcardsRouter(levelStore, generatedAssetStore, jobManager, postc
   },
   budget: imageDecodeBudget,
 }));
-app.use(createLevelsRouter(levelStore, undefined, ownerSecurity));
+app.use(createLevelsRouter(levelStore, undefined, ownerSecurity, {
+  getJob: (jobId) => jobManager.getPublicWithReconciledAudio(jobId),
+}));
 
 const terminalErrorHandler: ErrorRequestHandler = (error, req, res, next) => {
   if (res.headersSent) {
