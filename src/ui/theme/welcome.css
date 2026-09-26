@@ -82,14 +82,26 @@
 .wk-transform__media { aspect-ratio: 4 / 3; }
 .wk-transform__item figcaption { font-size: 1.0625rem; font-weight: 500; color: var(--wk-text); }
 .wk-transform__item figcaption span { display: block; font-size: var(--wk-type-small); font-weight: 400; color: var(--wk-text-2); }
-/* The generated world stands on a pale stage, grounded by a soft contact
-   shadow on the floor beneath it. */
+/* The rebuilt corner on a pale stage: a still of the model until the live
+   turntable is ready (and instead of it without WebGL), then the turntable
+   fades in over it. Vertical swipes keep scrolling the page on touch; only
+   sideways drags turn the model. */
 .wk-transform__stage { background: linear-gradient(#fbf9ff, var(--wk-tint)); }
-.wk-transform__floor { position: absolute; left: 24%; right: 22%; top: 61%; height: 15%; border-radius: 50%; background: radial-gradient(closest-side, rgba(36, 20, 61, .2), rgba(36, 20, 61, .07) 60%, transparent); }
-.wk-transform__stage .oq-welcome__render { position: absolute; inset: 4% 0 0 0; }
-.oq-welcome__model { height: 100%; width: 100%; }
+.wk-transform__poster { position: absolute; inset: 8% 6%; width: 88%; height: 84%; object-fit: contain; transition: opacity 400ms var(--oq-ease); }
+.wk-transform__stage[data-ready="true"] .wk-transform__poster { opacity: 0; }
+.wk-turntable { position: absolute; inset: 0; opacity: 0; transition: opacity 400ms var(--oq-ease); cursor: grab; border-radius: inherit; }
+.wk-transform__stage[data-ready="true"] .wk-turntable { opacity: 1; }
+.wk-turntable:active { cursor: grabbing; }
+/* The focus ring is drawn above the canvas (a WebGL layer would cover an
+   inset outline). */
+.wk-turntable:focus-visible { outline: none; }
+.wk-turntable:focus-visible::after { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; box-shadow: inset 0 0 0 3px var(--wk-purple); pointer-events: none; }
+.wk-turntable canvas { touch-action: pan-y !important; }
+.wk-transform__status, .wk-transform__hint {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); margin: 0; padding: 5px 12px; border-radius: 999px;
+  background: #ffffffeb; color: var(--wk-text-2); font-size: .8rem; font-weight: 500; white-space: nowrap; box-shadow: var(--wk-shadow-sm); pointer-events: none;
+}
 .oq-welcome__photo { object-fit: cover; object-position: 63% center; }
-.oq-welcome__preview-status { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; padding: 16px; font-size: var(--wk-type-small); color: var(--wk-text-2); }
 /* A quiet connector: a thin purple arrow in a small white pill. */
 .wk-transform__link { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--wk-surface); border: 1px solid var(--wk-border); box-shadow: var(--wk-shadow-sm); }
 .wk-transform__link svg { width: 30px; height: auto; fill: none; stroke: var(--wk-purple); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
@@ -347,6 +359,7 @@
 @media (prefers-reduced-motion: reduce) {
   .oq-welcome__band::before { animation: none; }
   .wk-finale__photo { animation: none; opacity: 0; }
+  .wk-transform__poster, .wk-turntable { transition: none; }
   .wk-world, .wk-tile, .wk-world__media img, .wk-tile__image img { transition: none; }
   .wk-world:hover, .wk-world:focus-within, .wk-tile:hover, .wk-tile:focus-within { transform: none; }
   .wk-world:hover .wk-world__media img, .wk-world:focus-within .wk-world__media img,

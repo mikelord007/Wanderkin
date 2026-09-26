@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef } from "react";
+import { lazy, Suspense, useCallback, useRef, useState } from "react";
 import { Button, Icon, Logo, Modal, WorldStyleScope } from "../components/index.js";
 import { BRAND_NAME, BRAND_TAGLINE } from "../../brand.js";
 import "../theme/welcome.css";
@@ -8,7 +8,8 @@ import { SampleWorlds, useSampleLevels } from "../library/SampleWorlds.js";
 import { GiantButton, TinyExplorer } from "../components/Scenery.js";
 import { useInView } from "../components/useInView.js";
 
-const SampleWorldPreview = lazy(() => import("../components/SampleWorldPreview.js"));
+// Loaded only when the card comes near the viewport, with its model.
+const CornerTurntable = lazy(() => import("../components/CornerTurntable.js"));
 
 interface StartScreenProps {
   onPlaySample: (manifest: SceneManifest) => void;
@@ -47,6 +48,11 @@ export function StartScreen({
   const { samples: sampleLevels, error: sampleError } = useSampleLevels();
   const finaleRef = useRef<HTMLDivElement>(null);
   const finaleView = useInView(finaleRef);
+  // The turntable starts loading a little before it scrolls into view.
+  const cornerRef = useRef<HTMLDivElement>(null);
+  const cornerView = useInView(cornerRef, "120px 0px");
+  const [cornerReady, setCornerReady] = useState(false);
+  const onCornerReady = useCallback(() => setCornerReady(true), []);
   const signInLabel = authMode === "supabase" ? "Continue with Google" : "Sign in";
 
   return (
@@ -81,8 +87,8 @@ export function StartScreen({
       </div>
       <main>
         {/* Explanatory: the transformation, read at a glance. Two equal
-            frames and a quiet connector; the rebuilt corner stands on its
-            own floor shadow. */}
+            frames and a quiet connector; the rebuilt corner turns slowly on
+            a turntable and can be dragged round. */}
         <section className="wk-section wk-transform" aria-labelledby="transform-heading">
           <div className="oq-kit-container">
             <div className="wk-section__head wk-section__head--center">
@@ -100,16 +106,20 @@ export function StartScreen({
                 <svg viewBox="0 0 64 24" focusable="false"><path d="M2 12h52" /><path d="M48 5l8 7-8 7" /></svg>
               </div>
               <figure className="wk-transform__item">
-                <div className="wk-frame wk-transform__media wk-transform__stage">
-                  <span className="wk-transform__floor" aria-hidden="true" />
-                  <div className="oq-welcome__render">
-                    <Suspense fallback={<p className="oq-welcome__preview-status" role="status">Opening the little world…</p>}><SampleWorldPreview /></Suspense>
-                  </div>
+                {/* A still of the model until the live turntable is ready,
+                    and in its place if WebGL is unavailable. */}
+                <div className="wk-frame wk-transform__media wk-transform__stage" ref={cornerRef} data-ready={cornerReady}>
+                  <img className="wk-transform__poster" src="/landing/step-reconstruction.webp" alt="The desk and sofa from the photo, rebuilt as a 3D model" />
+                  {cornerView.seen ? (
+                    <Suspense fallback={null}><CornerTurntable active={cornerView.active} onReady={onCornerReady} /></Suspense>
+                  ) : null}
+                  {cornerView.seen && !cornerReady ? <p className="wk-transform__status" role="status">Opening the 3D view…</p> : null}
+                  {cornerReady ? <p className="wk-transform__hint" aria-hidden="true">Drag to look around</p> : null}
                 </div>
-                <figcaption>The same corner<span>Now somewhere you can stand</span></figcaption>
+                <figcaption>The same corner<span>Now somewhere you can stand, all the way round</span></figcaption>
               </figure>
             </div>
-            <p className="wk-transform__note">A real bundled world, running live — not a mock-up.</p>
+            <p className="wk-transform__note">The real 3D reconstruction of this photo, running live in your browser.</p>
           </div>
         </section>
         {/* Explanatory: one journey. Three identical cards on a checkpoint

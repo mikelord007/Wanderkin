@@ -21,4 +21,15 @@ and encoded to WebP with Chrome's own encoder.
 
 | `finale-sofa.webp` | 800×1000 (4:5 crop) | The explorer standing on the sofa seat, the sofa back and the desk with its laptop beyond; the final call to action dissolves the room photo into it | The desk & sofa adventure, Original look (spawn moved to the sofa-seat checkpoint in the capture harness only) |
 
+## `corner.glb`: the turntable model (1.47 MB)
+
+A lighter copy of the bundled reconstruction `/samples/rodin.glb` (4.98 MB)
+for the landing's "same corner" turntable, written by
+`nimbalyst-local/tmp-ui-redesign/build-corner-glb.mjs` with no new
+dependencies. The positions, UVs and indices are byte-for-byte the same
+(47,618 vertices, 50,000 triangles). The normals are dropped: the material
+is emissive-only (a baked, shaded texture on a black base colour), so
+lighting never reads them. The 2048 px PNG texture (3.15 MB) is re-encoded
+as a 2048 px JPEG at quality 0.8 (212 KB), which core glTF supports.
+
 The two `library-*` renders were captured 2026-09-26 with the same harness to replace the old standalone arch illustration; `finale-sofa.webp` was captured the same day with `capture-sofa.mjs`. Total about 185 KB. The landing labels the cards shown in a theme look.
