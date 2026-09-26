@@ -31,13 +31,18 @@ import {
   pathForPlay,
   pathForPrepareAsset,
   pathForPrepareNew,
+  pathForPrivacy,
   pathForSamples,
   pathForSharePlay,
   pathForStart,
+  pathForTerms,
   pathForWorlds,
   sharePath,
   type ParsedRoute,
 } from "./ui/routing.js";
+import { LegalScreen } from "./ui/legal/LegalScreen.js";
+import type { LegalDocumentId } from "./ui/legal/legalDocuments.js";
+import { supportEmail } from "./ui/legal/supportContact.js";
 import {
   clearActiveSource,
   clearPendingSubmission,
@@ -70,6 +75,8 @@ type Screen =
   | { name: "account" }
   | { name: "auth-callback" }
   | { name: "friend"; shareId: string }
+  /** The public Privacy Policy or Terms of Service. */
+  | { name: "legal"; doc: LegalDocumentId }
   | { name: "photos" }
   | { name: "generation"; jobId: string }
   | { name: "preparation"; source: PreparationSource; isNew: boolean; fromSample?: true }
@@ -173,6 +180,10 @@ function resolveSyncScreen(route: ParsedRoute, signedIn: boolean): Screen | null
       return { name: "preparation", source: { kind: "asset", assetId: route.assetId }, isNew: true };
     case "share":
       return { name: "friend", shareId: route.shareId };
+    case "privacy":
+      return { name: "legal", doc: "privacy" };
+    case "terms":
+      return { name: "legal", doc: "terms" };
     case "unknown":
       return { name: "start" };
     default:
@@ -271,6 +282,8 @@ function pathForScreen(screen: Screen): string {
       return "/auth/callback";
     case "friend":
       return sharePath(screen.shareId);
+    case "legal":
+      return screen.doc === "privacy" ? pathForPrivacy() : pathForTerms();
     case "photos":
       return pathForCreate();
     case "generation":
@@ -644,6 +657,9 @@ export function App() {
 
     case "account":
       return shell("account", <AccountScreen user={auth.user!} mode={auth.mode} onSignOut={() => { void handleSignOut(); }} />);
+
+    case "legal":
+      return <LegalScreen doc={screen.doc} contactEmail={supportEmail()} />;
 
     case "friend":
       return (

@@ -7,6 +7,7 @@ import type { AuthMode } from "../../auth/types.js";
 import { SampleWorlds, useSampleLevels } from "../library/SampleWorlds.js";
 import { GiantButton, TinyExplorer } from "../components/Scenery.js";
 import { useInView } from "../components/useInView.js";
+import { LegalLinks, SignInConsent } from "../legal/LegalScreen.js";
 
 // Loaded only when the card comes near the viewport, with its model.
 const CornerTurntable = lazy(() => import("../components/CornerTurntable.js"));
@@ -192,6 +193,7 @@ export function StartScreen({
                     : <><Button onClick={onSignIn} loading={signingIn} loadingLabel="Signing in…">{signInLabel}</Button>
                       <Button variant="ghost" onClick={onCreateFromPhotos} disabled={signingIn}>Make my world</Button></>}
                 </div>
+                {signedIn ? null : <SignInConsent />}
               </div>
             </div>
           </div>
@@ -219,7 +221,7 @@ export function StartScreen({
           </div>
         </section>
         <div className="oq-kit-container wk-welcome-foot">
-          <footer className="oq-welcome__footer"><span>{BRAND_TAGLINE}</span>{import.meta.env.DEV && <a href="/design-kit/">Explore the design kit</a>}</footer>
+          <footer className="oq-welcome__footer"><span>{BRAND_TAGLINE}</span><LegalLinks />{import.meta.env.DEV && <a href="/design-kit/">Explore the design kit</a>}</footer>
         </div>
       </main>
       <Modal open={signInPrompt !== null} onClose={() => onDismissSignInPrompt?.()} title="Sign in to continue">
@@ -229,6 +231,7 @@ export function StartScreen({
             <Button onClick={onSignIn} loading={signingIn} loadingLabel="Signing in…">{signInLabel}</Button>
             <Button variant="ghost" onClick={() => onDismissSignInPrompt?.()}>Not now</Button>
           </div>
+          <SignInConsent />
         </div>
       </Modal>
     </WorldStyleScope>

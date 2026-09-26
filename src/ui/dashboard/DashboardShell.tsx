@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Icon, Logo, WorldStyleScope } from "../components/index.js";
 import type { AuthUser } from "../../auth/types.js";
+import { LegalLinks } from "../legal/LegalScreen.js";
 import "./dashboard.css";
 
 export type DashboardSection = "worlds" | "create" | "samples" | "account";
@@ -91,6 +92,7 @@ export function DashboardShell({ active, user, onNavigate, onHome, onSignOut, ch
       </aside>
       <div className="wk-shell__content" id="wk-shell-content" tabIndex={-1}>
         {children}
+        <footer className="wk-shell__foot"><LegalLinks /></footer>
       </div>
     </WorldStyleScope>
   );

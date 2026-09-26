@@ -1,0 +1,41 @@
+/*
+ * Privacy Policy and Terms of Service. The light product system at its
+ * plainest: the page colour, a narrow reading column (about 68 characters),
+ * sentence-case headings, and the purple only for links. Numbered sections
+ * because they are referred to by number.
+ */
+.wk-legal { min-height: 100vh; width: 100%; align-self: flex-start; background: var(--wk-page); color: var(--wk-text); }
+.wk-legal__top, .wk-legal__column, .wk-legal__foot { width: min(100%, calc(42rem + 2 * var(--wk-page-x))); margin-inline: auto; padding-inline: var(--wk-page-x); }
+.wk-legal__top { display: flex; align-items: center; justify-content: space-between; gap: var(--oq-space-4); padding-block: var(--oq-space-5); }
+.wk-legal__brand { display: inline-flex; border-radius: 10px; }
+.wk-legal__back { font-size: var(--wk-type-small); font-weight: 500; }
+
+.wk-legal__column { padding-block: var(--oq-space-4) var(--wk-section-y); }
+.wk-legal__column h1 { font-size: clamp(2.2rem, 1.6rem + 2.2vw, 3.2rem); font-weight: 300; letter-spacing: -.035em; line-height: 1.05; }
+.wk-legal__date { margin-top: var(--oq-space-3); font-size: var(--wk-type-small); color: var(--wk-text-3); }
+.wk-legal__intro { margin-top: var(--wk-gap); font-size: var(--wk-type-lede); line-height: 1.6; color: var(--wk-text-2); }
+
+.wk-legal__sections { list-style: none; counter-reset: legal; margin: var(--wk-gap-group) 0 0; padding: 0; display: grid; gap: var(--wk-gap); }
+.wk-legal__sections > li { counter-increment: legal; scroll-margin-top: var(--oq-space-5); }
+.wk-legal__sections h2 { display: flex; gap: .6em; font-size: var(--wk-type-h3); font-weight: 500; letter-spacing: -.01em; line-height: 1.3; }
+.wk-legal__sections h2::before { content: counter(legal) "."; flex: none; min-width: 1.4em; color: var(--wk-purple-ink); font-variant-numeric: tabular-nums; }
+.wk-legal__sections p, .wk-legal__sections ul { margin-top: var(--oq-space-2); padding-left: 2.05em; line-height: 1.65; color: var(--wk-text-2); }
+.wk-legal__sections ul { padding-left: calc(2.05em + 1.1em); }
+.wk-legal__sections li li { margin-top: 4px; }
+.wk-legal__sections strong { color: var(--wk-text); font-weight: 600; }
+.wk-legal__sections code { font-size: .92em; padding: 1px 5px; border-radius: 6px; background: var(--wk-tint); color: var(--wk-text); overflow-wrap: anywhere; }
+.wk-legal__placeholder { padding: 2px 6px; border-radius: 6px; background: #fff4d6; color: #6b4a00; }
+.wk-legal a { color: var(--wk-purple-ink); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.wk-legal a:hover { text-decoration-thickness: 2px; }
+.wk-legal a:focus-visible { outline: 3px solid var(--wk-purple); outline-offset: 3px; border-radius: 4px; }
+.wk-legal__brand, .wk-legal__back { text-decoration: none !important; }
+
+.wk-legal__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--oq-space-3); padding-block: var(--oq-space-5) var(--oq-space-7); border-top: 1px solid var(--wk-border); font-size: var(--wk-type-small); color: var(--wk-text-3); }
+
+/* Shared by every footer and sign-in note that points to these pages. */
+.wk-legal-links { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.wk-legal-links a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.wk-legal-links a:hover, .wk-legal-links a[aria-current="page"] { color: var(--wk-purple-ink); }
+.wk-signin-consent { font-size: .8125rem; line-height: 1.5; color: var(--wk-text-3); }
+.wk-signin-consent a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.wk-signin-consent a:hover { color: var(--wk-purple-ink); }

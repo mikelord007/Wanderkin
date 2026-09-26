@@ -70,6 +70,13 @@
 /* Screens that bring their own full-page frame (the creation journey) sit in
    the content column instead of the viewport. */
 .wk-shell__content > .oq-creation { min-height: 100vh; }
+/* The quiet foot of every dashboard page: the legal links, in the page's
+   own column. */
+.wk-shell__foot {
+  width: min(100%, calc(var(--wk-max) + 2 * var(--wk-page-x)));
+  margin-inline: auto; padding: 0 var(--wk-page-x) var(--oq-space-6);
+  font-size: var(--wk-type-small); color: var(--wk-text-3);
+}
 
 /* === Page scaffold ====================================================== */
 .wk-page {

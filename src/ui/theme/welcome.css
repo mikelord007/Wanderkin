@@ -272,6 +272,7 @@
 .wk-library-invite__copy { display: grid; gap: var(--wk-gap-sm); justify-items: start; padding-right: var(--wk-card-pad); }
 .wk-library-invite__copy p { color: var(--wk-text-2); max-inline-size: 44ch; }
 .wk-library-invite__copy .oq-kit-row { margin-top: var(--oq-space-2); }
+.wk-library-invite__copy .wk-signin-consent, .wk-signin-prompt .wk-signin-consent { color: var(--wk-text-3); max-inline-size: 48ch; }
 
 /* === Final call to action (page) ======================================== */
 .wk-finale__inner { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: var(--wk-gap-group); align-items: center; }

@@ -10,8 +10,10 @@ import {
   pathForPlay,
   pathForPrepareAsset,
   pathForPrepareNew,
+  pathForPrivacy,
   pathForSharePlay,
   pathForStart,
+  pathForTerms,
   pathForWorlds,
 } from "./routing.js";
 
@@ -72,6 +74,18 @@ describe("parseRoute", () => {
     expect(parseRoute(pathForPlay("level_1"))).toEqual({ kind: "play", levelId: "level_1" });
     expect(parseRoute(pathForFinish("level_1"))).toEqual({ kind: "finish", levelId: "level_1" });
     expect(parseRoute(pathForSharePlay("share_1"))).toEqual({ kind: "share-play", shareId: "share_1" });
+    expect(parseRoute(pathForPrivacy())).toEqual({ kind: "privacy" });
+    expect(parseRoute(pathForTerms())).toEqual({ kind: "terms" });
+  });
+
+  it("serves the legal pages at the exact paths published on the Google consent screen", () => {
+    expect(pathForPrivacy()).toBe("/privacy");
+    expect(pathForTerms()).toBe("/terms");
+    expect(parseRoute("/privacy")).toEqual({ kind: "privacy" });
+    expect(parseRoute("/terms")).toEqual({ kind: "terms" });
+    expect(parseRoute("/privacy/")).toEqual({ kind: "privacy" });
+    expect(parseRoute("/terms/")).toEqual({ kind: "terms" });
+    expect(parseRoute("/privacy/extra")).toEqual({ kind: "unknown" });
   });
 });
 

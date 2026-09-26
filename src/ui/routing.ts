@@ -34,6 +34,8 @@ export type ParsedRoute =
   | { kind: "finish"; levelId: string }
   | { kind: "share"; shareId: string }
   | { kind: "share-play"; shareId: string }
+  | { kind: "privacy" }
+  | { kind: "terms" }
   | { kind: "unknown" };
 
 function decodeSegment(raw: string): string | null {
@@ -60,6 +62,8 @@ export function parseRoute(pathname: string): ParsedRoute {
   if (path === "/auth/callback") return { kind: "auth-callback" };
   if (path === "/create") return { kind: "create" };
   if (path === "/create/prepare") return { kind: "create-prepare" };
+  if (path === "/privacy") return { kind: "privacy" };
+  if (path === "/terms") return { kind: "terms" };
 
   const jobId = matchSegment(GENERATING_RE, path);
   if (jobId) return { kind: "create-generating", jobId };
@@ -97,6 +101,10 @@ export const pathForEdit = (levelId: string): string => `/edit/${encodeURICompon
 export const pathForPlay = (levelId: string): string => `/play/${encodeURIComponent(levelId)}`;
 export const pathForFinish = (levelId: string): string => `/finish/${encodeURIComponent(levelId)}`;
 export const pathForSharePlay = (shareId: string): string => `${sharePath(shareId)}/play`;
+/** The public legal pages. Plain, stable paths: they are published as the
+ * privacy policy and terms URLs on the Google sign-in consent screen. */
+export const pathForPrivacy = (): string => "/privacy";
+export const pathForTerms = (): string => "/terms";
 
 /**
  * Pushes or replaces the visible URL to `path`, preserving any existing
