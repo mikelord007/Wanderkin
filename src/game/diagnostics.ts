@@ -33,6 +33,20 @@ export interface GameDiagnostics {
   readonly nextCheckpointId: string | null;
   readonly nextCheckpointPosition: Vec3Tuple | null;
   readonly completed: boolean;
+  /** Grappling hook: its phase, whether it can fire, and what the reticle is over. */
+  readonly grapple?: {
+    readonly phase: string;
+    readonly ready: boolean;
+    readonly range: number;
+    readonly aimAnchor: string | null;
+    readonly aimRejection: string | null;
+    readonly aimPoint: Vec3Tuple | null;
+    readonly target: Vec3Tuple | null;
+    readonly tension: number;
+    readonly fov: number;
+    /** Why the hook last let go (player, arrived, mantle, blocked, cancelled). */
+    readonly lastRelease: string | null;
+  };
   readonly groundHeightBelow: number | null;
   readonly cameraYaw: number;
   readonly cameraPitch: number;

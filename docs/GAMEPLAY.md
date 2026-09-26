@@ -16,6 +16,7 @@ difference is in their manifest data.
 | Mouse | Look (third-person orbit; requires pointer lock) |
 | `Space` | Jump |
 | `E` | Contextual mantle, when the prompt is showing |
+| `F` / right mouse | Fire the grappling hook at the reticle; press again (or `Space`) to let go |
 | `R` | Return to the last activated checkpoint |
 | `Esc` | Pause and release the mouse |
 
@@ -44,6 +45,7 @@ returns an unsubscribe function and may listen to a named event or `*`.
 | `raceFinished` | A result is frozen and the local personal best is evaluated. |
 | `worldCompleted` | Any mode reaches its completion rule; emitted once per run. |
 | `introShown` | The contextual movement/jump introduction is shown for this world. |
+| `grappleAttached` | The grappling hook bites an anchor. Carries the anchor kind and distance; audio plays the synthesised bite. |
 
 Fragment and completion events are idempotent per run. Respawn never clears
 progress. Restart creates a new run and may therefore emit the same reward
@@ -201,6 +203,83 @@ Availability is re-probed every third fixed step (20 Hz) for the prompt,
 and always re-probed fresh on the key press, so `E` never acts on a stale
 result. The direction probed is the movement direction when there is input,
 otherwise the camera's forward direction.
+
+## Grappling hook
+
+When the main object is too tall to climb, the hook pulls the explorer up
+to where the reticle points, Just Cause style. It is a player ability in
+every world, look and mode. It adds nothing to the manifest and does not
+touch the editor.
+
+**Aim.** A small reticle sits at screen centre. A ray from the camera
+through it looks for an anchor within `2.5 ×` the main object's height,
+and never less than 1 m (`grappleRange`). The height is taken from the
+tallest generated mesh, or from the scene when there is none. The ray
+starts level with the character, so things between the camera and the
+player are ignored. Biome props are never anchors: the ray looks through
+them, and a prop (enabled in physics or not) across the rope blocks the
+shot. Anchors closer than two body heights are refused. The reticle is a
+plain ring over nothing. Over a valid anchor it closes into four ticks
+and a marigold gem. It dims while the hook is out or cooling down. Every
+mark is a plum under-stroke beneath a light top stroke, so it holds
+contrast on both bright and dark backgrounds.
+
+**Anchors.** Every anchor resolves to a kind, and every route is swept
+with the capsule before the reticle offers it:
+
+- `surface`: a standable top. The explorer is pulled to stand on it. If
+  the straight way is blocked, the route goes out past the lip nearest the
+  player (found by walking the top back toward them), up above it, then
+  across. The rope wraps over that lip.
+- `ledge`: a face, chamfer or lip with a top within a mantle's height
+  above it. The hook moves up to bite that lip, and the explorer goes out,
+  up and over. This is what gets round an overhang, like a desk top over
+  its drawers.
+- `wall`: anything else. The explorer is pulled up to hang off the face,
+  then mantles if a ledge is in reach, or drops with a small hop.
+
+The hook bites 1 cm off the surface along its normal, never inside it.
+
+**Fire and reel.** The hook flies to the anchor in 0.15–0.3 s along a
+slight arc, with the rope slack behind it. On the bite there is a puff, a
+synthesised click-and-thunk on the effects bus (no manifest cue or asset),
+and the rope goes taut. The reel moves the capsule through the same
+`KinematicCharacterController` as walking, from `locomotionStep`. There is
+no joint, so collisions, autostep and mantling keep working, and the
+solver stops the capsule at first contact. It accelerates at 30 m/s² to
+3.5× walk speed, lofts the first leg above its goal, and brakes into the
+arrival. It ends when the explorer:
+
+- stands on the target (stops there);
+- is within 0.6 m of a wall anchor, then mantles or hops;
+- stops making progress for 0.18 s, or hits a 3 s ceiling. A mantle, or a
+  swept pull-over onto the target, is tried before hopping. The hop
+  drifts toward the target.
+
+Pressing `F` again or `Space` lets go. The momentum is kept and gravity
+takes over. Letting go by jumping does not also jump.
+
+**Rules.** A 0.6 s cooldown follows every release, and a miss costs the
+same cooldown from the shot. There is no hook while mantling, respawning,
+or once the course is complete. A respawn or restart mid-reel drops the
+hook (`grapple-release` reason `cancelled`) with nothing carried over.
+Mission gates are unchanged: fragments, beacons and the portal still
+need the capsule to reach their triggers.
+
+**Camera.** A mild FOV kick (up to 5°) follows rope tension, with a 0.18 s
+shake on the bite. Under `prefers-reduced-motion` both are dropped, the
+puff fades in place, and the mechanic is unchanged. A two-line hint
+("Aim at a ledge, / press F to hook") shows once per browser session,
+after the movement intro, under `objectquest:intro:grapple-hook` in
+`sessionStorage`.
+
+**Touch.** There are no touch controls yet (see the limitations below).
+`InputController.fireGrapple()` is the single entry point for a future
+on-screen button.
+
+Diagnostics expose `grapple.{phase, ready, range, aimAnchor, aimRejection,
+aimPoint, target, tension, fov, lastRelease}`. Tuning constants live at
+the top of `src/game/core/grapple.ts` and `src/game/render/grappleVisuals.ts`.
 
 ## Checkpoints, respawn and completion
 
@@ -405,6 +484,11 @@ Known limitations:
   desktop-only. Coarse-pointer layouts explicitly say that keyboard and mouse
   are the supported controls instead of presenting inert touch controls.
 - **No audio.**
+- **Grappling hook on real scans.** Anchor paths are swept with the
+  capsule, but the arrival on some scanned lips (rounded arms, thin
+  overhangs) is confirmed by play, not by an automated route. Where the
+  route can't be proved, the reticle offers `wall` (reel up, then mantle or
+  drop) rather than promising the top.
 - Mantle `insufficient-headroom` is unreachable with the default tuning
   (see above); it exists for tunings where required clearance exceeds the
   capsule height.

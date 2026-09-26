@@ -40,6 +40,8 @@ export interface AvatarFrameState {
 
 export interface PlayerAvatarHandle {
   update(state: AvatarFrameState): void;
+  /** World position of the right hand, where the grappling rope starts. */
+  handPosition(out: THREE.Vector3): THREE.Vector3;
 }
 
 /** Total standing height of the capsule, which is also the character's height. */
@@ -90,7 +92,13 @@ export const PlayerAvatar = forwardRef<
   const lanternBase = LANTERN_LIGHT.intensityAtUnitHeight * height * height;
   const lanternPulse = LANTERN_LIGHT.pulseAtUnitHeight * height * height;
 
+  const hand = useMemo(() => model.rig.byName.get("wrist.R") ?? null, [model]);
+
   useImperativeHandle(ref, () => ({
+    handPosition(out) {
+      if (hand) return hand.getWorldPosition(out);
+      return root.current ? root.current.getWorldPosition(out) : out;
+    },
     update(state) {
       const group = root.current;
       if (!group) return;

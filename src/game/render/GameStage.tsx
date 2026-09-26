@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, type MutableRefObject, type RefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { PerspectiveCamera } from "three";
+import { PerspectiveCamera, Vector3 } from "three";
 import type { MovementConfig, SceneManifest, StyleDefinition } from "@shared/index.js";
 import type { LoadedSceneAsset } from "../assets/loadSceneAsset.js";
 import type { RapierModule } from "../core/physicsWorld.js";
@@ -19,9 +19,12 @@ import type { GameSimulation, SimulationEvent } from "../core/simulation.js";
 import type { InputController } from "../input/inputController.js";
 import type { GameDiagnostics } from "../diagnostics.js";
 import { GAMEPLAY_CAMERA_FOV_DEGREES } from "../core/constants.js";
-import { headingForward, headingRight } from "../core/vec.js";
+import { approach, headingForward, headingRight } from "../core/vec.js";
+import type { GrappleAim } from "../core/grapple.js";
 import { CameraRig } from "./cameraRig.js";
-import { PlayerAvatar, type PlayerAvatarHandle } from "./PlayerAvatar.js";
+import { PlayerAvatar, characterHeight, type PlayerAvatarHandle } from "./PlayerAvatar.js";
+import { GrappleRig, type GrappleRigHandle } from "./GrappleRig.js";
+import { reelCameraEffect, reticleState } from "./grappleVisuals.js";
 import { SceneEntities } from "./SceneEntities.js";
 import { SceneLighting } from "./SceneLighting.js";
 import { CheckpointMarkers } from "./Checkpoints.js";
@@ -57,6 +60,8 @@ export interface GameStageProps {
   onHudSignals: (signals: HudSignals) => void;
   objectiveArrowRef: RefObject<HTMLDivElement>;
   objectiveDistanceRef: RefObject<HTMLSpanElement>;
+  /** The grappling hook's reticle; its `data-state` is written every frame. */
+  grappleReticleRef?: RefObject<HTMLDivElement>;
   diagnosticsRef: MutableRefObject<GameDiagnostics | null>;
   style: StyleDefinition;
   atmosphere: string | undefined;
@@ -84,6 +89,7 @@ export function GameStage({
   onHudSignals,
   objectiveArrowRef,
   objectiveDistanceRef,
+  grappleReticleRef,
   diagnosticsRef,
   style,
   atmosphere,
@@ -117,6 +123,12 @@ export function GameStage({
     };
   }, [themed, manifest.experience, manifest.adventure, biomeDefinition]);
   const avatar = useRef<PlayerAvatarHandle>(null);
+  const grapple = useRef<GrappleRigHandle>(null);
+  // The camera ray through the reticle as last drawn: the shot the next
+  // press fires is exactly the one the reticle previewed.
+  const aimRef = useRef<GrappleAim | null>(null);
+  const grappleFx = useRef({ phase: "idle", sinceBite: 0, fov: GAMEPLAY_CAMERA_FOV_DEGREES, lastRelease: null as string | null });
+  const hand = useMemo(() => new Vector3(), []);
   const frames = useRef(0);
   const announcedFirstFrame = useRef(false);
 
@@ -164,13 +176,14 @@ export function GameStage({
     if (runningRef.current) {
       const raceAllowsMovement =
         modeState?.mode !== "race" || modeState.race.phase === "running";
-      if (raceAllowsMovement) simulation.advance(input.consume(), delta);
+      if (raceAllowsMovement) simulation.advance({ ...input.consume(), aim: aimRef.current }, delta);
       else input.clear();
       for (const event of simulation.drainEvents()) {
         if (event.type === "respawn") {
           input.setYaw(event.headingRadians);
           rig.reset();
         }
+        if (event.type === "grapple-release") grappleFx.current.lastRelease = event.reason;
         onEvent(event);
       }
     } else {
@@ -189,8 +202,30 @@ export function GameStage({
       input.pitch,
       delta,
     );
-    camera.position.set(pose.position.x, pose.position.y, pose.position.z);
+    const hook = simulation.grappleView;
+    const fx = grappleFx.current;
+    fx.sinceBite = hook.phase === "reeling" && fx.phase !== "reeling" ? 0 : fx.sinceBite + delta;
+    fx.phase = hook.phase;
+    const effect = reelCameraEffect(hook.phase, hook.tension, fx.sinceBite, characterHeight(config), reducedMotion);
+    // The shake is a brief positional wobble; the aim below uses the steady pose.
+    const wobble = effect.shake * Math.sin(fx.sinceBite * 90);
+    camera.position.set(pose.position.x + wobble, pose.position.y + wobble * 0.6, pose.position.z - wobble * 0.4);
     camera.lookAt(pose.target.x, pose.target.y, pose.target.z);
+    if (camera instanceof PerspectiveCamera) {
+      fx.fov = approach(fx.fov, GAMEPLAY_CAMERA_FOV_DEGREES + effect.fovKick, 8, delta);
+      if (Math.abs(camera.fov - fx.fov) > 0.01) {
+        camera.fov = fx.fov;
+        camera.updateProjectionMatrix();
+      }
+    }
+    aimRef.current = {
+      origin: { ...pose.position },
+      direction: {
+        x: pose.target.x - pose.position.x,
+        y: pose.target.y - pose.position.y,
+        z: pose.target.z - pose.position.z,
+      },
+    };
 
     const groundY = simulation.groundHeightBelow();
     avatar.current?.update({
@@ -203,6 +238,16 @@ export function GameStage({
       groundY,
       deltaSeconds: delta,
     });
+
+    if (avatar.current) {
+      grapple.current?.update({ view: hook, hand: avatar.current.handPosition(hand), deltaSeconds: delta, reducedMotion });
+    }
+    const aimShot = runningRef.current && hook.ready ? simulation.previewGrapple(aimRef.current) : null;
+    const reticle = grappleReticleRef?.current;
+    if (reticle) {
+      const state = reticleState(runningRef.current, hook.ready, aimShot?.anchor != null);
+      if (reticle.dataset.state !== state) reticle.dataset.state = state;
+    }
 
     onHudSignals({
       checkpointsCollected: simulation.checkpointsCollected,
@@ -250,6 +295,18 @@ export function GameStage({
           ]
         : null,
       completed: simulation.completed,
+      grapple: {
+        phase: hook.phase,
+        ready: hook.ready,
+        range: simulation.grappleRange,
+        aimAnchor: aimShot?.anchor ? aimShot.anchor.kind : null,
+        aimRejection: aimShot?.rejection ?? null,
+        aimPoint: aimShot?.aimPoint ? [aimShot.aimPoint.x, aimShot.aimPoint.y, aimShot.aimPoint.z] : null,
+        target: hook.target ? [hook.target.x, hook.target.y, hook.target.z] : null,
+        tension: hook.tension,
+        fov: fx.fov,
+        lastRelease: fx.lastRelease,
+      },
       groundHeightBelow: groundY,
       cameraYaw: input.yaw,
       cameraPitch: input.pitch,
@@ -320,6 +377,7 @@ export function GameStage({
         />
       ) : null}
       <PlayerAvatar ref={avatar} config={config} reducedMotion={reducedMotion} />
+      <GrappleRig ref={grapple} bodyHeight={characterHeight(config)} />
     </>
   );
 }

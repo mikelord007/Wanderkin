@@ -13,6 +13,7 @@ import type { GameLoadStage } from "../types.js";
 import type { AdventureHudCopy } from "../../biome/missionCopy.js";
 import type { GameplaySessionSnapshot } from "../modes/session.js";
 import { AudioControls, Icon, type AudioSettings } from "../../ui/components/index.js";
+import { GrappleHint, GrappleReticle } from "./GrappleReticle.js";
 import "./hud.css";
 
 export interface HudProps {
@@ -31,6 +32,10 @@ export interface HudProps {
   levelName: string;
   objectiveArrowRef: RefObject<HTMLDivElement>;
   objectiveDistanceRef: RefObject<HTMLSpanElement>;
+  /** The grappling hook's centre reticle; the stage writes its state. */
+  grappleReticleRef?: RefObject<HTMLDivElement>;
+  /** The once-per-session "Aim at a ledge, press F to hook" hint. */
+  grappleHintVisible?: boolean;
   onResume: () => void;
   onRestart: () => void;
   onRetry: () => void;
@@ -94,6 +99,8 @@ function Controls() {
         <dd>Jump</dd>
         <dt>E</dt>
         <dd>Climb up</dd>
+        <dt>F / Right click</dt>
+        <dd>Grappling hook</dd>
         <dt>R</dt>
         <dd>Back to checkpoint</dd>
         <dt>Esc</dt>
@@ -269,7 +276,9 @@ export function Hud(props: HudProps) {
             </div>
           ) : null}
 
+          {props.grappleReticleRef ? <GrappleReticle reticleRef={props.grappleReticleRef} /> : null}
           <Controls />
+          {props.grappleHintVisible && !props.introVisible && !paused && !completed ? <GrappleHint /> : null}
           {props.introVisible ? <div className="oq-hud__intro" role="status">
             <strong>Ready, tiny explorer?</strong>
             <span>Use WASD to move, Space to jump, and E to climb ledges.</span>

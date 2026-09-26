@@ -4,8 +4,8 @@
  * Kept out of React state deliberately: input is read once per animation
  * frame by the simulation, and routing it through `useState` would re-render
  * the whole tree on every key. Edge-triggered actions (jump, mantle,
- * respawn) are latched here and cleared when consumed, so a press between
- * frames is never dropped.
+ * respawn, grapple) are latched here and cleared when consumed, so a press
+ * between frames is never dropped.
  */
 
 import type { MovementConfig } from "@shared/index.js";
@@ -41,6 +41,7 @@ export class InputController {
   private jumpLatched = false;
   private mantleLatched = false;
   private respawnLatched = false;
+  private grappleLatched = false;
   private locked = false;
   /** Suppresses the pause that a deliberate pointer-lock release would fire. */
   private suppressNextUnlockPause = false;
@@ -66,12 +67,25 @@ export class InputController {
     const onMouseMove = (event: MouseEvent) => this.handleMouseMove(event);
     const onPointerLockChange = () => this.handlePointerLockChange();
     const onBlur = () => this.held.clear();
+    // Right mouse fires the hook. Only while the pointer is locked: before
+    // that the click belongs to the page (and to the click-to-play card).
+    const onMouseDown = (event: MouseEvent) => {
+      if (event.button === 2 && this.locked) {
+        this.grappleLatched = true;
+        event.preventDefault();
+      }
+    };
+    const onContextMenu = (event: Event) => {
+      if (this.locked) event.preventDefault();
+    };
 
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("blur", onBlur);
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("pointerlockchange", onPointerLockChange);
+    document.addEventListener("mousedown", onMouseDown);
+    element.addEventListener("contextmenu", onContextMenu);
 
     return () => {
       window.removeEventListener("keydown", onKeyDown);
@@ -79,6 +93,8 @@ export class InputController {
       window.removeEventListener("blur", onBlur);
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("pointerlockchange", onPointerLockChange);
+      document.removeEventListener("mousedown", onMouseDown);
+      element.removeEventListener("contextmenu", onContextMenu);
       this.held.clear();
       this.element = null;
     };
@@ -121,6 +137,9 @@ export class InputController {
         break;
       case "KeyR":
         this.respawnLatched = true;
+        break;
+      case "KeyF":
+        this.grappleLatched = true;
         break;
       default:
         break;
@@ -187,6 +206,14 @@ export class InputController {
     document.exitPointerLock();
   }
 
+  /**
+   * Fires the grappling hook (or lets go of it) on the next simulation step,
+   * exactly like F or right mouse. The entry point for any on-screen control.
+   */
+  fireGrapple(): void {
+    this.grappleLatched = true;
+  }
+
   /** Re-aims the camera, e.g. after respawning at a checkpoint's heading. */
   setYaw(yaw: number): void {
     this.yaw = yaw;
@@ -203,12 +230,14 @@ export class InputController {
       jump: this.jumpLatched,
       mantle: this.mantleLatched,
       respawn: this.respawnLatched,
+      grapple: this.grappleLatched,
       cameraYaw: this.yaw,
     };
 
     this.jumpLatched = false;
     this.mantleLatched = false;
     this.respawnLatched = false;
+    this.grappleLatched = false;
     return input;
   }
 
@@ -218,6 +247,7 @@ export class InputController {
     this.jumpLatched = false;
     this.mantleLatched = false;
     this.respawnLatched = false;
+    this.grappleLatched = false;
   }
 
   private anyHeld(codes: Set<string>): boolean {

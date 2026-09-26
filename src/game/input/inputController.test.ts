@@ -64,4 +64,30 @@ describe("InputController", () => {
     internals.handleKeyDown({ code: "KeyM", repeat: true });
     expect(events).toEqual(["mute", "capture"]);
   });
+
+  it("latches the grappling hook on F or fireGrapple() for exactly one consume", () => {
+    const controller = new InputController(CONFIG, 0, {
+      onPauseRequested: () => undefined,
+      onPointerLockChange: () => undefined,
+    });
+    const internals = controller as unknown as {
+      handleKeyDown: (event: { code: string; repeat?: boolean }) => void;
+    };
+
+    internals.handleKeyDown({ code: "KeyF" });
+    expect(controller.consume().grapple).toBe(true);
+    expect(controller.consume().grapple).toBe(false);
+
+    // Holding F does not re-fire.
+    internals.handleKeyDown({ code: "KeyF", repeat: true });
+    expect(controller.consume().grapple).toBe(false);
+
+    controller.fireGrapple();
+    expect(controller.consume().grapple).toBe(true);
+
+    // Pausing drops a latched shot.
+    controller.fireGrapple();
+    controller.clear();
+    expect(controller.consume().grapple).toBe(false);
+  });
 });

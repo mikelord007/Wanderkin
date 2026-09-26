@@ -1,5 +1,6 @@
 import type { AudioSettings } from "../ui/components/index.js";
 import { resolveAudioUrls, type AudioCue } from "./assets.js";
+import { playGrappleBite } from "./synth.js";
 import type { LevelMedia } from "@shared/index.js";
 
 type Bus = "music" | "effects";
@@ -77,6 +78,13 @@ export class GameAudioEngine {
 
   async play(cue: Exclude<AudioCue, "music" | "ambience">): Promise<void> {
     await this.playOneShot(cue, "effects");
+  }
+
+  /** The grappling hook biting: synthesised, so it needs no cue or asset. */
+  playGrappleBite(): void {
+    if (!this.unlocked) return;
+    const context = this.ensureContext();
+    playGrappleBite(context, this.buses!.effects);
   }
 
   stop(): void {

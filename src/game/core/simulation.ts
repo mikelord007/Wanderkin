@@ -16,6 +16,7 @@ import {
   GROUND_STICK_SPEED,
   JUMP_BUFFER_SECONDS,
   MANTLE_DURATION_SECONDS,
+  MANTLE_LANDING_SKIN,
   MANTLE_PROBE_INTERVAL_STEPS,
   MANTLE_VERTICAL_FRACTION,
   MAX_FRAME_DELTA_SECONDS,
@@ -37,6 +38,29 @@ import {
   type CheckpointState,
 } from "./checkpoints.js";
 import { probeMantle, type MantleProbeResult, type MantleTarget } from "./mantle.js";
+import {
+  GRAPPLE_COOLDOWN_SECONDS,
+  HOOK_RETRACT_SECONDS,
+  REEL_ARRIVE_DISTANCE,
+  REEL_END_HOP_SPEED,
+  REEL_END_NUDGE_SECONDS,
+  REEL_END_NUDGE_SPEED,
+  REEL_STUCK_SECONDS,
+  REEL_TIMEOUT_SECONDS,
+  ROPE_TENSION_SECONDS,
+  grappleRange,
+  hookFlightSeconds,
+  mainObjectHeight,
+  nextReelSpeed,
+  pullOverApex,
+  reelSteerPoint,
+  segmentHitsProp,
+  selectGrappleAnchor,
+  type GrappleAim,
+  type GrappleAimResult,
+  type GrappleAnchor,
+} from "./grapple.js";
+import { soupBounds } from "./soup.js";
 import { capsuleHeight, reseatCapsuleCentre, toMiniatureScale } from "./characterScale.js";
 import {
   HEAD_ON_PROP_DEGREES,
@@ -64,9 +88,14 @@ import {
   approach,
   clamp,
   copy,
+  distance,
+  dot,
   fromTuple,
   headingForward,
   headingRight,
+  length as vecLength,
+  normalize,
+  sub,
   vec3,
   yawOf,
   type Vec3Like,
@@ -97,6 +126,10 @@ export interface SimulationInput {
   jump: boolean;
   mantle: boolean;
   respawn: boolean;
+  /** Edge: fire the grappling hook, or let go of it while it is out. */
+  grapple?: boolean;
+  /** The camera ray through the reticle, which the hook is fired along. */
+  aim?: GrappleAim | null;
   /** Camera yaw in radians, measured around +Y from +Z. */
   cameraYaw: number;
 }
@@ -117,7 +150,36 @@ export type SimulationEvent =
   | { type: "mantle-end" }
   | { type: "checkpoint"; id: string; collected: number; total: number }
   | { type: "complete" }
-  | { type: "respawn"; reason: "fell" | "manual"; headingRadians: number };
+  | { type: "respawn"; reason: "fell" | "manual"; headingRadians: number }
+  | { type: "grapple-fire"; hit: boolean }
+  | { type: "grapple-attach"; anchor: GrappleAnchor }
+  | { type: "grapple-release"; reason: GrappleReleaseReason };
+
+/** Why a hook let go: the player, arrival, a mantle over the lip, being blocked, or a respawn. */
+export type GrappleReleaseReason = "player" | "arrived" | "mantle" | "blocked" | "cancelled";
+
+export type GrapplePhase = "idle" | "flying" | "reeling" | "missed";
+
+/**
+ * What the renderer needs to draw the hook, all in simulation time. The hand
+ * end of the rope is the avatar's, so it is not part of this.
+ */
+export interface GrappleView {
+  phase: GrapplePhase;
+  /** Where the hook is heading or holding: the anchor, or a missed shot's end. */
+  target: Vec3Like | null;
+  normal: Vec3Like | null;
+  /** Where the rope wraps over a lip, while the character is still below it. */
+  bend: Vec3Like | null;
+  /** 0..1 along the flight (flying), or out-and-back for a miss (1 = fully out). */
+  progress: number;
+  /** 0 slack .. 1 taut. */
+  tension: number;
+  /** Seconds until the hook can fire again. */
+  cooldown: number;
+  /** True when a press now would fire (not mantling, cooling down or finished). */
+  ready: boolean;
+}
 
 export interface SimulationOptions {
   manifest: SceneManifest;
@@ -176,11 +238,26 @@ export class GameSimulation {
   private mantleActiveTarget: MantleTarget | null = null;
   private lastProbe: MantleProbeResult = { target: null, rejection: null };
 
+  private grapplePhase: GrapplePhase = "idle";
+  private grappleAnchor: GrappleAnchor | null = null;
+  private grappleMissPoint: Vec3Like | null = null;
+  private grappleElapsed = 0;
+  private grappleFlight = 0;
+  private grappleCooldown = 0;
+  private reelSpeed = 0;
+  private reelBest = Infinity;
+  private reelStuck = 0;
+  /** The anchor's waypoint until the reel has passed it. */
+  private reelWaypoint: Vec3Like | null = null;
+  /** Hook reach for this level, from the main object's height (`grapple.ts`). */
+  readonly grappleRange: number;
+
   private accumulator = 0;
   private alpha = 0;
   private pendingJump = false;
   private pendingMantle = false;
   private pendingRespawn = false;
+  private pendingGrapple = false;
 
   private measuredSpeed = 0;
   private propEntries: { collider: RapierCollider; data: PropCollider; enabled: boolean }[] = [];
@@ -234,6 +311,13 @@ export class GameSimulation {
     this.controller.setApplyImpulsesToDynamicBodies(false);
     this.propActiveRadius = propActivationRadius(this.config);
 
+    const meshBounds = collision.entities.flatMap((entry) => {
+      const entity = options.manifest.entities.find((candidate) => candidate.id === entry.entityId);
+      const bounds = entity?.kind === "generated-mesh" && entry.shape.kind === "trimesh" ? soupBounds(entry.shape.soup) : null;
+      return bounds ? [bounds] : [];
+    });
+    this.grappleRange = grappleRange(mainObjectHeight(meshBounds, this.scene.bounds));
+
     this.position = this.seat(fromTuple(options.manifest.spawn.position));
     this.previousPosition = copy(this.position);
     this.facingYaw = options.manifest.spawn.headingRadians;
@@ -265,6 +349,65 @@ export class GameSimulation {
   get mantleRejection(): MantleProbeResult["rejection"] {
     return this.lastProbe.rejection;
   }
+
+  get isReeling(): boolean {
+    return this.grapplePhase === "reeling";
+  }
+
+  /** True when a hook press now would fire. */
+  get grappleReady(): boolean {
+    return (
+      this.grapplePhase === "idle" &&
+      this.grappleCooldown <= 0 &&
+      this.mantleElapsed === null &&
+      !this.checkpointState.completed
+    );
+  }
+
+  get grappleView(): GrappleView {
+    const phase = this.grapplePhase;
+    let progress = 0;
+    let tension = 0;
+    if (phase === "flying") {
+      progress = this.grappleFlight > 0 ? clamp(this.grappleElapsed / this.grappleFlight, 0, 1) : 1;
+    } else if (phase === "reeling") {
+      progress = 1;
+      tension = clamp(this.grappleElapsed / ROPE_TENSION_SECONDS, 0, 1);
+    } else if (phase === "missed") {
+      const out = this.grappleFlight;
+      progress = this.grappleElapsed <= out
+        ? clamp(this.grappleElapsed / out, 0, 1)
+        : clamp(1 - (this.grappleElapsed - out) / HOOK_RETRACT_SECONDS, 0, 1);
+    }
+    const target = phase === "missed" ? this.grappleMissPoint : phase === "idle" ? null : this.grappleAnchor?.point ?? null;
+    const normal = phase === "flying" || phase === "reeling" ? this.grappleAnchor?.normal ?? null : null;
+    const bend = phase === "flying" || (phase === "reeling" && this.reelWaypoint !== null)
+      ? this.grappleAnchor?.bend ?? null
+      : null;
+    return {
+      phase,
+      target: target ? copy(target) : null,
+      normal: normal ? copy(normal) : null,
+      bend: bend ? copy(bend) : null,
+      progress,
+      tension,
+      cooldown: this.grappleCooldown,
+      ready: this.grappleReady,
+    };
+  }
+
+  /**
+   * The shot a hook press would fire along `aim` right now, for the reticle.
+   * Read-only: the same query the press itself runs.
+   */
+  previewGrapple(aim: GrappleAim | null | undefined): GrappleAimResult {
+    if (this.disposed) return { anchor: null, rejection: "no-aim", aimPoint: null };
+    return selectGrappleAnchor(this.mantleContext(), this.position, aim, this.grappleRange, this.ropeHitsProp);
+  }
+
+  /** Every installed prop blocks the rope, including those disabled far away. */
+  private readonly ropeHitsProp = (hand: Vec3Like, point: Vec3Like): boolean =>
+    this.propEntries.some((entry) => segmentHitsProp(hand, point, entry.data));
 
   /** Intended control-space horizontal speed. */
   get horizontalSpeed(): number {
@@ -485,6 +628,7 @@ export class GameSimulation {
     if (input.jump) this.pendingJump = true;
     if (input.mantle) this.pendingMantle = true;
     if (input.respawn) this.pendingRespawn = true;
+    if (input.grapple) this.pendingGrapple = true;
 
     const h = this.config.fixedTimestepSeconds;
     this.accumulator += Math.min(Math.max(frameDeltaSeconds, 0), MAX_FRAME_DELTA_SECONDS);
@@ -496,10 +640,12 @@ export class GameSimulation {
         jump: this.pendingJump,
         mantle: this.pendingMantle,
         respawn: this.pendingRespawn,
+        grapple: this.pendingGrapple,
       });
       this.pendingJump = false;
       this.pendingMantle = false;
       this.pendingRespawn = false;
+      this.pendingGrapple = false;
       this.accumulator -= h;
       steps += 1;
     }
@@ -557,6 +703,10 @@ export class GameSimulation {
   private locomotionStep(input: SimulationInput, h: number): void {
     const config = this.config;
 
+    const hook = this.grappleStep(input, h);
+    if (hook === "reeled") return;
+    const jumpPressed = input.jump && hook !== "released-by-jump";
+
     const forwardDir = headingForward(input.cameraYaw);
     const rightDir = headingRight(input.cameraYaw);
     let moveX = forwardDir.x * input.forward + rightDir.x * input.right;
@@ -585,7 +735,7 @@ export class GameSimulation {
     this.velocity.x = approach(this.velocity.x, moveX * config.walkSpeed, accelRate, h);
     this.velocity.z = approach(this.velocity.z, moveZ * config.walkSpeed, accelRate, h);
 
-    if (input.jump) this.jumpBufferTimer = JUMP_BUFFER_SECONDS;
+    if (jumpPressed) this.jumpBufferTimer = JUMP_BUFFER_SECONDS;
 
     const canJump = this.grounded || this.coyoteTimer > 0;
     let jumped = false;
@@ -683,6 +833,263 @@ export class GameSimulation {
     }
   }
 
+  // ---- grappling hook ---------------------------------------------------
+
+  /**
+   * The hook's share of a locomotion step: a press fires it (or lets go while
+   * it is out), a hook in flight bites once it arrives, and while attached the
+   * reel moves the capsule instead of walking. Returns "reeled" when the reel
+   * owned this step, and "released-by-jump" when a jump press was spent
+   * letting go, so it does not also queue a jump.
+   */
+  private grappleStep(input: SimulationInput, h: number): "reeled" | "released-by-jump" | "none" {
+    if (this.grappleCooldown > 0) this.grappleCooldown = Math.max(0, this.grappleCooldown - h);
+
+    if (input.grapple) {
+      if (this.grapplePhase === "flying" || this.grapplePhase === "reeling") {
+        this.releaseGrapple("player");
+        return "none";
+      }
+      if (this.grappleReady) this.fireGrapple(input.aim);
+    }
+
+    switch (this.grapplePhase) {
+      case "flying":
+        this.grappleElapsed += h;
+        if (this.grappleElapsed >= this.grappleFlight) this.attachGrapple();
+        return "none";
+      case "missed":
+        this.grappleElapsed += h;
+        if (this.grappleElapsed >= this.grappleFlight + HOOK_RETRACT_SECONDS) this.clearGrapple();
+        return "none";
+      case "reeling":
+        if (input.jump) {
+          this.releaseGrapple("player");
+          return "released-by-jump";
+        }
+        this.grappleElapsed += h;
+        this.reelStep(h);
+        return "reeled";
+      default:
+        return "none";
+    }
+  }
+
+  private fireGrapple(aim: GrappleAim | null | undefined): void {
+    const shot = selectGrappleAnchor(this.mantleContext(), this.position, aim, this.grappleRange, this.ropeHitsProp);
+    this.grappleElapsed = 0;
+    if (shot.anchor) {
+      this.grapplePhase = "flying";
+      this.grappleAnchor = shot.anchor;
+      this.grappleFlight = hookFlightSeconds(shot.anchor.distance);
+      this.events.push({ type: "grapple-fire", hit: true });
+    } else if (shot.aimPoint) {
+      // Nothing to bite: the hook flies out, snaps back, and the cooldown
+      // runs from the shot so a miss cannot be spammed.
+      this.grapplePhase = "missed";
+      this.grappleMissPoint = shot.aimPoint;
+      this.grappleFlight = hookFlightSeconds(distance(this.position, shot.aimPoint));
+      this.grappleCooldown = GRAPPLE_COOLDOWN_SECONDS;
+      this.events.push({ type: "grapple-fire", hit: false });
+    }
+  }
+
+  private attachGrapple(): void {
+    const anchor = this.grappleAnchor;
+    if (!anchor) {
+      this.clearGrapple();
+      return;
+    }
+    this.grapplePhase = "reeling";
+    this.grappleElapsed = 0;
+    this.reelWaypoint = anchor.waypoint ? copy(anchor.waypoint) : null;
+    const toGoal = sub(this.reelWaypoint ?? anchor.target, this.position);
+    const goalDistance = vecLength(toGoal);
+    // Whatever speed the character already has toward the anchor carries in.
+    this.reelSpeed = goalDistance > 1e-6 ? Math.max(0, dot(this.velocity, toGoal) / goalDistance) : 0;
+    this.reelBest = this.reelRemaining();
+    this.reelStuck = 0;
+    this.coyoteTimer = 0;
+    this.jumpBufferTimer = 0;
+    this.events.push({ type: "grapple-attach", anchor });
+  }
+
+  /** Path length left: to the waypoint (while one is pending), then to the target. */
+  private reelRemaining(): number {
+    const anchor = this.grappleAnchor;
+    if (!anchor) return 0;
+    return this.reelWaypoint
+      ? distance(this.position, this.reelWaypoint) + distance(this.reelWaypoint, anchor.target)
+      : distance(this.position, anchor.target);
+  }
+
+  /**
+   * One reel step through the character controller: steer at a point lofted
+   * above the next goal (the waypoint, then the target), accelerate up to the
+   * reel speed and brake into the arrival. The controller slides the capsule
+   * along whatever it meets and never lets it into geometry; lack of
+   * progress ends the reel.
+   */
+  private reelStep(h: number): void {
+    const anchor = this.grappleAnchor;
+    if (!anchor) {
+      this.clearGrapple();
+      return;
+    }
+    const target = anchor.target;
+    const settle = this.config.characterRadius;
+    // Round the waypoint's corner a little early at speed, so the turn over
+    // the lip is a curve rather than a snap.
+    if (this.reelWaypoint && distance(this.position, this.reelWaypoint) <= Math.max(settle * 2, this.reelSpeed * h * 4)) {
+      this.reelWaypoint = null;
+      this.reelBest = this.reelRemaining();
+      this.reelStuck = 0;
+    }
+    if (!this.reelWaypoint && distance(this.position, target) <= settle) {
+      this.finishReel("arrived");
+      return;
+    }
+
+    // A reel covers ground several times faster than walking, which the
+    // periodic prop refresh is sized for; keep the props around it live.
+    if (this.propEntries.length > 0) this.refreshPropActivation();
+
+    const goal = this.reelWaypoint ?? target;
+    // The first leg is lofted; the leg on from a waypoint is the straight
+    // line that was swept when the hook was aimed.
+    const steer = this.reelWaypoint || !anchor.waypoint ? reelSteerPoint(this.position, goal) : goal;
+    const direction = normalize(sub(steer, this.position));
+    this.reelSpeed = nextReelSpeed(this.reelSpeed, this.reelRemaining(), this.config.walkSpeed, h);
+    const stepLength = Math.min(this.reelSpeed * h, distance(this.position, goal));
+
+    this.controller.computeColliderMovement(
+      this.scene.playerCollider,
+      { x: direction.x * stepLength, y: direction.y * stepLength, z: direction.z * stepLength },
+      this.RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
+    );
+    const movement = this.controller.computedMovement();
+    this.velocity.x = direction.x * this.reelSpeed;
+    this.velocity.y = direction.y * this.reelSpeed;
+    this.velocity.z = direction.z * this.reelSpeed;
+    this.grounded = false;
+    this.applyTranslation({
+      x: this.position.x + movement.x,
+      y: this.position.y + movement.y,
+      z: this.position.z + movement.z,
+    });
+
+    if (Math.hypot(direction.x, direction.z) > 0.05) {
+      const targetYaw = yawOf({ x: direction.x, y: 0, z: direction.z });
+      this.facingYaw += angleDelta(this.facingYaw, targetYaw) * (1 - Math.exp(-AVATAR_TURN_RATE * h));
+    }
+
+    const now = this.reelRemaining();
+    if (now < this.reelBest - 1e-3) {
+      this.reelBest = now;
+      this.reelStuck = 0;
+    } else {
+      this.reelStuck += h;
+    }
+
+    const nearAnchor = distance(this.position, anchor.point) <= REEL_ARRIVE_DISTANCE;
+    if ((!this.reelWaypoint && now <= settle) || (anchor.kind === "wall" && nearAnchor)) {
+      this.finishReel("arrived");
+    } else if (nearAnchor && this.stepCount % MANTLE_PROBE_INTERVAL_STEPS === 0 && this.tryReelMantle()) {
+      // Pulled up beside the lip: the mantle takes it from here.
+    } else if (this.reelStuck >= REEL_STUCK_SECONDS || this.grappleElapsed >= REEL_TIMEOUT_SECONDS) {
+      this.finishReel("blocked");
+    }
+  }
+
+  /** Horizontal direction from the character toward the hook, else its facing. */
+  private towardAnchor(): Vec3Like {
+    const anchor = this.grappleAnchor;
+    if (anchor) {
+      const dx = anchor.point.x - this.position.x;
+      const dz = anchor.point.z - this.position.z;
+      const length = Math.hypot(dx, dz);
+      if (length > 1e-4) return { x: dx / length, y: 0, z: dz / length };
+    }
+    return headingForward(this.facingYaw);
+  }
+
+  /** Ends the reel in a mantle when one is on offer toward the hook. */
+  private tryReelMantle(): boolean {
+    const toward = this.towardAnchor();
+    const probe = probeMantle(this.mantleContext(), this.position, toward);
+    if (!probe.target) return false;
+    this.clearGrapple();
+    this.grappleCooldown = GRAPPLE_COOLDOWN_SECONDS;
+    this.events.push({ type: "grapple-release", reason: "mantle" });
+    this.beginMantle(probe.target, toward);
+    return true;
+  }
+
+  /**
+   * A reel toward a ledge or surface that stalled at the rim: pull the
+   * character over onto its target with the mantle's scripted move, when a
+   * sweep proves the way clear (`pullOverApex`).
+   */
+  private tryPullOver(): boolean {
+    const anchor = this.grappleAnchor;
+    if (!anchor || anchor.kind === "wall") return false;
+    const destination = anchor.target;
+    const apex = pullOverApex(this.mantleContext(), this.position, destination);
+    if (!apex) return false;
+    const halfTotal = this.config.characterHalfHeight + this.config.characterRadius;
+    const feetY = this.position.y - halfTotal;
+    const ledgeTopY = destination.y - halfTotal - MANTLE_LANDING_SKIN;
+    const toward = this.towardAnchor();
+    this.clearGrapple();
+    this.grappleCooldown = GRAPPLE_COOLDOWN_SECONDS;
+    this.events.push({ type: "grapple-release", reason: "mantle" });
+    this.beginMantle(
+      { destination: copy(destination), apex, ledgeTopY, ledgeHeight: ledgeTopY - feetY, faceDistance: 0 },
+      toward,
+    );
+    return true;
+  }
+
+  /**
+   * The reel is over. Standing on the target: stop there. Otherwise mantle
+   * onto the ledge if one is in reach (or pull over onto the target), or stop
+   * and drop with a small hop, nudged toward where the hook was pulling.
+   */
+  private finishReel(reason: "arrived" | "blocked"): void {
+    const anchor = this.grappleAnchor;
+    const onTarget = anchor !== null && anchor.kind !== "wall" && distance(this.position, anchor.target) <= this.config.characterRadius * 2;
+    if (!onTarget && (this.tryReelMantle() || this.tryPullOver())) return;
+    const nudge = anchor && !onTarget ? sub(anchor.target, this.position) : null;
+    const nudgeLength = nudge ? Math.hypot(nudge.x, nudge.z) : 0;
+    const nudgeSpeed = Math.min(REEL_END_NUDGE_SPEED, nudgeLength / REEL_END_NUDGE_SECONDS);
+    this.clearGrapple();
+    this.grappleCooldown = GRAPPLE_COOLDOWN_SECONDS;
+    this.velocity.x = nudge && nudgeLength > 1e-4 ? (nudge.x / nudgeLength) * nudgeSpeed : 0;
+    this.velocity.z = nudge && nudgeLength > 1e-4 ? (nudge.z / nudgeLength) * nudgeSpeed : 0;
+    this.velocity.y = onTarget ? 0 : REEL_END_HOP_SPEED;
+    this.events.push({ type: "grapple-release", reason });
+  }
+
+  /** Lets go. A reel's momentum is kept; gravity takes over from here. */
+  private releaseGrapple(reason: GrappleReleaseReason): void {
+    this.clearGrapple();
+    this.grappleCooldown = GRAPPLE_COOLDOWN_SECONDS;
+    this.events.push({ type: "grapple-release", reason });
+  }
+
+  /** Drops the hook with no event and no cooldown (respawn, restart). */
+  private clearGrapple(): void {
+    this.grapplePhase = "idle";
+    this.grappleAnchor = null;
+    this.grappleMissPoint = null;
+    this.grappleElapsed = 0;
+    this.grappleFlight = 0;
+    this.reelSpeed = 0;
+    this.reelBest = Infinity;
+    this.reelStuck = 0;
+    this.reelWaypoint = null;
+  }
+
   /**
    * When this step's move pressed the capsule nearly head-on into the side of
    * a round prop (`propColliders.ts`), the move made before touching it;
@@ -739,6 +1146,7 @@ export class GameSimulation {
   }
 
   private beginMantle(target: MantleTarget, facingDir: Vec3Like): void {
+    if (this.grapplePhase === "flying" || this.grapplePhase === "reeling") this.releaseGrapple("mantle");
     this.mantleElapsed = 0;
     this.mantleStart = copy(this.position);
     this.mantleActiveTarget = target;
@@ -822,6 +1230,8 @@ export class GameSimulation {
     this.pendingJump = false;
     this.pendingMantle = false;
     this.pendingRespawn = false;
+    this.pendingGrapple = false;
+    this.grappleCooldown = 0;
     this.stepCount = 0;
     this.elapsedSeconds = 0;
   }
@@ -838,6 +1248,11 @@ export class GameSimulation {
     this.mantleElapsed = null;
     this.mantleActiveTarget = null;
     this.lastProbe = { target: null, rejection: null };
+    // A respawn mid-reel drops the hook; nothing carries over to the new pose.
+    if (this.grapplePhase === "flying" || this.grapplePhase === "reeling") {
+      this.events.push({ type: "grapple-release", reason: "cancelled" });
+    }
+    this.clearGrapple();
     this.facingYaw = headingRadians;
     this.previousFacingYaw = headingRadians;
 

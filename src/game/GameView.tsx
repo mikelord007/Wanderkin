@@ -40,6 +40,7 @@ import { useGameAudio } from "../audio/useGameAudio.js";
 import { useBiomeAdventure } from "../biome/useBiomeAdventure.js";
 import { adventureHudCopy } from "../biome/missionCopy.js";
 import { AdventureControls } from "../ui/components/AdventureControls.js";
+import { claimGrappleHint } from "./hud/GrappleReticle.js";
 
 interface Runtime {
   simulation: GameSimulation;
@@ -172,11 +173,14 @@ export const GameView = forwardRef<GameViewHandle, GameViewProps>(function GameV
     () => gameplaySession?.snapshot ?? null,
   );
   const [introVisible, setIntroVisible] = useState(false);
+  const [grappleHintVisible, setGrappleHintVisible] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const objectiveArrowRef = useRef<HTMLDivElement>(null);
   const objectiveDistanceRef = useRef<HTMLSpanElement>(null);
+  const grappleReticleRef = useRef<HTMLDivElement>(null);
+  const grappleHintTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const diagnosticsRef = useRef<GameDiagnostics | null>(null);
   const runningRef = useRef(false);
   const completionHandledRef = useRef(false);
@@ -199,6 +203,7 @@ export const GameView = forwardRef<GameViewHandle, GameViewProps>(function GameV
   useEffect(() => () => {
     if (introTimerRef.current) clearTimeout(introTimerRef.current);
     if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+    for (const timer of grappleHintTimersRef.current) clearTimeout(timer);
   }, []);
 
   useEffect(() => resolvedEventBus.on("fragmentCollected", (event) => {
@@ -451,9 +456,21 @@ export const GameView = forwardRef<GameViewHandle, GameViewProps>(function GameV
       }
       if (event.type === "complete") {
         if (!gameplaySession) finishGameplay(null);
+        return;
+      }
+      if (event.type === "grapple-fire") {
+        setGrappleHintVisible(false);
+        return;
+      }
+      if (event.type === "grapple-attach") {
+        resolvedEventBus.emit({
+          type: "grappleAttached",
+          anchorKind: event.anchor.kind,
+          distance: event.anchor.distance,
+        });
       }
     },
-    [runtime, gameplaySession, syncModeState, finishGameplay],
+    [runtime, gameplaySession, syncModeState, finishGameplay, resolvedEventBus],
   );
 
   const handleGameplayFrame = useCallback((position: Vec3Like) => {
@@ -478,6 +495,14 @@ export const GameView = forwardRef<GameViewHandle, GameViewProps>(function GameV
       introTimerRef.current = setTimeout(() => setIntroVisible(false), 5200);
     }
     gameplaySession?.start();
+    // The hook's hint, once a session, after the movement intro has had its turn.
+    if (claimGrappleHint()) {
+      const showAfter = introTimerRef.current ? 5400 : 900;
+      grappleHintTimersRef.current.push(
+        setTimeout(() => setGrappleHintVisible(true), showAfter),
+        setTimeout(() => setGrappleHintVisible(false), showAfter + 7000),
+      );
+    }
     syncModeState(true);
     setStarted(true);
     setPaused(false);
@@ -634,6 +659,7 @@ export const GameView = forwardRef<GameViewHandle, GameViewProps>(function GameV
             onHudSignals={handleHudSignals}
             objectiveArrowRef={objectiveArrowRef}
             objectiveDistanceRef={objectiveDistanceRef}
+            grappleReticleRef={grappleReticleRef}
             diagnosticsRef={diagnosticsRef}
             style={style}
             atmosphere={resolvedAtmosphere}
@@ -665,6 +691,8 @@ export const GameView = forwardRef<GameViewHandle, GameViewProps>(function GameV
         levelName={manifest.name}
         objectiveArrowRef={objectiveArrowRef}
         objectiveDistanceRef={objectiveDistanceRef}
+        grappleReticleRef={grappleReticleRef}
+        grappleHintVisible={grappleHintVisible}
         onResume={handleResume}
         onRestart={handleRestart}
         onRetry={handleRetry}

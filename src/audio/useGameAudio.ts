@@ -34,7 +34,10 @@ export function useGameAudio(options: {
   return { settings, setSettings, unlock, getDiagnostics, setLookAmbience };
 }
 
-export function handleEvent(engine: Pick<GameAudioEngine, "play">, event: GameplayEvent): void {
+export function handleEvent(
+  engine: Pick<GameAudioEngine, "play"> & Partial<Pick<GameAudioEngine, "playGrappleBite">>,
+  event: GameplayEvent,
+): void {
   switch (event.type) {
     case "fragmentCollected": void engine.play("fragment-pickup"); break;
     case "portalActivated": void engine.play("portal-activate"); break;
@@ -43,6 +46,7 @@ export function handleEvent(engine: Pick<GameAudioEngine, "play">, event: Gamepl
     case "raceStarted": void engine.play("race-start"); break;
     case "raceFinished": void engine.play("race-finish"); break;
     case "worldCompleted": void engine.play("completion"); break;
+    case "grappleAttached": engine.playGrappleBite?.(); break;
     default: break;
   }
 }

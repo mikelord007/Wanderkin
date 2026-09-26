@@ -27,6 +27,7 @@ export interface GameplayEventMap {
     publishedVersionId: string | null;
   };
   introShown: { worldId: string };
+  grappleAttached: { anchorKind: "surface" | "ledge" | "wall"; distance: number };
 }
 
 export type GameplayEvent = {
