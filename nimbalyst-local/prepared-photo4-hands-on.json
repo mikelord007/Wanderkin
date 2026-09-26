@@ -1,0 +1,411 @@
+{
+  "manifest": {
+    "schemaVersion": 1,
+    "levelId": "live-validation-photo4-20260924-hands-on",
+    "name": "The Cozy Corner Color Caper!",
+    "createdAt": "2026-09-24T13:51:13.585Z",
+    "updatedAt": "2026-09-24T13:51:13.585Z",
+    "coordinateConvention": "y-up-right-handed-meters",
+    "calibration": {
+      "assumedExtentMeters": 8
+    },
+    "assets": [
+      {
+        "id": "4c7a5b8a-234a-4fad-bc14-4b8674f08f4d",
+        "url": "/api/assets/files/f0855519fb1314e14703ef91a7778b6992f2f4c80b64910cfe4781e719b0e24c.glb",
+        "sha256": "f0855519fb1314e14703ef91a7778b6992f2f4c80b64910cfe4781e719b0e24c",
+        "sizeBytes": 4680412,
+        "provenance": {
+          "providerId": "livepeer-agent-mcp",
+          "capabilityUsed": "rodin-i3d",
+          "fallbackFired": null,
+          "providerJobId": "mjob_0001ef7f3201",
+          "registeredModel": "fal-ai/hyper3d/rodin/v2.5",
+          "sourcePhotoOrder": [
+            1
+          ],
+          "generatedAt": "2026-09-24T12:34:47.564Z"
+        }
+      }
+    ],
+    "photos": [
+      {
+        "id": "632f0492-579a-46ff-8436-b7649035fd98",
+        "url": "/api/photos/files/632f0492-579a-46ff-8436-b7649035fd98.jpg",
+        "order": 1,
+        "label": "Reviewed representative source photo 4"
+      }
+    ],
+    "entities": [
+      {
+        "id": "live-validation-photo4-20260924-hands-on-mesh",
+        "kind": "generated-mesh",
+        "assetId": "4c7a5b8a-234a-4fad-bc14-4b8674f08f4d",
+        "transform": {
+          "position": [
+            -0.01312794136920159,
+            1.6476762094319264,
+            0.017123291995183032
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            4.23656051370381,
+            4.23656051370381,
+            4.23656051370381
+          ]
+        },
+        "collider": {
+          "kind": "triangle-mesh"
+        }
+      },
+      {
+        "id": "helper-floor",
+        "kind": "floor",
+        "transform": {
+          "position": [
+            0,
+            -0.2,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "dimensions": [
+          14.531762936469075,
+          0.4,
+          9.506993883744943
+        ],
+        "collider": {
+          "kind": "box",
+          "halfExtents": [
+            7.265881468234538,
+            0.2,
+            4.753496941872472
+          ]
+        },
+        "addedBy": "game"
+      }
+    ],
+    "spawn": {
+      "position": [
+        4.434118461608886,
+        0.3700000029802323,
+        -3.493497123718262
+      ],
+      "headingRadians": -1.3439974787410107
+    },
+    "checkpoints": [
+      {
+        "id": "checkpoint-1",
+        "order": 0,
+        "position": [
+          -0.2458815383911137,
+          0.3700000029802323,
+          -2.413497123718262
+        ],
+        "triggerRadius": 0.396,
+        "safeRespawn": {
+          "position": [
+            -0.2458815383911137,
+            0.3700000029802323,
+            -2.413497123718262
+          ],
+          "headingRadians": 1.7975951748487826
+        }
+      },
+      {
+        "id": "checkpoint-2",
+        "order": 1,
+        "position": [
+          -4.565881538391114,
+          0.3700000029802323,
+          -4.213497123718262
+        ],
+        "triggerRadius": 0.396,
+        "safeRespawn": {
+          "position": [
+            -4.565881538391114,
+            0.3700000029802323,
+            -4.213497123718262
+          ],
+          "headingRadians": 1.1760052070951352
+        }
+      },
+      {
+        "id": "checkpoint-3",
+        "order": 2,
+        "position": [
+          0.11411846160888661,
+          0.3700000029802323,
+          2.266502876281738
+        ],
+        "triggerRadius": 0.396,
+        "safeRespawn": {
+          "position": [
+            0.11411846160888661,
+            0.3700000029802323,
+            2.266502876281738
+          ],
+          "headingRadians": -2.516107613350564
+        }
+      },
+      {
+        "id": "checkpoint-4",
+        "order": 3,
+        "position": [
+          -6.725881538391113,
+          0.3700000029802323,
+          4.426502876281738
+        ],
+        "triggerRadius": 0.396,
+        "safeRespawn": {
+          "position": [
+            -6.725881538391113,
+            0.3700000029802323,
+            4.426502876281738
+          ],
+          "headingRadians": 1.876675198199749
+        }
+      },
+      {
+        "id": "checkpoint-5",
+        "order": 4,
+        "position": [
+          6.954118461608886,
+          0.3700000029802323,
+          4.426502876281738
+        ],
+        "triggerRadius": 0.396,
+        "safeRespawn": {
+          "position": [
+            6.954118461608886,
+            0.3700000029802323,
+            4.426502876281738
+          ],
+          "headingRadians": -1.5707963267948966
+        }
+      }
+    ],
+    "seed": "live-validation-photo4-20260924-hands-on-v1",
+    "movementConfigId": "default-v1",
+    "courseValidation": {
+      "status": "validated",
+      "method": "conservative-kinematic-v1 (safety factor 0.7, swept 0.36×0.70 m box clearance, ballistic jump model from 0.6 m jump height at 2.2 m/s)",
+      "checkedAt": "2026-09-24T13:51:13.772Z",
+      "evidence": "4 segment(s): 67 walk, 0 jump, 0 mantle transitions; 73 clearance sweeps, 1 transitions rejected by clearance, 1 re-plans.",
+      "uncertaintyNotes": "Checked against a kinematic model of the movement config, not the live Rapier controller. It sweeps an axis-aligned box larger than the capsule, so it can refuse a passage the controller could make; it does not model air control, sliding, momentum, or contact friction. A pass means 'no violation found under a conservative model', not 'played to completion'."
+    },
+    "experience": {
+      "schemaVersion": 1,
+      "style": {
+        "id": "cartoon",
+        "definitionVersion": 1,
+        "atmosphere": "A welcoming miniature room-corner island.",
+        "approvedPreviewAssetId": "4372d056-ec44-49a9-a374-31cfec00f2c7"
+      },
+      "mode": {
+        "kind": "collect",
+        "requiredCollectibleIds": [
+          "fragment-red",
+          "fragment-yellow",
+          "fragment-blue"
+        ],
+        "requiredCount": 3,
+        "finishPortalId": "finish-portal",
+        "restorationSteps": [
+          0.3333333333333333,
+          0.6666666666666666,
+          1
+        ]
+      },
+      "quest": {
+        "schemaVersion": 1,
+        "title": "The Cozy Corner Color Caper!",
+        "intro": "Welcome, tiny explorer! Our friendly room corner has lost all its wonderful colors! They've scattered like dandelion fluff in the wind. Can you help us find them all?",
+        "objective": "Discover every lost color piece, then step into the shimmering portal!",
+        "narrationScript": "Oh dear, the colors have gone astray! Let's help them find their way back home. Gather all the twinkling pieces, then the magic portal will whisk you away!"
+      },
+      "collectibles": [
+        {
+          "id": "fragment-red",
+          "kind": "color-fragment",
+          "transform": {
+            "position": [
+              -0.2458815383911137,
+              0.7075000029802323,
+              -2.413497123718262
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "scale": [
+              0.22,
+              0.22,
+              0.22
+            ]
+          },
+          "triggerRadius": 0.45,
+          "color": "#FF4D6D",
+          "order": 0,
+          "restorationAmount": 0.3333333333
+        },
+        {
+          "id": "fragment-yellow",
+          "kind": "color-fragment",
+          "transform": {
+            "position": [
+              -4.565881538391114,
+              0.7075000029802323,
+              -4.213497123718262
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "scale": [
+              0.22,
+              0.22,
+              0.22
+            ]
+          },
+          "triggerRadius": 0.45,
+          "color": "#FFD93D",
+          "order": 1,
+          "restorationAmount": 0.3333333333
+        },
+        {
+          "id": "fragment-blue",
+          "kind": "color-fragment",
+          "transform": {
+            "position": [
+              0.11411846160888661,
+              0.7075000029802323,
+              2.266502876281738
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "scale": [
+              0.22,
+              0.22,
+              0.22
+            ]
+          },
+          "triggerRadius": 0.45,
+          "color": "#4D96FF",
+          "order": 2,
+          "restorationAmount": 0.3333333334
+        }
+      ],
+      "finishPortal": {
+        "id": "finish-portal",
+        "kind": "finish-portal",
+        "transform": {
+          "position": [
+            -6.725881538391113,
+            0.7200000029802323,
+            4.426502876281738
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.8,
+            1.2,
+            0.25
+          ]
+        },
+        "triggerRadius": 0.75,
+        "activation": "all-required-collectibles",
+        "inactiveColor": "#6D6780",
+        "activeColor": "#9B5DE5"
+      },
+      "initialColorRestoration": 0
+    },
+    "media": {
+      "audio": [],
+      "video": []
+    },
+    "workflow": {
+      "schemaVersion": 1,
+      "reviewedImageAssetId": "e4bd9b09-4912-44e8-9b71-6f2a6ff6f2c0",
+      "selectedReference": {
+        "photoIds": [
+          "632f0492-579a-46ff-8436-b7649035fd98"
+        ],
+        "reviewedImageAssetId": "e4bd9b09-4912-44e8-9b71-6f2a6ff6f2c0",
+        "approvedPreviewAssetId": "4372d056-ec44-49a9-a374-31cfec00f2c7",
+        "style": "cartoon",
+        "mode": "collect",
+        "atmosphere": "A welcoming miniature room-corner island."
+      },
+      "jobs": [
+        {
+          "kind": "image-edit",
+          "jobId": "job_737935e2-c54b-4c18-a6a6-782a7a4c69c8",
+          "status": "ready",
+          "providerJobId": "mjob_a2426904c928",
+          "updatedAt": "2026-09-24T11:57:46.373Z",
+          "consumedByAssetId": "e4bd9b09-4912-44e8-9b71-6f2a6ff6f2c0"
+        },
+        {
+          "kind": "image-edit",
+          "jobId": "job_ef2fde65-65e2-4d16-b8df-e75d53c93d85",
+          "status": "ready",
+          "providerJobId": "mjob_d3d1797a1657",
+          "updatedAt": "2026-09-24T12:30:53.706Z",
+          "consumedByAssetId": "4372d056-ec44-49a9-a374-31cfec00f2c7"
+        },
+        {
+          "kind": "image-edit",
+          "jobId": "job_f9bcf342-6254-4b38-9fa0-d32c797cb89f",
+          "status": "ready",
+          "providerJobId": "mjob_4a0b2bde417b",
+          "updatedAt": "2026-09-24T12:32:14.988Z",
+          "consumedByAssetId": "12b090df-d46d-4e28-a2e5-da1648c81f67"
+        },
+        {
+          "kind": "image-to-3d",
+          "jobId": "job_662f0c8a-52f1-4e33-adad-fcff355e014d",
+          "status": "ready",
+          "providerJobId": "mjob_0001ef7f3201",
+          "updatedAt": "2026-09-24T12:34:47.570Z",
+          "consumedByAssetId": "4c7a5b8a-234a-4fad-bc14-4b8674f08f4d"
+        },
+        {
+          "kind": "text",
+          "jobId": "job_8df572b8-0ded-4e8b-b524-c3361698a1ca",
+          "status": "ready",
+          "providerJobId": "mjob_13e739e8d5af",
+          "updatedAt": "2026-09-24T13:22:01.269Z"
+        }
+      ]
+    }
+  },
+  "placementIssues": []
+}

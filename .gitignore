@@ -12,3 +12,11 @@ test-results/*
 test-results/live-validation/*
 !test-results/live-validation/cutout-chrome.png
 playwright-report/
+
+# Local agent scratch: screenshots, debug audio, worker harnesses, editor state
+.nimbalyst/
+nimbalyst-local/audio-debug/
+nimbalyst-local/env-upgrade/
+nimbalyst-local/screenshots/
+nimbalyst-local/design/shots/
+nimbalyst-local/tmp-*/
