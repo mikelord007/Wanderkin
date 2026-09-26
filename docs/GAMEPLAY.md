@@ -16,7 +16,10 @@ difference is in their manifest data.
 | Mouse | Look (third-person orbit; requires pointer lock) |
 | `Space` | Jump |
 | `E` | Contextual mantle, when the prompt is showing |
-| `F` / right mouse | Fire the grappling hook at the reticle; press again (or `Space`) to let go |
+| Hold right mouse / hold `F` | Aim the grappling hook over the shoulder; release to fire onto the anchor under the reticle (or cancel if there is none) |
+| Tap right mouse / tap `F` | Fire the hook straight away at the centre dot |
+| `Space` / `Esc` while aiming | Cancel the aim |
+| Right mouse / `F` / `Space` while hooked | Let go |
 | `R` | Return to the last activated checkpoint |
 | `Esc` | Pause and release the mouse |
 
@@ -211,6 +214,25 @@ to where the reticle points, Just Cause style. It is a player ability in
 every world, look and mode. It adds nothing to the manifest and does not
 touch the editor.
 
+**Aim mode.** The chase camera keeps the explorer at screen centre, where
+the reticle is. So holding right mouse (or `F`) for longer than 150 ms
+enters aim mode. Over about 180 ms the camera eases to an over-the-shoulder
+frame: the look-at point slides two explorer heights (0.35 m) to the
+camera's right, rises 0.6 heights, and the field of view closes by 6°.
+The explorer ends up in the lower-left third, clear of the centre
+reticle. The slide goes left instead when the camera's collision ball,
+swept sideways, finds the right side blocked. Props are ignored, as they
+are by the boom. The boom then sweeps from the shifted point with the
+usual collision rules. Releasing fires only if the reticle is on a valid
+anchor; otherwise it cancels, with no whiff and no cooldown. A tap under
+150 ms fires straight away, as before. `Space` or `Esc` while holding
+cancels. The frame holds through the throw and the reel, so the rope is
+seen from the side, then eases back over about 250 ms. Under
+`prefers-reduced-motion` the frame cuts instead of easing, with no zoom.
+Outside aim mode the reticle is only a faint dot. In aim mode it shows
+the full valid/invalid state, plus "Too far" over a surface out of
+range.
+
 **Aim.** A small reticle sits at screen centre. A ray from the camera
 through it looks for an anchor within `2.5 ×` the main object's height,
 and never less than 1 m (`grappleRange`). The height is taken from the
@@ -271,15 +293,26 @@ shake on the bite. Under `prefers-reduced-motion` both are dropped, the
 puff fades in place, and the mechanic is unchanged. A two-line hint
 ("Aim at a ledge, / press F to hook") shows once per browser session,
 after the movement intro, under `objectquest:intro:grapple-hook` in
-`sessionStorage`.
+`sessionStorage`. The hint reads "Hold right-click to aim, / release to
+hook (or hold F)".
+
+**Seeing the throw.** The explorer's body and contour write a stencil
+mark on their visible pixels. A second, depth-free pass of the rope and
+hook draws only on those pixels. Where the rope crosses the explorer it
+reads on top, with no depth fight, yet it still never shows through
+walls. The renderer is created with a stencil buffer for this. The bite
+puff is 1.35× its first size.
 
 **Touch.** There are no touch controls yet (see the limitations below).
 `InputController.fireGrapple()` is the single entry point for a future
 on-screen button.
 
 Diagnostics expose `grapple.{phase, ready, range, aimAnchor, aimRejection,
-aimPoint, target, tension, fov, lastRelease}`. Tuning constants live at
-the top of `src/game/core/grapple.ts` and `src/game/render/grappleVisuals.ts`.
+aimPoint, target, tension, fov, lastRelease, aiming, aimBlend, shoulder,
+playerScreen}` (`playerScreen` is the explorer's centre in -1..1 screen
+space). Tuning constants live at the top of `src/game/core/grapple.ts`,
+`src/game/render/grappleVisuals.ts`, `src/game/render/aimFraming.ts` and
+`src/game/input/aimState.ts`.
 
 ## Checkpoints, respawn and completion
 

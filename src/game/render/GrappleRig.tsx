@@ -17,10 +17,33 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "rea
 import * as THREE from "three";
 import type { GrappleView } from "../core/simulation.js";
 import { PALETTE } from "./character/characterDesign.js";
+import { CHARACTER_STENCIL_REF } from "./character/buildCharacter.js";
 import { hookPosition, ropePoints, ropeSag } from "./grappleVisuals.js";
 
 const ROPE_SEGMENTS = 14;
 const PUFF_BITS = 7;
+/** The bite puff, relative to its first size: a touch bigger so the throw reads. */
+const PUFF_SCALE = 1.35;
+/** Overlay passes draw after the explorer, whose stencil they test. */
+const OVERLAY_RENDER_ORDER = 10;
+
+/**
+ * A copy of `material` that ignores depth but only draws on pixels the
+ * explorer marked in the stencil buffer: the rope and hook stay visible where
+ * they cross in front of or behind the explorer, and nowhere else.
+ */
+function overExplorer<T extends THREE.Material>(material: T): T {
+  const overlay = material.clone() as T;
+  overlay.depthTest = false;
+  overlay.depthWrite = false;
+  overlay.stencilWrite = true;
+  overlay.stencilRef = CHARACTER_STENCIL_REF;
+  overlay.stencilFunc = THREE.EqualStencilFunc;
+  overlay.stencilFail = THREE.KeepStencilOp;
+  overlay.stencilZFail = THREE.KeepStencilOp;
+  overlay.stencilZPass = THREE.KeepStencilOp;
+  return overlay;
+}
 const PUFF_SECONDS = 0.35;
 const PUFF_REDUCED_SECONDS = 0.2;
 
@@ -47,7 +70,9 @@ const CLAW_TURNS: readonly THREE.Quaternion[] = [0, 1, 2].map((i) => {
 
 export const GrappleRig = forwardRef<GrappleRigHandle, { bodyHeight: number }>(function GrappleRig({ bodyHeight }, ref) {
   const hookGroup = useRef<THREE.Group>(null);
+  const hookOverlay = useRef<THREE.Group>(null);
   const rope = useRef<THREE.InstancedMesh>(null);
+  const ropeOverlay = useRef<THREE.InstancedMesh>(null);
   const puff = useRef<THREE.InstancedMesh>(null);
 
   const parts = useMemo(() => {
@@ -62,10 +87,20 @@ export const GrappleRig = forwardRef<GrappleRigHandle, { bodyHeight: number }>(f
       collarMaterial: new THREE.MeshStandardMaterial({ color: PALETTE.suit, roughness: 0.55 }),
       clawGeometry: new THREE.ConeGeometry(size * 0.035, size * 0.12, 6),
       clawMaterial: new THREE.MeshStandardMaterial({ color: PALETTE.cap, roughness: 0.45, metalness: 0.15 }),
-      puffGeometry: new THREE.IcosahedronGeometry(size * 0.05, 0),
+      puffGeometry: new THREE.IcosahedronGeometry(size * 0.05 * PUFF_SCALE, 0),
       puffMaterial: new THREE.MeshBasicMaterial({ color: "#fff6e8", transparent: true, depthWrite: false }),
     };
   }, [bodyHeight]);
+  const overlays = useMemo(() => ({
+    rope: overExplorer(parts.ropeMaterial),
+    shank: overExplorer(parts.shankMaterial),
+    collar: overExplorer(parts.collarMaterial),
+    claw: overExplorer(parts.clawMaterial),
+  }), [parts]);
+
+  useEffect(() => () => {
+    for (const value of Object.values(overlays)) value.dispose();
+  }, [overlays]);
 
   useEffect(() => () => {
     for (const value of Object.values(parts)) value.dispose();
@@ -93,6 +128,12 @@ export const GrappleRig = forwardRef<GrappleRigHandle, { bodyHeight: number }>(f
       if (!group || !ropeMesh || !puffMesh) return;
 
       const hook = hookPosition(hand, view);
+      const overlayGroup = hookOverlay.current;
+      const overlayRope = ropeOverlay.current;
+      if (overlayRope && overlayRope.instanceMatrix !== ropeMesh.instanceMatrix) {
+        // One set of segment matrices drives both passes.
+        overlayRope.instanceMatrix = ropeMesh.instanceMatrix;
+      }
       if (!hook) {
         group.visible = false;
         ropeMesh.visible = false;
@@ -128,6 +169,12 @@ export const GrappleRig = forwardRef<GrappleRigHandle, { bodyHeight: number }>(f
         }
         ropeMesh.instanceMatrix.needsUpdate = true;
       }
+      if (overlayGroup) {
+        overlayGroup.visible = group.visible;
+        overlayGroup.position.copy(group.position);
+        overlayGroup.quaternion.copy(group.quaternion);
+      }
+      if (overlayRope) overlayRope.visible = ropeMesh.visible;
 
       // Puff: a ring of bits blooming off the surface where the hook bit.
       if (view.phase === "reeling" && scratch.previousPhase === "flying" && view.target) {
@@ -159,26 +206,36 @@ export const GrappleRig = forwardRef<GrappleRigHandle, { bodyHeight: number }>(f
         puffMesh.visible = false;
       }
     },
-  }), [scratch, parts, bodyHeight]);
+  }), [scratch, parts, overlays, bodyHeight]);
 
   const claw = bodyHeight * 0.06;
+  const hookParts = (overlay: boolean) => (
+    <>
+      <mesh geometry={parts.shankGeometry} material={overlay ? overlays.shank : parts.shankMaterial}
+        castShadow={!overlay} renderOrder={overlay ? OVERLAY_RENDER_ORDER : 0} />
+      <mesh geometry={parts.collarGeometry} material={overlay ? overlays.collar : parts.collarMaterial}
+        renderOrder={overlay ? OVERLAY_RENDER_ORDER : 0}
+        position={[0, -bodyHeight * 0.09, 0]} rotation={[Math.PI / 2, 0, 0]} />
+      {CLAW_TURNS.map((turn, i) => {
+        const angle = (i / CLAW_TURNS.length) * Math.PI * 2;
+        return (
+          <mesh key={i} geometry={parts.clawGeometry} material={overlay ? overlays.claw : parts.clawMaterial}
+            castShadow={!overlay} renderOrder={overlay ? OVERLAY_RENDER_ORDER : 0}
+            position={[Math.cos(angle) * claw, bodyHeight * 0.07, Math.sin(angle) * claw]}
+            quaternion={turn} />
+        );
+      })}
+    </>
+  );
   return (
     <>
-      <group ref={hookGroup} visible={false}>
-        <mesh geometry={parts.shankGeometry} material={parts.shankMaterial} castShadow />
-        <mesh geometry={parts.collarGeometry} material={parts.collarMaterial}
-          position={[0, -bodyHeight * 0.09, 0]} rotation={[Math.PI / 2, 0, 0]} />
-        {CLAW_TURNS.map((turn, i) => {
-          const angle = (i / CLAW_TURNS.length) * Math.PI * 2;
-          return (
-            <mesh key={i} geometry={parts.clawGeometry} material={parts.clawMaterial} castShadow
-              position={[Math.cos(angle) * claw, bodyHeight * 0.07, Math.sin(angle) * claw]}
-              quaternion={turn} />
-          );
-        })}
-      </group>
+      <group ref={hookGroup} visible={false}>{hookParts(false)}</group>
+      {/* The same hook and rope again, drawn only over the explorer's pixels. */}
+      <group ref={hookOverlay} visible={false}>{hookParts(true)}</group>
       <instancedMesh ref={rope} args={[parts.ropeGeometry, parts.ropeMaterial, ROPE_SEGMENTS]}
         visible={false} frustumCulled={false} castShadow />
+      <instancedMesh ref={ropeOverlay} args={[parts.ropeGeometry, overlays.rope, ROPE_SEGMENTS]}
+        visible={false} frustumCulled={false} renderOrder={OVERLAY_RENDER_ORDER} />
       <instancedMesh ref={puff} args={[parts.puffGeometry, parts.puffMaterial, PUFF_BITS]}
         visible={false} frustumCulled={false} renderOrder={2} />
     </>

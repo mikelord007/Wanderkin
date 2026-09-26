@@ -65,22 +65,51 @@ describe("InputController", () => {
     expect(events).toEqual(["mute", "capture"]);
   });
 
-  it("latches the grappling hook on F or fireGrapple() for exactly one consume", () => {
+  it("fires the hook on a quick tap of F, and holding aims until release", () => {
+    let now = 0;
     const controller = new InputController(CONFIG, 0, {
       onPauseRequested: () => undefined,
       onPointerLockChange: () => undefined,
-    });
+    }, () => now);
     const internals = controller as unknown as {
-      handleKeyDown: (event: { code: string; repeat?: boolean }) => void;
+      handleKeyDown: (event: { code: string; repeat?: boolean; preventDefault?: () => void }) => void;
+      handleKeyUp: (event: { code: string }) => void;
     };
 
+    // Tap: fires on release, may whiff.
     internals.handleKeyDown({ code: "KeyF" });
-    expect(controller.consume().grapple).toBe(true);
+    expect(controller.consume().grapple).toBe(false);
+    now = 0.08;
+    internals.handleKeyUp({ code: "KeyF" });
+    expect(controller.aiming).toBe(false);
+    expect(controller.consume()).toMatchObject({ grapple: true, grappleRequireAnchor: false });
     expect(controller.consume().grapple).toBe(false);
 
-    // Holding F does not re-fire.
+    // Hold: aims, and the release fires only onto an anchor.
+    now = 1;
+    internals.handleKeyDown({ code: "KeyF" });
     internals.handleKeyDown({ code: "KeyF", repeat: true });
-    expect(controller.consume().grapple).toBe(false);
+    now = 1.4;
+    expect(controller.aiming).toBe(true);
+    internals.handleKeyUp({ code: "KeyF" });
+    expect(controller.aiming).toBe(false);
+    expect(controller.consume()).toMatchObject({ grapple: true, grappleRequireAnchor: true });
+
+    // Space while aiming cancels the aim and does not jump.
+    now = 2;
+    internals.handleKeyDown({ code: "KeyF" });
+    now = 2.5;
+    internals.handleKeyDown({ code: "Space", preventDefault: () => undefined });
+    expect(controller.aiming).toBe(false);
+    internals.handleKeyUp({ code: "KeyF" });
+    expect(controller.consume()).toMatchObject({ grapple: false, jump: false });
+
+    // While the hook is out, a press lets go at once instead of aiming.
+    controller.setGrappleOut(true);
+    internals.handleKeyDown({ code: "KeyF" });
+    expect(controller.aiming).toBe(false);
+    expect(controller.consume()).toMatchObject({ grapple: true, grappleRequireAnchor: false });
+    controller.setGrappleOut(false);
 
     controller.fireGrapple();
     expect(controller.consume().grapple).toBe(true);

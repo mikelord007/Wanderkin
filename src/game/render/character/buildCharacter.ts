@@ -33,6 +33,23 @@ export interface CharacterModel {
   dispose(): void;
 }
 
+/**
+ * Stencil value the explorer's body and contour write wherever they are
+ * visible. The grappling rope and hook draw an overlay pass only on these
+ * pixels, so they read on top of the explorer without showing through walls
+ * (`GrappleRig.tsx`). Harmless where the renderer has no stencil buffer.
+ */
+export const CHARACTER_STENCIL_REF = 1;
+
+/** Marks the material's visible pixels with {@link CHARACTER_STENCIL_REF}. */
+function writesCharacterStencil<T extends THREE.Material>(material: T): T {
+  material.stencilWrite = true;
+  material.stencilRef = CHARACTER_STENCIL_REF;
+  material.stencilFunc = THREE.AlwaysStencilFunc;
+  material.stencilZPass = THREE.ReplaceStencilOp;
+  return material;
+}
+
 function restOf(name: string): readonly [number, number, number] {
   const bone = BONES.find((entry) => entry.name === name);
   if (!bone) throw new Error(`Unknown character bone "${name}".`);
@@ -44,12 +61,12 @@ export function buildCharacter(options: { outline?: boolean } = {}): CharacterMo
   const data = buildCharacterMeshData(rig.boneNames);
 
   const faceTexture = createFaceTexture();
-  const bodyMaterial = new THREE.MeshStandardMaterial({
+  const bodyMaterial = writesCharacterStencil(new THREE.MeshStandardMaterial({
     vertexColors: true,
     roughness: 0.62,
     metalness: 0.02,
     ...(faceTexture ? { map: faceTexture } : {}),
-  });
+  }));
 
   const body = new THREE.SkinnedMesh(toBufferGeometry(data), bodyMaterial);
   body.castShadow = true;
@@ -64,10 +81,10 @@ export function buildCharacter(options: { outline?: boolean } = {}): CharacterMo
   group.add(body);
   body.bind(rig.skeleton, new THREE.Matrix4());
 
-  const outlineMaterial = new THREE.MeshBasicMaterial({
+  const outlineMaterial = writesCharacterStencil(new THREE.MeshBasicMaterial({
     color: OUTLINE_COLOUR,
     side: THREE.BackSide,
-  });
+  }));
   const outline = new THREE.SkinnedMesh(
     toOutlineGeometry(data, OUTLINE_THICKNESS),
     outlineMaterial,

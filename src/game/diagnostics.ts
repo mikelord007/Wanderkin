@@ -46,6 +46,14 @@ export interface GameDiagnostics {
     readonly fov: number;
     /** Why the hook last let go (player, arrived, mantle, blocked, cancelled). */
     readonly lastRelease: string | null;
+    /** Holding the hook button past a tap: the over-the-shoulder aim is on. */
+    readonly aiming: boolean;
+    /** 0 chase frame .. 1 aim frame. */
+    readonly aimBlend: number;
+    /** +1 right shoulder, -1 left. */
+    readonly shoulder: number;
+    /** The explorer's centre in normalised screen space (-1..1). */
+    readonly playerScreen: readonly [number, number];
   };
   readonly groundHeightBelow: number | null;
   readonly cameraYaw: number;

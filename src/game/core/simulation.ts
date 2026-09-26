@@ -128,6 +128,8 @@ export interface SimulationInput {
   respawn: boolean;
   /** Edge: fire the grappling hook, or let go of it while it is out. */
   grapple?: boolean;
+  /** The shot ends a held aim: fire only onto a valid anchor, never whiff. */
+  grappleRequireAnchor?: boolean;
   /** The camera ray through the reticle, which the hook is fired along. */
   aim?: GrappleAim | null;
   /** Camera yaw in radians, measured around +Y from +Z. */
@@ -258,6 +260,7 @@ export class GameSimulation {
   private pendingMantle = false;
   private pendingRespawn = false;
   private pendingGrapple = false;
+  private pendingGrappleRequireAnchor = false;
 
   private measuredSpeed = 0;
   private propEntries: { collider: RapierCollider; data: PropCollider; enabled: boolean }[] = [];
@@ -628,7 +631,10 @@ export class GameSimulation {
     if (input.jump) this.pendingJump = true;
     if (input.mantle) this.pendingMantle = true;
     if (input.respawn) this.pendingRespawn = true;
-    if (input.grapple) this.pendingGrapple = true;
+    if (input.grapple) {
+      this.pendingGrapple = true;
+      this.pendingGrappleRequireAnchor = input.grappleRequireAnchor === true;
+    }
 
     const h = this.config.fixedTimestepSeconds;
     this.accumulator += Math.min(Math.max(frameDeltaSeconds, 0), MAX_FRAME_DELTA_SECONDS);
@@ -641,11 +647,13 @@ export class GameSimulation {
         mantle: this.pendingMantle,
         respawn: this.pendingRespawn,
         grapple: this.pendingGrapple,
+        grappleRequireAnchor: this.pendingGrappleRequireAnchor,
       });
       this.pendingJump = false;
       this.pendingMantle = false;
       this.pendingRespawn = false;
       this.pendingGrapple = false;
+      this.pendingGrappleRequireAnchor = false;
       this.accumulator -= h;
       steps += 1;
     }
@@ -850,7 +858,7 @@ export class GameSimulation {
         this.releaseGrapple("player");
         return "none";
       }
-      if (this.grappleReady) this.fireGrapple(input.aim);
+      if (this.grappleReady) this.fireGrapple(input.aim, input.grappleRequireAnchor === true);
     }
 
     switch (this.grapplePhase) {
@@ -875,8 +883,10 @@ export class GameSimulation {
     }
   }
 
-  private fireGrapple(aim: GrappleAim | null | undefined): void {
+  private fireGrapple(aim: GrappleAim | null | undefined, requireAnchor = false): void {
     const shot = selectGrappleAnchor(this.mantleContext(), this.position, aim, this.grappleRange, this.ropeHitsProp);
+    // Releasing a held aim over nothing cancels it: no whiff, no cooldown.
+    if (!shot.anchor && requireAnchor) return;
     this.grappleElapsed = 0;
     if (shot.anchor) {
       this.grapplePhase = "flying";

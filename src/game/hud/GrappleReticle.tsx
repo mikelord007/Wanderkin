@@ -2,17 +2,22 @@
  * The grappling hook's HUD: a reticle at screen centre and a one-time hint.
  *
  * The reticle's state is written straight to its `data-state` by the stage's
- * frame loop (`hidden`, `open`, `locked`, `busy`), so aiming never re-renders
- * React. Its own stylesheet keeps the hook's HUD apart from `hud.css`.
+ * frame loop, so aiming never re-renders React: a faint `dot` in normal play,
+ * and while the hook button is held the full reticle — `locked` over an
+ * anchor, `far` over a surface out of range, `open` over nothing, `busy`
+ * while the hook is out. Its own stylesheet keeps it apart from `hud.css`.
  */
 
 import type { RefObject } from "react";
 import "./grapple.css";
 
 export const GRAPPLE_HINT_COPY = {
-  title: "Aim at a ledge,",
-  body: "press F to hook",
+  title: "Hold right-click to aim,",
+  body: "release to hook (or hold F)",
 } as const;
+
+/** Shown under the reticle while aiming at a surface beyond the hook's reach. */
+export const GRAPPLE_OUT_OF_RANGE_COPY = "Too far";
 
 /** Session key for the hint, beside the world intros' `objectquest:intro:*`. */
 export const GRAPPLE_HINT_KEY = "objectquest:intro:grapple-hook";
@@ -62,6 +67,7 @@ export function GrappleReticle({ reticleRef }: { reticleRef: RefObject<HTMLDivEl
         </g>
         <circle cx="16" cy="16" r="1.6" className="oq-grapple-reticle__dot" />
       </svg>
+      <span className="oq-grapple-reticle__range">{GRAPPLE_OUT_OF_RANGE_COPY}</span>
     </div>
   );
 }
@@ -69,7 +75,14 @@ export function GrappleReticle({ reticleRef }: { reticleRef: RefObject<HTMLDivEl
 export function GrappleHint() {
   return (
     <div className="oq-grapple-hint" role="status">
-      <span className="oq-grapple-hint__key" aria-hidden="true">F</span>
+      {/* A mouse with its right button lit: "hold right-click". */}
+      <span className="oq-grapple-hint__key" aria-hidden="true">
+        <svg viewBox="0 0 16 20" width="14" height="18">
+          <rect x="1.5" y="1.5" width="13" height="17" rx="6.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+          <path d="M8 1.5 V8" stroke="currentColor" strokeWidth="1.6" />
+          <path d="M8.8 2.3 A6 6 0 0 1 13.7 8 H8.8 Z" fill="currentColor" />
+        </svg>
+      </span>
       <strong>{GRAPPLE_HINT_COPY.title}</strong>
       <span>{GRAPPLE_HINT_COPY.body}</span>
     </div>

@@ -343,6 +343,23 @@ describe("grapple state machine", () => {
     }
   });
 
+  it("releasing a held aim over nothing cancels: no whiff, no cooldown", async () => {
+    const sim = await world();
+    try {
+      const sky = aimAt(sim, { x: 1, y: 30, z: 0 });
+      sim.stepFixed({ ...NEUTRAL_INPUT, grapple: true, grappleRequireAnchor: true, aim: sky });
+      expect(sim.drainEvents().some((event) => event.type === "grapple-fire")).toBe(false);
+      expect(sim.grappleView.phase).toBe("idle");
+      expect(sim.grappleReady).toBe(true);
+
+      // The same release over a valid anchor fires.
+      sim.stepFixed({ ...NEUTRAL_INPUT, grapple: true, grappleRequireAnchor: true, aim: aimAt(sim, { x: BLOCK_FACE_X + 0.5, y: BLOCK_TOP, z: 0 }) });
+      expect(sim.drainEvents()).toContainEqual({ type: "grapple-fire", hit: true });
+    } finally {
+      sim.dispose();
+    }
+  });
+
   it("cannot fire while mantling", async () => {
     // A 0.5 m ledge right in front: E mantles, F is ignored until it ends.
     const sim = await world([boxEntity("ledge", [1, 0.5, 2], [0.62, 0.25, 0]), block()]);

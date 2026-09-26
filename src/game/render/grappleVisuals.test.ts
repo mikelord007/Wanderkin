@@ -48,10 +48,12 @@ describe("grapple visuals", () => {
     expect(reelCameraEffect("reeling", 1, 0, 0.175, true)).toEqual({ fovKick: 0, shake: 0 });
   });
 
-  it("shows the reticle only in play, locked over an anchor, busy while the hook is out", () => {
-    expect(reticleState(false, true, true)).toBe("hidden");
-    expect(reticleState(true, false, true)).toBe("busy");
-    expect(reticleState(true, true, true)).toBe("locked");
-    expect(reticleState(true, true, false)).toBe("open");
+  it("shows only a faint dot outside aim, and the full reticle state while aiming", () => {
+    expect(reticleState(false, true, true, true)).toBe("hidden");
+    expect(reticleState(true, false, true, true)).toBe("dot");
+    expect(reticleState(true, true, false, true)).toBe("busy");
+    expect(reticleState(true, true, true, true)).toBe("locked");
+    expect(reticleState(true, true, true, false)).toBe("open");
+    expect(reticleState(true, true, true, false, true)).toBe("far");
   });
 });

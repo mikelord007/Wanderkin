@@ -1,7 +1,7 @@
 import { createElement, createRef } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { GRAPPLE_HINT_COPY, GRAPPLE_HINT_KEY, GrappleHint, GrappleReticle, claimGrappleHint } from "./GrappleReticle.js";
+import { GRAPPLE_HINT_COPY, GRAPPLE_HINT_KEY, GRAPPLE_OUT_OF_RANGE_COPY, GrappleHint, GrappleReticle, claimGrappleHint } from "./GrappleReticle.js";
 
 function memoryStore() {
   const values = new Map<string, string>();
@@ -24,10 +24,11 @@ describe("grapple HUD", () => {
     const hint = renderToStaticMarkup(createElement(GrappleHint));
     expect(hint).toContain(GRAPPLE_HINT_COPY.title);
     expect(hint).toContain(GRAPPLE_HINT_COPY.body);
-    expect(`${GRAPPLE_HINT_COPY.title} ${GRAPPLE_HINT_COPY.body}`).toBe("Aim at a ledge, press F to hook");
+    expect(`${GRAPPLE_HINT_COPY.title} ${GRAPPLE_HINT_COPY.body}`).toBe("Hold right-click to aim, release to hook (or hold F)");
 
     const reticle = renderToStaticMarkup(createElement(GrappleReticle, { reticleRef: createRef<HTMLDivElement>() }));
     expect(reticle).toContain('data-state="hidden"');
     expect(reticle).toContain('aria-hidden="true"');
+    expect(reticle).toContain(GRAPPLE_OUT_OF_RANGE_COPY);
   });
 });

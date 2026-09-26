@@ -12,6 +12,7 @@ import type { MovementConfig } from "@shared/index.js";
 import type { SimulationInput } from "../core/simulation.js";
 import { MOUSE_SENSITIVITY } from "../core/constants.js";
 import { clamp } from "../core/vec.js";
+import { AimState, type AimSource } from "./aimState.js";
 
 const MOVE_FORWARD = new Set(["KeyW", "ArrowUp"]);
 const MOVE_BACK = new Set(["KeyS", "ArrowDown"]);
@@ -42,6 +43,12 @@ export class InputController {
   private mantleLatched = false;
   private respawnLatched = false;
   private grappleLatched = false;
+  /** The latched shot came from a held aim: fire only onto a valid anchor. */
+  private grappleRequireAnchor = false;
+  /** True while the hook is out, so a press lets go instead of aiming. */
+  private grappleOut = false;
+  private readonly aim = new AimState();
+  private readonly clock: () => number;
   private locked = false;
   /** Suppresses the pause that a deliberate pointer-lock release would fire. */
   private suppressNextUnlockPause = false;
@@ -49,9 +56,16 @@ export class InputController {
   yaw: number;
   pitch: number;
 
-  constructor(config: MovementConfig, initialYaw: number, callbacks: InputControllerCallbacks) {
+  constructor(
+    config: MovementConfig,
+    initialYaw: number,
+    callbacks: InputControllerCallbacks,
+    /** Seconds, monotonic. Injectable so the hold-to-aim timing is testable. */
+    clock: () => number = () => performance.now() / 1000,
+  ) {
     this.config = config;
     this.callbacks = callbacks;
+    this.clock = clock;
     this.yaw = initialYaw;
     // Start slightly above the character, looking gently down at the scene.
     this.pitch = clamp(0.28, config.camera.minPitchRadians, config.camera.maxPitchRadians);
@@ -61,19 +75,23 @@ export class InputController {
     this.element = element;
 
     const onKeyDown = (event: KeyboardEvent) => this.handleKeyDown(event);
-    const onKeyUp = (event: KeyboardEvent) => {
-      if (!isInteractiveTarget(event.target)) this.held.delete(event.code);
-    };
+    const onKeyUp = (event: KeyboardEvent) => this.handleKeyUp(event);
     const onMouseMove = (event: MouseEvent) => this.handleMouseMove(event);
     const onPointerLockChange = () => this.handlePointerLockChange();
-    const onBlur = () => this.held.clear();
-    // Right mouse fires the hook. Only while the pointer is locked: before
-    // that the click belongs to the page (and to the click-to-play card).
+    const onBlur = () => {
+      this.held.clear();
+      this.aim.cancel();
+    };
+    // Right mouse aims and fires the hook. Only while the pointer is locked:
+    // before that the click belongs to the page (and to the click-to-play card).
     const onMouseDown = (event: MouseEvent) => {
       if (event.button === 2 && this.locked) {
-        this.grappleLatched = true;
+        this.pressGrapple("mouse");
         event.preventDefault();
       }
+    };
+    const onMouseUp = (event: MouseEvent) => {
+      if (event.button === 2) this.releaseGrapple("mouse");
     };
     const onContextMenu = (event: Event) => {
       if (this.locked) event.preventDefault();
@@ -85,6 +103,7 @@ export class InputController {
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("pointerlockchange", onPointerLockChange);
     document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("mouseup", onMouseUp);
     element.addEventListener("contextmenu", onContextMenu);
 
     return () => {
@@ -94,8 +113,10 @@ export class InputController {
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("pointerlockchange", onPointerLockChange);
       document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("mouseup", onMouseUp);
       element.removeEventListener("contextmenu", onContextMenu);
       this.held.clear();
+      this.aim.cancel();
       this.element = null;
     };
   }
@@ -110,6 +131,7 @@ export class InputController {
       // pointerlockchange. Automation and embedded browsers can deliver the
       // key event without performing the browser-chrome Escape release.
       // releasePointerLock suppresses the resulting duplicate pause.
+      this.aim.cancel();
       this.releasePointerLock();
       this.callbacks.onPauseRequested();
       return;
@@ -128,7 +150,8 @@ export class InputController {
 
     switch (event.code) {
       case "Space":
-        this.jumpLatched = true;
+        // Space while holding an aim cancels it rather than jumping.
+        if (!this.aim.cancel()) this.jumpLatched = true;
         // Stop the page scrolling out from under the canvas.
         event.preventDefault();
         break;
@@ -139,7 +162,7 @@ export class InputController {
         this.respawnLatched = true;
         break;
       case "KeyF":
-        this.grappleLatched = true;
+        this.pressGrapple("key");
         break;
       default:
         break;
@@ -155,6 +178,30 @@ export class InputController {
     }
 
     this.held.add(event.code);
+  }
+
+  private handleKeyUp(event: KeyboardEvent): void {
+    if (isInteractiveTarget(event.target)) return;
+    this.held.delete(event.code);
+    if (event.code === "KeyF") this.releaseGrapple("key");
+  }
+
+  /** A hook button went down: let go of a hook that is out, else start a hold. */
+  private pressGrapple(source: AimSource): void {
+    if (this.grappleOut) {
+      this.grappleLatched = true;
+      this.grappleRequireAnchor = false;
+      return;
+    }
+    this.aim.press(source, this.clock());
+  }
+
+  /** A hook button came up: a tap fires, a held aim fires only onto an anchor. */
+  private releaseGrapple(source: AimSource): void {
+    const action = this.aim.release(source, this.clock());
+    if (action === "none") return;
+    this.grappleLatched = true;
+    this.grappleRequireAnchor = action === "fire-if-anchor";
   }
 
   private handleMouseMove(event: MouseEvent): void {
@@ -179,6 +226,7 @@ export class InputController {
 
     if (!locked) {
       this.held.clear();
+      this.aim.cancel();
       if (this.suppressNextUnlockPause) {
         this.suppressNextUnlockPause = false;
       } else {
@@ -212,6 +260,18 @@ export class InputController {
    */
   fireGrapple(): void {
     this.grappleLatched = true;
+    this.grappleRequireAnchor = false;
+  }
+
+  /** True while a hook button has been held past a tap: the aim framing is on. */
+  get aiming(): boolean {
+    return this.aim.isAiming(this.clock());
+  }
+
+  /** Told each frame whether the hook is out, so a press lets go instead of aiming. */
+  setGrappleOut(out: boolean): void {
+    this.grappleOut = out;
+    if (out) this.aim.cancel();
   }
 
   /** Re-aims the camera, e.g. after respawning at a checkpoint's heading. */
@@ -231,6 +291,7 @@ export class InputController {
       mantle: this.mantleLatched,
       respawn: this.respawnLatched,
       grapple: this.grappleLatched,
+      grappleRequireAnchor: this.grappleLatched && this.grappleRequireAnchor,
       cameraYaw: this.yaw,
     };
 
@@ -238,6 +299,7 @@ export class InputController {
     this.mantleLatched = false;
     this.respawnLatched = false;
     this.grappleLatched = false;
+    this.grappleRequireAnchor = false;
     return input;
   }
 
@@ -248,6 +310,8 @@ export class InputController {
     this.mantleLatched = false;
     this.respawnLatched = false;
     this.grappleLatched = false;
+    this.grappleRequireAnchor = false;
+    this.aim.cancel();
   }
 
   private anyHeld(codes: Set<string>): boolean {

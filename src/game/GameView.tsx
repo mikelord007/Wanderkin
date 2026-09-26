@@ -639,7 +639,8 @@ export const GameView = forwardRef<GameViewHandle, GameViewProps>(function GameV
         <Canvas
           shadows
           dpr={[1, 2]}
-          gl={{ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: true }}
+          // Stencil: the grappling rope draws over the explorer where they overlap.
+          gl={{ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: true, stencil: true }}
           // A near plane of 2cm matters at toy scale: the collision-aware
           // camera can legitimately sit under 30cm from the character.
           camera={{ fov: 55, near: 0.02, far: 600 }}

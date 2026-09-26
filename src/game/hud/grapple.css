@@ -53,9 +53,39 @@
   opacity: 0;
 }
 
-/* Over nothing the hook can bite: a small plain ring. */
-.oq-grapple-reticle[data-state="open"] {
+/* Not aiming: only a faint centre dot, so nothing sits over the explorer. */
+.oq-grapple-reticle[data-state="dot"] .oq-grapple-reticle__open {
+  display: none;
+}
+
+.oq-grapple-reticle[data-state="dot"] {
+  opacity: .55;
+}
+
+/* Aiming over nothing the hook can bite: a small plain ring. */
+.oq-grapple-reticle[data-state="open"],
+.oq-grapple-reticle[data-state="far"] {
   opacity: .9;
+}
+
+/* Aiming at a surface out of reach: the ring plus a small "Too far". */
+.oq-grapple-reticle__range {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  translate: -50% .2rem;
+  display: none;
+  padding: .05rem .45rem;
+  border-radius: 999px;
+  background: var(--hud-panel, #ffffffeb);
+  color: var(--hud-ink, #24143d);
+  font-size: .68rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.oq-grapple-reticle[data-state="far"] .oq-grapple-reticle__range {
+  display: block;
 }
 
 /* Over a valid anchor: the ring closes into four marigold-tipped ticks and a
@@ -119,6 +149,7 @@
 
 .oq-grapple-hint__key {
   grid-row: span 2;
+  line-height: 0;
   display: inline-grid;
   place-items: center;
   width: 2.25rem;

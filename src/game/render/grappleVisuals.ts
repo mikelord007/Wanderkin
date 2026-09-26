@@ -93,11 +93,23 @@ export function reelCameraEffect(
   return { fovKick: REEL_FOV_KICK_DEGREES * taut, shake: REEL_SHAKE_HEIGHTS * bodyHeight * fade };
 }
 
-/** `hidden` outside play, `locked` over a valid anchor, `open` over nothing, `busy` while the hook is out or cooling down. */
-export type ReticleState = "hidden" | "locked" | "open" | "busy";
+/**
+ * `hidden` outside play; a faint `dot` when not aiming; while aiming,
+ * `locked` over a valid anchor, `far` over a surface out of range, `open`
+ * over nothing, and `busy` while the hook is out or cooling down.
+ */
+export type ReticleState = "hidden" | "dot" | "locked" | "far" | "open" | "busy";
 
-export function reticleState(running: boolean, ready: boolean, anchorUnderReticle: boolean): ReticleState {
+export function reticleState(
+  running: boolean,
+  aiming: boolean,
+  ready: boolean,
+  anchorUnderReticle: boolean,
+  outOfRange = false,
+): ReticleState {
   if (!running) return "hidden";
+  if (!aiming) return "dot";
   if (!ready) return "busy";
-  return anchorUnderReticle ? "locked" : "open";
+  if (anchorUnderReticle) return "locked";
+  return outOfRange ? "far" : "open";
 }
