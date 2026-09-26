@@ -2,9 +2,10 @@ import { createElement, isValidElement, type ReactElement, type ReactNode } from
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import {
-  ADVENTURE_COPY, ADVENTURE_OPTIONS, AdventureControls, AdventureControlsView, LOOK_LABELS, THEME_OPTIONS,
+  ADVENTURE_COPY, ADVENTURE_OPTIONS, AdventureControls, AdventureControlsView,
   type AdventureControlsProps,
 } from "./AdventureControls.js";
+import { LOOK_LABELS } from "../../biome/lookCatalog.js";
 import { BIOME_IDS } from "../../biome/presets.js";
 
 type ViewProps = Parameters<typeof AdventureControlsView>[0];
@@ -57,47 +58,27 @@ function html(props: Partial<AdventureControlsProps> = {}) {
 }
 
 describe("AdventureControls", () => {
-  it("offers all seven looks in the shared biome order, with Original first, and both adventures", () => {
-    expect(THEME_OPTIONS.map((o) => [o.value, o.label])).toEqual([
-      ["original", "Original"], ["tropical", "Tropical Island"], ["desert", "Desert"],
-      ["alpine", "Snowy Alpine"], ["autumn", "Autumn Forest"], ["ember", "Volcanic Ember"], ["monsoon", "Monsoon Marsh"],
-    ]);
-    expect(THEME_OPTIONS.map((o) => o.value)).toEqual([...BIOME_IDS]);
-    expect(ADVENTURE_OPTIONS.map((o) => o.value)).toEqual(["restore-portal", "reach-beacon"]);
-    const markup = html({ biomeId: "desert", template: "reach-beacon" });
-    const checked = [...markup.matchAll(/<input type="radio"[^>]*checked=""[^>]*value="([^"]+)"/g)].map((m) => m[1]);
-    expect(checked).toEqual(["desert", "reach-beacon"]);
-  });
-
-  it("names every look id, so a future look appears with a proper label", () => {
+  it("states the world's look, locked, and offers no way to change it", () => {
     for (const id of BIOME_IDS) {
-      const entry = LOOK_LABELS[id];
-      expect(entry, id).toBeDefined();
-      expect(entry.value).toBe(id);
-      expect(entry.label.trim().length, id).toBeGreaterThan(0);
-      expect(entry.description.trim().length, id).toBeGreaterThan(0);
-      // Only Original is the photo itself; every other look shows its palette.
-      if (id === "original") expect(entry.swatch).toBeNull();
-      else expect(Object.values(entry.swatch ?? {}).every((c) => /^#[0-9a-f]{6}$/i.test(c)), id).toBe(true);
+      const markup = html({ biomeId: id });
+      expect(markup).toContain(`${ADVENTURE_COPY.worldLabel}: ${LOOK_LABELS[id].label}`);
+      expect(markup).toContain(ADVENTURE_COPY.worldLocked);
+      expect(markup).toMatch(/<p class="oq-adventure__world" data-theme="[a-z]+"><svg[^>]*class="oq-adventure__world-lock"/);
+      // No look radios at all: the only radios are the two adventures.
+      const radios = [...markup.matchAll(/<input type="radio"[^>]*value="([^"]+)"/g)].map((m) => m[1]);
+      expect(radios).toEqual(["restore-portal", "reach-beacon"]);
     }
   });
 
-  it("renders the looks as one labelled radio group with a tile per look", () => {
-    const markup = html({ biomeId: "ember" });
-    expect(markup).toMatch(/<div class="oq-adventure__looks" role="radiogroup" aria-labelledby="[^"]+-theme-legend">/);
-    for (const id of BIOME_IDS) expect(markup).toContain(`data-theme="${id}"`);
-    const lookRadios = [...markup.matchAll(/<input type="radio" name="([^"]+)"[^>]*value="(original|tropical|desert|alpine|autumn|ember|monsoon)"/g)];
-    expect(lookRadios).toHaveLength(BIOME_IDS.length);
-    expect(new Set(lookRadios.map((m) => m[1])).size).toBe(1);
-    expect(markup).toContain(ADVENTURE_COPY.themeHint);
-  });
-
-  it("changing the look only calls onBiomeChange and never starts a new adventure", () => {
-    const props = baseProps();
-    (radio(props, "tropical").props.onChange as () => void)();
-    expect(props.onBiomeChange).toHaveBeenCalledWith("tropical");
-    expect(props.onNewAdventure).not.toHaveBeenCalled();
-    expect(props.onTemplateChange).not.toHaveBeenCalled();
+  it("never reports a look change, whatever the player does", () => {
+    const props = baseProps({ biomeId: "monsoon" });
+    for (const el of tree(props)) {
+      for (const handler of ["onChange", "onClick"] as const) {
+        const fn = el.props[handler];
+        if (typeof fn === "function" && el.props.type !== "checkbox") (fn as (e?: unknown) => void)({ currentTarget: { checked: true } });
+      }
+    }
+    expect(props.onBiomeChange).not.toHaveBeenCalled();
   });
 
   it("choosing an adventure only records it for the next reset", () => {
@@ -137,11 +118,11 @@ describe("AdventureControls", () => {
     expect(props.onNewAdventure).toHaveBeenCalledTimes(1);
   });
 
-  it("can hide the new-adventure section while keeping the look choice", () => {
-    const markup = html({ newAdventureAvailable: false });
+  it("can hide the new-adventure section while still naming the world", () => {
+    const markup = html({ newAdventureAvailable: false, biomeId: "desert" });
     expect(markup).not.toContain(ADVENTURE_COPY.newAdventure);
     expect(markup).not.toContain('value="reach-beacon"');
-    expect(markup).toContain('value="desert"');
+    expect(markup).toContain("World: Desert");
   });
 
   it("locks every control and announces progress while busy", () => {
@@ -149,30 +130,28 @@ describe("AdventureControls", () => {
     expect(markup).toContain('role="status"');
     expect(markup).toContain(ADVENTURE_COPY.busy);
     expect(markup).toContain('aria-busy="true"');
-    expect(markup.match(/<fieldset[^>]*disabled=""/g)).toHaveLength(2);
+    expect(markup.match(/<fieldset[^>]*disabled=""/g)).toHaveLength(1);
     expect(markup).toMatch(/<input type="checkbox"[^>]*disabled=""/);
     expect(markup).toMatch(/<button[^>]*disabled=""[^>]*>Start new adventure/);
 
     const props = baseProps({ busy: true });
-    (radio(props, "desert").props.onChange as () => void)();
+    (radio(props, "reach-beacon").props.onChange as () => void)();
     (buttonByText(props, ADVENTURE_COPY.newAdventure).props.onClick as () => void)();
-    expect(props.onBiomeChange).not.toHaveBeenCalled();
+    expect(props.onTemplateChange).not.toHaveBeenCalled();
     expect(props.onConfirmingChange).not.toHaveBeenCalled();
     expect(props.onNewAdventure).not.toHaveBeenCalled();
   });
 
   it("honours disabled the same way", () => {
     const props = baseProps({ disabled: true });
-    (radio(props, "desert").props.onChange as () => void)();
     (radio(props, "reach-beacon").props.onChange as () => void)();
-    expect(props.onBiomeChange).not.toHaveBeenCalled();
     expect(props.onTemplateChange).not.toHaveBeenCalled();
   });
 
-  it("does not report a change when the current option is re-selected", () => {
-    const props = baseProps({ biomeId: "desert" });
-    (radio(props, "desert").props.onChange as () => void)();
-    expect(props.onBiomeChange).not.toHaveBeenCalled();
+  it("does not report a change when the current adventure is re-selected", () => {
+    const props = baseProps({ template: "reach-beacon" });
+    (radio(props, "reach-beacon").props.onChange as () => void)();
+    expect(props.onTemplateChange).not.toHaveBeenCalled();
   });
 
   it("shows a failure as an alert and reassures that the world was kept", () => {
@@ -187,7 +166,7 @@ describe("AdventureControls", () => {
     const text = renderToStaticMarkup(createElement(AdventureControls, { ...baseProps(), confirmReset: true }))
       .replace(/<[^>]+>/g, " ");
     const allCopy = [text, ...Object.values(ADVENTURE_COPY),
-      ...THEME_OPTIONS.flatMap((o) => [o.label, o.description]),
+      ...Object.values(LOOK_LABELS).flatMap((o) => [o.label, o.description]),
       ...ADVENTURE_OPTIONS.flatMap((o) => [o.label, o.description])].join(" ");
     expect(allCopy).not.toMatch(/\b(biome|seed|template|model|mesh|layout|quality|procedural|manifest|AI)\b/i);
   });
@@ -195,8 +174,8 @@ describe("AdventureControls", () => {
   it("gives each group an accessible name and unique radio names per instance", () => {
     const a = html();
     expect(a).toMatch(/<section class="oq-adventure" aria-labelledby="[^"]+"/);
-    expect(a.match(/<legend/g)).toHaveLength(2);
+    expect(a.match(/<legend/g)).toHaveLength(1);
     const names = new Set([...a.matchAll(/type="radio" name="([^"]+)"/g)].map((m) => m[1]));
-    expect(names.size).toBe(2);
+    expect(names.size).toBe(1);
   });
 });

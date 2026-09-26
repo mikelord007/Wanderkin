@@ -26,7 +26,7 @@ export function WorldReadyScreen({ manifest, onEnter, onAdjustCourse, onBack }: 
   const mode = manifest.experience?.mode.kind ?? "explore";
   const mission = manifest.experience?.quest.objective ?? (mode === "race" ? "Reach every checkpoint and find the finish." : mode === "collect" ? "Find the lost colors and unlock the portal." : "Explore this little world and discover its path.");
 
-  return <CreationFrame activeStep={3} eyebrow="Your world is ready" title={`Welcome to ${manifest.name}.`} onBack={onBack} style={style as StyleId}>
+  return <CreationFrame activeStep={4} eyebrow="Your world is ready" title={`Welcome to ${manifest.name}.`} onBack={onBack} style={style as StyleId}>
     <section className="oq-world-ready">
       <Card className="oq-world-ready__scene">
         {previewFailures ? <div className="oq-world-ready__missing" role="alert"><strong>The world preview could not load.</strong><p>Your course is still saved.</p><Button onClick={() => setPreviewFailures(0)}>Retry loading</Button><Button variant="ghost" onClick={onBack}>My worlds</Button></div> :

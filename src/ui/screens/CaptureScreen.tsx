@@ -111,7 +111,7 @@ export function CaptureScreen({ initialPhotoUrl, onUsePhoto, onBack }: CaptureSc
   }
 
   return (
-    <CreationFrame activeStep={0} eyebrow="Step 1 of 4 · Photo" title="What will your world be made of?" onBack={onBack}>
+    <CreationFrame activeStep={0} eyebrow="Step 1 of 5 · Photo" title="What will your world be made of?" onBack={onBack}>
       <section className="oq-capture" aria-label="Choose an object photo">
         <Card className="oq-capture__card">
           {previewUrl ? (

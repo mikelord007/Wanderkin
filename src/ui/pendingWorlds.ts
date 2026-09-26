@@ -1,9 +1,10 @@
-import type { GameModeId, GenerationJob, GenerationRequest, StyleId } from "@shared/index.js";
+import type { GameModeId, GenerationJob, GenerationRequest, SceneBiomeId, StyleId } from "@shared/index.js";
+import { lookName } from "../biome/lookCatalog.js";
 import type { ProgressStage } from "./components/index.js";
 import { buildWorldExtrasRequests, type CreationAttentionStage, type CreationJobRef, type CreationRecord } from "./creationFlow.js";
 
 /*
- * Worlds being built. Once a creation reaches step 4 it leaves Create and
+ * Worlds being built. Once a creation reaches step 5 it leaves Create and
  * lives in My worlds as a card until it is ready to play. The data is the
  * same durable creation record Create already keeps (creationStorage.ts); the
  * jobs themselves are server-side and survive reloads. This module is pure:
@@ -19,6 +20,8 @@ export interface PendingWorld {
   title: string;
   style: StyleId;
   mode: GameModeId;
+  /** The biome locked at creation; none for creations made before that. */
+  biome?: SceneBiomeId;
   state: PendingWorldState;
   /** The source photo: the card's picture while it builds. */
   photoUrl?: string;
@@ -94,14 +97,16 @@ export function worldBuildStages(record: CreationRecord | null, shape?: ShapeVie
   return [
     { id: "object", label: "Preparing your object", status: record?.jobs.object?.state === "failed" ? "error" : "complete" },
     { id: "shape", label: "Building its 3D shape", status: shapeState === "failed" ? "error" : shapeState === "ready" ? "complete" : "active", ...(shapeMessage ? { detail: shapeMessage } : {}) },
-    { id: "course", label: "Creating your course", status: shapeState === "ready" ? "active" : "pending", detail: shapeState === "ready" ? "The shape is ready for course preparation." : "Begins when the shape is ready." },
+    { id: "course", label: record?.selection.biome ? `Creating your ${lookName(record.selection.biome)} course` : "Creating your course", status: shapeState === "ready" ? "active" : "pending", detail: shapeState === "ready" ? "The shape is ready for course preparation." : "Begins when the shape is ready." },
     { id: "story", label: "Adding its story and sound", status: optionalFailed ? "error" : optionalReady ? "complete" : optionalStarted ? "active" : "pending", ...(optionalFailed ? { detail: "Your world stays playable. Sound can be added later." } : {}) },
   ];
 }
 
 /** A creation that has left Create for My worlds: its 3D build was submitted. */
 export function isBuildRecord(record: CreationRecord): record is CreationRecord & { jobs: { shape: CreationJobRef } } {
-  return record.step === "building" && Boolean(record.jobs.shape);
+  // "ready" (course prepared) stays a card until its saved level exists; My
+  // worlds then hides it (see creationLevels.ts unsavedBuilds).
+  return (record.step === "building" || record.step === "ready") && Boolean(record.jobs.shape);
 }
 
 function isTerminal(state: GenerationJob["state"] | undefined): boolean {
@@ -129,6 +134,7 @@ export function toPendingWorld(record: CreationRecord, buildStartedAt?: string):
     title: record.title?.trim() || "Untitled world",
     style: record.selection.style,
     mode: record.selection.mode,
+    ...(record.selection.biome ? { biome: record.selection.biome } : {}),
     state,
     ...(record.photo?.url ? { photoUrl: record.photo.url } : {}),
     ...(record.preview?.asset.url ? { previewUrl: record.preview.asset.url } : {}),
@@ -170,3 +176,9 @@ export function startedHint(startedAt: string, now: number): string {
 
 export const LOOK_LABELS: Record<StyleId, string> = { cartoon: "Cartoon", "hand-painted": "Hand-painted", watercolor: "Watercolor" };
 export const MODE_LABELS: Record<GameModeId, string> = { explore: "Explore", collect: "Collect", race: "Race" };
+
+/** "Cartoon look · Monsoon Marsh · Collect": a world's choices in one line,
+ * the same on the preview, the build page and its card. */
+export function worldChoicesLine(style: StyleId, mode: GameModeId, biome?: SceneBiomeId): string {
+  return [`${LOOK_LABELS[style]} look`, ...(biome ? [lookName(biome)] : []), MODE_LABELS[mode]].join(" · ");
+}

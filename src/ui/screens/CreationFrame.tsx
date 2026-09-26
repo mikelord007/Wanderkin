@@ -3,7 +3,7 @@ import type { StyleId } from "@shared/index.js";
 import { Button, WorldStyleScope } from "../components/index.js";
 import "./creation.css";
 
-const steps = ["Photo", "Look", "Preview", "World"] as const;
+const steps = ["Photo", "Look", "Biome", "Preview", "World"] as const;
 
 export function CreationFrame({
   activeStep,
@@ -13,7 +13,7 @@ export function CreationFrame({
   style = "cartoon",
   children,
 }: {
-  activeStep: 0 | 1 | 2 | 3;
+  activeStep: 0 | 1 | 2 | 3 | 4;
   title: string;
   eyebrow?: string;
   onBack?: () => void;

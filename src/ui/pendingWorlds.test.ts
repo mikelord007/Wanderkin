@@ -111,7 +111,8 @@ describe("toPendingWorld", () => {
   it("is only for creations whose 3D build was submitted", () => {
     expect(toPendingWorld(createCreationRecord("draft"))).toBeNull();
     expect(toPendingWorld({ ...createCreationRecord("no-shape"), step: "building" })).toBeNull();
-    expect(toPendingWorld({ ...building("ready", ref("s", "ready")), step: "ready" })).toBeNull();
+    // A prepared course ("ready") stays a card until its level is saved.
+    expect(toPendingWorld({ ...building("ready", ref("s", "ready")), step: "ready" })).toMatchObject({ state: "done" });
   });
 
   it("describes a build in progress: the photo, the stage and a partial bar", () => {

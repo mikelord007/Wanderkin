@@ -67,7 +67,11 @@ test("an in-progress build still resumes straight to its progress screen on relo
   await page.locator('input[type="file"]').setInputFiles("public/samples/photo-4.jpg");
   await page.getByRole("button", { name: "Use this photo" }).click();
   await page.getByRole("button", { name: "Looks good" }).click();
-  await page.getByRole("button", { name: "Preview my world" }).click();
+  // Look → Biome (locked in) → Preview.
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { name: "Where will it grow?" })).toBeVisible();
+  await page.locator(".oq-kit-choice").filter({ hasText: "Monsoon Marsh" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("button", { name: "Use this preview" })).toBeEnabled();
   await page.getByRole("button", { name: "Use this preview" }).click();
   await page.getByRole("button", { name: "Build my world" }).click();

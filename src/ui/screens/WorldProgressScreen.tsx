@@ -4,7 +4,7 @@ import { Button, Card, ProgressPanel } from "../components/index.js";
 import { describeApiError, getJob, retryJob, submitGeneration } from "../api.js";
 import { loadActiveCreation, loadCreationRecords, saveCreationRecord, updateCreationJob } from "../creationStorage.js";
 import type { CreationAttentionStage, CreationRecord } from "../creationFlow.js";
-import { extraRetryMode, extrasToSubmit, failedExtraStage, worldBuildStages, type ExtraStage } from "../pendingWorlds.js";
+import { extraRetryMode, extrasToSubmit, failedExtraStage, worldBuildStages, worldChoicesLine, type ExtraStage } from "../pendingWorlds.js";
 import { formatElapsed, useElapsedSeconds } from "../useElapsedSeconds.js";
 import { useJobPolling } from "../useJobPolling.js";
 import { EXTRAS_REASK_MS, reaskMissingExtras } from "../worldBuild.js";
@@ -84,11 +84,11 @@ export function WorldProgressScreen({ jobId, onReady, onCancel }: WorldProgressS
   const optionalFailed = failedExtraStage(record);
   const stages = worldBuildStages(record, shapeJob ? { state: shapeJob.state, uiMessage: shapeJob.uiMessage } : null);
 
-  return <CreationFrame activeStep={3} eyebrow="Step 4 of 4 · World" title="Your world is taking shape." style={record?.selection.style ?? "cartoon"}>
+  return <CreationFrame activeStep={4} eyebrow="Step 5 of 5 · World" title="Your world is taking shape." style={record?.selection.style ?? "cartoon"}>
     <section className="oq-world-progress">
       <Card className="oq-world-progress__preview">
         {record?.preview?.asset.url ? <img src={record.preview.asset.url} alt="Approved visual direction for your world" /> : <div className="oq-world-progress__placeholder" />}
-        <div><p className="oq-kit-eyebrow">A first glimpse</p><h2>{title}</h2>{intro ? <p>{intro}</p> : <p className="oq-kit-muted">Your title and mission will appear here when they are ready.</p>}</div>
+        <div><p className="oq-kit-eyebrow">A first glimpse</p><h2>{title}</h2>{record ? <p className="oq-world-progress__choices">{worldChoicesLine(record.selection.style, record.selection.mode, record.selection.biome)}</p> : null}{intro ? <p>{intro}</p> : <p className="oq-kit-muted">Your title and mission will appear here when they are ready.</p>}</div>
         {music ? <div className="oq-world-progress__audio">
           <label>Music preview<audio controls preload="none" src={music.url} /></label>
           <p className="oq-kit-muted">Sound plays only when you press play.</p>

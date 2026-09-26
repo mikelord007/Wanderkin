@@ -1,3 +1,4 @@
+import { lookName, manifestBiomeId } from "../../biome/lookCatalog.js";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SceneManifest } from "@shared/index.js";
 import { Button, Icon, Toast } from "../components/index.js";
@@ -10,6 +11,7 @@ import type { PendingWorld } from "../pendingWorlds.js";
 import { NoPicture, WorldTile } from "./WorldTile.js";
 import { PendingWorldTile } from "./PendingWorldTile.js";
 import { usePendingWorlds } from "./usePendingWorlds.js";
+import { unsavedBuilds } from "../creationLevels.js";
 import "../theme/welcome.css";
 import "./dashboard.css";
 
@@ -100,6 +102,9 @@ export function MyWorldsScreen({
     return () => { cancelled = true; };
   }, [attempt]);
 
+  // A creation's card stays until its saved level exists; then the saved
+  // level's tile takes over, so a world is never listed twice.
+  const buildCards = useMemo(() => unsavedBuilds(builds.cards, savedLevels), [builds.cards, savedLevels]);
   // Creations being built show as their own cards (above), so they are left
   // out of the older creation list here rather than shown twice.
   const buildIds = useMemo(() => new Set(builds.cards.map((card) => card.id)), [builds.cards]);
@@ -175,8 +180,8 @@ export function MyWorldsScreen({
     }
   }
 
-  const count = savedLevels ? worldItems.length + builds.cards.length : null;
-  const buildTiles = builds.cards.map((world) => <PendingWorldTile key={`build-${world.id}`} world={world} now={builds.now}
+  const count = savedLevels ? worldItems.length + buildCards.length : null;
+  const buildTiles = buildCards.map((world) => <PendingWorldTile key={`build-${world.id}`} world={world} now={builds.now}
     retrying={builds.retrying === world.id} retryError={builds.errors[world.id]}
     onOpen={() => onOpenBuild?.(world)} onPlay={() => onPlayBuiltWorld?.(world)}
     onRetry={() => void builds.retry(world)} onDiscard={() => builds.discard(world)} />);
@@ -262,7 +267,7 @@ export function MyWorldsScreen({
             return <WorldTile key={manifest.levelId} status={draft ? "draft" : "ready"}
               badge={draft ? "Draft changes" : savedWorldOrigin(manifest) === "generated" ? "Generated world" : savedWorldOrigin(manifest) === "sample-copy" ? "Bundled sample copy" : "Imported world"}
               title={manifest.name || "Untitled world"} image={worldImage(manifest)}
-              meta={`${manifest.experience?.style.id ?? "cartoon"} · ${manifest.experience?.mode.kind ?? "explore"} · ${manifest.checkpoints.length} checkpoints`}
+              meta={`${manifest.experience?.style.id ?? "cartoon"}${manifest.biome ? ` · ${lookName(manifestBiomeId(manifest))}` : ""} · ${manifest.experience?.mode.kind ?? "explore"} · ${manifest.checkpoints.length} checkpoints`}
               notice={assetIssues[manifest.levelId] ? <p className="oq-kit-error" role="alert">{assetIssues[manifest.levelId]}</p> : null}
               actions={<>
                 {draft ? <Button onClick={() => (onResumeDraft ?? ((next) => onEditSavedLevel(next)))(draft.manifest, true)}>Resume</Button> : <Button className="wk-tile__play" onClick={() => handlePlaySaved(manifest)} loading={checkingLevelId === manifest.levelId} loadingLabel="Checking assets…"><Icon name="play" />Play</Button>}

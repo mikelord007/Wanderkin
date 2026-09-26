@@ -1,4 +1,5 @@
 import type { CreationSelection } from "../creationFlow.js";
+import { worldChoicesLine } from "../pendingWorlds.js";
 import { Button, Card } from "../components/index.js";
 import { CreationFrame } from "./CreationFrame.js";
 
@@ -34,7 +35,7 @@ export function StylePreviewScreen({
   building?: boolean;
 }) {
   const lookLabel = selection.style === "hand-painted" ? "Hand-painted" : selection.style === "watercolor" ? "Watercolor" : "Cartoon";
-  return <CreationFrame activeStep={2} eyebrow="Step 3 of 4 · Preview" title="Like this direction?" onBack={onBack} style={selection.style}>
+  return <CreationFrame activeStep={3} eyebrow="Step 4 of 5 · Preview" title="Like this direction?" onBack={onBack} style={selection.style}>
     <section className="oq-style-preview">
       <div className="oq-style-preview__compare">
         <Card><figure><div className="oq-style-preview__image"><img src={originalUrl} alt="Your original object" /></div><figcaption>Original object</figcaption></figure></Card>
@@ -51,7 +52,7 @@ export function StylePreviewScreen({
         </Card>
       </div>
       <Card className="oq-style-preview__decision oq-kit-stack">
-        <div><p className="oq-kit-eyebrow">Visual direction</p><h2>{lookLabel}</h2></div>
+        <div><p className="oq-kit-eyebrow">Visual direction</p><h2>{lookLabel}</h2><p className="oq-style-preview__choices">{worldChoicesLine(selection.style, selection.mode, selection.biome)}</p></div>
         <p>{selection.atmosphere.trim() ? `Atmosphere: ${selection.atmosphere.trim()}` : "No extra atmosphere — keep it delightfully surprising."}</p>
         <p className="oq-kit-muted">This is the visual direction. Your playable world may look a little different.</p>
         {error ? <div className="oq-style-preview__error" role="alert"><strong>This preview didn’t finish.</strong><p>{error}</p>{previewUrl ? <p>Your last successful preview is still safe.</p> : null}</div> : null}

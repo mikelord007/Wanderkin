@@ -9,15 +9,15 @@ const ADVENTURES = [
   { value: "race", label: "Race", description: "One route, one clock. Reach the finish as fast as you can." },
 ] as const;
 
-export function CustomizeScreen({ selection, onChange, onPreview, onBack, submitting = false, error }: {
+export function CustomizeScreen({ selection, onChange, onContinue, onBack, error }: {
   selection: CreationSelection;
   onChange: (selection: CreationSelection) => void;
-  onPreview: () => void;
+  /** On to the biome step. */
+  onContinue: () => void;
   onBack: () => void;
-  submitting?: boolean;
   error?: string;
 }) {
-  return <CreationFrame activeStep={1} eyebrow="Step 2 of 4" title="Pick a look, pick an adventure." onBack={onBack} style={selection.style}>
+  return <CreationFrame activeStep={1} eyebrow="Step 2 of 5 · Look" title="Pick a look, pick an adventure." onBack={onBack} style={selection.style}>
     <div className="oq-customize">
       {/* Two decisions of the same weight, so they get the same treatment: a
           heading in the display face, a rule, and the tiles. The old screen
@@ -62,8 +62,8 @@ export function CustomizeScreen({ selection, onChange, onPreview, onBack, submit
 
       {error ? <div className="oq-customize__error" role="alert"><strong>Your preview didn’t finish.</strong><p>{error}</p></div> : null}
       <div className="oq-kit-row oq-customize__actions">
-        <Button variant="secondary" disabled={submitting} onClick={onBack}>Back</Button>
-        <Button loading={submitting} loadingLabel="Making your preview…" onClick={onPreview}>{error ? "Try the preview again" : "Preview my world"}</Button>
+        <Button variant="secondary" onClick={onBack}>Back</Button>
+        <Button onClick={onContinue}>Continue</Button>
       </div>
     </div>
   </CreationFrame>;

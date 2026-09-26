@@ -65,6 +65,8 @@ describe("creation flow", () => {
     const draft = createCreationRecord("world-1", "2026-09-24T00:00:00.000Z");
     const approved = withCreationUpdate(draft, {
       step: "preview",
+      // The biome is locked in before the preview step (see biomeStep.test).
+      selection: { ...draft.selection, biome: "desert" },
       preview: {
         cacheKey: "cache-1",
         jobId: "job-1",

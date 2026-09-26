@@ -12,7 +12,7 @@
 .oq-creation__topline { display: flex; align-items: center; gap: var(--oq-space-5); flex-wrap: wrap; }
 
 /* The step rail: small numbered pills joined by a hairline. */
-.oq-creation__progress { flex: 1 1 320px; display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; list-style: none; margin: 0; padding: 0; font-size: var(--wk-type-small); color: var(--wk-text-3); }
+.oq-creation__progress { flex: 1 1 320px; display: grid; grid-template-columns: repeat(5,1fr); gap: 6px; list-style: none; margin: 0; padding: 0; font-size: var(--wk-type-small); color: var(--wk-text-3); }
 .oq-creation__progress li { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .oq-creation__progress li::after { content: ""; height: 1px; flex: 1; background: var(--wk-border); }
 .oq-creation__progress li:last-child::after { display: none; }
@@ -201,3 +201,82 @@
   .oq-capture__drop, .oq-review__stage img { transition: none; }
   .oq-style-preview__placeholder, .oq-world-progress__preview > img { animation: none; }
 }
+
+/* --- Step 3, the biome. Seven places as tiles (the same tiny landscapes the
+   in-game panel showed), then the locking moment: the chosen tile grown into
+   a full-width card with the object set into it. The swatches are content,
+   so they keep their own hues rather than the interface palette. */
+.oq-biome { max-width: 960px; display: grid; gap: var(--wk-gap-group); }
+.oq-biome .oq-kit-choices__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.oq-biome .oq-kit-choice__image { aspect-ratio: 4 / 3; border-radius: var(--wk-r-inner); }
+.oq-biome .oq-kit-choice input:checked + .oq-kit-choice__body { box-shadow: 0 0 0 4px var(--wk-glow); }
+.oq-biome__actions { justify-content: flex-end; }
+.oq-biome__note { margin: 0; color: var(--wk-text-2); font-size: var(--wk-type-small); }
+
+.oq-biome__swatch, .oq-biome-card__land {
+  position: relative; display: block; width: 100%; height: 100%; overflow: hidden;
+  background:
+    radial-gradient(circle at 70% 64%, var(--sw-glint) 0 5px, transparent 6px),
+    linear-gradient(to bottom, var(--sw-zenith) 0%, var(--sw-horizon) 56%, var(--sw-ground) 56.5%, var(--sw-ground) 100%);
+}
+.oq-biome-card__land { position: absolute; inset: 0; background:
+    radial-gradient(circle at 78% 70%, var(--sw-glint) 0 9px, transparent 10px),
+    linear-gradient(to bottom, var(--sw-zenith) 0%, var(--sw-horizon) 58%, var(--sw-ground) 58.5%, var(--sw-ground) 100%); }
+/* One glint of the place's collectible colour, above the hill. */
+.oq-biome__swatch::before, .oq-biome-card__land::before {
+  content: ""; position: absolute; z-index: 1; left: 68%; top: 66%; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--sw-glint); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sw-glint) 30%, transparent);
+}
+.oq-biome-card__land::before { left: 80%; top: 74%; width: 14px; height: 14px; }
+.oq-biome__swatch--photo::before, .oq-biome-card__land--photo::before { display: none; }
+/* A soft hill line on the ground, so each swatch reads as a place. */
+.oq-biome__swatch::after, .oq-biome-card__land::after {
+  content: ""; position: absolute; left: -20%; right: -20%; top: 52%; height: 44%;
+  border-radius: 50% 50% 0 0; background: var(--sw-ground); filter: brightness(.94);
+}
+.oq-biome__swatch--photo, .oq-biome-card__land--photo { display: grid; place-items: center; color: var(--wk-purple); background: var(--wk-tint); }
+.oq-biome__swatch--photo::after, .oq-biome-card__land--photo::after { display: none; }
+.oq-biome__swatch--photo svg { width: 28px; height: 28px; }
+.oq-biome-card__land--photo svg { display: none; }
+
+.oq-biome-card {
+  display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); overflow: hidden;
+  border: 1px solid var(--wk-border); border-radius: var(--wk-r-card); background: var(--wk-surface); box-shadow: var(--wk-shadow-md);
+  transform-origin: 20% 30%; animation: oq-biome-grow .5s cubic-bezier(.2, .8, .2, 1) both;
+}
+.oq-biome-card[data-phase="choose"] { animation: none; }
+.oq-biome-card__scene { position: relative; min-height: 260px; }
+.oq-biome-card__object {
+  position: absolute; left: 50%; bottom: 14%; width: 46%; max-height: 72%; object-fit: contain; transform: translateX(-50%);
+  filter: drop-shadow(0 10px 14px rgba(36, 20, 61, .28));
+}
+.oq-biome-card[data-phase="growing"] .oq-biome-card__object { animation: oq-biome-rise 1.1s ease-out both; }
+.oq-biome-card__seal {
+  position: absolute; top: 14px; right: 14px; display: grid; place-items: center; width: 40px; height: 40px;
+  border-radius: 50%; color: #fff; background: var(--wk-purple); box-shadow: var(--wk-shadow-sm);
+  animation: oq-biome-seal .35s cubic-bezier(.2, .8, .2, 1.4) both;
+}
+.oq-biome-card[data-phase="choose"] .oq-biome-card__seal { animation: none; }
+.oq-biome-card__body { display: grid; align-content: center; gap: var(--wk-gap-sm); padding: var(--wk-card-pad); }
+.oq-biome-card__body h2 { margin: 0; font-size: var(--wk-type-h3); }
+.oq-biome-card__description { margin: 0; color: var(--wk-text-2); }
+.oq-biome-card__status { display: flex; align-items: center; gap: 10px; margin: 6px 0 0; font-weight: 600; color: var(--wk-purple-ink); }
+.oq-biome-card__status svg { flex: none; }
+.oq-biome-card__status .oq-kit-spinner { flex: none; width: 18px; height: 18px; color: var(--wk-purple); }
+@keyframes oq-biome-grow { from { transform: scale(.42); opacity: .4; } to { transform: none; opacity: 1; } }
+@keyframes oq-biome-rise { from { transform: translate(-50%, 18%) scale(.7); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
+@keyframes oq-biome-seal { from { transform: scale(.3); opacity: 0; } to { transform: none; opacity: 1; } }
+
+@media (max-width: 699px) {
+  .oq-biome .oq-kit-choices__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .oq-biome .oq-kit-choice__image { aspect-ratio: 16 / 9; }
+  .oq-biome .oq-kit-choice__body { padding: 10px; gap: 6px; }
+  .oq-biome-card { grid-template-columns: 1fr; }
+  .oq-biome-card__scene { min-height: 200px; }
+  .oq-biome__actions { flex-direction: column-reverse; align-items: stretch; }
+  .oq-biome__actions .oq-kit-button { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .oq-biome-card, .oq-biome-card__object, .oq-biome-card__seal { animation: none; }
+}
+.oq-style-preview__choices, .oq-world-progress__choices { margin: 4px 0 0; color: var(--wk-text-2); font-size: var(--wk-type-small); font-weight: 500; }

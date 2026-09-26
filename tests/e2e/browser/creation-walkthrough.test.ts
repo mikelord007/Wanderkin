@@ -26,7 +26,11 @@ test("screens 2–7 mocked creation walkthrough", async ({ page }) => {
 
   await page.locator(".oq-kit-choice").filter({ hasText: "Watercolor" }).click();
   await page.getByPlaceholder("A floating island above the clouds…").fill("A cloud garden at sunset");
-  await page.getByRole("button", { name: "Preview my world" }).click();
+  // Look → Biome (locked in) → Preview.
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { name: "Where will it grow?" })).toBeVisible();
+  await page.locator(".oq-kit-choice").filter({ hasText: "Monsoon Marsh" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("button", { name: "Use this preview" })).toBeEnabled();
   await page.screenshot({ path: `${evidenceDir}/05-preview.png`, fullPage: true });
 

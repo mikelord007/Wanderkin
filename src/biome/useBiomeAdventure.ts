@@ -6,13 +6,15 @@ import { getBiomeDefinition } from "./presets.js";
 import { prepareBiomeLayout } from "./placement.js";
 import { prepareAdventure } from "./adventures.js";
 import { acceptGeneratedAdventure } from "./adventureDraft.js";
+import { manifestBiomeId } from "./lookCatalog.js";
 
-export const THEME_FAILED_MESSAGE = "This look couldn’t be prepared for your world. Nothing changed — try another look.";
+export const THEME_FAILED_MESSAGE = "This world’s look couldn’t be prepared on this device, so it is shown as your original place.";
 export const ADVENTURE_FAILED_MESSAGE = "We couldn’t find a safe new adventure here. Your current world is unchanged.";
 
-/** Last look chosen per world, for this browser session only. It survives a
- * replay or a return from Finish but is never written to a saved world. */
-const sessionLooks = new Map<string, { id: BiomeId; quality: EffectsQuality }>();
+/** Effects quality chosen per world, for this browser session only. It
+ * survives a replay or a return from Finish but is never written to a saved
+ * world. The look itself is the world's own (see `manifestBiomeId`). */
+const sessionLooks = new Map<string, { quality: EffectsQuality }>();
 let sessionQuality: EffectsQuality = "standard";
 const LAYOUT_CACHE_LIMIT = 6;
 
@@ -26,12 +28,15 @@ export interface BiomeAdventureState {
   /** What is currently rendered. */
   presented: Presentation;
   definition: BiomeDefinition;
-  /** What the player picked; differs from `presented.id` only while preparing. */
+  /** The world's own look, fixed when it was created; differs from
+   * `presented.id` only while preparing (or if it could not be prepared). */
   selectedId: BiomeId;
   selectedQuality: EffectsQuality;
   template: AdventureTemplateId;
   busy: boolean;
   error: string | null;
+  /** @deprecated The look is locked to the world and cannot be changed in
+   * play; this does nothing and is kept only so existing callers compile. */
   setBiome: (id: BiomeId) => void;
   setQuality: (quality: EffectsQuality) => void;
   setTemplate: (template: AdventureTemplateId) => void;
@@ -50,8 +55,10 @@ export function useBiomeAdventure({ manifest, assets, movement, onAdventure }: {
   movement: MovementConfig | null;
   onAdventure: ((manifest: SceneManifest) => void) | undefined;
 }): BiomeAdventureState {
-  const initial = sessionLooks.get(manifest.levelId)
-    ?? { id: manifest.biome?.id ?? "original", quality: sessionQuality };
+  // The look comes from the world and nothing in play changes it; worlds saved
+  // without one keep the look they always had.
+  const worldBiome = manifestBiomeId(manifest);
+  const initial = { id: worldBiome, quality: sessionLooks.get(manifest.levelId)?.quality ?? sessionQuality };
   const [selected, setSelected] = useState(initial);
   const [presented, setPresented] = useState<Presentation>({ id: "original", quality: initial.quality, layout: null });
   const [template, setTemplate] = useState<AdventureTemplateId>(manifest.adventure?.template ?? "restore-portal");
@@ -73,10 +80,15 @@ export function useBiomeAdventure({ manifest, assets, movement, onAdventure }: {
     setTemplate(manifest.adventure?.template ?? "restore-portal");
   }, [manifest]);
 
+  // A different world shows its own look.
   useEffect(() => {
-    sessionLooks.set(manifest.levelId, selected);
+    setSelected((current) => current.id === worldBiome ? current : { ...current, id: worldBiome });
+  }, [worldBiome]);
+
+  useEffect(() => {
+    sessionLooks.set(manifest.levelId, { quality: selected.quality });
     sessionQuality = selected.quality;
-  }, [manifest.levelId, selected]);
+  }, [manifest.levelId, selected.quality]);
 
   useEffect(() => {
     if (!assets || !movement) return;
@@ -111,9 +123,9 @@ export function useBiomeAdventure({ manifest, assets, movement, onAdventure }: {
         setPresented({ id: selected.id, quality: selected.quality, layout });
       } catch (cause) {
         console.warn("[biome] look preparation failed", cause);
+        // What is on screen stays; the world keeps its own look (it is not
+        // retried until something it depends on changes).
         setError(THEME_FAILED_MESSAGE);
-        // Put the controls back on what is actually shown.
-        setSelected((current) => current === selected ? { id: presented.id, quality: presented.quality } : current);
       } finally {
         setThemeBusy(false);
       }
@@ -160,7 +172,7 @@ export function useBiomeAdventure({ manifest, assets, movement, onAdventure }: {
           setError(ADVENTURE_FAILED_MESSAGE);
           return;
         }
-        sessionLooks.set(accepted.manifest.levelId, { id: presented.id, quality: presented.quality });
+        sessionLooks.set(accepted.manifest.levelId, { quality: presented.quality });
         onAdventure(accepted.manifest);
       } catch (cause) {
         console.warn("[biome] adventure preparation failed", cause);
@@ -181,7 +193,7 @@ export function useBiomeAdventure({ manifest, assets, movement, onAdventure }: {
     template,
     busy,
     error,
-    setBiome: useCallback((id: BiomeId) => setSelected((current) => current.id === id ? current : { ...current, id }), []),
+    setBiome: useCallback((_id: BiomeId) => undefined, []),
     setQuality: useCallback((quality: EffectsQuality) => setSelected((current) => current.quality === quality ? current : { ...current, quality }), []),
     setTemplate,
     newAdventure,

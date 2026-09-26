@@ -1,16 +1,18 @@
-import { STYLE_DEFINITIONS } from "@shared/index.js";
+import { worldMusicPrompt } from "../audio/musicPrompt.js";
 import type {
   GameModeId,
   GeneratedImageReference,
   GenerationJob,
   GenerationRequest,
   PhotoReference,
+  SceneBiomeId,
+  SceneManifest,
   StyleId,
   SelectedWorldReferenceV1,
   WorldWorkflowV1,
 } from "@shared/index.js";
 
-export type CreationStep = "photo" | "review" | "customize" | "preview" | "building" | "ready";
+export type CreationStep = "photo" | "review" | "customize" | "biome" | "preview" | "building" | "ready";
 /** Creations saved before narration was removed may still carry a
  * `jobs.narration` entry; it is kept as history and never shown or retried. */
 export type CreationAttentionStage = "object" | "preview" | "shape" | "story" | "music";
@@ -25,6 +27,10 @@ export interface CreationSelection {
   style: StyleId;
   mode: GameModeId;
   atmosphere: string;
+  /** The world's biome. Set only once it is locked in, on leaving the biome
+   * step; from then on it cannot be changed for this world. A new photo
+   * clears it (see `withNewPhoto`). */
+  biome?: SceneBiomeId;
 }
 
 export interface ApprovedPreview {
@@ -119,19 +125,24 @@ function withoutPhotoWork(record: CreationRecord): CreationRecord {
   delete next.pendingPreview;
   delete next.reviewedImageAssetId;
   delete next.selectedReference;
+  if (next.selection.biome) {
+    const { biome: _biome, ...selection } = next.selection;
+    next.selection = selection;
+  }
   return next;
 }
 
-/** The creation with a new photo, ready for review. The cut-out, style
- * preview and approval all belonged to the old photo and are dropped, so
- * step 3 starts with an empty preview slot. Re-using the same photo keeps
- * them. */
+/** The creation with a new photo, ready for review. The cut-out, locked
+ * biome, style preview and approval all belonged to the old photo and are
+ * dropped, so the preview step starts with an empty slot. Re-using the same
+ * photo keeps them. */
 export function withNewPhoto(record: CreationRecord, photo: PhotoReference, now?: string): CreationRecord {
   const base = record.photo?.id === photo.id ? record : withoutPhotoWork(record);
   return withCreationUpdate(base, { photo, step: "review" }, now);
 }
 
-/** The creation back at step 1 with no photo, and nothing derived from one. */
+/** The creation back at step 1 with no photo, and nothing derived from one
+ * (its locked biome included). */
 export function withoutPhoto(record: CreationRecord, now?: string): CreationRecord {
   const next = withoutPhotoWork(record);
   delete next.photo;
@@ -155,7 +166,7 @@ export function withReadyPreview(next: CreationRecord, before: CreationRecord, j
 }
 
 /**
- * The picture for step 3's preview slot: this creation's own last successful
+ * The picture for the preview step's slot: this creation's own last successful
  * style preview, or nothing. Records saved before pending previews existed
  * could hold the cut-out or the photo itself as a stand-in while a preview was
  * loading; that is never shown as a preview.
@@ -179,8 +190,27 @@ export function approvedPreviewMatchesSelection(record: CreationRecord): boolean
   );
 }
 
+/** The biome is locked in: chosen, and never offered again for this world. */
+export function isBiomeLocked(record: CreationRecord): record is CreationRecord & { selection: { biome: SceneBiomeId } } {
+  return Boolean(record.selection.biome);
+}
+
+/** Locks a biome into the creation. A creation whose biome is already locked
+ * keeps it: the choice is final. The step is left alone, so the locking
+ * moment can play before the preview step opens. */
+export function withLockedBiome(record: CreationRecord, biome: SceneBiomeId, now?: string): CreationRecord {
+  if (record.selection.biome) return record;
+  return withCreationUpdate(record, { selection: { ...record.selection, biome } }, now);
+}
+
+/** Where a saved creation picks up. A creation saved at the preview step
+ * before biomes were chosen at creation goes back to choose one first. */
+export function resumeStep(record: CreationRecord): CreationStep {
+  return record.step === "preview" && !isBiomeLocked(record) ? "biome" : record.step;
+}
+
 export function canBuildWorld(record: CreationRecord): record is CreationRecord & { preview: ApprovedPreview } {
-  return approvedPreviewMatchesSelection(record);
+  return isBiomeLocked(record) && approvedPreviewMatchesSelection(record);
 }
 
 /** True only for a record that still looks exactly like what
@@ -212,6 +242,7 @@ export function isUntouchedCreationRecord(record: CreationRecord): boolean {
     && record.selection.style === DEFAULT_CREATION_SELECTION.style
     && record.selection.mode === DEFAULT_CREATION_SELECTION.mode
     && record.selection.atmosphere === DEFAULT_CREATION_SELECTION.atmosphere
+    && !record.selection.biome
   );
 }
 
@@ -221,12 +252,22 @@ export function creationNeedsAttention(record: CreationRecord): CreationAttentio
 }
 
 export function buildWorldExtrasRequests(record: CreationRecord, key: (prefix: string) => string): [CreationAttentionStage, GenerationRequest][] {
-  const definition = STYLE_DEFINITIONS[record.selection.style];
   const titleSubject = record.selection.atmosphere.trim() || "a tiny object world";
   const requests: [CreationAttentionStage, GenerationRequest][] = [];
   if (!record.jobs.story) requests.push(["story", { schemaVersion: 1, kind: "text", capability: "gemini-text", idempotencyKey: key("story"), purpose: "quest-text", prompt: `Write a short, family-friendly quest for ${titleSubject}. Mode: ${record.selection.mode}.\nReturn one JSON object only. Do not use Markdown or code fences.\nUse exactly these string fields and nothing else: "title" (2-80 characters), "intro" (20-320), "objective" (10-160).`, output: "quest-json", maxCharacters: 1200 }]);
-  if (!record.jobs.music) requests.push(["music", { schemaVersion: 1, kind: "music", capability: "music", idempotencyKey: key("music"), purpose: "world-soundtrack", prompt: definition.audioPrompts.music, durationSeconds: 15, instrumental: true, loop: true }]);
+  if (!record.jobs.music) requests.push(["music", { schemaVersion: 1, kind: "music", capability: "music", idempotencyKey: key("music"), purpose: "world-soundtrack", prompt: worldMusicPrompt(record.selection), durationSeconds: 15, instrumental: true, loop: true }]);
   return requests;
+}
+
+/**
+ * A prepared course carries the biome locked at creation, so play, saves and
+ * shares all show it. Its seed is the course's own seed, which is what the
+ * game has always used to decorate a look. A creation without a biome (made
+ * before biomes were chosen at creation) adds nothing.
+ */
+export function withCreationBiome<M extends Pick<SceneManifest, "seed" | "biome">>(manifest: M, record: CreationRecord | null): M {
+  const biome = record?.selection.biome;
+  return biome ? { ...manifest, biome: { id: biome, seed: manifest.seed.slice(0, 256) } } : manifest;
 }
 
 export function toWorldWorkflow(record: CreationRecord): WorldWorkflowV1 | null {
@@ -313,6 +354,7 @@ function draftStatus(step: CreationStep): string {
     case "photo": return "Add a photo to continue";
     case "review": return "Review your object";
     case "customize": return "Choose a look and adventure";
+    case "biome": return "Choose your world’s biome";
     case "preview": return "Approve your style preview";
     default: return "Continue creating";
   }

@@ -6,7 +6,7 @@ import { LoadingScreen } from "../components/LoadingScreen.js";
 import { courseCandidateOptions, replaceSavedCandidate } from "../courseCandidates.js";
 import { attachProvenance, resolveAssetForManifest } from "../manifestProvenance.js";
 import { loadActiveCreation, saveCreationRecord } from "../creationStorage.js";
-import { toWorldWorkflow, withCreationUpdate } from "../creationFlow.js";
+import { toWorldWorkflow, withCreationBiome, withCreationUpdate } from "../creationFlow.js";
 import { WorldReadyScreen } from "./WorldReadyScreen.js";
 import { repairGuidanceFor, type RepairGuidance } from "../../editor/repairGuidance.js";
 import { validateExperiencePlacements } from "../../game/placementValidation.js";
@@ -135,12 +135,14 @@ export function PreparationScreen({ source, isNew, onPlay, onSave, onExport, onB
         if (cancelled) return;
 
         const workflow = creation ? toWorldWorkflow(creation) : null;
-        const basePrimary = attachProvenance(result.manifest, cleanAsset, resolvedSourcePhotos);
+        // Every course offered carries the biome locked at creation, so play,
+        // saves and shares all show it.
+        const basePrimary = withCreationBiome(attachProvenance(result.manifest, cleanAsset, resolvedSourcePhotos), creation);
         // The world's own soundtrack, if it is ready; the server attaches a
         // later one when the world is saved or opened.
         const primary = workflow ? await attachWorldMusic({ ...basePrimary, workflow }, getJob) : basePrimary;
         const candidateManifests = (result.courseCandidates ?? []).map((candidate: SceneManifest) =>
-          workflow ? { ...attachProvenance(candidate, cleanAsset, resolvedSourcePhotos), workflow } : attachProvenance(candidate, cleanAsset, resolvedSourcePhotos),
+          workflow ? { ...withCreationBiome(attachProvenance(candidate, cleanAsset, resolvedSourcePhotos), creation), workflow } : withCreationBiome(attachProvenance(candidate, cleanAsset, resolvedSourcePhotos), creation),
         );
         const checkedPrimary = await validateForRepair(primary);
         const checkedCandidates = await Promise.all(candidateManifests.map(validateForRepair));

@@ -38,7 +38,7 @@ export function ReviewObjectScreen({
   const visibleUrl = showOriginal || !cutoutUrl ? originalUrl : cutoutUrl;
 
   return (
-    <CreationFrame activeStep={0} eyebrow="Step 1 of 4 · Review" title="Here’s your object." onBack={onBack}>
+    <CreationFrame activeStep={0} eyebrow="Step 1 of 5 · Review" title="Here’s your object." onBack={onBack}>
       <section className="oq-review">
         <Card className="oq-review__visual">
           <div className="oq-review__toolbar" aria-label="Object view">

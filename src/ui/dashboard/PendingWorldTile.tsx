@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button, Icon, Stepper } from "../components/index.js";
 import { buildStageNote } from "../buildStageNotes.js";
-import { LOOK_LABELS, MODE_LABELS, startedHint, type PendingWorld } from "../pendingWorlds.js";
+import { startedHint, worldChoicesLine, type PendingWorld } from "../pendingWorlds.js";
 import { WorldTile } from "./WorldTile.js";
 
 /**
@@ -22,7 +22,7 @@ export function PendingWorldTile({ world, now, retrying = false, retryError, onO
   onDiscard: () => void;
 }) {
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
-  const meta = `${LOOK_LABELS[world.style]} look · ${MODE_LABELS[world.mode]}`;
+  const meta = worldChoicesLine(world.style, world.mode, world.biome);
   const stepIndex = world.stages.findIndex((stage) => stage.id === world.currentStage.id) + 1;
   const note = buildStageNote(world.currentStage);
 
