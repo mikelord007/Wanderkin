@@ -30,6 +30,12 @@ A leftover `narrationScript` field (from the retired narration feature) is dropp
 - one 15-second ambience `sfx` job, marked to loop during game playback;
 - seven 3-second `sfx` jobs: fragment pickup, portal activate, checkpoint, fall/respawn, race start, race finish, completion.
 
+### A world's own soundtrack
+
+The creation flow asks for one music job per world (purpose `world-soundtrack`) alongside the story; the saved manifest keeps only its job id in `workflow.jobs`. `shared/worldMusic.ts` copies that job's ready asset into `media.audio` as the world's music, using the newest `music` workflow entry only (older clients carried jobs over from an earlier creation, so an older entry may belong to another world). The levels API does this when a level is created, saved and opened, and only for a job the requester may see, so music that finishes after the world was saved is attached and stored the next time the world is opened. Until then the bundled loop plays.
+
+The music prompt comes from `src/audio/musicPrompt.ts`: instrumental background music shaped by the object and the player's atmosphere words (a toy plane gets light, airy, soaring music; a sofa gets cosy, warm music), plus the look, biome and mode. The capability is sent `instrumental: true`, but the model has sung anyway, so every music and ambience prompt also says "instrumental only, no vocals, no singing, no lyrics, no spoken words", and words that invite a voice are removed from the player's text.
+
 There is no narration: no `tts` job is requested for a new world, either here or by the creation flow (`src/ui/creationFlow.ts` asks only for the story and a music preview). The idempotency key still hashes an always-empty `narrationScript` field so every remaining cue keeps the key it had before narration was removed.
 
 Prompts begin with the matching shared style audio fields. Each cue has an input-derived idempotency key. Submitting unchanged inputs therefore reconciles the stored job instead of starting new generation. Refresh reads existing job IDs; retry addresses only the failed job. `Promise.allSettled` isolates submission errors, and `playable: true` is invariant for every audio result. Only ready assets are attached to `manifest.media.audio`, retaining gateway provenance.

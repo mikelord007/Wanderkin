@@ -41,10 +41,27 @@ describe("audio orchestration", () => {
     expect(AUDIO_CUES).not.toContain("narration");
   });
 
-  it("keeps existing cue idempotency keys unchanged so stored jobs still reconcile", () => {
+  it("keeps existing SFX idempotency keys unchanged so stored jobs still reconcile", () => {
     // Pinned from the keys issued before narration was removed.
-    expect(audioKey(input, "music")).toBe("audio-music-e04d36a3");
     expect(audioKey(input, "completion")).toBe("audio-completion-f8ca0168");
+    expect(audioKey(input, "fragment-pickup")).toBe(audioKey({ ...input }, "fragment-pickup"));
+  });
+
+  it("gives music and ambience new keys now that their prompts changed, so a stored job never conflicts", () => {
+    // Before the no-vocals prompts, music was keyed audio-music-e04d36a3.
+    expect(audioKey(input, "music")).not.toBe("audio-music-e04d36a3");
+  });
+
+  it("asks for instrumental background music and ambience with vocals banned in words", () => {
+    const requests = buildAudioRequests(input);
+    for (const cue of ["music", "ambience"] as const) {
+      const request = requests.find((item) => item.cue === cue)!.request;
+      expect(request.kind === "music" || request.kind === "sfx" ? request.prompt : "").toContain("instrumental only, no vocals, no singing, no lyrics, no spoken words");
+    }
+    const music = requests.find((item) => item.cue === "music")!.request;
+    expect(music).toMatchObject({ instrumental: true, durationSeconds: 15 });
+    expect(music.kind === "music" ? music.prompt : "").toMatch(/background bed/);
+    expect(music.kind === "music" ? music.prompt : "").toContain("a ceramic fox");
   });
 
   it("runs jobs independently and keeps the world playable on optional failures", async () => {

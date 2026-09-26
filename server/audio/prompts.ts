@@ -1,4 +1,5 @@
 import { STYLE_DEFINITIONS, type GenerationRequest, type StyleId } from "../../shared/index.js";
+import { NO_VOCALS, worldMusicPrompt } from "../../src/audio/musicPrompt.js";
 
 export const AUDIO_CUES = [
   "music",
@@ -25,9 +26,10 @@ export function buildAudioRequests(input: AudioPromptInput): ReadonlyArray<{ cue
   const definition = STYLE_DEFINITIONS[input.style];
   const context = [input.objectDescription.trim(), input.atmosphere?.trim()].filter(Boolean).join(", ");
   const finish = (description: string) => `${description}. ${definition.label} miniature adventure; ${context}; clean game-ready sound, no speech, no copyrighted melody.`;
+  const music = worldMusicPrompt({ style: input.style, mode: "explore", atmosphere: input.atmosphere ?? "", objectDescription: input.objectDescription });
   return [
-    { cue: "music", request: { schemaVersion: 1, kind: "music", capability: "music", idempotencyKey: audioKey(input, "music"), purpose: "audio:music", prompt: finish(definition.audioPrompts.music), durationSeconds: 15, instrumental: true, loop: true } },
-    { cue: "ambience", request: { schemaVersion: 1, kind: "sfx", capability: "mirelo-sfx", idempotencyKey: audioKey(input, "ambience"), purpose: "audio:ambience", prompt: finish(definition.audioPrompts.ambience), durationSeconds: 15, loop: true } },
+    { cue: "music", request: { schemaVersion: 1, kind: "music", capability: "music", idempotencyKey: audioKey(input, "music"), purpose: "audio:music", prompt: music, durationSeconds: 15, instrumental: true, loop: true } },
+    { cue: "ambience", request: { schemaVersion: 1, kind: "sfx", capability: "mirelo-sfx", idempotencyKey: audioKey(input, "ambience"), purpose: "audio:ambience", prompt: `${finish(definition.audioPrompts.ambience)} Soft background bed, ${NO_VOCALS}.`, durationSeconds: 15, loop: true } },
     { cue: "fragment-pickup", request: sfx(input, "fragment-pickup", finish(definition.audioPrompts.collectSfx), 3) },
     { cue: "portal-activate", request: sfx(input, "portal-activate", finish(definition.audioPrompts.portalSfx), 3) },
     { cue: "checkpoint", request: sfx(input, "checkpoint", finish("short bright checkpoint confirmation"), 3) },
@@ -52,6 +54,9 @@ export function audioKey(input: AudioPromptInput, cue: AudioCue): string {
     // key is unchanged and resubmitting a world reconciles its stored jobs.
     narrationScript: "",
     cue,
+    // Music and ambience prompts were rewritten to ban vocals; a new key keeps
+    // a job stored under the old prompt from coming back as a conflict.
+    ...(cue === "music" || cue === "ambience" ? { promptRevision: 2 } : {}),
   });
   // Browser-compatible FNV-1a is sufficient for deterministic idempotency;
   // the gateway still compares the complete request before reconciliation.
