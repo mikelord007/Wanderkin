@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import type { GenerationJob, JobError } from "../../shared/job.js";
 import type { GenerationRequest, GenerationResult } from "../../shared/generation.js";
@@ -67,6 +68,42 @@ const MAX_AUTO_RETRIES = 1;
 /** Failures a re-run cannot fix. */
 const NO_AUTO_RETRY_CODES = new Set(["budget_exceeded", "cost_not_bounded", "unsafe_url", "download_too_large", "idempotency_retention_expired"]);
 const PROVIDER_ID = "livepeer-agent-mcp";
+/** A poll slower than this is logged with the step it was in. */
+const SLOW_POLL_LOG_MS = 30_000;
+/** A poll's hard limit. Each step is bounded on its own (status 20 s,
+ * download 60 s), so only a hang or an unusually slow automatic re-run
+ * submit reaches it. */
+const POLL_TIMEOUT_MS = 5 * 60_000;
+/** A wait for a job's lock longer than this is logged. */
+const LOCK_WAIT_LOG_MS = 30_000;
+
+interface PollAttempt {
+  jobId: string;
+  token: number;
+  /** The step running now, and when it began. */
+  phase: string;
+  phaseStartedAt: number;
+  /** The longest finished step so far. */
+  slowestPhase?: { phase: string; ms: number };
+  kind: string;
+  purpose: string | undefined;
+  startedAt: number;
+}
+
+function enterPhase(attempt: PollAttempt, phase: string, now = Date.now()): void {
+  const ms = now - attempt.phaseStartedAt;
+  if (!attempt.slowestPhase || ms > attempt.slowestPhase.ms) attempt.slowestPhase = { phase: attempt.phase, ms };
+  attempt.phase = phase;
+  attempt.phaseStartedAt = now;
+}
+
+/** One line per poll event; ids and labels only, never prompts or text. A
+ * slow poll names its slowest step; a timed-out one the step it is stuck in. */
+function logPoll(event: "slow_poll" | "poll_timeout" | "stale_poll_write_dropped", attempt: PollAttempt): void {
+  if (event === "slow_poll") enterPhase(attempt, "done");
+  const phase = event === "slow_poll" ? attempt.slowestPhase?.phase : attempt.phase;
+  console.warn(JSON.stringify({ event, jobId: attempt.jobId, kind: attempt.kind, purpose: attempt.purpose, phase, ms: Date.now() - attempt.startedAt }));
+}
 const TERMINAL_PROVIDER_STATUSES = new Set(["failed", "cancelled", "canceled"]);
 
 /** Livepeer's documented `idempotency_key` cache retention is 24h — a
@@ -261,7 +298,85 @@ export class JobManager {
       dailyLimitUsd: number;
       ownerSecurity?: OwnerSecurity;
     },
-  ) {}
+    pollGuard: { slowPollMs?: number; pollTimeoutMs?: number; lockWaitLogMs?: number } = {},
+  ) {
+    this.slowPollMs = pollGuard.slowPollMs ?? SLOW_POLL_LOG_MS;
+    this.pollTimeoutMs = pollGuard.pollTimeoutMs ?? POLL_TIMEOUT_MS;
+    this.lockWaitLogMs = pollGuard.lockWaitLogMs ?? LOCK_WAIT_LOG_MS;
+  }
+
+  private readonly slowPollMs: number;
+  private readonly pollTimeoutMs: number;
+  private readonly lockWaitLogMs: number;
+  /** Set while a tick is reading the store and starting polls. */
+  private ticking = false;
+  /** Jobs with a poll queued or running (from a tick, a GET or a retry). */
+  private readonly pollsInFlight = new Map<string, number>();
+  /** The context of the poll attempt currently running, and each job's
+   * current attempt: an attempt abandoned by its timeout may still finish
+   * later, and its writes to the job are then dropped (see `save`). */
+  private readonly pollContext = new AsyncLocalStorage<PollAttempt>();
+  private readonly currentPollAttempt = new Map<string, number>();
+  private pollAttempts = 0;
+
+  /** Every job write goes through here. */
+  private async save(record: JobRecord): Promise<void> {
+    const attempt = this.pollContext.getStore();
+    if (attempt && attempt.jobId === record.job.id && this.currentPollAttempt.get(attempt.jobId) !== attempt.token) {
+      logPoll("stale_poll_write_dropped", attempt);
+      return;
+    }
+    await this.store.put(record);
+  }
+
+  /** Records which step a running poll is in, for the slow/timeout logs. */
+  private pollPhase(phase: string): void {
+    const attempt = this.pollContext.getStore();
+    if (attempt) enterPhase(attempt, phase);
+  }
+
+  /**
+   * Runs one poll attempt with a hard time limit. A poll that exceeds it is
+   * logged with the step it was stuck in, stops holding the job's lock, and
+   * the job is due again on the next tick; if the abandoned attempt finishes
+   * later, its writes are ignored.
+   */
+  private async boundedPoll(record: JobRecord, work: () => Promise<GenerationJob>): Promise<GenerationJob> {
+    const attempt: PollAttempt = {
+      jobId: record.job.id,
+      token: ++this.pollAttempts,
+      phase: "start",
+      phaseStartedAt: Date.now(),
+      kind: record.job.request?.kind ?? record.job.kind ?? "image-to-3d",
+      purpose: record.job.request?.purpose,
+      startedAt: Date.now(),
+    };
+    this.currentPollAttempt.set(attempt.jobId, attempt.token);
+    const running = this.pollContext.run(attempt, work);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<"timeout">((resolve) => {
+      timer = setTimeout(() => resolve("timeout"), this.pollTimeoutMs);
+      timer.unref?.();
+    });
+    try {
+      const outcome = await Promise.race([running, timedOut]);
+      if (outcome !== "timeout") {
+        if (Date.now() - attempt.startedAt > this.slowPollMs) logPoll("slow_poll", attempt);
+        return outcome;
+      }
+      running.catch(() => undefined);
+      logPoll("poll_timeout", attempt);
+      if (this.currentPollAttempt.get(attempt.jobId) === attempt.token) this.currentPollAttempt.delete(attempt.jobId);
+      const latest = (await this.store.get(attempt.jobId)) ?? record;
+      if (!isTerminalJobState(latest.job.state)) {
+        latest.internal.nextPollAt = Date.now();
+        await this.store.put(latest);
+      }
+      return toPublicJob(latest);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
   private async assertProviderCapacity(excludeJobId?: string): Promise<void> {
     const limit = this.generation?.maxInFlight ?? 4;
@@ -290,13 +405,19 @@ export class JobManager {
       occurredAt: new Date().toISOString(),
     };
     record.job.updatedAt = new Date().toISOString();
-    await this.store.put(record);
+    await this.save(record);
     return toPublicJob(record);
   }
 
   private runExclusive<T>(key: string, fn: () => Promise<T>): Promise<T> {
     const prior = this.locks.get(key) ?? Promise.resolve();
-    const run = prior.then(fn, fn);
+    const queuedAt = Date.now();
+    const start = () => {
+      const waitedMs = Date.now() - queuedAt;
+      if (key.startsWith("job:") && waitedMs > this.lockWaitLogMs) console.warn(JSON.stringify({ event: "lock_wait", key, ms: waitedMs }));
+      return fn();
+    };
+    const run = prior.then(start, start);
     this.locks.set(
       key,
       run.then(
@@ -323,7 +444,7 @@ export class JobManager {
       if (isTerminalJobState(record.job.state)) continue;
       if (record.job.providerJobId) {
         record.internal.nextPollAt = Date.now();
-        await this.store.put(record);
+        await this.save(record);
       } else {
         const jobId = record.job.id;
         await this.runExclusive(`job:${jobId}`, async () => {
@@ -341,7 +462,7 @@ export class JobManager {
               current.job.lastError = toJobError(error);
               current.job.completedAt = new Date().toISOString();
               current.job.updatedAt = current.job.completedAt;
-              await this.store.put(current);
+              await this.save(current);
               return;
             }
             await this.submitGenerationToProvider(
@@ -379,14 +500,24 @@ export class JobManager {
     }
   }
 
-  private async tick(): Promise<void> {
-    const now = Date.now();
-    const records = await this.store.all();
-    for (const record of records) {
-      if (isTerminalJobState(record.job.state)) continue;
-      if (!record.job.providerJobId) continue; // still being submitted inline by the request handler
-      if (record.internal.nextPollAt > now) continue;
-      await this.pollAndAdvance(record.job.id);
+  /** One scheduler pass. Ticks never overlap, and a tick only starts polls
+   * without waiting on them: a job whose poll is still in flight is skipped,
+   * so one hung job can never hold up the others. Public for tests. */
+  async tick(): Promise<void> {
+    if (this.ticking) return;
+    this.ticking = true;
+    try {
+      const now = Date.now();
+      const records = await this.store.all();
+      for (const record of records) {
+        if (isTerminalJobState(record.job.state)) continue;
+        if (!record.job.providerJobId) continue; // still being submitted inline by the request handler
+        if (record.internal.nextPollAt > now) continue;
+        if (this.pollsInFlight.has(record.job.id)) continue;
+        void this.pollAndAdvance(record.job.id).catch(() => undefined);
+      }
+    } finally {
+      this.ticking = false;
     }
   }
 
@@ -416,7 +547,7 @@ export class JobManager {
       const normalized = await this.generation!.generatedAssets.reconcileAudioDuration(result.asset);
       if (result.asset.durationSeconds !== normalized.durationSeconds) {
         result.asset.durationSeconds = normalized.durationSeconds;
-        await this.store.put(record);
+        await this.save(record);
       }
       return toPublicJob(record);
     });
@@ -462,7 +593,7 @@ export class JobManager {
         if (ownerId && this.generation?.ownerSecurity) {
           await this.generation.ownerSecurity.claim("job", record.job.id, ownerId);
         }
-        await this.store.put(record);
+        await this.save(record);
       });
       const submitted = await this.submitToProvider(record, request);
       return { status: "created", job: toPublicJob(submitted) };
@@ -518,7 +649,7 @@ export class JobManager {
           await this.generation.ownerSecurity.claim("job", record.job.id, options.ownerId);
           if (options.worldId) await this.generation.ownerSecurity.claim("world", options.worldId, options.ownerId);
         }
-        await this.store.put(record);
+        await this.save(record);
       });
       const submitted = await this.submitGenerationToProvider(record, request, effectiveRequestLimit);
       return { status: "created", job: toPublicJob(submitted) };
@@ -570,7 +701,7 @@ export class JobManager {
     record.job.state = photosForGeneration(request).length > 0 ? "uploading" : "generating";
     record.job.uiMessage = friendlyMessage(record.job.state);
     record.job.updatedAt = new Date().toISOString();
-    await this.store.put(record);
+    await this.save(record);
 
     try {
       const result = await this.adapter.submitGeneration({ ...request, maxCostUsd: requestLimitUsd });
@@ -604,7 +735,7 @@ export class JobManager {
       record.job.lastError = toJobError(err);
       record.job.updatedAt = new Date().toISOString();
     }
-    await this.store.put(record);
+    await this.save(record);
     return record;
   }
 
@@ -648,7 +779,7 @@ export class JobManager {
     record.job.state = "uploading";
     record.job.uiMessage = friendlyMessage("uploading");
     record.job.updatedAt = new Date().toISOString();
-    await this.store.put(record);
+    await this.save(record);
 
     try {
       const result = await this.adapter.submit({
@@ -672,7 +803,7 @@ export class JobManager {
       record.job.lastError = toJobError(err);
       record.job.updatedAt = new Date().toISOString();
     }
-    await this.store.put(record);
+    await this.save(record);
     return record;
   }
 
@@ -682,11 +813,18 @@ export class JobManager {
    * (or two concurrent GETs) can't interleave and finalize/write over each
    * other. */
   async pollAndAdvance(jobId: string, opts: { force?: boolean } = {}): Promise<GenerationJob | undefined> {
-    return this.runExclusive(`job:${jobId}`, async () => {
-      const record = await this.store.get(jobId);
-      if (!record) return undefined;
-      return this.pollAndAdvanceLocked(record, opts);
-    });
+    this.pollsInFlight.set(jobId, (this.pollsInFlight.get(jobId) ?? 0) + 1);
+    try {
+      return await this.runExclusive(`job:${jobId}`, async () => {
+        const record = await this.store.get(jobId);
+        if (!record) return undefined;
+        return this.boundedPoll(record, () => this.pollAndAdvanceLocked(record, opts));
+      });
+    } finally {
+      const remaining = (this.pollsInFlight.get(jobId) ?? 1) - 1;
+      if (remaining > 0) this.pollsInFlight.set(jobId, remaining);
+      else this.pollsInFlight.delete(jobId);
+    }
   }
 
   /** Core poll/advance logic. Must only be called while already holding
@@ -698,6 +836,7 @@ export class JobManager {
     if (record.job.request) return this.pollGenerationLocked(record);
 
     try {
+      this.pollPhase("provider-status");
       const status = await this.adapter.getStatus(record.job.providerJobId);
       record.internal.lastProviderStatusRaw = status;
 
@@ -718,7 +857,8 @@ export class JobManager {
         record.job.state = "downloading";
         record.job.uiMessage = friendlyMessage("downloading");
         record.job.updatedAt = new Date().toISOString();
-        await this.store.put(record);
+        await this.save(record);
+        this.pollPhase("download");
         await this.finalizeReady(record, status.resultAssetUrl, status.actualRegisteredModel);
       } else {
         record.internal.backoffMs = Math.min(record.internal.backoffMs * 1.6, MAX_BACKOFF_MS);
@@ -750,13 +890,14 @@ export class JobManager {
       }
     }
 
-    await this.store.put(record);
+    await this.save(record);
     return toPublicJob(record);
   }
 
   private async pollGenerationLocked(record: JobRecord): Promise<GenerationJob> {
     if (!record.job.providerJobId || !record.job.request || !this.adapter.getGenerationStatus) return toPublicJob(record);
     try {
+      this.pollPhase("provider-status");
       const status = await this.adapter.getGenerationStatus(record.job.providerJobId);
       record.internal.lastProviderStatusRaw = status;
       if (status.actualCapabilityUsed) record.job.capabilityUsed = status.actualCapabilityUsed;
@@ -785,6 +926,7 @@ export class JobManager {
         record.job.updatedAt = record.job.completedAt;
         record.job.provenance = buildProvenance(record.job);
       } else if (status.state === "ready" && status.output) {
+        this.pollPhase("finalize");
         await this.finalizeGenerationOutput(record, status.output, status.actualRegisteredModel);
       } else {
         record.internal.backoffMs = Math.min(record.internal.backoffMs * 1.6, MAX_BACKOFF_MS);
@@ -813,8 +955,12 @@ export class JobManager {
       record.job.completedAt = new Date().toISOString();
       record.job.updatedAt = record.job.completedAt;
     }
-    if (this.canAutoRetry(record)) return toPublicJob(await this.autoRetry(record));
-    await this.store.put(record);
+    if (this.canAutoRetry(record)) {
+      this.pollPhase("auto-retry");
+      return toPublicJob(await this.autoRetry(record));
+    }
+    this.pollPhase("save");
+    await this.save(record);
     return toPublicJob(record);
   }
 
@@ -859,7 +1005,7 @@ export class JobManager {
       ...buildProvenance(record.job),
       servedModel: servedModel ?? record.job.provenance?.servedModel ?? null,
     };
-    await this.store.put(record);
+    await this.save(record);
 
     try {
       let result: GenerationResult;
@@ -1003,7 +1149,7 @@ export class JobManager {
         record.job.providerJobId,
         status.actualRegisteredModel,
       );
-      await this.store.put(record);
+      await this.save(record);
       return repaired;
     });
   }
@@ -1028,9 +1174,9 @@ export class JobManager {
         if (record.job.state === "failed") {
           record.job.state = "generating";
           delete record.job.lastError;
-          await this.store.put(record);
+          await this.save(record);
         }
-        return this.pollAndAdvanceLocked(record, { force: true });
+        return this.boundedPoll(record, () => this.pollAndAdvanceLocked(record, { force: true }));
       }
 
       if (record.job.request) assertRequestCostBounded(record.job.request);
@@ -1048,7 +1194,7 @@ export class JobManager {
         record.job.retryCount += 1;
         record.job.state = "queued";
         delete record.job.lastError;
-        await this.store.put(record);
+        await this.save(record);
       });
 
       const updated = record.job.request

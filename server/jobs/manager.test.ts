@@ -1014,6 +1014,96 @@ describe("JobManager", () => {
     expect(vi.mocked(downloadBounded)).toHaveBeenCalledTimes(1);
   });
 
+  describe("the poll scheduler cannot be stalled by one hung job", () => {
+    const story = v2Requests.find((request) => request.kind === "text")!;
+    const music = v2Requests.find((request) => request.kind === "music")!;
+    const READY_STORY: ProviderGenerationStatus = { state: "ready", output: { text: JSON.stringify({ title: "Forest Colors", intro: "The forest has lost its colors. Bring them back.", objective: "Find every lost color." }), outputKind: "text" } };
+
+    function guarded(adapter: ProviderAdapter & GenerationProviderAdapter, pollGuard: { slowPollMs?: number; pollTimeoutMs?: number; lockWaitLogMs?: number }) {
+      return new JobManager(new JobStore(dir), adapter, new AssetStore(dir), new PhotoStore(dir), {
+        generatedAssets: new GeneratedAssetStore(dir), spendLedger: new SpendLedger(dir),
+        perRequestLimitUsd: 2, perWorldLimitUsd: 8, maxRetries: 2, maxInFlight: 100, globalLimitUsd: 100, dailyLimitUsd: 20,
+      }, pollGuard);
+    }
+    const warnings = () => vi.mocked(console.warn).mock.calls.map(([line]) => JSON.parse(String(line)) as Record<string, unknown>);
+    beforeEach(() => { vi.spyOn(console, "warn").mockImplementation(() => undefined); });
+    afterEach(() => { vi.mocked(console.warn).mockRestore(); });
+
+    it("never runs two ticks at once, so no job is polled twice by overlapping ticks", async () => {
+      const adapter = fakeMultiAdapter();
+      const manager = guarded(adapter, {});
+      await manager.submitGenerationOrReconcile(story, { worldId: "w" });
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        vi.setSystemTime(Date.now() + 10_000);
+        await Promise.all([manager.tick(), manager.tick()]);
+        await vi.waitFor(() => expect(adapter.getGenerationStatus).toHaveBeenCalledTimes(1));
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(adapter.getGenerationStatus).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("skips a job whose poll is still in flight and keeps polling the others", async () => {
+      const hung = new Promise<ProviderGenerationStatus>(() => undefined);
+      const adapter = fakeMultiAdapter({
+        getGenerationStatus: vi.fn(async (providerJobId: string) => (providerJobId.includes(story.idempotencyKey) ? hung : { state: "generating" as const })),
+      });
+      const manager = guarded(adapter, { pollTimeoutMs: 60_000 });
+      await manager.submitGenerationOrReconcile(story, { worldId: "w" });
+      await manager.submitGenerationOrReconcile(music, { worldId: "w" });
+      const polled = (key: string) => vi.mocked(adapter.getGenerationStatus!).mock.calls.filter(([id]) => id.includes(key)).length;
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        vi.setSystemTime(Date.now() + 10_000);
+        await manager.tick();
+        await vi.waitFor(() => expect(polled(music.idempotencyKey)).toBe(1));
+        vi.setSystemTime(Date.now() + 120_000);
+        await manager.tick();
+        await vi.waitFor(() => expect(polled(music.idempotencyKey)).toBe(2));
+        expect(polled(story.idempotencyKey)).toBe(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("bounds a hung poll: logs where it hung, releases the lock, and ignores the abandoned poll's late write", async () => {
+      let releaseHung: (status: ProviderGenerationStatus) => void = () => undefined;
+      const statuses: Array<Promise<ProviderGenerationStatus>> = [
+        new Promise((resolve) => { releaseHung = resolve; }),
+        Promise.resolve(READY_STORY),
+      ];
+      const adapter = fakeMultiAdapter({ getGenerationStatus: vi.fn(() => statuses.shift()!) });
+      const manager = guarded(adapter, { pollTimeoutMs: 50 });
+      const outcome = await manager.submitGenerationOrReconcile(story, { worldId: "w" });
+
+      const timedOut = await manager.pollAndAdvance(outcome.job.id, { force: true });
+      expect(timedOut?.state).toBe("generating");
+      expect(warnings()).toContainEqual(expect.objectContaining({ event: "poll_timeout", jobId: outcome.job.id, kind: "text", purpose: story.purpose, phase: "provider-status" }));
+
+      // The lock is free again: the next attempt finishes the story.
+      expect((await manager.pollAndAdvance(outcome.job.id, { force: true }))?.state).toBe("ready");
+
+      // The abandoned attempt finally answers; its stale write must not undo the story.
+      releaseHung({ state: "generating" });
+      await vi.waitFor(() => expect(warnings()).toContainEqual(expect.objectContaining({ event: "stale_poll_write_dropped", jobId: outcome.job.id })));
+      expect((await manager.getPublic(outcome.job.id))?.state).toBe("ready");
+      expect(JSON.stringify(vi.mocked(console.warn).mock.calls)).not.toContain(story.prompt);
+    });
+
+    it("logs a slow poll and a long wait for the per-job lock", async () => {
+      const adapter = fakeMultiAdapter({
+        getGenerationStatus: vi.fn(async () => { await new Promise((resolve) => setTimeout(resolve, 60)); return { state: "generating" as const }; }),
+      });
+      const manager = guarded(adapter, { slowPollMs: 20, lockWaitLogMs: 20, pollTimeoutMs: 5_000 });
+      const outcome = await manager.submitGenerationOrReconcile(story, { worldId: "w" });
+      await Promise.all([manager.pollAndAdvance(outcome.job.id, { force: true }), manager.pollAndAdvance(outcome.job.id, { force: true })]);
+      expect(warnings()).toContainEqual(expect.objectContaining({ event: "slow_poll", jobId: outcome.job.id, kind: "text", purpose: story.purpose, phase: "provider-status" }));
+      expect(warnings()).toContainEqual(expect.objectContaining({ event: "lock_wait", key: `job:${outcome.job.id}` }));
+    });
+  });
+
   describe("story and sound jobs recover instead of failing the world", () => {
     const story = v2Requests.find((request) => request.kind === "text")!;
     const music = v2Requests.find((request) => request.kind === "music")!;
