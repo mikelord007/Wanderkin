@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createCreationRecord, type CreationJobRef, type CreationRecord } from "./creationFlow.js";
-import { pendingWorldsFrom, startedHint, toPendingWorld, unfinishedBuildJobs, worldBuildStages } from "./pendingWorlds.js";
+import { extraRetryMode, extrasToSubmit, failedExtraStage, pendingWorldsFrom, startedHint, toPendingWorld, unfinishedBuildJobs, worldBuildStages } from "./pendingWorlds.js";
 import {
   discardPendingWorld,
   findCreationByShapeJob,
@@ -50,6 +50,60 @@ describe("worldBuildStages", () => {
     const stages = worldBuildStages(record);
     expect(stages[3]).toMatchObject({ status: "error", detail: "Your world stays playable. Sound can be added later." });
     expect(toPendingWorld(record)?.state).toBe("done");
+  });
+});
+
+/** Recorded from storage/jobs.json: job_7c48d489 (the 60 s soundtrack asked
+ * for before 9e87271) and job_02ca4c57 (a story the provider could not finish). */
+const OLD_SOUNDTRACK_REFUSAL = "`create_media` was refused before it ran, so nothing was dispatched and nothing was charged. One argument is wrong:\n- `duration` must be at most 15.";
+const STORY_PROVIDER_FAILURE = "The provider rejected the generation request. Check the selected model settings and try again.";
+
+describe("story and sound stage honesty", () => {
+  const key = (prefix: string) => `${prefix}-fresh`;
+
+  it("is pending, with no alarm, while story and music were never asked for", () => {
+    const record = building("a", ref("s", "ready"));
+    expect(worldBuildStages(record)[3]).toEqual({ id: "story", label: "Adding its story and sound", status: "pending" });
+    expect(failedExtraStage(record)).toBeUndefined();
+  });
+
+  it("is active, with no alarm, while story and music are still being made", () => {
+    const record = building("a", ref("s", "ready"));
+    record.jobs.story = ref("st", "generating", { kind: "text" });
+    record.jobs.music = ref("m", "queued", { kind: "music" });
+    expect(worldBuildStages(record)[3]).toMatchObject({ status: "active" });
+    expect(worldBuildStages(record)[3]).not.toHaveProperty("detail");
+    expect(failedExtraStage(record)).toBeUndefined();
+  });
+
+  it("asks again, quietly, for a soundtrack stored with the old 60 s refusal", () => {
+    const record = building("a", ref("s", "ready"));
+    record.jobs.story = ref("st", "ready", { kind: "text" });
+    record.jobs.music = ref("job_7c48d489", "failed", { kind: "music", error: OLD_SOUNDTRACK_REFUSAL, retryable: false });
+    expect(worldBuildStages(record)[3]).toEqual({ id: "story", label: "Adding its story and sound", status: "active" });
+    expect(failedExtraStage(record)).toBeUndefined();
+    const requests = extrasToSubmit(record, key);
+    expect(requests.map(([stage]) => stage)).toEqual(["music"]);
+    expect(requests[0]![1]).toMatchObject({ kind: "music", durationSeconds: 15, idempotencyKey: "music-fresh" });
+  });
+
+  it("raises the alarm only for a story or music job that really failed", () => {
+    const record = building("a", ref("s", "ready"));
+    record.jobs.story = ref("job_02ca4c57", "failed", { kind: "text", error: STORY_PROVIDER_FAILURE, retryable: false });
+    record.jobs.music = ref("m", "ready", { kind: "music" });
+    expect(failedExtraStage(record)).toBe("story");
+    expect(worldBuildStages(record)[3]).toMatchObject({ status: "error", detail: "Your world stays playable. Sound can be added later." });
+    // A real failure is never resubmitted behind the user's back.
+    expect(extrasToSubmit(record, key)).toEqual([]);
+  });
+
+  it("retries a failure the server will not retry by asking for a fresh story", () => {
+    const record = building("a", ref("s", "ready"));
+    record.jobs.story = ref("job_02ca4c57", "failed", { kind: "text", error: STORY_PROVIDER_FAILURE, retryable: false });
+    record.jobs.music = ref("m", "ready", { kind: "music" });
+    expect(extraRetryMode(record.jobs.story)).toBe("resubmit");
+    expect(extrasToSubmit(record, key, ["story"]).map(([stage, request]) => [stage, request.idempotencyKey])).toEqual([["story", "story-fresh"]]);
+    expect(extraRetryMode(ref("m", "failed", { kind: "music", error: "Upstream timed out", retryable: true }))).toBe("retry-job");
   });
 });
 

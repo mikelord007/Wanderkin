@@ -41,7 +41,9 @@ export function StylePreviewScreen({
         <Card data-state={state}>
           <figure>
             <div className="oq-style-preview__image">
-              {previewUrl ? <img src={previewUrl} alt={`Your object in the ${lookLabel} style`} /> : <div className="oq-style-preview__placeholder" />}
+              {previewUrl
+                ? <img src={previewUrl} alt={`Your object in the ${lookLabel} style`} />
+                : <div className="oq-style-preview__placeholder" data-loading={state === "loading"}><span>Your preview will appear here</span></div>}
               {state === "loading" ? <div className="oq-style-preview__loading" role="status"><span className="oq-kit-spinner" aria-hidden="true" />Finding your world’s look…</div> : null}
             </div>
             <figcaption><span>{lookLabel}</span>{approved ? <strong>✓ Approved for build</strong> : "Style preview"}</figcaption>

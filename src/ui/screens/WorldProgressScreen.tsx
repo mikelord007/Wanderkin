@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { GenerationJob } from "@shared/index.js";
-import { Button, Card, ProgressPanel, type ProgressStage } from "../components/index.js";
+import { Button, Card, ProgressPanel } from "../components/index.js";
 import { describeApiError, getJob, retryJob, submitGeneration } from "../api.js";
-import { loadActiveCreation, saveCreationRecord, updateCreationJob } from "../creationStorage.js";
-import { buildWorldExtrasRequests, type CreationAttentionStage, type CreationRecord } from "../creationFlow.js";
+import { loadActiveCreation, loadCreationRecords, saveCreationRecord, updateCreationJob } from "../creationStorage.js";
+import type { CreationAttentionStage, CreationRecord } from "../creationFlow.js";
+import { extraRetryMode, extrasToSubmit, failedExtraStage, worldBuildStages, type ExtraStage } from "../pendingWorlds.js";
 import { formatElapsed, useElapsedSeconds } from "../useElapsedSeconds.js";
 import { useJobPolling } from "../useJobPolling.js";
+import { EXTRAS_REASK_MS, reaskMissingExtras } from "../worldBuild.js";
 import { CreationFrame } from "./CreationFrame.js";
 
 interface WorldProgressScreenProps { jobId: string; onReady: (job: GenerationJob) => void; onCancel: () => void; }
@@ -18,11 +20,11 @@ export function WorldProgressScreen({ jobId, onReady, onCancel }: WorldProgressS
   const [jobs, setJobs] = useState<FullJobs>({});
   const [actionError, setActionError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState<CreationAttentionStage | null>(null);
-  const started = useRef(false);
   const elapsed = useElapsedSeconds(shapeJob?.startedAt ?? shapeJob?.createdAt);
 
   function persistJob(stage: CreationAttentionStage, job: GenerationJob) {
-    const current = loadActiveCreation() ?? record; if (!current) return;
+    // This screen's own creation, even if another one has since become active.
+    const current = loadCreationRecords().find(candidate => candidate.id === record?.id) ?? record; if (!current) return;
     const next = updateCreationJob(current, stage, job); saveCreationRecord(next); setRecord(next);
     setJobs(previous => ({ ...previous, [stage]: job }));
   }
@@ -30,9 +32,16 @@ export function WorldProgressScreen({ jobId, onReady, onCancel }: WorldProgressS
   useEffect(() => { if (shapeJob) persistJob("shape", shapeJob); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [shapeJob?.state, shapeJob?.updatedAt]);
 
   useEffect(() => {
-    if (!record || started.current) return; started.current = true;
-    for (const [stage, request] of buildWorldExtrasRequests(record, key)) submitGeneration({ request, worldId: record.id }).then(job => persistJob(stage, job)).catch(error => setActionError(describeApiError(error)));
-  // one orchestration pass per mounted durable creation
+    const id = record?.id; if (!id) return;
+    // Only what is still missing: never asked for, turned away (busy, over a
+    // limit), or the superseded 60 s soundtrack; asked again every so often
+    // while this screen is open. A real failure waits for Retry.
+    const ask = () => {
+      const current = loadCreationRecords().find(candidate => candidate.id === id);
+      if (current) void reaskMissingExtras(current, { submit: request => submitGeneration({ request, worldId: id }), record: persistJob, key });
+    };
+    ask(); const timer = window.setInterval(ask, EXTRAS_REASK_MS);
+    return () => window.clearInterval(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [record?.id]);
 
@@ -45,7 +54,19 @@ export function WorldProgressScreen({ jobId, onReady, onCancel }: WorldProgressS
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [record?.jobs.story?.state, record?.jobs.music?.state]);
 
+  function submitExtra(stage: ExtraStage, request: Parameters<typeof submitGeneration>[0]["request"]) {
+    if (!record) return Promise.resolve();
+    return submitGeneration({ request, worldId: record.id }).then(job => persistJob(stage, job)).catch(error => setActionError(describeApiError(error)));
+  }
+
   async function retry(stage: CreationAttentionStage) {
+    if ((stage === "story" || stage === "music") && record && extraRetryMode(record.jobs[stage]) === "resubmit") {
+      // The server would hand back the same failed job; ask for a fresh one.
+      setRetrying(stage); setActionError(null);
+      try { for (const [extraStage, request] of extrasToSubmit(record, key, [stage])) if (extraStage === stage) await submitExtra(stage, request); }
+      finally { setRetrying(null); }
+      return;
+    }
     const ref = stage === "shape" ? shapeJob : record?.jobs[stage] ? jobs[stage] ?? record.jobs[stage] : undefined;
     if (!ref) return; setRetrying(stage); setActionError(null);
     try { const next = await retryJob(ref.id); persistJob(stage, next); if (stage === "shape") restart(); }
@@ -58,13 +79,9 @@ export function WorldProgressScreen({ jobId, onReady, onCancel }: WorldProgressS
   const intro = typeof structured?.intro === "string" ? structured.intro : typeof structured?.objective === "string" ? structured.objective : record?.questIntro;
   const music = jobs.music?.result?.kind === "music" ? jobs.music.result.asset : null;
   const shapeState = shapeJob?.state;
-  const optionalFailed = (["story", "music"] as const).find(stage => record?.jobs[stage]?.state === "failed");
-  const stages: ProgressStage[] = [
-    { id: "object", label: "Preparing your object", status: record?.jobs.object?.state === "failed" ? "error" : "complete" },
-    { id: "shape", label: "Building its 3D shape", status: shapeState === "failed" ? "error" : shapeState === "ready" ? "complete" : "active", ...(shapeJob?.uiMessage ? { detail: shapeJob.uiMessage } : {}) },
-    { id: "course", label: "Creating your course", status: shapeState === "ready" ? "active" : "pending", detail: shapeState === "ready" ? "The shape is ready for course preparation." : "Begins when the shape is ready." },
-    { id: "story", label: "Adding its story and sound", status: optionalFailed ? "error" : record?.jobs.story?.state === "ready" && record.jobs.music?.state === "ready" ? "complete" : record?.jobs.story || record?.jobs.music ? "active" : "pending", ...(optionalFailed ? { detail: "Your world stays playable. Sound can be added later." } : {}) },
-  ];
+  // The same stages and alarm rule a My worlds card uses (pendingWorlds.ts).
+  const optionalFailed = failedExtraStage(record);
+  const stages = worldBuildStages(record, shapeJob ? { state: shapeJob.state, uiMessage: shapeJob.uiMessage } : null);
 
   return <CreationFrame activeStep={3} eyebrow="Step 4 of 4 · World" title="Your world is taking shape." style={record?.selection.style ?? "cartoon"}>
     <section className="oq-world-progress">

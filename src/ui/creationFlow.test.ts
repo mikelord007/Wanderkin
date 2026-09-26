@@ -44,6 +44,15 @@ describe("creation flow", () => {
     }
   });
 
+  it("asks for the story as bare JSON with only the three fields and their limits", () => {
+    const story = buildWorldExtrasRequests(createCreationRecord("world-1", "2026-09-24T00:00:00.000Z"), prefix => `${prefix}-key`).find(([stage]) => stage === "story")?.[1];
+    expect(story?.kind).toBe("text");
+    const prompt = story?.kind === "text" ? story.prompt : "";
+    expect(prompt).toContain("Do not use Markdown or code fences.");
+    expect(prompt).toContain('"title" (2-80 characters), "intro" (20-320), "objective" (10-160)');
+    expect(prompt).not.toContain("narrationScript");
+  });
+
   it("requests only the story and music for world extras — no narration voice", () => {
     const requests = buildWorldExtrasRequests(createCreationRecord("world-1", "2026-09-24T00:00:00.000Z"), prefix => `${prefix}-key`);
     expect(requests.map(([stage]) => stage)).toEqual(["story", "music"]);

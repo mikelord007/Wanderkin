@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { visibleToCurrentOwner } from "../../auth/credentials.js";
-import { getJob, retryJob, describeApiError } from "../api.js";
+import { getJob, retryJob, describeApiError, submitGeneration } from "../api.js";
 import { createBuildPoller } from "../buildPoller.js";
 import { loadCreationRecords, saveCreationRecord, updateCreationJob } from "../creationStorage.js";
 import { unfinishedBuildJobs, type PendingWorld } from "../pendingWorlds.js";
 import { discardPendingWorld, loadPendingWorldCards } from "../pendingWorldStore.js";
+import { EXTRAS_REASK_MS, reaskMissingExtras } from "../worldBuild.js";
 
 /** One poller for the whole app: every card shares its single timer. */
 const sharedPoller = createBuildPoller({ fetchJob: getJob });
+function newKey(prefix: string): string { return `${prefix}-${"randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`}`; }
 
 function buildRecords() {
   return loadCreationRecords().filter((record) => visibleToCurrentOwner(record.ownerId));
@@ -47,6 +49,30 @@ export function usePendingWorlds() {
     });
     return () => unwatch.forEach((stop) => stop());
   }, [watchKey, reload]);
+
+  // Story and music a build is still missing (turned away while the service
+  // was busy, or never asked for) are asked for again from here too, so a
+  // world gets its sound even if its progress screen is never opened.
+  const anyBuild = cards.length > 0;
+  useEffect(() => {
+    if (!anyBuild) return;
+    const ask = () => {
+      for (const record of buildRecords()) {
+        void reaskMissingExtras(record, {
+          submit: (request) => submitGeneration({ request, worldId: record.id }),
+          record: (stage, job) => {
+            const current = loadCreationRecords().find((candidate) => candidate.id === record.id);
+            if (current) saveCreationRecord(updateCreationJob(current, stage, job));
+            reload();
+          },
+          key: newKey,
+        });
+      }
+    };
+    ask();
+    const id = window.setInterval(ask, EXTRAS_REASK_MS);
+    return () => window.clearInterval(id);
+  }, [anyBuild, reload]);
 
   // The "Started 4 min ago" hint only needs a minute's accuracy.
   const anyBuilding = cards.some((card) => card.state === "building");

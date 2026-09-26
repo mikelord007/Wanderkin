@@ -1,6 +1,6 @@
-import type { GameModeId, GenerationJob, StyleId } from "@shared/index.js";
+import type { GameModeId, GenerationJob, GenerationRequest, StyleId } from "@shared/index.js";
 import type { ProgressStage } from "./components/index.js";
-import type { CreationAttentionStage, CreationJobRef, CreationRecord } from "./creationFlow.js";
+import { buildWorldExtrasRequests, type CreationAttentionStage, type CreationJobRef, type CreationRecord } from "./creationFlow.js";
 
 /*
  * Worlds being built. Once a creation reaches step 4 it leaves Create and
@@ -45,6 +45,41 @@ interface ShapeView { state: GenerationJob["state"]; uiMessage?: string | undefi
 /** Story and music are optional. (Narration is no longer generated; older
  * records may still carry a narration job, which is ignored here.) */
 const OPTIONAL_STAGES = ["story", "music"] as const;
+export type ExtraStage = (typeof OPTIONAL_STAGES)[number];
+
+/**
+ * A soundtrack that failed only because the app once asked for 60 seconds,
+ * more than the provider's 15 (fixed in 9e87271). The provider refused it
+ * before anything ran or was charged, so it is not the user's problem: it is
+ * treated as never asked for, and asked for again.
+ */
+function isSupersededExtra(ref: CreationJobRef | undefined): boolean {
+  return ref?.state === "failed" && ref.kind === "music" && /duration/i.test(ref.error ?? "");
+}
+
+/** The story or music job that really failed, if any. Only this raises the
+ * "still safe" alarm; a job never asked for or still running never does. */
+export function failedExtraStage(record: CreationRecord | null): ExtraStage | undefined {
+  return OPTIONAL_STAGES.find((stage) => record?.jobs[stage]?.state === "failed" && !isSupersededExtra(record.jobs[stage]));
+}
+
+/**
+ * The story and music requests a build still has to ask for: those never
+ * asked for (or turned away before a job existed), a superseded soundtrack,
+ * and any stage in `resubmit`. A real failure is never resubmitted unasked.
+ */
+export function extrasToSubmit(record: CreationRecord, key: (prefix: string) => string, resubmit: readonly ExtraStage[] = []): [ExtraStage, GenerationRequest][] {
+  const jobs = { ...record.jobs };
+  for (const stage of OPTIONAL_STAGES) if (resubmit.includes(stage) || isSupersededExtra(jobs[stage])) delete jobs[stage];
+  return buildWorldExtrasRequests({ ...record, jobs }, key) as [ExtraStage, GenerationRequest][];
+}
+
+/** How Retry recovers a failed story or music job. The server only retries a
+ * job it marked retryable (otherwise it returns the same failed job), so any
+ * other failure is asked for afresh. */
+export function extraRetryMode(ref: CreationJobRef | undefined): "retry-job" | "resubmit" {
+  return ref && ref.retryable !== false && !isSupersededExtra(ref) ? "retry-job" : "resubmit";
+}
 
 /**
  * The four build stages, exactly as WorldProgressScreen shows them. Story
@@ -53,9 +88,9 @@ const OPTIONAL_STAGES = ["story", "music"] as const;
 export function worldBuildStages(record: CreationRecord | null, shape?: ShapeView | null): ProgressStage[] {
   const shapeState = shape?.state ?? record?.jobs.shape?.state;
   const shapeMessage = shape?.uiMessage;
-  const optionalFailed = OPTIONAL_STAGES.find((stage) => record?.jobs[stage]?.state === "failed");
+  const optionalFailed = failedExtraStage(record);
   const optionalReady = OPTIONAL_STAGES.every((stage) => record?.jobs[stage]?.state === "ready");
-  const optionalStarted = OPTIONAL_STAGES.some((stage) => record?.jobs[stage]);
+  const optionalStarted = OPTIONAL_STAGES.some((stage) => record?.jobs[stage] && !isSupersededExtra(record.jobs[stage]));
   return [
     { id: "object", label: "Preparing your object", status: record?.jobs.object?.state === "failed" ? "error" : "complete" },
     { id: "shape", label: "Building its 3D shape", status: shapeState === "failed" ? "error" : shapeState === "ready" ? "complete" : "active", ...(shapeMessage ? { detail: shapeMessage } : {}) },
