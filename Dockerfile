@@ -6,9 +6,10 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-COPY tsconfig.json vite.config.ts index.html ./
+COPY tsconfig.json tsconfig.base.json vite.config.ts vitest.config.ts index.html ./
 COPY design-kit ./design-kit
 COPY public ./public
+COPY scripts ./scripts
 COPY server ./server
 COPY shared ./shared
 COPY src ./src
