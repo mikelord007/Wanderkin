@@ -1,0 +1,311 @@
+{
+  "schemaVersion": 1,
+  "levelId": "sample-boot-rain",
+  "name": "Boot in the Rain",
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "coordinateConvention": "y-up-right-handed-meters",
+  "calibration": {
+    "assumedExtentMeters": 8
+  },
+  "assets": [
+    {
+      "id": "shoe-model",
+      "url": "/samples/shoe/model.glb",
+      "sha256": "2d353a47545eead23a16723b0acb62e52a1ec0b9387525adda62da707802b0fd",
+      "sizeBytes": 6920100,
+      "provenance": {
+        "providerId": "livepeer-agent-mcp",
+        "capabilityUsed": "rodin-i3d",
+        "fallbackFired": null,
+        "providerJobId": "mjob_87a0d3ef7e51",
+        "registeredModel": "fal-ai/hyper3d/rodin/v2.5",
+        "sourcePhotoOrder": [
+          1,
+          2
+        ],
+        "generatedAt": "2026-09-26T19:58:00.202Z"
+      }
+    }
+  ],
+  "photos": [],
+  "entities": [
+    {
+      "id": "shoe-mesh",
+      "kind": "generated-mesh",
+      "assetId": "shoe-model",
+      "transform": {
+        "position": [
+          0.009015427231980455,
+          1.4758119302040777,
+          -0.003579658629455418
+        ],
+        "rotation": [
+          0.4999999999999999,
+          0.5,
+          0.5,
+          0.5000000000000001
+        ],
+        "scale": [
+          4.220132529874246,
+          4.220132529874246,
+          4.220132529874246
+        ]
+      },
+      "collider": {
+        "kind": "triangle-mesh"
+      }
+    },
+    {
+      "id": "helper-floor",
+      "kind": "floor",
+      "transform": {
+        "position": [
+          0,
+          -0.2,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "dimensions": [
+        13.890403610849527,
+        0.4,
+        11.447981222576297
+      ],
+      "collider": {
+        "kind": "box",
+        "halfExtents": [
+          6.945201805424763,
+          0.2,
+          5.723990611288149
+        ]
+      },
+      "addedBy": "game"
+    }
+  ],
+  "spawn": {
+    "position": [
+      -4.9652018737792964,
+      0.3700000029802323,
+      3.096009559631348
+    ],
+    "headingRadians": 1.1659045405098132
+  },
+  "checkpoints": [
+    {
+      "id": "checkpoint-1",
+      "order": 0,
+      "position": [
+        0.0747981262207027,
+        0.3700000029802323,
+        5.256009559631348
+      ],
+      "triggerRadius": 0.396,
+      "safeRespawn": {
+        "position": [
+          0.0747981262207027,
+          0.3700000029802323,
+          5.256009559631348
+        ],
+        "headingRadians": -1.9756881130799802
+      }
+    },
+    {
+      "id": "checkpoint-2",
+      "order": 1,
+      "position": [
+        5.474798126220703,
+        0.3700000029802323,
+        5.256009559631348
+      ],
+      "triggerRadius": 0.396,
+      "safeRespawn": {
+        "position": [
+          5.474798126220703,
+          0.3700000029802323,
+          5.256009559631348
+        ],
+        "headingRadians": -1.5707963267948966
+      }
+    },
+    {
+      "id": "checkpoint-3",
+      "order": 2,
+      "position": [
+        1.8747981262207034,
+        0.3700000029802323,
+        -0.14399044036865227
+      ],
+      "triggerRadius": 0.396,
+      "safeRespawn": {
+        "position": [
+          1.8747981262207034,
+          0.3700000029802323,
+          -0.14399044036865227
+        ],
+        "headingRadians": 0.5880026035475675
+      }
+    },
+    {
+      "id": "checkpoint-4",
+      "order": 3,
+      "position": [
+        -2.445201873779297,
+        0.3700000029802323,
+        -5.183990440368652
+      ],
+      "triggerRadius": 0.396,
+      "safeRespawn": {
+        "position": [
+          -2.445201873779297,
+          0.3700000029802323,
+          -5.183990440368652
+        ],
+        "headingRadians": 0.7086262721276703
+      }
+    },
+    {
+      "id": "checkpoint-5",
+      "order": 4,
+      "position": [
+        6.554798126220703,
+        0.3700000029802323,
+        -5.183990440368652
+      ],
+      "triggerRadius": 0.396,
+      "safeRespawn": {
+        "position": [
+          6.554798126220703,
+          0.3700000029802323,
+          -5.183990440368652
+        ],
+        "headingRadians": -1.5707963267948966
+      }
+    }
+  ],
+  "seed": "asset:ac903dc5",
+  "movementConfigId": "default-v1",
+  "courseValidation": {
+    "status": "validated",
+    "method": "conservative-kinematic-v1 (safety factor 0.7, swept 0.36\u00d70.70 m box clearance, ballistic jump model from 0.6 m jump height at 2.2 m/s)",
+    "checkedAt": "2026-09-26T19:58:04.573Z",
+    "evidence": "5 segment(s): 96 walk, 0 jump, 0 mantle transitions; 96 clearance sweeps, 0 transitions rejected by clearance, 0 re-plans.",
+    "uncertaintyNotes": "Checked against a kinematic model of the movement config, not the live Rapier controller. It sweeps an axis-aligned box larger than the capsule, so it can refuse a passage the controller could make; it does not model air control, sliding, momentum, or contact friction. A pass means 'no violation found under a conservative model', not 'played to completion'."
+  },
+  "media": {
+    "audio": [
+      {
+        "schemaVersion": 1,
+        "mediaType": "audio",
+        "kind": "music",
+        "id": "shoe-music",
+        "url": "/samples/shoe/music.mp3",
+        "sha256": "e86033d96a2740af51daffd7b969f5b34751bdbed8f5176d2698d5f3eb81b73e",
+        "sizeBytes": 643124,
+        "mimeType": "audio/mpeg",
+        "durationSeconds": 15,
+        "provenance": {
+          "providerId": "livepeer-agent-mcp",
+          "requestedCapability": "music",
+          "servedCapability": "music",
+          "servedModel": "fal-ai/minimax-music/v2",
+          "applicationJobId": "bundled-shoe-music",
+          "providerJobId": "mjob_15c47591c795",
+          "timings": {
+            "requestedAt": "2026-09-26T19:55:29.058Z",
+            "startedAt": "2026-09-26T19:55:31.787Z",
+            "completedAt": "2026-09-26T19:56:24.811Z",
+            "queueMilliseconds": 2729,
+            "executionMilliseconds": 53024,
+            "totalMilliseconds": 55753
+          },
+          "reportedCost": null
+        },
+        "loop": true,
+        "defaultGain": 0.7
+      }
+    ],
+    "video": []
+  },
+  "biome": {
+    "id": "monsoon",
+    "seed": "asset:ac903dc5"
+  },
+  "experience": {
+    "schemaVersion": 1,
+    "style": {
+      "id": "cartoon",
+      "definitionVersion": 1
+    },
+    "mode": {
+      "kind": "explore",
+      "destinations": [
+        {
+          "id": "checkpoint-1",
+          "position": [
+            0.0747981262207027,
+            0.3700000029802323,
+            5.256009559631348
+          ],
+          "label": "Checkpoint 1"
+        },
+        {
+          "id": "checkpoint-2",
+          "position": [
+            5.474798126220703,
+            0.3700000029802323,
+            5.256009559631348
+          ],
+          "label": "Checkpoint 2"
+        },
+        {
+          "id": "checkpoint-3",
+          "position": [
+            1.8747981262207034,
+            0.3700000029802323,
+            -0.14399044036865227
+          ],
+          "label": "Checkpoint 3"
+        },
+        {
+          "id": "checkpoint-4",
+          "position": [
+            -2.445201873779297,
+            0.3700000029802323,
+            -5.183990440368652
+          ],
+          "label": "Checkpoint 4"
+        },
+        {
+          "id": "checkpoint-5",
+          "position": [
+            6.554798126220703,
+            0.3700000029802323,
+            -5.183990440368652
+          ],
+          "label": "Checkpoint 5"
+        }
+      ],
+      "optionalCollectibleIds": []
+    },
+    "quest": {
+      "schemaVersion": 1,
+      "title": "Boot in the Rain",
+      "intro": "Explore Boot in the Rain.",
+      "objective": "Reach all 5 checkpoints."
+    },
+    "collectibles": [],
+    "finishPortal": null,
+    "initialColorRestoration": 1
+  }
+}

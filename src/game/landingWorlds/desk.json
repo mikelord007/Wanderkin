@@ -1,0 +1,311 @@
+{
+  "schemaVersion": 1,
+  "levelId": "sample-desk-beach",
+  "name": "The Desk on the Beach",
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "coordinateConvention": "y-up-right-handed-meters",
+  "calibration": {
+    "assumedExtentMeters": 8
+  },
+  "assets": [
+    {
+      "id": "desk-model",
+      "url": "/samples/desk/model.glb",
+      "sha256": "40cf0ca890a30558e0653b0c292d2ada0ba63150dad0d4b922a66b26fa591840",
+      "sizeBytes": 5353920,
+      "provenance": {
+        "providerId": "livepeer-agent-mcp",
+        "capabilityUsed": "rodin-i3d",
+        "fallbackFired": null,
+        "providerJobId": "mjob_e3e7801e0d9d",
+        "registeredModel": "fal-ai/hyper3d/rodin/v2.5",
+        "sourcePhotoOrder": [
+          1,
+          2
+        ],
+        "generatedAt": "2026-09-26T19:45:34.084Z"
+      }
+    }
+  ],
+  "photos": [],
+  "entities": [
+    {
+      "id": "desk-mesh",
+      "kind": "generated-mesh",
+      "assetId": "desk-model",
+      "transform": {
+        "position": [
+          -0.0009180606451073547,
+          2.1685226187347997,
+          -0.0071375770864086086
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          4.202592563182737,
+          4.202592563182737,
+          4.202592563182737
+        ]
+      },
+      "collider": {
+        "kind": "triangle-mesh"
+      }
+    },
+    {
+      "id": "helper-floor",
+      "kind": "floor",
+      "transform": {
+        "position": [
+          0,
+          -0.2,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "dimensions": [
+        16,
+        0.4,
+        15.040279691621802
+      ],
+      "collider": {
+        "kind": "box",
+        "halfExtents": [
+          8,
+          0.2,
+          7.520139845810901
+        ]
+      },
+      "addedBy": "game"
+    }
+  ],
+  "spawn": {
+    "position": [
+      6.9399999999999995,
+      0.3700000029802323,
+      -1.5801396942138677
+    ],
+    "headingRadians": -2.356194490192345
+  },
+  "checkpoints": [
+    {
+      "id": "checkpoint-1",
+      "order": 0,
+      "position": [
+        1.5399999999999991,
+        0.3700000029802323,
+        -6.980139694213867
+      ],
+      "triggerRadius": 0.396,
+      "safeRespawn": {
+        "position": [
+          1.5399999999999991,
+          0.3700000029802323,
+          -6.980139694213867
+        ],
+        "headingRadians": 0.7853981633974484
+      }
+    },
+    {
+      "id": "checkpoint-2",
+      "order": 1,
+      "position": [
+        -1.7000000000000002,
+        0.3700000029802323,
+        -0.1401396942138673
+      ],
+      "triggerRadius": 0.396,
+      "safeRespawn": {
+        "position": [
+          -1.7000000000000002,
+          0.3700000029802323,
+          -0.1401396942138673
+        ],
+        "headingRadians": 2.6992184306130484
+      }
+    },
+    {
+      "id": "checkpoint-3",
+      "order": 2,
+      "position": [
+        2.26,
+        0.3700000029802323,
+        7.059860305786133
+      ],
+      "triggerRadius": 0.396,
+      "safeRespawn": {
+        "position": [
+          2.26,
+          0.3700000029802323,
+          7.059860305786133
+        ],
+        "headingRadians": -2.6387494426619322
+      }
+    },
+    {
+      "id": "checkpoint-4",
+      "order": 3,
+      "position": [
+        -7.46,
+        0.3700000029802323,
+        7.059860305786133
+      ],
+      "triggerRadius": 0.396,
+      "safeRespawn": {
+        "position": [
+          -7.46,
+          0.3700000029802323,
+          7.059860305786133
+        ],
+        "headingRadians": 1.5707963267948966
+      }
+    },
+    {
+      "id": "checkpoint-5",
+      "order": 4,
+      "position": [
+        -6.38,
+        0.3700000029802323,
+        -6.980139694213867
+      ],
+      "triggerRadius": 0.396,
+      "safeRespawn": {
+        "position": [
+          -6.38,
+          0.3700000029802323,
+          -6.980139694213867
+        ],
+        "headingRadians": -0.07677189126977804
+      }
+    }
+  ],
+  "seed": "asset:0ef4536a",
+  "movementConfigId": "default-v1",
+  "courseValidation": {
+    "status": "validated",
+    "method": "conservative-kinematic-v1 (safety factor 0.7, swept 0.36\u00d70.70 m box clearance, ballistic jump model from 0.6 m jump height at 2.2 m/s)",
+    "checkedAt": "2026-09-26T19:45:39.621Z",
+    "evidence": "5 segment(s): 149 walk, 0 jump, 0 mantle transitions; 252 clearance sweeps, 72 transitions rejected by clearance, 72 re-plans.",
+    "uncertaintyNotes": "Checked against a kinematic model of the movement config, not the live Rapier controller. It sweeps an axis-aligned box larger than the capsule, so it can refuse a passage the controller could make; it does not model air control, sliding, momentum, or contact friction. A pass means 'no violation found under a conservative model', not 'played to completion'."
+  },
+  "media": {
+    "audio": [
+      {
+        "schemaVersion": 1,
+        "mediaType": "audio",
+        "kind": "music",
+        "id": "desk-music",
+        "url": "/samples/desk/music.mp3",
+        "sha256": "c0f95b9b8f87b6958745b5b6125be265ab21b52d50db90c6b07a85b3c1629b8c",
+        "sizeBytes": 558696,
+        "mimeType": "audio/mpeg",
+        "durationSeconds": 15,
+        "provenance": {
+          "providerId": "livepeer-agent-mcp",
+          "requestedCapability": "music",
+          "servedCapability": "music",
+          "servedModel": "fal-ai/minimax-music/v2",
+          "applicationJobId": "bundled-desk-music",
+          "providerJobId": "mjob_194ba2d411d4",
+          "timings": {
+            "requestedAt": "2026-09-26T19:43:01.395Z",
+            "startedAt": "2026-09-26T19:43:04.148Z",
+            "completedAt": "2026-09-26T19:43:56.954Z",
+            "queueMilliseconds": 2753,
+            "executionMilliseconds": 52806,
+            "totalMilliseconds": 55559
+          },
+          "reportedCost": null
+        },
+        "loop": true,
+        "defaultGain": 0.7
+      }
+    ],
+    "video": []
+  },
+  "biome": {
+    "id": "tropical",
+    "seed": "asset:0ef4536a"
+  },
+  "experience": {
+    "schemaVersion": 1,
+    "style": {
+      "id": "cartoon",
+      "definitionVersion": 1
+    },
+    "mode": {
+      "kind": "explore",
+      "destinations": [
+        {
+          "id": "checkpoint-1",
+          "position": [
+            1.5399999999999991,
+            0.3700000029802323,
+            -6.980139694213867
+          ],
+          "label": "Checkpoint 1"
+        },
+        {
+          "id": "checkpoint-2",
+          "position": [
+            -1.7000000000000002,
+            0.3700000029802323,
+            -0.1401396942138673
+          ],
+          "label": "Checkpoint 2"
+        },
+        {
+          "id": "checkpoint-3",
+          "position": [
+            2.26,
+            0.3700000029802323,
+            7.059860305786133
+          ],
+          "label": "Checkpoint 3"
+        },
+        {
+          "id": "checkpoint-4",
+          "position": [
+            -7.46,
+            0.3700000029802323,
+            7.059860305786133
+          ],
+          "label": "Checkpoint 4"
+        },
+        {
+          "id": "checkpoint-5",
+          "position": [
+            -6.38,
+            0.3700000029802323,
+            -6.980139694213867
+          ],
+          "label": "Checkpoint 5"
+        }
+      ],
+      "optionalCollectibleIds": []
+    },
+    "quest": {
+      "schemaVersion": 1,
+      "title": "The Desk on the Beach",
+      "intro": "Explore The Desk on the Beach.",
+      "objective": "Reach all 5 checkpoints."
+    },
+    "collectibles": [],
+    "finishPortal": null,
+    "initialColorRestoration": 1
+  }
+}

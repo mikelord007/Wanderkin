@@ -59,8 +59,11 @@ credentials or budget settings.
 
 ### Keyless and API-key modes
 
-- **Bundled/offline demo:** no provider access is needed. The Lost Colors,
-  Explore, Rodin, and Tripo samples load from `public/samples/`.
+- **Bundled/offline demo:** no provider access is needed. The landing's four
+  worlds (Desk, Plane, Shoe, Car) load from `public/samples/<slug>/` with
+  their manifests in `src/game/landingWorlds/`; the older Lost Colors,
+  Explore, Rodin, and Tripo samples load from `public/samples/` and stay
+  playable by their `/play/` links, off the landing.
 - **Keyless generation:** leave `LIVEPEER_API_KEY` empty. Requests use the
   endpoint's shared keyless allowance and still pass ObjectQuest's per-request,
   per-world, and retry guards. Availability and allowance are external state;

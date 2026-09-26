@@ -196,13 +196,18 @@ function resolveSyncScreen(route: ParsedRoute, signedIn: boolean): Screen | null
   }
 }
 
-async function findBundledSample(levelId: string): Promise<SceneManifest | null> {
+/** Exported for tests. */
+export async function findBundledSample(levelId: string): Promise<SceneManifest | null> {
   try {
-    const [sceneSamples, gameSamples] = await Promise.all([
+    const [landingWorlds, sceneSamples, gameSamples] = await Promise.all([
+      import("./game/landingWorlds.js"),
       import("./scene/samples.js"),
       import("./game/bundledSamples.js"),
     ]);
+    // The landing's worlds, then the older samples (off the landing, still
+    // playable by their /play/ links).
     const all: SceneManifest[] = [
+      ...landingWorlds.LANDING_WORLDS,
       gameSamples.LOST_COLORS_SAMPLE,
       gameSamples.EXPLORE_SAMPLE,
       ...sceneSamples.SAMPLE_LEVELS,

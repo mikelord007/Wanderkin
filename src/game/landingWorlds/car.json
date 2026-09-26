@@ -1,0 +1,311 @@
+{
+  "schemaVersion": 1,
+  "levelId": "sample-car-dunes",
+  "name": "Car in the Dunes",
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "coordinateConvention": "y-up-right-handed-meters",
+  "calibration": {
+    "assumedExtentMeters": 8
+  },
+  "assets": [
+    {
+      "id": "car-model",
+      "url": "/samples/car/model.glb",
+      "sha256": "008522418aeb7206fb19ad6c1ebd1bb28cf4e425800a73a3c13e9263c439cc72",
+      "sizeBytes": 6179156,
+      "provenance": {
+        "providerId": "livepeer-agent-mcp",
+        "capabilityUsed": "rodin-i3d",
+        "fallbackFired": null,
+        "providerJobId": "mjob_d5963791504f",
+        "registeredModel": "fal-ai/hyper3d/rodin/v2.5",
+        "sourcePhotoOrder": [
+          1,
+          2
+        ],
+        "generatedAt": "2026-09-26T20:03:19.149Z"
+      }
+    }
+  ],
+  "photos": [],
+  "entities": [
+    {
+      "id": "car-mesh",
+      "kind": "generated-mesh",
+      "assetId": "car-model",
+      "transform": {
+        "position": [
+          -0.007212289121267146,
+          0.9988787908210542,
+          -0.0015604295674697122
+        ],
+        "rotation": [
+          0,
+          0.7071067811865475,
+          0,
+          0.7071067811865476
+        ],
+        "scale": [
+          4.217424713044041,
+          4.217424713044041,
+          4.217424713044041
+        ]
+      },
+      "collider": {
+        "kind": "triangle-mesh"
+      }
+    },
+    {
+      "id": "helper-floor",
+      "kind": "floor",
+      "transform": {
+        "position": [
+          0,
+          -0.2,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "dimensions": [
+        12.054642058007381,
+        0.4,
+        7.613676602700366
+      ],
+      "collider": {
+        "kind": "box",
+        "halfExtents": [
+          6.027321029003691,
+          0.2,
+          3.806838301350183
+        ]
+      },
+      "addedBy": "game"
+    }
+  ],
+  "spawn": {
+    "position": [
+      3.872679138183594,
+      0.3700000029802323,
+      -2.5468382740020754
+    ],
+    "headingRadians": 0.36717383381821905
+  },
+  "checkpoints": [
+    {
+      "id": "checkpoint-1",
+      "order": 0,
+      "position": [
+        5.672679138183593,
+        0.3700000029802323,
+        2.1331617259979243
+      ],
+      "triggerRadius": 0.396,
+      "safeRespawn": {
+        "position": [
+          5.672679138183593,
+          0.3700000029802323,
+          2.1331617259979243
+        ],
+        "headingRadians": -2.774418819771574
+      }
+    },
+    {
+      "id": "checkpoint-2",
+      "order": 1,
+      "position": [
+        0.9926791381835933,
+        0.3700000029802323,
+        3.2131617259979244
+      ],
+      "triggerRadius": 0.396,
+      "safeRespawn": {
+        "position": [
+          0.9926791381835933,
+          0.3700000029802323,
+          3.2131617259979244
+        ],
+        "headingRadians": 1.7975951748487826
+      }
+    },
+    {
+      "id": "checkpoint-3",
+      "order": 2,
+      "position": [
+        -5.487320861816406,
+        0.3700000029802323,
+        3.2131617259979244
+      ],
+      "triggerRadius": 0.396,
+      "safeRespawn": {
+        "position": [
+          -5.487320861816406,
+          0.3700000029802323,
+          3.2131617259979244
+        ],
+        "headingRadians": 1.5707963267948966
+      }
+    },
+    {
+      "id": "checkpoint-4",
+      "order": 3,
+      "position": [
+        -5.127320861816406,
+        0.3700000029802323,
+        -0.38683827400207527
+      ],
+      "triggerRadius": 0.396,
+      "safeRespawn": {
+        "position": [
+          -5.127320861816406,
+          0.3700000029802323,
+          -0.38683827400207527
+        ],
+        "headingRadians": -0.09966865249116212
+      }
+    },
+    {
+      "id": "checkpoint-5",
+      "order": 4,
+      "position": [
+        -2.967320861816406,
+        0.3700000029802323,
+        -3.266838274002075
+      ],
+      "triggerRadius": 0.396,
+      "safeRespawn": {
+        "position": [
+          -2.967320861816406,
+          0.3700000029802323,
+          -3.266838274002075
+        ],
+        "headingRadians": -0.6435011087932844
+      }
+    }
+  ],
+  "seed": "asset:10979f3c",
+  "movementConfigId": "default-v1",
+  "courseValidation": {
+    "status": "validated",
+    "method": "conservative-kinematic-v1 (safety factor 0.7, swept 0.36\u00d70.70 m box clearance, ballistic jump model from 0.6 m jump height at 2.2 m/s)",
+    "checkedAt": "2026-09-26T20:03:28.162Z",
+    "evidence": "5 segment(s): 62 walk, 0 jump, 0 mantle transitions; 62 clearance sweeps, 0 transitions rejected by clearance, 0 re-plans.",
+    "uncertaintyNotes": "Checked against a kinematic model of the movement config, not the live Rapier controller. It sweeps an axis-aligned box larger than the capsule, so it can refuse a passage the controller could make; it does not model air control, sliding, momentum, or contact friction. A pass means 'no violation found under a conservative model', not 'played to completion'."
+  },
+  "media": {
+    "audio": [
+      {
+        "schemaVersion": 1,
+        "mediaType": "audio",
+        "kind": "music",
+        "id": "car-music",
+        "url": "/samples/car/music.mp3",
+        "sha256": "2f486a3ee2c35d159f9e6bfe57923c23d9acbca49b84e7909e6b9265355bc601",
+        "sizeBytes": 501018,
+        "mimeType": "audio/mpeg",
+        "durationSeconds": 15,
+        "provenance": {
+          "providerId": "livepeer-agent-mcp",
+          "requestedCapability": "music",
+          "servedCapability": "music",
+          "servedModel": "fal-ai/minimax-music/v2",
+          "applicationJobId": "bundled-car-music",
+          "providerJobId": "mjob_dbb60451cbe4",
+          "timings": {
+            "requestedAt": "2026-09-26T20:00:55.504Z",
+            "startedAt": "2026-09-26T20:01:00.229Z",
+            "completedAt": "2026-09-26T20:01:51.775Z",
+            "queueMilliseconds": 4725,
+            "executionMilliseconds": 51546,
+            "totalMilliseconds": 56271
+          },
+          "reportedCost": null
+        },
+        "loop": true,
+        "defaultGain": 0.7
+      }
+    ],
+    "video": []
+  },
+  "biome": {
+    "id": "desert",
+    "seed": "asset:10979f3c"
+  },
+  "experience": {
+    "schemaVersion": 1,
+    "style": {
+      "id": "cartoon",
+      "definitionVersion": 1
+    },
+    "mode": {
+      "kind": "explore",
+      "destinations": [
+        {
+          "id": "checkpoint-1",
+          "position": [
+            5.672679138183593,
+            0.3700000029802323,
+            2.1331617259979243
+          ],
+          "label": "Checkpoint 1"
+        },
+        {
+          "id": "checkpoint-2",
+          "position": [
+            0.9926791381835933,
+            0.3700000029802323,
+            3.2131617259979244
+          ],
+          "label": "Checkpoint 2"
+        },
+        {
+          "id": "checkpoint-3",
+          "position": [
+            -5.487320861816406,
+            0.3700000029802323,
+            3.2131617259979244
+          ],
+          "label": "Checkpoint 3"
+        },
+        {
+          "id": "checkpoint-4",
+          "position": [
+            -5.127320861816406,
+            0.3700000029802323,
+            -0.38683827400207527
+          ],
+          "label": "Checkpoint 4"
+        },
+        {
+          "id": "checkpoint-5",
+          "position": [
+            -2.967320861816406,
+            0.3700000029802323,
+            -3.266838274002075
+          ],
+          "label": "Checkpoint 5"
+        }
+      ],
+      "optionalCollectibleIds": []
+    },
+    "quest": {
+      "schemaVersion": 1,
+      "title": "Car in the Dunes",
+      "intro": "Explore Car in the Dunes.",
+      "objective": "Reach all 5 checkpoints."
+    },
+    "collectibles": [],
+    "finishPortal": null,
+    "initialColorRestoration": 1
+  }
+}

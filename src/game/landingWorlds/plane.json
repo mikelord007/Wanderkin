@@ -1,0 +1,311 @@
+{
+  "schemaVersion": 1,
+  "levelId": "sample-plane-snow",
+  "name": "Plane in the Snow",
+  "createdAt": "2026-09-27T00:00:00.000Z",
+  "updatedAt": "2026-09-27T00:00:00.000Z",
+  "coordinateConvention": "y-up-right-handed-meters",
+  "calibration": {
+    "assumedExtentMeters": 8
+  },
+  "assets": [
+    {
+      "id": "plane-model",
+      "url": "/samples/plane/model.glb",
+      "sha256": "31d710f13ee48d393c3b67e70b126b4931eb31d60947c76e3ce3a3eff57fb15d",
+      "sizeBytes": 4816724,
+      "provenance": {
+        "providerId": "livepeer-agent-mcp",
+        "capabilityUsed": "rodin-i3d",
+        "fallbackFired": null,
+        "providerJobId": "mjob_bdbb688bb705",
+        "registeredModel": "fal-ai/hyper3d/rodin/v2.5",
+        "sourcePhotoOrder": [
+          1,
+          2
+        ],
+        "generatedAt": "2026-09-26T19:52:14.570Z"
+      }
+    }
+  ],
+  "photos": [],
+  "entities": [
+    {
+      "id": "plane-mesh",
+      "kind": "generated-mesh",
+      "assetId": "plane-model",
+      "transform": {
+        "position": [
+          -0.0006534738423433772,
+          1.156084850678842,
+          -0.0015308810951246699
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          4.2118600858026465,
+          4.2118600858026465,
+          4.2118600858026465
+        ]
+      },
+      "collider": {
+        "kind": "triangle-mesh"
+      }
+    },
+    {
+      "id": "helper-floor",
+      "kind": "floor",
+      "transform": {
+        "position": [
+          0,
+          -0.2,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "dimensions": [
+        12.59480529717997,
+        0.4,
+        11.431379346962977
+      ],
+      "collider": {
+        "kind": "box",
+        "halfExtents": [
+          6.297402648589985,
+          0.2,
+          5.715689673481489
+        ]
+      },
+      "addedBy": "game"
+    }
+  ],
+  "spawn": {
+    "position": [
+      -4.31740285873413,
+      0.3700000029802323,
+      3.4643103408813474
+    ],
+    "headingRadians": 1.892546881191539
+  },
+  "checkpoints": [
+    {
+      "id": "checkpoint-1",
+      "order": 0,
+      "position": [
+        1.082597141265869,
+        0.3700000029802323,
+        1.6643103408813475
+      ],
+      "triggerRadius": 0.396,
+      "safeRespawn": {
+        "position": [
+          1.082597141265869,
+          0.3700000029802323,
+          1.6643103408813475
+        ],
+        "headingRadians": -1.2490457723982544
+      }
+    },
+    {
+      "id": "checkpoint-2",
+      "order": 1,
+      "position": [
+        0.3625971412658693,
+        1.192263687849045,
+        -2.2956896591186524
+      ],
+      "triggerRadius": 0.396,
+      "safeRespawn": {
+        "position": [
+          0.3625971412658693,
+          1.192263687849045,
+          -2.2956896591186524
+        ],
+        "headingRadians": 0.17985349979247822
+      }
+    },
+    {
+      "id": "checkpoint-3",
+      "order": 2,
+      "position": [
+        5.762597141265868,
+        0.3700000029802323,
+        -5.175689659118652
+      ],
+      "triggerRadius": 0.396,
+      "safeRespawn": {
+        "position": [
+          5.762597141265868,
+          0.3700000029802323,
+          -5.175689659118652
+        ],
+        "headingRadians": -1.0808390005411683
+      }
+    },
+    {
+      "id": "checkpoint-4",
+      "order": 3,
+      "position": [
+        5.762597141265868,
+        0.3700000029802323,
+        5.264310340881348
+      ],
+      "triggerRadius": 0.396,
+      "safeRespawn": {
+        "position": [
+          5.762597141265868,
+          0.3700000029802323,
+          5.264310340881348
+        ],
+        "headingRadians": 3.141592653589793
+      }
+    },
+    {
+      "id": "checkpoint-5",
+      "order": 4,
+      "position": [
+        -5.757402858734131,
+        0.3700000029802323,
+        -5.175689659118652
+      ],
+      "triggerRadius": 0.396,
+      "safeRespawn": {
+        "position": [
+          -5.757402858734131,
+          0.3700000029802323,
+          -5.175689659118652
+        ],
+        "headingRadians": 0.8345388978134685
+      }
+    }
+  ],
+  "seed": "asset:47f3873d",
+  "movementConfigId": "default-v1",
+  "courseValidation": {
+    "status": "validated",
+    "method": "conservative-kinematic-v1 (safety factor 0.7, swept 0.36\u00d70.70 m box clearance, ballistic jump model from 0.6 m jump height at 2.2 m/s)",
+    "checkedAt": "2026-09-26T19:52:16.726Z",
+    "evidence": "5 segment(s): 108 walk, 2 jump, 2 mantle transitions; 113 clearance sweeps, 1 transitions rejected by clearance, 1 re-plans.",
+    "uncertaintyNotes": "Checked against a kinematic model of the movement config, not the live Rapier controller. It sweeps an axis-aligned box larger than the capsule, so it can refuse a passage the controller could make; it does not model air control, sliding, momentum, or contact friction. A pass means 'no violation found under a conservative model', not 'played to completion'."
+  },
+  "media": {
+    "audio": [
+      {
+        "schemaVersion": 1,
+        "mediaType": "audio",
+        "kind": "music",
+        "id": "plane-music",
+        "url": "/samples/plane/music.mp3",
+        "sha256": "b03c7b8ac195ea3768f5f2b76c0372c8ae3eb1e35b2fa7f9e34aed4cf357b43a",
+        "sizeBytes": 903095,
+        "mimeType": "audio/mpeg",
+        "durationSeconds": 15,
+        "provenance": {
+          "providerId": "livepeer-agent-mcp",
+          "requestedCapability": "music",
+          "servedCapability": "music",
+          "servedModel": "fal-ai/minimax-music/v2",
+          "applicationJobId": "bundled-plane-music",
+          "providerJobId": "mjob_6e0e915c3223",
+          "timings": {
+            "requestedAt": "2026-09-26T19:50:36.499Z",
+            "startedAt": "2026-09-26T19:50:46.418Z",
+            "completedAt": "2026-09-26T19:51:39.508Z",
+            "queueMilliseconds": 9919,
+            "executionMilliseconds": 53090,
+            "totalMilliseconds": 63009
+          },
+          "reportedCost": null
+        },
+        "loop": true,
+        "defaultGain": 0.7
+      }
+    ],
+    "video": []
+  },
+  "biome": {
+    "id": "alpine",
+    "seed": "asset:47f3873d"
+  },
+  "experience": {
+    "schemaVersion": 1,
+    "style": {
+      "id": "cartoon",
+      "definitionVersion": 1
+    },
+    "mode": {
+      "kind": "explore",
+      "destinations": [
+        {
+          "id": "checkpoint-1",
+          "position": [
+            1.082597141265869,
+            0.3700000029802323,
+            1.6643103408813475
+          ],
+          "label": "Checkpoint 1"
+        },
+        {
+          "id": "checkpoint-2",
+          "position": [
+            0.3625971412658693,
+            1.192263687849045,
+            -2.2956896591186524
+          ],
+          "label": "Checkpoint 2"
+        },
+        {
+          "id": "checkpoint-3",
+          "position": [
+            5.762597141265868,
+            0.3700000029802323,
+            -5.175689659118652
+          ],
+          "label": "Checkpoint 3"
+        },
+        {
+          "id": "checkpoint-4",
+          "position": [
+            5.762597141265868,
+            0.3700000029802323,
+            5.264310340881348
+          ],
+          "label": "Checkpoint 4"
+        },
+        {
+          "id": "checkpoint-5",
+          "position": [
+            -5.757402858734131,
+            0.3700000029802323,
+            -5.175689659118652
+          ],
+          "label": "Checkpoint 5"
+        }
+      ],
+      "optionalCollectibleIds": []
+    },
+    "quest": {
+      "schemaVersion": 1,
+      "title": "Plane in the Snow",
+      "intro": "Explore Plane in the Snow.",
+      "objective": "Reach all 5 checkpoints."
+    },
+    "collectibles": [],
+    "finishPortal": null,
+    "initialColorRestoration": 1
+  }
+}
