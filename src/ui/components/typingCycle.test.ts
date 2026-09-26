@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  caretOf, createCycleDriver, delayFor, HEADLINE_PAIRS, initialState, isFaded, settle, slotSizers, step, TIMING,
+  caretOf, caretSlot, createCycleDriver, delayFor, HEADLINE_PAIRS, highlightOf, initialState, isFaded, settle, step, TIMING,
   type CycleState,
 } from "./typingCycle.js";
 
@@ -25,9 +25,10 @@ describe("headline pairs", () => {
   });
 
   it("never repeats a word, and every landscape reads after 'is a'", () => {
-    const { object, landscape } = slotSizers();
-    expect(object).toHaveLength(HEADLINE_PAIRS.length);
-    expect(landscape).toHaveLength(HEADLINE_PAIRS.length);
+    const object = new Set(HEADLINE_PAIRS.map((p) => p.object));
+    const landscape = new Set(HEADLINE_PAIRS.map((p) => p.landscape));
+    expect(object.size).toBe(HEADLINE_PAIRS.length);
+    expect(landscape.size).toBe(HEADLINE_PAIRS.length);
     for (const word of landscape) expect(word).toMatch(/^[^aeiou]/i);
   });
 
@@ -39,27 +40,13 @@ describe("headline pairs", () => {
   });
 });
 
-describe("slot sizing", () => {
-  it("stacks every word a slot can hold, so the slot is as wide as its longest", () => {
-    const sizers = slotSizers();
-    expect(sizers.object).toContain("houseplant");
-    expect(sizers.landscape).toContain("cliffside runway");
-    const longest = (words: string[]) => words.reduce((a, b) => (b.length > a.length ? b : a));
-    expect(sizers.object).toContain(longest(HEADLINE_PAIRS.map((p) => p.object)));
-    expect(sizers.landscape).toContain(longest(HEADLINE_PAIRS.map((p) => p.landscape)));
-  });
-
-  it("drops duplicates", () => {
-    const sizers = slotSizers([{ object: "mug", landscape: "crater" }, { object: "mug", landscape: "lake" }]);
-    expect(sizers).toEqual({ object: ["mug"], landscape: ["crater", "lake"] });
-  });
-});
-
 describe("the typing cycle", () => {
-  it("starts on the first pair, still, with no caret", () => {
+  it("starts on the first pair, still, caret blinking after the landscape", () => {
     const start = initialState();
     expect(start).toMatchObject({ pair: 0, object: "sofa", landscape: "mountain range", phase: "hold" });
-    expect(caretOf(start)).toBe("none");
+    expect(caretOf(start)).toBe("blink");
+    expect(caretSlot(start)).toBe("landscape");
+    expect(highlightOf(start)).toBeNull();
     expect(delayFor(start, false)).toBe(TIMING.firstHold);
   });
 
@@ -80,6 +67,9 @@ describe("the typing cycle", () => {
     const secondHold = runUntil(step(initialState()), (s) => s.phase === "hold").state;
     expect(delayFor(secondHold, false)).toBe(2600);
     expect(TIMING.firstHold).toBe(1500);
+    const highlighted = step(secondHold);
+    expect(highlighted.phase).toBe("caret");
+    expect(delayFor(highlighted, false)).toBe(400);
     const deleting = runUntil(step(secondHold), (s) => s.phase === "delete").state;
     expect(delayFor(deleting, false)).toBe(35);
     const typing = runUntil(deleting, (s) => s.phase === "type").state;
@@ -88,14 +78,30 @@ describe("the typing cycle", () => {
     expect(delayFor(typing, false, () => 1)).toBe(55 + TIMING.typeJitter);
   });
 
-  it("blinks the caret only while it waits, holds it solid while letters change", () => {
-    const { seen } = runUntil(step(initialState()), (s) => s.phase === "hold");
+  it("always shows the caret: solid while letters change, blinking otherwise", () => {
+    const { seen } = runUntil(initialState(), (s) => s.phase === "hold" && s.pair === 1);
     for (const s of seen) {
-      const caret = caretOf(s);
-      if (s.phase === "delete" || s.phase === "type") expect(caret).toBe("solid");
-      else if (s.phase === "hold") expect(caret).toBe("none");
-      else expect(caret).toBe("blink");
+      expect(caretOf(s)).toBe(s.phase === "delete" || s.phase === "type" ? "solid" : "blink");
     }
+  });
+
+  it("keeps the caret in the slot being edited, then after the landscape", () => {
+    const { seen } = runUntil(step(initialState()), (s) => s.phase === "hold");
+    const places = seen.map(caretSlot).filter((slot, i, all) => slot !== all[i - 1]);
+    expect(places).toEqual(["object", "landscape"]);
+    expect(caretSlot(seen.at(-1)!)).toBe("landscape");
+  });
+
+  it("tints the word from just before it is deleted until the new word is typed", () => {
+    const { seen } = runUntil(step(initialState()), (s) => s.phase === "hold");
+    const tinted = seen.map((s) => [s.phase, highlightOf(s), s.object, s.landscape] as const);
+    // On for the object from the highlight lead through the last letter typed.
+    expect(tinted[0]).toEqual(["caret", "object", "sofa", "mountain range"]);
+    expect(tinted.filter(([, h]) => h === "object").map(([, , o]) => o).at(-1)).toBe("fridg");
+    // Off once each word is whole, and while holding.
+    for (const [phase, h] of tinted) if (phase === "rest" || phase === "hold") expect(h).toBeNull();
+    expect(tinted.filter(([, h]) => h === "landscape").map(([, , , l]) => l)[0]).toBe("mountain range");
+    expect(tinted.filter(([, h]) => h === "landscape").map(([, , , l]) => l).at(-1)).toBe("glacier wal");
   });
 
   it("loops forever, back to the sofa", () => {
@@ -112,12 +118,12 @@ describe("the typing cycle", () => {
 });
 
 describe("reduced motion", () => {
-  it("never types or shows a caret: it fades to the next whole pair every four seconds", () => {
+  it("never types: a static caret, and a fade to the next whole pair every four seconds", () => {
     const start = initialState();
     expect(delayFor(start, true)).toBe(TIMING.reducedHold);
     const { seen } = runUntil(step(start, HEADLINE_PAIRS, true), (s) => s.phase === "hold", true);
     expect(seen.map((s) => s.phase)).toEqual(["fadeOut", "fadeIn", "hold"]);
-    expect(seen.every((s) => caretOf(s) === "none")).toBe(true);
+    expect(seen.every((s) => caretOf(s, true) === "static" && highlightOf(s) === null)).toBe(true);
     const [fadingOut, fadingIn] = seen as [CycleState, CycleState];
     expect(isFaded(fadingOut)).toBe(true);
     expect(fadingOut).toMatchObject({ object: "sofa", landscape: "mountain range" });

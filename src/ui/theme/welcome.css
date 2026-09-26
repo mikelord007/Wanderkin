@@ -76,30 +76,38 @@
 }
 
 /* The typed headline: two fixed lines, "Your ___" and "is a ___.", each
-   blank at the end of its line so a word grows rightwards from a still
-   start. Every word a slot can hold is stacked invisibly in it, so the lines
-   are always as wide as their longest pair: no rewrap, no jump. The block is
-   left-aligned inside and centred as a whole. */
-.wk-typing__lines { display: inline-grid; justify-items: start; text-align: start; }
+   centred. A slot is as wide as its word (set from a hidden copy by
+   TypingHeadline) and eases to each new width, so the line glides as letters
+   come and go; clip-path trims the next letter until the width reaches it.
+   The lines never wrap, so the height never changes. */
+.wk-typing__lines { display: grid; justify-items: center; text-align: center; }
 .wk-typing__line { white-space: nowrap; }
-.wk-typing__slot { display: inline-grid; justify-items: start; }
-.wk-typing__slot > * { grid-area: 1 / 1; }
-.wk-typing__sizer { visibility: hidden; user-select: none; }
-.wk-typing__live { transition: opacity .45s ease; }
-.wk-typing__live[data-faded] { opacity: 0; }
-.wk-typing__word { position: relative; }
-/* The caret: a 2px accent bar just after the last letter. It takes no width,
-   holds solid while letters change and blinks once a second while it waits. */
-.wk-typing__word[data-caret]::after {
-  content: ""; position: absolute; inset-inline-start: calc(100% + .06em); inset-block: .24em .2em;
-  inline-size: 2px; background: var(--wk-purple); border-radius: 1px;
+.wk-typing__slot {
+  position: relative; display: inline-block; box-sizing: content-box; vertical-align: baseline;
+  /* Room for the highlight, given back by the margins so no text moves. */
+  padding: .02em .09em .07em; margin: -.02em -.09em -.07em;
+  border-radius: .15em; background-color: transparent;
+  clip-path: inset(-.4em 0);
+  transition: width .12s ease-out, background-color .3s ease;
 }
-.wk-typing__word[data-caret="blink"]::after { animation: wk-caret-blink 1s steps(1, end) infinite; }
+/* The word about to be retyped, from just before it goes until the new one
+   is complete. Plum text on this tint is still over 12:1. */
+.wk-typing__slot[data-highlight] { background-color: var(--wk-glow); }
+.wk-typing__measure { position: absolute; inset-block-start: 0; inset-inline-start: 0; visibility: hidden; white-space: pre; }
+.wk-typing__word { transition: opacity .45s ease; }
+.wk-typing__word[data-faded] { opacity: 0; }
+/* The caret: a 2px accent bar after the last slot edited, solid while
+   letters change and blinking once a second otherwise. Each slot has a narrow
+   cell for it, shown only where the caret is. */
+.wk-typing__caret { position: relative; display: inline-block; inline-size: .16em; margin-inline-end: -.1em; block-size: 0; }
+.wk-typing__caret[data-caret]::before {
+  content: ""; position: absolute; inset-inline-start: calc(50% - 1px); inset-block-end: -.05em;
+  inline-size: 2px; block-size: .8em; background: var(--wk-purple); border-radius: 1px;
+}
+.wk-typing__caret[data-caret="blink"]::before { animation: wk-caret-blink 1s steps(1, end) infinite; }
 @keyframes wk-caret-blink { 50% { opacity: 0; } }
-/* Optional: a quiet accent underline under the object. */
-.wk-typing--underline .wk-typing__slot--object .wk-typing__word {
-  text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--wk-purple) 55%, transparent);
-  text-decoration-thickness: .045em; text-underline-offset: .1em;
+@media (prefers-reduced-motion: reduce) {
+  .wk-typing__slot { transition: none; }
 }
 .oq-welcome__lede { max-inline-size: 44ch; font-size: clamp(1.0625rem, 1rem + .35vw, 1.25rem); line-height: 1.55; color: var(--wk-text-2); }
 .oq-welcome__ctas { justify-content: center; margin-top: var(--oq-space-2); }

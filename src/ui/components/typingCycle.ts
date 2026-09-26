@@ -30,8 +30,9 @@ export const TIMING = {
   /** The first pair sits still this long before anything moves. */
   firstHold: 1500,
   hold: 2600,
-  /** The caret blinks in the slot before it starts deleting. */
-  caretLead: 500,
+  /** The word about to go is highlighted, caret blinking after it, this
+   * long before deleting starts. */
+  caretLead: 400,
   deleteChar: 35,
   /** Empty slot, caret blinking, before the new word starts. */
   gap: 220,
@@ -47,8 +48,9 @@ export const TIMING = {
 
 export type Slot = "object" | "landscape";
 export type Phase = "hold" | "caret" | "delete" | "gap" | "type" | "rest" | "fadeOut" | "fadeIn";
-/** "blink" only while the caret waits in a slot; "solid" while characters change. */
-export type Caret = "none" | "solid" | "blink";
+/** Always shown: "blink" while it waits, "solid" while characters change,
+ * "static" (no blink) under reduced motion. */
+export type Caret = "solid" | "blink" | "static";
 
 export interface CycleState {
   /** The pair on screen in "hold", otherwise the pair being written. */
@@ -56,7 +58,7 @@ export interface CycleState {
   object: string;
   landscape: string;
   phase: Phase;
-  /** The slot the caret is in, if any. */
+  /** The slot being edited, if any. */
   slot: Slot | null;
   /** True only for the very first hold after page load. */
   first: boolean;
@@ -74,11 +76,23 @@ export function initialState(pairs: readonly TypingPair[] = HEADLINE_PAIRS): Cyc
   return { pair: 0, object: start.object, landscape: start.landscape, phase: "hold", slot: null, first: true };
 }
 
-export function caretOf(state: CycleState): Caret {
+export function caretOf(state: CycleState, reducedMotion = false): Caret {
+  if (reducedMotion) return "static";
+  return state.phase === "delete" || state.phase === "type" ? "solid" : "blink";
+}
+
+/** Where the caret sits: in the slot being edited, otherwise after the last
+ * slot edited, which is the landscape at the end of the sentence. */
+export function caretSlot(state: CycleState): Slot {
+  return state.slot ?? "landscape";
+}
+
+/** The slot whose word is tinted: from just before it is deleted until the
+ * new word is fully typed. */
+export function highlightOf(state: CycleState): Slot | null {
   switch (state.phase) {
-    case "caret": case "gap": case "rest": return "blink";
-    case "delete": case "type": return "solid";
-    default: return "none";
+    case "caret": case "delete": case "gap": case "type": return state.slot;
+    default: return null;
   }
 }
 
@@ -142,16 +156,6 @@ export function settle(state: CycleState, pairs: readonly TypingPair[] = HEADLIN
   if (state.phase === "hold") return state;
   const { object, landscape } = pairAt(pairs, state.pair);
   return { ...state, object, landscape, phase: "hold", slot: null };
-}
-
-/** Every word that can sit in each slot. The headline stacks them invisibly
- * under the live word so each slot is always as wide as its longest word in
- * the real font, and the lines never rewrap or jump. */
-export function slotSizers(pairs: readonly TypingPair[] = HEADLINE_PAIRS): Record<Slot, string[]> {
-  return {
-    object: [...new Set(pairs.map((pair) => pair.object))],
-    landscape: [...new Set(pairs.map((pair) => pair.landscape))],
-  };
 }
 
 export interface CycleTimers {
