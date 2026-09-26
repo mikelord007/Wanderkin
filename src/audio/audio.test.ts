@@ -69,7 +69,7 @@ describe("client audio", () => {
       destination: {},
       resume: async () => undefined,
       close: async () => undefined,
-      createGain: () => ({ gain: { value: 1 }, connect: () => undefined }),
+      createGain: () => ({ gain: { value: 1, cancelScheduledValues: () => undefined, setValueAtTime: () => undefined, setTargetAtTime: () => undefined }, connect: () => undefined }),
       createBufferSource: () => ({ connect: () => undefined, start: () => { starts += 1; }, stop: () => undefined, loop: false, loopStart: 0, loopEnd: 0, buffer: null }),
       decodeAudioData: async () => buffer,
       createBuffer: () => buffer,
@@ -174,7 +174,7 @@ describe("client audio", () => {
       destination: {},
       resume: async () => undefined,
       close: async () => undefined,
-      createGain: () => ({ gain: { value: 1 }, connect: () => undefined }),
+      createGain: () => ({ gain: { value: 1, cancelScheduledValues: () => undefined, setValueAtTime: () => undefined, setTargetAtTime: () => undefined }, connect: () => undefined }),
       createBufferSource: () => {
         const source = { buffer: null as AudioBuffer | null, connect: () => undefined, loop: false, loopStart: 0, loopEnd: 0,
           start: () => { started.push(String((source.buffer as unknown as { url: string }).url)); },

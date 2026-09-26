@@ -29,6 +29,19 @@ export function lookAmbienceUrl(lookId: string | null | undefined): string | nul
   return lookId ? LOOK_AMBIENCE_URLS[lookId] ?? null : null;
 }
 
+/** A loop with no authored level sits 6 dB down, under the one-shots. */
+export const DEFAULT_BED_GAIN = 0.5;
+
+/** How loud each loop plays: the world's own asset's authored `defaultGain`
+ * (a generated soundtrack is stored at 0.7), else the default bed level. */
+export function resolveLoopGains(media?: LevelMedia): Readonly<Record<"music" | "ambience", number>> {
+  const gain = (kind: "music" | "ambience") => {
+    const value = media?.audio.find((asset) => asset.kind === kind)?.defaultGain;
+    return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.min(1, value) : DEFAULT_BED_GAIN;
+  };
+  return { music: gain("music"), ambience: gain("ambience") };
+}
+
 /** Shared media currently stores SFX as a flat array. The server writes them
  * in this documented canonical order; generated kind-specific assets win,
  * while a missing optional asset falls back to the tiny bundled sound.

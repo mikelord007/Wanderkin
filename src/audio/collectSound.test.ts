@@ -45,7 +45,7 @@ function fakeEngine() {
     destination: {},
     resume: async () => undefined,
     close: async () => undefined,
-    createGain: () => ({ gain: { value: 1 }, connect: () => undefined }),
+    createGain: () => ({ gain: { value: 1, cancelScheduledValues: () => undefined, setValueAtTime: () => undefined, setTargetAtTime: () => undefined }, connect: () => undefined }),
     createBufferSource: () => {
       const source = { buffer: null as AudioBuffer | null, connect: () => undefined, loop: false, loopStart: 0, loopEnd: 0,
         start: () => { started.push((source.buffer as unknown as { url: string }).url); }, stop: () => undefined };
