@@ -1,0 +1,1 @@
+import json;d=json.load(open("/mnt/data/objectquest/jobs.json"));[print(json.dumps(v.get("job",v))[:2500]) for v in d.values() if (v.get("job",v)).get("state")=="failed"]

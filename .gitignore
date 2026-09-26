@@ -20,5 +20,11 @@ nimbalyst-local/env-upgrade/
 nimbalyst-local/screenshots/
 nimbalyst-local/design/shots/
 nimbalyst-local/tmp-*/
+nimbalyst-local/exports/
+nimbalyst-local/design/source/
+nimbalyst-local/audio-probe/
+nimbalyst-local/collect-sfx/
+nimbalyst-local/grapple/
+nimbalyst-local/physics-collision/
 .vercel
 .env*

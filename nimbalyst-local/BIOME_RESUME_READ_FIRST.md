@@ -157,3 +157,15 @@ Retired/completed original owners: geometry `64ffaf53-9e9f-4f97-ad6f-b1cc88d34f3
 ## Resume protocol
 
 Read current Git/status and newest pause acknowledgments/checkpoints. Check pending queued prompts so OLD GO messages do not override this pause. Tell each resumed worker explicitly that new orchestrator is taking over and resume ONLY its outstanding scope. No need to restart retired workers or repeat audits/tests. Keep orchestration-only boundary and user-owned gameplay prominent in every handoff. If user has not yet authorized the new session to resume, stay paused after context recovery.
+
+## 2026-09-27 00:05 IST — evening wave closed, all live
+
+Deployed today after the morning wave (all via Nimbalyst commits by workers, pushed by the orchestrator; API image `fb744bb` on the GCE VM, client at `a974b5f` on Vercel):
+- Deployment: Vercel client (wanderkin-tau.vercel.app), API on Compute Engine `wanderkin-api` behind Caddy at wanderkin.duckdns.org, Vercel rewrite for /api/*. Runbook: GCP_DEPLOYMENT.md.
+- Auth: Google ID-token sign-in from our own origin (9cda2ab); legal pages (8d8b0f7).
+- Creation: builds hand off to My worlds (475bd0a, 173e15f), Resume fix (b1342da), save-before-play (bb2b5bd), stale preview fix + story/music recovery (8f0e70b, a5868bb, dcd0dfe), stage spinners (1b8d74c, 796be92), loading centred (a383243), world naming (a102898), biome step locked at creation (7b37dde).
+- Game: narration removed (f7c4c44), solid props (213c57c, dbe89eb), Monsoon Marsh look with rain (4b9ab66, 8ef99c3, 3dcb8fb), grappling hook + hold-to-aim framing (637ec70, 448f5b4).
+- Audio: world music attached on read/save (a6bd4ae), object-aware then upbeat chiptune prompt (7b1b49c, 7448c3f), restored Mirelo collect sound (24c4bac), music bed/duck mix + context resume (a974b5f).
+- Landing: typing headline (fb744bb, 90fe08e), object-neutral lede (7a421ce).
+Open follow-ups (not requested): reload mid-story can create a duplicate story job; no server-side list of a user's in-flight builds (cards are per device); the chiptune server prompt needs the next API rollout; GameView still passes the deprecated onBiomeChange prop (one-line cleanup).
+User-owned checks: hook feel (walk out from under the desk, aim, F), Monsoon rain, collect sound over music after Restart, biome step flow, plane worlds reappearing then saving on Play.
