@@ -21,6 +21,45 @@ export interface GameAudioDiagnostics {
   readonly activeLoops: readonly AudioCue[];
 }
 
+/** A browser that neither resumes nor refuses must not hold up Play or a sound. */
+const RESUME_TIMEOUT_MS = 400;
+const TRACE_LENGTH = 20;
+
+export interface AudioTraceEntry {
+  /** Milliseconds since the page loaded. */
+  readonly at: number;
+  readonly what: "unlock" | "event" | "loaded" | "load-failed" | "started" | "skipped" | "resume" | "stop";
+  readonly cue?: string;
+  readonly detail?: string;
+  readonly context: string;
+}
+
+/** What `window.__wanderkinAudio()` returns: enough to tell a silent pickup's
+ * cause from a player's console paste. */
+export interface AudioReport {
+  readonly unlocked: boolean;
+  readonly contextState: string;
+  readonly settings: AudioSettings;
+  readonly gains: { master: number; music: number; effects: number; duck: number } | null;
+  readonly urls: Readonly<Record<AudioCue, string>>;
+  readonly loopLevels: Readonly<Record<Loop, number>>;
+  readonly activeLoops: readonly AudioCue[];
+  readonly events: readonly AudioTraceEntry[];
+}
+
+export const AUDIO_REPORT_GLOBAL = "__wanderkinAudio";
+
+/** Puts the engine's report on the page for the console; returns its removal. */
+export function installAudioReport(
+  engine: Pick<GameAudioEngine, "report">,
+  page: Record<string, unknown> | null = typeof window === "undefined" ? null : window as unknown as Record<string, unknown>,
+): () => void {
+  if (!page) return () => undefined;
+  const report = () => engine.report();
+  page[AUDIO_REPORT_GLOBAL] = report;
+  return () => { if (page[AUDIO_REPORT_GLOBAL] === report) delete page[AUDIO_REPORT_GLOBAL]; };
+}
+
 export class GameAudioEngine {
   private context: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -38,6 +77,8 @@ export class GameAudioEngine {
   private levels = resolveLoopGains();
   private ambienceOverride: string | null = null;
   private unlocked = false;
+  /** The last few audio happenings, for `window.__wanderkinAudio()`. */
+  private readonly trace: AudioTraceEntry[] = [];
 
   constructor(
     private settings: AudioSettings,
@@ -50,6 +91,37 @@ export class GameAudioEngine {
    * browser suspended since Play: a tab or app switch, an interruption, a
    * new output device. Browsers only allow resuming from such a gesture. */
   private readonly onGesture = (): void => { void this.resumeIfSuspended(); };
+
+  /** A gameplay event reached audio (whether or not it has a sound). */
+  noteGameplayEvent(type: string): void {
+    this.note("event", type);
+  }
+
+  report(): AudioReport {
+    return {
+      unlocked: this.unlocked,
+      contextState: this.context?.state ?? "uninitialized",
+      settings: this.settings,
+      gains: this.master && this.buses && this.duck
+        ? { master: this.master.gain.value, music: this.buses.music.gain.value, effects: this.buses.effects.gain.value, duck: this.duck.gain.value }
+        : null,
+      urls: this.urls,
+      loopLevels: this.levels,
+      activeLoops: [...this.loops.keys()],
+      events: [...this.trace],
+    };
+  }
+
+  private note(what: AudioTraceEntry["what"], cue?: string, detail?: string): void {
+    this.trace.push({
+      at: Math.round(typeof performance === "undefined" ? Date.now() : performance.now()),
+      what,
+      ...(cue ? { cue } : {}),
+      ...(detail ? { detail } : {}),
+      context: this.context?.state ?? "uninitialized",
+    });
+    if (this.trace.length > TRACE_LENGTH) this.trace.shift();
+  }
 
   configure(media?: LevelMedia): void {
     const urls = { ...resolveAudioUrls(media) };
@@ -105,6 +177,7 @@ export class GameAudioEngine {
     if (!this.unlocked) for (const type of GESTURES) this.gestures?.addEventListener(type, this.onGesture);
     this.unlocked = true;
     this.ensureContext();
+    this.note("unlock");
     await this.resumeIfSuspended();
     await Promise.all([this.startLoop("music"), this.startLoop("ambience")]);
   }
@@ -122,6 +195,7 @@ export class GameAudioEngine {
 
   stop(): void {
     // Stopped for good: nothing afterwards may build a new context or play.
+    this.note("stop");
     this.unlocked = false;
     for (const type of GESTURES) this.gestures?.removeEventListener(type, this.onGesture);
     for (const source of this.loops.values()) { try { source.stop(); } catch { /* already stopped */ } }
@@ -140,7 +214,15 @@ export class GameAudioEngine {
   private async resumeIfSuspended(): Promise<void> {
     const context = this.context;
     if (!this.unlocked || !context || context.state === "running" || context.state === "closed") return;
-    try { await context.resume(); } catch { /* the next gesture tries again */ }
+    const from = context.state;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const outcome = await Promise.race([
+      context.resume().then(() => "resumed", () => "refused"),
+      new Promise<string>((resolve) => { timer = setTimeout(() => resolve("timed out"), RESUME_TIMEOUT_MS); }),
+    ]);
+    clearTimeout(timer);
+    // Refused or timed out: the next gesture tries again.
+    this.note("resume", undefined, outcome === "resumed" ? `${from} → ${context.state}` : outcome);
   }
 
   private ensureContext(): AudioContext {
@@ -186,15 +268,18 @@ export class GameAudioEngine {
   }
 
   private async playOneShot(cue: AudioCue, bus: Bus): Promise<void> {
-    if (!this.unlocked) return;
+    if (!this.unlocked) { this.note("skipped", cue, "audio not unlocked by Play"); return; }
     const context = this.ensureContext();
     void this.resumeIfSuspended();
     const buffer = await this.load(this.urls[cue]);
-    if (!buffer || !this.unlocked) return;
+    if (!buffer) { this.note("load-failed", cue, this.urls[cue]); return; }
+    this.note("loaded", cue);
+    if (!this.unlocked) { this.note("skipped", cue, "stopped while loading"); return; }
     const source = context.createBufferSource();
     source.buffer = buffer;
     source.connect(this.buses![bus]);
     source.start();
+    this.note("started", cue, `${buffer.duration.toFixed(2)} s`);
     if (cue === DUCKED_UNDER) this.duckMusic(context, buffer);
   }
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { LevelMedia } from "@shared/index.js";
 import type { GameplayEvent, GameplayEventBus } from "../game/events.js";
 import type { AudioSettings } from "../ui/components/index.js";
-import { GameAudioEngine } from "./engine.js";
+import { GameAudioEngine, installAudioReport } from "./engine.js";
 import { loadAudioSettings, saveAudioSettings } from "./settings.js";
 
 export function useGameAudio(options: {
@@ -23,7 +23,12 @@ export function useGameAudio(options: {
     engine.setSettings(next);
   }, [engine]);
 
-  useEffect(() => options.eventBus.on("*", (event) => handleEvent(engine, event)), [engine, options.eventBus]);
+  useEffect(() => options.eventBus.on("*", (event) => {
+    engine.noteGameplayEvent(event.type);
+    handleEvent(engine, event);
+  }), [engine, options.eventBus]);
+  // `window.__wanderkinAudio()` in the console: the last audio happenings.
+  useEffect(() => installAudioReport(engine), [engine]);
 
   const unlock = useCallback(() => engine.unlockAndStart(), [engine]);
   const getDiagnostics = useCallback(() => engine.diagnostics(), [engine]);
