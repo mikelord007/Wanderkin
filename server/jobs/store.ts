@@ -21,6 +21,11 @@ export interface JobInternal {
    * `LivepeerAdapter.submit` on any later attempt for the same job so a
    * retry/resubmit sends the provider byte-identical `image_urls`. */
   resolvedImageUrls?: string[];
+  /** Automatic re-runs already spent on this job (story and sound get one;
+   * see JobManager.autoRetry). Manual retries are `job.retryCount`. */
+  autoRetries?: number;
+  /** The failure that triggered the latest automatic re-run, for operators. */
+  lastAutoRetryError?: GenerationJob["lastError"];
 }
 
 export interface JobRecord {

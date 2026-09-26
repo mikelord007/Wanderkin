@@ -78,4 +78,25 @@ describe("multi-kind job routes", () => {
     expect(await second.json()).toMatchObject({ cacheHit: true, approved: true, job: { id: "job-preview" } });
     expect(submitGenerationOrReconcile).toHaveBeenCalledTimes(1);
   });
+
+  it("logs a turned-away generation request in one line, without its prompt", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const manager = { submitGenerationOrReconcile: vi.fn() } as unknown as JobManager;
+      const baseUrl = await start(manager, new PhotoStore(dir), new PreviewCacheStore(dir));
+      const request = { schemaVersion: 1, kind: "music", capability: "music", idempotencyKey: "music-1", purpose: "world-soundtrack", prompt: "secret prompt words", durationSeconds: 60, instrumental: true, loop: true };
+      const response = await fetch(`${baseUrl}/api/jobs/generate`, {
+        method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": request.idempotencyKey },
+        body: JSON.stringify({ request, worldId: "world-1" }),
+      });
+      expect(response.status).toBe(400);
+      expect(warn).toHaveBeenCalledTimes(1);
+      const line = String(warn.mock.calls[0]![0]);
+      expect(JSON.parse(line)).toMatchObject({ event: "generation_rejected", status: 400, kind: "music", capability: "music", purpose: "world-soundtrack" });
+      expect(line).toContain("durationSeconds");
+      expect(line).not.toContain("secret prompt words");
+    } finally {
+      warn.mockRestore();
+    }
+  });
 });

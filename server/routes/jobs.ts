@@ -139,7 +139,34 @@ export function createJobsRouter(
     return undefined;
   }
 
+  /** One line per turned-away generation request, so a world that silently
+   * lost its story or music can be traced. Never logs prompts or text. */
+  function logRejected(status: number, body: unknown, message: string): void {
+    const request = (body as { request?: Record<string, unknown> } | undefined)?.request;
+    const field = (key: string) => (typeof request?.[key] === "string" ? (request[key] as string).slice(0, 80) : undefined);
+    console.warn(JSON.stringify({
+      event: "generation_rejected",
+      status,
+      kind: field("kind"),
+      capability: field("capability"),
+      purpose: field("purpose"),
+      message: message.slice(0, 300),
+    }));
+  }
+
   async function submitGeneration(req: Request, res: Response): Promise<void> {
+    const status = res.status.bind(res);
+    res.status = (code: number) => {
+      const reply = status(code);
+      if (code >= 400) {
+        const json = reply.json.bind(reply);
+        reply.json = (payload: unknown) => {
+          logRejected(code, req.body, (payload as { message?: unknown } | undefined)?.message?.toString() ?? "");
+          return json(payload);
+        };
+      }
+      return reply;
+    };
     const parsed = generationEnvelopeSchema.safeParse(req.body);
     if (!parsed.success) {
       const detail = parsed.error.issues.map((issue) => `${issue.path.join(".") || "body"}: ${issue.message}`).join("; ");

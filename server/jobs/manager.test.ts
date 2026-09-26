@@ -1013,4 +1013,122 @@ describe("JobManager", () => {
     expect(vi.mocked(adapter.getStatus)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(downloadBounded)).toHaveBeenCalledTimes(1);
   });
+
+  describe("story and sound jobs recover instead of failing the world", () => {
+    const story = v2Requests.find((request) => request.kind === "text")!;
+    const music = v2Requests.find((request) => request.kind === "music")!;
+    const INTRO = "Welcome, brave little explorer, to the whispering forest corner where every leaf remembers a color and every flower hums a tune. ".repeat(4);
+    /** The shape of job_ed1c0f5e's answer on the live server (2026-09-26):
+     * a fenced block, extra fields, an object objective and a narration array
+     * with a stray string, well over the 1200-character cap. */
+    const RECORDED_QUEST_ANSWER = [
+      "```json",
+      JSON.stringify({
+        questId: "forest-collect-01",
+        title: "The Lost Colors of the Forest Corner",
+        mode: "collect",
+        intro: INTRO,
+        objective: { type: "collect", item: "color fragment", quantity: 8, description: "Find all eight lost color fragments hidden among the trees, then step into the glowing portal." },
+        narrationScript: [
+          { speaker: "Guide", line: "Oh dear, the colors have scattered across the forest floor! Let us find every one of them together." },
+          { speaker: "Guide", line: "Look under the bushes and behind the flowers, little one. The portal is waiting." },
+          "and then the forest sang again",
+        ],
+      }, null, 2),
+      "```",
+    ].join("\n");
+
+    it("repairs the recorded over-long quest answer into a ready story without asking again", async () => {
+      expect(RECORDED_QUEST_ANSWER.length).toBeGreaterThan(1200);
+      const adapter = fakeMultiAdapter({
+        getGenerationStatus: vi.fn(async (): Promise<ProviderGenerationStatus> => ({ state: "ready", output: { text: RECORDED_QUEST_ANSWER, outputKind: "text" } })),
+      });
+      const manager = buildMulti(adapter);
+      const outcome = await manager.submitGenerationOrReconcile(story, { worldId: "world-a" });
+      const job = await manager.pollAndAdvance(outcome.job.id, { force: true });
+
+      expect(job?.state).toBe("ready");
+      const output = job?.result?.kind === "text" ? job.result.output : undefined;
+      expect(output?.structured).toEqual({
+        title: "The Lost Colors of the Forest Corner",
+        intro: expect.any(String),
+        objective: "Find all eight lost color fragments hidden among the trees, then step into the glowing portal.",
+      });
+      const structured = output?.structured as { intro: string };
+      expect(structured.intro.length).toBeLessThanOrEqual(320);
+      expect(output!.text.length).toBeLessThanOrEqual(1200);
+      expect(adapter.submitGeneration).toHaveBeenCalledTimes(1);
+    });
+
+    it("asks once more, more strictly, when an answer cannot be repaired, then succeeds", async () => {
+      const answers = ["Here is a lovely quest about the forest!", JSON.stringify({ title: "Forest Colors", intro: "The forest has lost its colors. Can you bring them back?", objective: "Find every lost color, then enter the portal." })];
+      const adapter = fakeMultiAdapter({
+        getGenerationStatus: vi.fn(async (): Promise<ProviderGenerationStatus> => ({ state: "ready", output: { text: answers.shift()!, outputKind: "text" } })),
+      });
+      const manager = buildMulti(adapter);
+      const outcome = await manager.submitGenerationOrReconcile(story, { worldId: "world-a" });
+
+      const afterFirst = await manager.pollAndAdvance(outcome.job.id, { force: true });
+      expect(afterFirst?.state).not.toBe("failed");
+      expect(adapter.submitGeneration).toHaveBeenCalledTimes(2);
+      const second = vi.mocked(adapter.submitGeneration!).mock.calls[1]![0];
+      expect(second.idempotencyKey).not.toBe(story.idempotencyKey);
+      expect(second.kind === "text" && second.prompt).toContain("Do not use Markdown or code fences.");
+
+      const done = await manager.pollAndAdvance(outcome.job.id, { force: true });
+      expect(done).toMatchObject({ id: outcome.job.id, state: "ready" });
+    });
+
+    it("fails a story only after the one automatic retry also fails", async () => {
+      const adapter = fakeMultiAdapter({
+        getGenerationStatus: vi.fn(async (): Promise<ProviderGenerationStatus> => ({ state: "ready", output: { text: "no json here", outputKind: "text" } })),
+      });
+      const manager = buildMulti(adapter);
+      const outcome = await manager.submitGenerationOrReconcile(story, { worldId: "world-a" });
+      await manager.pollAndAdvance(outcome.job.id, { force: true });
+      const final = await manager.pollAndAdvance(outcome.job.id, { force: true });
+
+      expect(final).toMatchObject({ state: "failed", lastError: { retryable: true } });
+      expect(adapter.submitGeneration).toHaveBeenCalledTimes(2);
+    });
+
+    it("re-runs a story or soundtrack once when the provider finished without a result", async () => {
+      const failures = new Set<string>();
+      const adapter = fakeMultiAdapter({
+        getGenerationStatus: vi.fn(async (providerJobId: string): Promise<ProviderGenerationStatus> => {
+          if (!failures.has(providerJobId)) {
+            failures.add(providerJobId);
+            return { state: "failed", error: { message: "The render finished but returned no media. This was still billed upstream — re-run the request, or try a different model.", retryable: false } };
+          }
+          return { state: "generating" };
+        }),
+      });
+      const manager = buildMulti(adapter);
+      for (const request of [story, music]) {
+        const outcome = await manager.submitGenerationOrReconcile(request, { worldId: "world-b" });
+        const job = await manager.pollAndAdvance(outcome.job.id, { force: true });
+        expect(job?.state).not.toBe("failed");
+      }
+      expect(adapter.submitGeneration).toHaveBeenCalledTimes(4);
+    });
+
+    it("gives up on a story still unanswered after its deadline, re-runs it once, and never lets it hold a provider slot", async () => {
+      const adapter = fakeMultiAdapter();
+      const manager = buildMulti(adapter, dir, { maxInFlight: 1 });
+      const outcome = await manager.submitGenerationOrReconcile(story, { worldId: "world-c" });
+      // Like job_ed1c0f5e, which sat "generating" for 86 minutes.
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        vi.setSystemTime(Date.now() + 30 * 60_000);
+        // A stale story does not block the next world's music.
+        await expect(manager.submitGenerationOrReconcile(music, { worldId: "world-d" })).resolves.toMatchObject({ status: "created" });
+
+        const retried = await manager.pollAndAdvance(outcome.job.id, { force: true });
+        expect(retried?.state).not.toBe("failed");
+        expect(vi.mocked(adapter.submitGeneration!).mock.calls.filter(([request]) => request.kind === "text")).toHaveLength(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
 });

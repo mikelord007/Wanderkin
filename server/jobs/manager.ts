@@ -20,6 +20,7 @@ import {
   estimateRequestCost,
   RequestCostNotBoundedError,
 } from "../livepeer/capabilities.js";
+import { repairQuestJson, strictQuestPromptSuffix } from "../quest/repair.js";
 import type { GenerationProviderAdapter, ProviderGenerationStatus } from "./types.js";
 import { BudgetExceededError, SpendLedger } from "./spendLedger.js";
 import {
@@ -55,6 +56,16 @@ export class ProviderConcurrencyExceededError extends Error {
 }
 
 const MAX_RETRIES = 3;
+/** Story text normally arrives in seconds (p95 under 7 s). One still
+ * unanswered after this is treated as lost: it is re-run once, and it stops
+ * counting against the in-flight cap so it can never starve other worlds. */
+export const TEXT_JOB_DEADLINE_MS = 3 * 60_000;
+/** Cheap, optional world extras get one automatic re-run of a failed
+ * provider attempt. Paid, user-driven kinds (3D, images, video) never do. */
+const AUTO_RETRY_KINDS = new Set<GenerationRequest["kind"]>(["text", "music", "sfx"]);
+const MAX_AUTO_RETRIES = 1;
+/** Failures a re-run cannot fix. */
+const NO_AUTO_RETRY_CODES = new Set(["budget_exceeded", "cost_not_bounded", "unsafe_url", "download_too_large", "idempotency_retention_expired"]);
 const PROVIDER_ID = "livepeer-agent-mcp";
 const TERMINAL_PROVIDER_STATUSES = new Set(["failed", "cancelled", "canceled"]);
 
@@ -207,28 +218,20 @@ function buildProvenance(job: GenerationJob): GenerationProvenance {
   };
 }
 
-function parseQuestJson(text: string, alreadyParsed: unknown): Record<string, unknown> {
-  let value = alreadyParsed;
-  if (value === undefined) {
-    try {
-      value = JSON.parse(text);
-    } catch {
-      throw new Error("Quest generation did not return valid JSON");
-    }
+function isPastTextDeadline(record: JobRecord, now = Date.now()): boolean {
+  const startedAt = record.job.startedAt ? Date.parse(record.job.startedAt) : NaN;
+  return record.job.request?.kind === "text" && Number.isFinite(startedAt) && now - startedAt > TEXT_JOB_DEADLINE_MS;
+}
+
+/** The provider-facing request for an automatic re-run: a fresh provider
+ * idempotency key (the original one would hand back the same cached answer)
+ * and, for quest text, the stricter prompt. The job's own request is kept. */
+function autoRetryRequest(request: GenerationRequest, attempt: number): GenerationRequest {
+  const idempotencyKey = `${request.idempotencyKey.slice(0, 120)}-auto${attempt}`;
+  if (request.kind === "text" && request.output === "quest-json") {
+    return { ...request, idempotencyKey, prompt: `${request.prompt}\n\n${strictQuestPromptSuffix()}`.slice(0, 8000) };
   }
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error("Quest generation must return a JSON object");
-  }
-  const record = value as Record<string, unknown>;
-  for (const field of ["title", "intro", "objective"]) {
-    if (record[field] !== undefined && typeof record[field] !== "string") {
-      throw new Error(`Quest field "${field}" must be text`);
-    }
-  }
-  if (typeof record.title !== "string" || typeof record.objective !== "string") {
-    throw new Error("Quest JSON must include text fields title and objective");
-  }
-  return record;
+  return { ...request, idempotencyKey };
 }
 
 export class JobManager {
@@ -263,8 +266,9 @@ export class JobManager {
   private async assertProviderCapacity(excludeJobId?: string): Promise<void> {
     const limit = this.generation?.maxInFlight ?? 4;
     const records = await this.store.all();
+    const now = Date.now();
     const inFlight = records.filter(
-      (record) => record.job.id !== excludeJobId && !isTerminalJobState(record.job.state),
+      (record) => record.job.id !== excludeJobId && !isTerminalJobState(record.job.state) && !isPastTextDeadline(record, now),
     ).length;
     if (inFlight >= limit) {
       throw new ProviderConcurrencyExceededError(this.generation?.concurrencyRetrySeconds ?? 15);
@@ -802,8 +806,42 @@ export class JobManager {
         record.internal.nextPollAt = Date.now() + record.internal.backoffMs;
       }
     }
+    if (!isTerminalJobState(record.job.state) && isPastTextDeadline(record)) {
+      record.job.state = "failed";
+      record.job.uiMessage = friendlyMessage("failed");
+      record.job.lastError = { message: "The story took too long to arrive.", code: "text_timeout", retryable: true, occurredAt: new Date().toISOString() };
+      record.job.completedAt = new Date().toISOString();
+      record.job.updatedAt = record.job.completedAt;
+    }
+    if (this.canAutoRetry(record)) return toPublicJob(await this.autoRetry(record));
     await this.store.put(record);
     return toPublicJob(record);
+  }
+
+  private canAutoRetry(record: JobRecord): boolean {
+    const request = record.job.request;
+    return record.job.state === "failed"
+      && request !== undefined && AUTO_RETRY_KINDS.has(request.kind)
+      && (record.internal.autoRetries ?? 0) < MAX_AUTO_RETRIES
+      && !NO_AUTO_RETRY_CODES.has(record.job.lastError?.code ?? "");
+  }
+
+  /** Re-runs a failed story or sound once, as a new provider job under the
+   * same application job: the client keeps polling the same id and never
+   * sees the first failure. Must hold `job:<id>`. */
+  private async autoRetry(record: JobRecord): Promise<JobRecord> {
+    const attempt = (record.internal.autoRetries ?? 0) + 1;
+    record.internal.autoRetries = attempt;
+    record.internal.lastAutoRetryError = record.job.lastError;
+    delete record.job.lastError;
+    delete record.job.completedAt;
+    delete record.job.result;
+    record.job.providerJobId = null;
+    return this.submitGenerationToProvider(
+      record,
+      autoRetryRequest(record.job.request!, attempt),
+      this.generation?.perRequestLimitUsd ?? Number.MAX_SAFE_INTEGER,
+    );
   }
 
   private async finalizeGenerationOutput(
@@ -831,15 +869,19 @@ export class JobManager {
         return;
       }
       if (request.kind === "text") {
-        const text = output.text ?? (typeof output.json === "string" ? output.json : JSON.stringify(output.json));
-        if (!text || text.length > request.maxCharacters) {
-          throw new Error(`Generated text must contain at most ${request.maxCharacters} characters`);
+        const raw = output.text ?? (typeof output.json === "string" ? output.json : JSON.stringify(output.json));
+        if (request.output === "quest-json") {
+          // Unwrapped, reduced to title/intro/objective and trimmed, so a long
+          // or fenced answer is repaired rather than rejected.
+          const repaired = repairQuestJson(raw ?? "", typeof output.json === "object" ? output.json : undefined);
+          if (!repaired.ok) throw new Error(repaired.reason);
+          result = { kind: "text", output: { text: repaired.text, structured: repaired.quest } };
+        } else {
+          if (!raw || raw.length > request.maxCharacters) {
+            throw new Error(`Generated text must contain at most ${request.maxCharacters} characters`);
+          }
+          result = { kind: "text", output: { text: raw } };
         }
-        const structured = request.output === "quest-json" ? parseQuestJson(text, output.json) : undefined;
-        result = {
-          kind: "text",
-          output: { text, ...(structured !== undefined ? { structured } : {}) },
-        };
       } else {
         if (!output.url) throw new Error(`${request.kind} provider output did not include a URL`);
         const maxBytes = request.kind === "image-edit" ? 25 * 1024 * 1024 : request.kind === "video" ? 200 * 1024 * 1024 : 75 * 1024 * 1024;

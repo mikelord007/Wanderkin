@@ -6,11 +6,12 @@ export interface QuestValidationResult {
   errors: string[];
 }
 
-const LIMITS = {
+export const QUEST_TEXT_LIMITS = {
   title: [2, 80],
   intro: [20, 320],
   objective: [10, 160],
 } as const;
+const LIMITS = QUEST_TEXT_LIMITS;
 
 /** Older prompts asked for narration text; a model that still sends it is
  * not penalised with a retry. The value is dropped unread. */
