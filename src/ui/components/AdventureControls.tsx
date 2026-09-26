@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
 import type { AdventureTemplateId, BiomeId, EffectsQuality } from "../../biome/types.js";
 // Data only: the shared look names. No biome render code is imported.
-import { lookName } from "../../biome/lookCatalog.js";
+import { LOOK_LABELS, lookName } from "../../biome/lookCatalog.js";
 import { Icon } from "./Icon.js";
 import "./adventure-controls.css";
 
@@ -105,7 +105,7 @@ export function AdventureControlsView({
       <p className="oq-adventure__world" data-theme={biomeId}>
         <Icon name="lock" className="oq-adventure__world-lock" />
         <span><span className="oq-adventure__world-label">{ADVENTURE_COPY.worldLabel}: {lookName(biomeId)}</span>
-          <span className="oq-adventure__hint">{ADVENTURE_COPY.worldLocked}</span></span>
+          <span className="oq-adventure__hint">{LOOK_LABELS[biomeId].elements}. {ADVENTURE_COPY.worldLocked}.</span></span>
       </p>
 
       <label className="oq-adventure__toggle">

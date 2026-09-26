@@ -209,42 +209,32 @@
   .oq-style-preview__placeholder, .oq-world-progress__preview > img { animation: none; }
 }
 
-/* --- Step 3, the biome. Seven places as tiles (the same tiny landscapes the
-   in-game panel showed), then the locking moment: the chosen tile grown into
-   a full-width card with the object set into it. The swatches are content,
-   so they keep their own hues rather than the interface palette. */
+/* --- Step 3, the biome. Seven places as tiles, each a real render of the
+   look with what grows there written under its name (Monsoon first and
+   chosen, Original last and quiet), then the locking moment: the chosen tile
+   grown into a full-width card with the object set into it. */
 .oq-biome { max-width: 960px; display: grid; gap: var(--wk-gap-group); }
 .oq-biome .oq-kit-choices__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.oq-biome .oq-kit-choice__image { aspect-ratio: 4 / 3; border-radius: var(--wk-r-inner); }
+.oq-biome .oq-kit-choice__image { aspect-ratio: 3 / 2; border-radius: var(--wk-r-inner); }
 .oq-biome .oq-kit-choice input:checked + .oq-kit-choice__body { box-shadow: 0 0 0 4px var(--wk-glow); }
 .oq-biome__actions { justify-content: flex-end; }
 .oq-biome__note { margin: 0; color: var(--wk-text-2); font-size: var(--wk-type-small); }
 
-.oq-biome__swatch, .oq-biome-card__land {
-  position: relative; display: block; width: 100%; height: 100%; overflow: hidden;
-  background:
-    radial-gradient(circle at 70% 64%, var(--sw-glint) 0 5px, transparent 6px),
-    linear-gradient(to bottom, var(--sw-zenith) 0%, var(--sw-horizon) 56%, var(--sw-ground) 56.5%, var(--sw-ground) 100%);
+/* Each tile is a real render of the look, with its palette as a small chip.
+   The renders are content, so they keep their own colours. */
+.oq-biome__render, .oq-biome-card__land { position: relative; display: block; width: 100%; height: 100%; overflow: hidden; background: var(--wk-tint); }
+.oq-biome__render img, .oq-biome-card__land img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.oq-biome-card__land { position: absolute; inset: 0; }
+.oq-biome__chip {
+  position: absolute; left: 8px; bottom: 8px; width: 26px; height: 12px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--sw-zenith) 0 34%, var(--sw-ground) 34% 67%, var(--sw-glint) 67%);
+  box-shadow: 0 0 0 2px var(--wk-surface), var(--wk-shadow-sm);
 }
-.oq-biome-card__land { position: absolute; inset: 0; background:
-    radial-gradient(circle at 78% 70%, var(--sw-glint) 0 9px, transparent 10px),
-    linear-gradient(to bottom, var(--sw-zenith) 0%, var(--sw-horizon) 58%, var(--sw-ground) 58.5%, var(--sw-ground) 100%); }
-/* One glint of the place's collectible colour, above the hill. */
-.oq-biome__swatch::before, .oq-biome-card__land::before {
-  content: ""; position: absolute; z-index: 1; left: 68%; top: 66%; width: 10px; height: 10px; border-radius: 50%;
-  background: var(--sw-glint); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sw-glint) 30%, transparent);
-}
-.oq-biome-card__land::before { left: 80%; top: 74%; width: 14px; height: 14px; }
-.oq-biome__swatch--photo::before, .oq-biome-card__land--photo::before { display: none; }
-/* A soft hill line on the ground, so each swatch reads as a place. */
-.oq-biome__swatch::after, .oq-biome-card__land::after {
-  content: ""; position: absolute; left: -20%; right: -20%; top: 52%; height: 44%;
-  border-radius: 50% 50% 0 0; background: var(--sw-ground); filter: brightness(.94);
-}
-.oq-biome__swatch--photo, .oq-biome-card__land--photo { display: grid; place-items: center; color: var(--wk-purple); background: var(--wk-tint); }
-.oq-biome__swatch--photo::after, .oq-biome-card__land--photo::after { display: none; }
-.oq-biome__swatch--photo svg { width: 28px; height: 28px; }
-.oq-biome-card__land--photo svg { display: none; }
+.oq-biome-card__land .oq-biome__chip { display: none; }
+/* Original is offered last and kept quiet: the least likely pick. */
+.oq-biome .oq-kit-choice:has(input[value="original"]) .oq-kit-choice__body { border-style: dashed; background: transparent; box-shadow: none; }
+.oq-biome .oq-kit-choice:has(input[value="original"]:not(:checked)) .oq-kit-choice__image img { filter: saturate(.3); opacity: .7; }
+.oq-biome .oq-kit-choice:has(input[value="original"]) .oq-kit-choice__label { font-weight: 400; color: var(--wk-text-2); }
 
 .oq-biome-card {
   display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); overflow: hidden;
@@ -276,7 +266,7 @@
 
 @media (max-width: 699px) {
   .oq-biome .oq-kit-choices__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .oq-biome .oq-kit-choice__image { aspect-ratio: 16 / 9; }
+  .oq-biome .oq-kit-choice__image { aspect-ratio: 3 / 2; }
   .oq-biome .oq-kit-choice__body { padding: 10px; gap: 6px; }
   .oq-biome-card { grid-template-columns: 1fr; }
   .oq-biome-card__scene { min-height: 200px; }

@@ -7,7 +7,7 @@ import {
   type CreationRecord,
 } from "./creationFlow.js";
 import { toPendingWorld, worldBuildStages, worldChoicesLine } from "./pendingWorlds.js";
-import { BIOME_STEP_COPY, BiomeStepView, type BiomeStepViewProps } from "./screens/BiomeStepScreen.js";
+import { BIOME_STEP_COPY, BiomeStepScreen, BiomeStepView, type BiomeStepViewProps } from "./screens/BiomeStepScreen.js";
 
 const NOW = "2026-09-26T21:00:00.000Z";
 const selection = { style: "cartoon" as const, mode: "collect" as const, atmosphere: "" };
@@ -99,7 +99,23 @@ describe("the biome step screen", () => {
     expect(markup).toMatch(/<li aria-current="step"><span aria-hidden="true">3<\/span>Biome<\/li>/);
   });
 
-  it("empty: seven tiles, none chosen, and Continue waits for a choice", () => {
+  it("opens with Monsoon chosen, so Continue works straight away", () => {
+    const markup = renderToStaticMarkup(createElement(BiomeStepScreen, { style: "cartoon", onLock: vi.fn(), onContinue: vi.fn(), onBack: vi.fn() }));
+    expect([...markup.matchAll(/<input type="radio"[^>]*checked=""[^>]*value="([a-z]+)"/g)].map((m) => m[1])).toEqual(["monsoon"]);
+    expect(markup).not.toMatch(/<button[^>]*disabled=""[^>]*>Continue<\/button>/);
+  });
+
+  it("each tile is a real render with what grows there: Monsoon first, Original last", () => {
+    const markup = render({ picked: "monsoon" });
+    expect([...markup.matchAll(/<input type="radio"[^>]*value="([a-z]+)"/g)].map((m) => m[1])).toEqual(["monsoon", "tropical", "desert", "alpine", "autumn", "ember", "original"]);
+    expect(markup).toContain('src="/looks/monsoon.webp" srcSet="/looks/monsoon.webp 480w, /looks/monsoon@2x.webp 960w"');
+    expect(markup).toContain("Palms, reeds, stilt huts, steady rain");
+    expect(markup).toContain("Just the place in your photo, no scenery");
+    // Original carries no colour chip; the six looks do.
+    expect(markup.match(/class="oq-biome__chip"/g)).toHaveLength(6);
+  });
+
+  it("with nothing chosen, Continue waits for a choice", () => {
     const markup = render();
     expect(tileCount(markup)).toBe(7);
     expect(markup).not.toContain('checked=""');

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { SceneBiomeId, StyleId } from "@shared/index.js";
-import { LOOK_LABELS, LOOK_OPTIONS, withArticle, type LookEntry } from "../../biome/lookCatalog.js";
+import { DEFAULT_PICKED_LOOK, LOOK_LABELS, LOOK_PICKER_OPTIONS, withArticle, type LookEntry } from "../../biome/lookCatalog.js";
 import { Button, ChoiceTiles, Icon } from "../components/index.js";
 import { CreationFrame } from "./CreationFrame.js";
 
@@ -31,12 +31,13 @@ function swatchStyle(entry: LookEntry): CSSProperties | undefined {
   return swatch ? { "--sw-zenith": swatch.zenith, "--sw-horizon": swatch.horizon, "--sw-ground": swatch.ground, "--sw-glint": swatch.glint } as CSSProperties : undefined;
 }
 
-/** The same tiny landscape the in-game panel used for each look, or a photo
- * glyph for Original (the place in the photo itself). */
-function Swatch({ entry, className }: { entry: LookEntry; className: string }) {
-  return entry.swatch
-    ? <span className={className} style={swatchStyle(entry)} aria-hidden="true" />
-    : <span className={`${className} ${className}--photo`} aria-hidden="true"><Icon name="photo" /></span>;
+/** A real render of the look, with its palette as a small chip (none for
+ * Original, which is the place in the photo itself). */
+function LookRender({ entry, className, sizes }: { entry: LookEntry; className: string; sizes: string }) {
+  return <span className={className}>
+    <img src={entry.image.src} srcSet={`${entry.image.src} 480w, ${entry.image.src2x} 960w`} sizes={sizes} width={480} height={320} alt="" decoding="async" />
+    {entry.swatch ? <span className="oq-biome__chip" style={swatchStyle(entry)} aria-hidden="true" /> : null}
+  </span>;
 }
 
 export interface BiomeStepViewProps {
@@ -66,14 +67,14 @@ export function BiomeStepView({ style, objectUrl, picked, lockedBiome, phase, on
         <ChoiceTiles<SceneBiomeId>
           legend={BIOME_STEP_COPY.legend}
           hint={BIOME_STEP_COPY.lead}
-          // No tile is chosen until the player picks one.
           value={(picked ?? "") as SceneBiomeId}
           onChange={onPick}
-          options={LOOK_OPTIONS.map((entry) => ({
+          // Monsoon first and chosen by default; Original last, and quieter.
+          options={LOOK_PICKER_OPTIONS.map((entry) => ({
             value: entry.value,
             label: entry.label,
-            description: entry.description,
-            image: <Swatch entry={entry} className="oq-biome__swatch" />,
+            description: entry.elements,
+            image: <LookRender entry={entry} className="oq-biome__render" sizes="(max-width: 699px) 45vw, 240px" />,
           }))}
         />
         <div className="oq-kit-row oq-biome__actions">
@@ -99,14 +100,14 @@ export function BiomeStepView({ style, objectUrl, picked, lockedBiome, phase, on
 function BiomeCard({ entry, objectUrl, phase }: { entry: LookEntry; objectUrl?: string | undefined; phase: BiomeStepPhase }) {
   return <section className="oq-biome-card" data-phase={phase} data-theme={entry.value} aria-labelledby="oq-biome-card-title">
     <div className="oq-biome-card__scene">
-      <Swatch entry={entry} className="oq-biome-card__land" />
+      <LookRender entry={entry} className="oq-biome-card__land" sizes="(max-width: 699px) 100vw, 560px" />
       {objectUrl ? <img className="oq-biome-card__object" src={objectUrl} alt="" /> : null}
       {phase !== "growing" ? <span className="oq-biome-card__seal" aria-hidden="true"><Icon name="lock" /></span> : null}
     </div>
     <div className="oq-biome-card__body">
       <p className="oq-kit-eyebrow">{BIOME_STEP_COPY.legend}</p>
       <h2 id="oq-biome-card-title">{entry.label}</h2>
-      <p className="oq-biome-card__description">{entry.description}</p>
+      <p className="oq-biome-card__description">{entry.elements}</p>
       <p className="oq-biome-card__status" role="status">
         {phase === "growing"
           ? <><span className="oq-kit-spinner" aria-hidden="true" />{BIOME_STEP_COPY.growing(entry.label)}</>
@@ -134,7 +135,9 @@ export function BiomeStepScreen({ style, objectUrl, lockedBiome, onLock, onConti
   onContinue: () => void;
   onBack: () => void;
 }) {
-  const [picked, setPicked] = useState<SceneBiomeId | null>(null);
+  // A choice is already made (Monsoon), so Continue works straight away;
+  // a creation whose biome is locked shows that one instead.
+  const [picked, setPicked] = useState<SceneBiomeId | null>(DEFAULT_PICKED_LOOK);
   const [phase, setPhase] = useState<BiomeStepPhase>("choose");
   const continueRef = useRef(onContinue);
   continueRef.current = onContinue;
