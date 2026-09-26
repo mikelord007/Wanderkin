@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { BRAND_BUNDLE_EXTENSION, BRAND_NAME, BRAND_SLUG } from "../../brand.js";
-import { LOGO_SMALL_BELOW, Logo, LogoMark, type LogoTone } from "./Logo.js";
+import { LOGO_SMALL_BELOW, Logo, LogoMark, MARK_BOX, TILE_FIT, type LogoTone } from "./Logo.js";
 
 const root = new URL("../../../", import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, root), "utf8");
@@ -37,6 +37,20 @@ describe("LogoMark", () => {
     for (const size of [24, 36, 64]) {
       expect(mark(size)).toContain('rx="12"');
       expect(mark(size)).toContain("stroke-width");
+    }
+  });
+
+  it("centres the drawing in its tile: equal clearance above and below, and either side", () => {
+    for (const cut of ["full", "small"] as const) {
+      const { scale, x, y } = TILE_FIT[cut];
+      const box = MARK_BOX[cut];
+      const top = y + scale * box.top;
+      const bottom = 48 - (y + scale * box.bottom);
+      const left = x + scale * box.left;
+      const right = 48 - (x + scale * box.right);
+      expect(Math.abs(top - bottom), cut).toBeLessThan(0.05);
+      expect(Math.abs(left - right), cut).toBeLessThan(0.05);
+      expect(top, cut).toBeGreaterThan(5);
     }
   });
 

@@ -90,16 +90,29 @@ const STANCE = {
 } as const;
 
 /**
- * How the drawing sits inside the purple tile: scaled about the centre line and
- * lifted, so the planet clears the tile's bottom edge by about as much as its
- * glow clears the sides (about 11 units on the full cut) instead of resting on
- * it. The small cut shrinks less, so it still reads at 16px. Mono has no tile
- * and keeps the drawing at full size.
+ * The drawing's bounding box before it is fitted to the tile, per cut. Top is
+ * the highest point of the explorer (the pompom on the full cut, the beanie on
+ * the small one); bottom is the lowest edge of the button (its outer haze on
+ * the full cut, the planet on the small one); the sides are the widest light
+ * circle.
  */
-const TILE_FIT = {
-  full: "translate(5.28 -.28) scale(.78)",
-  small: "translate(4.32 .47) scale(.82)",
+export const MARK_BOX = {
+  full: { top: 4.21, bottom: 47.8, left: 7.8, right: 40.2 },
+  small: { top: 3.08, bottom: 47.8, left: 8.2, right: 39.8 },
 } as const;
+
+/**
+ * How the drawing sits inside the purple tile: scaled about the centre line
+ * and moved so its box is centred, with the same clearance above the hat as
+ * below the button (7.0 units on the full cut, 5.66 on the small one). The
+ * small cut shrinks less, so it still reads at 16px. Mono has no tile and
+ * keeps the drawing at full size.
+ */
+export const TILE_FIT = {
+  full: { scale: 0.78, x: 5.28, y: 3.72 },
+  small: { scale: 0.82, x: 4.32, y: 3.14 },
+} as const;
+const fit = (cut: keyof typeof TILE_FIT) => `translate(${TILE_FIT[cut].x} ${TILE_FIT[cut].y}) scale(${TILE_FIT[cut].scale})`;
 
 /** The mono rim: an arc over the top of the planet, clear of its edge. */
 const MONO_RIM = {
@@ -134,7 +147,7 @@ function FullMark() {
   return (
     <>
       <rect x="0" y="0" width="48" height="48" rx="12" fill={MARK_COLORS.night} />
-      <g transform={TILE_FIT.full}>
+      <g transform={fit("full")}>
         <circle cx={p.cx} cy={p.haze.cy} r={p.haze.r} fill={MARK_COLORS.violet} fillOpacity=".28" />
         <circle cx={p.cx} cy={p.band.cy} r={p.band.r} fill={MARK_COLORS.violet} />
         <circle cx={p.cx} cy={p.rim.cy} r={p.rim.r} fill={MARK_COLORS.rim} />
@@ -167,7 +180,7 @@ function SmallMark() {
   return (
     <>
       <rect x="0" y="0" width="48" height="48" rx="11" fill={MARK_COLORS.night} />
-      <g transform={TILE_FIT.small}>
+      <g transform={fit("small")}>
         <circle cx={p.cx} cy={p.band.cy} r={p.band.r} fill={MARK_COLORS.violet} />
         <circle cx={p.cx} cy={p.rim.cy} r={p.rim.r} fill={MARK_COLORS.rim} />
         <circle cx={p.cx} cy={p.cy} r={p.r} fill={MARK_COLORS.planet} />
