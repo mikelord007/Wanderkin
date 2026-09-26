@@ -90,6 +90,14 @@ describe("static brand files match the component", () => {
     expect(read("public/brand/wanderkin-mark-mono.svg")).toContain(drawing(48, "mono"));
   });
 
+  it("index.html centres the boot screen in the viewport on its own, whatever the app CSS does to #root", () => {
+    const html = read("index.html");
+    const rule = html.match(/\.mh-boot\s*\{([^}]*)\}/)?.[1] ?? "";
+    for (const declaration of ["position: fixed", "inset: 0", "margin: auto", "width: fit-content", "height: fit-content"]) {
+      expect(rule, declaration).toContain(declaration);
+    }
+  });
+
   it("index.html uses the small cut as favicon and inlines the full mark on the boot screen", () => {
     const html = read("index.html");
     const icon = html.match(/<link rel="icon" href="\/([^"]+)"/)?.[1];

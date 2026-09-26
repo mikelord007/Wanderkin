@@ -29,7 +29,15 @@
       html, body { margin: 0; padding: 0; background: #faf7ff; }
       body { background: radial-gradient(ellipse 96% 44% at 50% 108%, #7b5cfa40 0%, #c9b8fd33 40%, #faf7ff00 76%), #faf7ff; min-height: 100vh; }
       #root { min-height: 100vh; display: flex; }
+      /* Centred in the viewport on its own, both ways, whatever the app's
+         stylesheet later does to #root: that stylesheet loads while this is
+         still showing and sets #root's height to 100% of an unsized parent,
+         which used to drop the boot screen to the top until the app took over. */
       .mh-boot {
+        position: fixed;
+        inset: 0;
+        width: fit-content;
+        height: fit-content;
         margin: auto;
         display: flex;
         flex-direction: column;
