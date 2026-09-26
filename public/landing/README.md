@@ -33,3 +33,27 @@ lighting never reads them. The 2048 px PNG texture (3.15 MB) is re-encoded
 as a 2048 px JPEG at quality 0.8 (212 KB), which core glTF supports.
 
 The two `library-*` renders were captured 2026-09-26 with the same harness to replace the old standalone arch illustration; `finale-sofa.webp` was captured the same day with `capture-sofa.mjs`. Total about 185 KB. The landing labels the cards shown in a theme look.
+
+## Room photos (`room-photo*.webp`)
+
+The landing's photographs of the room, used where it shows "the photo"
+before the 3D model and the game: the "From photo to explorable world" frame,
+the first "How it works" card, and the finale, where it dissolves into
+`finale-sofa.webp`. They replace `/samples/photo-4.jpg` on the landing only;
+that file is still the bundled sample world's source photo and is unchanged.
+
+Source: a photo of the same room, desk and sofa, supplied by the owner on
+2026-09-27 (`nimbalyst-local/design/source/sofa-2026-09-27.jpg`, 8160×4590).
+Built by `nimbalyst-local/design/shots/landing-photo/build-room-photo.py`:
+EXIF orientation applied, Display P3 converted to sRGB, a light colour
+balance only (half-way white balance on the wall, +6% exposure, no filters),
+cropped per slot, Lanczos downscale with a light unsharp mask, WebP q80. All
+metadata is stripped (no EXIF, GPS, XMP or ICC chunks; each file holds only
+the VP8 image).
+
+| File | Size | Bytes | Crop |
+|---|---|---|---|
+| `room-photo.webp` | 800×600 (4:3) | 26,328 | Laptop, desk and drawers, the sofa with its cushions; the far arm trimmed |
+| `room-photo@2x.webp` | 1600×1200 | 65,828 | Same crop, for 2x screens |
+| `room-photo-finale.webp` | 480×600 (4:5) | 16,204 | The sofa's near end and cushions, the laptop and drawers at its left, like the render it dissolves into |
+| `room-photo-finale@2x.webp` | 960×1200 | 39,734 | Same crop, for 2x screens |

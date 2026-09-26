@@ -23,8 +23,16 @@ describe("StartScreen hero", () => {
     expect(html).toContain('<span class="wk-typing__word">mountain range</span>');
   });
 
+  it("shows the landing's own room photo, never the sample world's source photo", () => {
+    expect(html).not.toContain("/samples/photo-4.jpg");
+    expect(html.match(/src="\/landing\/room-photo\.webp" srcSet="\/landing\/room-photo\.webp 800w, \/landing\/room-photo@2x\.webp 1600w"/g)).toHaveLength(2);
+    expect(html).toContain('src="/landing/room-photo-finale.webp" srcSet="/landing/room-photo-finale.webp 480w, /landing/room-photo-finale@2x.webp 960w"');
+    expect(html).toContain('alt="A photo of a small room: a wooden desk with an open laptop and a glass jug, beside a dark grey fabric sofa with cushions"');
+    expect(html).toContain('alt="The original photo: a wooden desk with a laptop beside a grey sofa in the corner of a room"');
+  });
+
   it("keeps the lede still and true for any object the headline names", () => {
     expect(html).toContain('<p class="oq-welcome__lede">Photograph something ordinary. Wanderkin rebuilds it in 3D and shrinks you down until it towers over you.</p>');
-    expect(html).not.toContain("cushions");
+    expect(html).not.toContain("cushions are cliffs");
   });
 });

@@ -100,7 +100,7 @@ export function StartScreen({
             <div className="wk-transform__pair">
               <figure className="wk-transform__item">
                 <div className="wk-frame wk-transform__media">
-                  <img className="oq-welcome__photo" src="/samples/photo-4.jpg" alt="A photo of a small room: a wooden desk with a laptop beside a dark fabric sofa" />
+                  <img className="oq-welcome__photo" src="/landing/room-photo.webp" srcSet="/landing/room-photo.webp 800w, /landing/room-photo@2x.webp 1600w" sizes="(min-width: 1024px) 560px, 100vw" alt="A photo of a small room: a wooden desk with an open laptop and a glass jug, beside a dark grey fabric sofa with cushions" />
                 </div>
                 <figcaption>The photograph<span>One corner of a real room</span></figcaption>
               </figure>
@@ -135,7 +135,7 @@ export function StartScreen({
             <ol className="wk-steps__list">
               <li className="wk-step-card">
                 <span className="wk-step-card__num" aria-hidden="true">1</span>
-                <div className="wk-step-card__media"><img src="/samples/photo-4.jpg" alt="The original photo: a desk and a sofa in the corner of a room" loading="lazy" /></div>
+                <div className="wk-step-card__media"><img src="/landing/room-photo.webp" srcSet="/landing/room-photo.webp 800w, /landing/room-photo@2x.webp 1600w" sizes="(min-width: 1024px) 340px, 100vw" alt="The original photo: a wooden desk with a laptop beside a grey sofa in the corner of a room" loading="lazy" /></div>
                 <h3>Photograph it</h3><p>Anything with some shape to it — a chair, a kettle, a pile of books.</p>
               </li>
               <li className="wk-step-card">
@@ -216,7 +216,7 @@ export function StartScreen({
               <div className="wk-finale__scene" ref={finaleRef} data-playing={finaleView.active}>
                 <img className="wk-finale__render" src="/landing/finale-sofa.webp" alt="In the game: the tiny explorer standing on the sofa seat, with the desk and laptop beyond" loading="lazy" />
                 <p className="wk-finale__pill">Your explorer starts right here</p>
-                <img className="wk-finale__photo" src="/samples/photo-4.jpg" alt="" loading="lazy" />
+                <img className="wk-finale__photo" src="/landing/room-photo-finale.webp" srcSet="/landing/room-photo-finale.webp 480w, /landing/room-photo-finale@2x.webp 960w" sizes="(min-width: 900px) 440px, 400px" alt="" loading="lazy" />
               </div>
             </figure>
           </div>
