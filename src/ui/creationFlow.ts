@@ -1,7 +1,9 @@
+import { STYLE_DEFINITIONS } from "@shared/index.js";
 import type {
   GameModeId,
   GeneratedImageReference,
   GenerationJob,
+  GenerationRequest,
   PhotoReference,
   StyleId,
   SelectedWorldReferenceV1,
@@ -148,6 +150,16 @@ export function isUntouchedCreationRecord(record: CreationRecord): boolean {
 export function creationNeedsAttention(record: CreationRecord): CreationAttentionStage | null {
   const order: CreationAttentionStage[] = ["object", "preview", "shape", "story", "music", "narration"];
   return order.find((stage) => record.jobs[stage]?.state === "failed") ?? null;
+}
+
+export function buildWorldExtrasRequests(record: CreationRecord, key: (prefix: string) => string): [CreationAttentionStage, GenerationRequest][] {
+  const definition = STYLE_DEFINITIONS[record.selection.style];
+  const titleSubject = record.selection.atmosphere.trim() || "a tiny object world";
+  const requests: [CreationAttentionStage, GenerationRequest][] = [];
+  if (!record.jobs.story) requests.push(["story", { schemaVersion: 1, kind: "text", capability: "gemini-text", idempotencyKey: key("story"), purpose: "quest-text", prompt: `Write compact quest JSON with title, intro, objective, and narrationScript for ${titleSubject}. Mode: ${record.selection.mode}.`, output: "quest-json", maxCharacters: 1200 }]);
+  if (!record.jobs.music) requests.push(["music", { schemaVersion: 1, kind: "music", capability: "music", idempotencyKey: key("music"), purpose: "world-soundtrack", prompt: definition.audioPrompts.music, durationSeconds: 15, instrumental: true, loop: true }]);
+  if (!record.jobs.narration) requests.push(["narration", { schemaVersion: 1, kind: "tts", capability: "chatterbox-tts", idempotencyKey: key("narration"), purpose: "quest-narration", text: `Welcome, explorer. Your ${record.selection.mode} adventure is taking shape.`, language: "en" }]);
+  return requests;
 }
 
 export function toWorldWorkflow(record: CreationRecord): WorldWorkflowV1 | null {

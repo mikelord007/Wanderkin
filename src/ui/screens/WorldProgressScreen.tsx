@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { STYLE_DEFINITIONS, type GenerationJob, type GenerationRequest } from "@shared/index.js";
+import type { GenerationJob } from "@shared/index.js";
 import { Button, Card, ProgressPanel, type ProgressStage } from "../components/index.js";
 import { describeApiError, getJob, retryJob, submitGeneration } from "../api.js";
 import { loadActiveCreation, saveCreationRecord, updateCreationJob } from "../creationStorage.js";
-import type { CreationAttentionStage, CreationRecord } from "../creationFlow.js";
+import { buildWorldExtrasRequests, type CreationAttentionStage, type CreationRecord } from "../creationFlow.js";
 import { formatElapsed, useElapsedSeconds } from "../useElapsedSeconds.js";
 import { useJobPolling } from "../useJobPolling.js";
 import { CreationFrame } from "./CreationFrame.js";
@@ -31,13 +31,7 @@ export function WorldProgressScreen({ jobId, onReady, onCancel }: WorldProgressS
 
   useEffect(() => {
     if (!record || started.current) return; started.current = true;
-    const definition = STYLE_DEFINITIONS[record.selection.style];
-    const titleSubject = record.selection.atmosphere.trim() || "a tiny object world";
-    const requests: [CreationAttentionStage, GenerationRequest][] = [];
-    if (!record.jobs.story) requests.push(["story", { schemaVersion: 1, kind: "text", capability: "gemini-text", idempotencyKey: key("story"), purpose: "quest-text", prompt: `Write compact quest JSON with title, intro, objective, and narrationScript for ${titleSubject}. Mode: ${record.selection.mode}.`, output: "quest-json", maxCharacters: 1200 }]);
-    if (!record.jobs.music) requests.push(["music", { schemaVersion: 1, kind: "music", capability: "music", idempotencyKey: key("music"), purpose: "world-soundtrack", prompt: definition.audioPrompts.music, durationSeconds: 60, instrumental: true, loop: true }]);
-    if (!record.jobs.narration) requests.push(["narration", { schemaVersion: 1, kind: "tts", capability: "chatterbox-tts", idempotencyKey: key("narration"), purpose: "quest-narration", text: `Welcome, explorer. Your ${record.selection.mode} adventure is taking shape.`, language: "en" }]);
-    for (const [stage, request] of requests) submitGeneration({ request, worldId: record.id }).then(job => persistJob(stage, job)).catch(error => setActionError(describeApiError(error)));
+    for (const [stage, request] of buildWorldExtrasRequests(record, key)) submitGeneration({ request, worldId: record.id }).then(job => persistJob(stage, job)).catch(error => setActionError(describeApiError(error)));
   // one orchestration pass per mounted durable creation
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [record?.id]);

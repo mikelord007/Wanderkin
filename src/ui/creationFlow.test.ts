@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { GeneratedImageReference } from "@shared/index.js";
 import {
   approvedPreviewMatchesSelection,
+  buildWorldExtrasRequests,
   canBuildWorld,
   createCreationRecord,
   isUntouchedCreationRecord,
@@ -31,6 +32,18 @@ const image = {
 } satisfies GeneratedImageReference;
 
 describe("creation flow", () => {
+  it("builds world extras whose Livepeer create_media durations are integers from 3 through 15", () => {
+    const requests = buildWorldExtrasRequests(createCreationRecord("world-1", "2026-09-24T00:00:00.000Z"), prefix => `${prefix}-key`);
+    const music = requests.find(([stage]) => stage === "music")?.[1];
+    expect(music).toMatchObject({ kind: "music", durationSeconds: 15, instrumental: true, loop: true });
+    for (const [, request] of requests) {
+      if (request.kind !== "music" && request.kind !== "sfx" && request.kind !== "video") continue;
+      expect(Number.isInteger(request.durationSeconds)).toBe(true);
+      expect(request.durationSeconds).toBeGreaterThanOrEqual(3);
+      expect(request.durationSeconds).toBeLessThanOrEqual(15);
+    }
+  });
+
   it("allows building only from the approved preview matching the current selection", () => {
     const draft = createCreationRecord("world-1", "2026-09-24T00:00:00.000Z");
     const approved = withCreationUpdate(draft, {
