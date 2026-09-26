@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useRef } from "react";
 import { Button, Icon, Logo, Modal, WorldStyleScope } from "../components/index.js";
 import { BRAND_NAME, BRAND_TAGLINE } from "../../brand.js";
 import "../theme/welcome.css";
@@ -6,6 +6,7 @@ import type { SceneManifest } from "@shared/index.js";
 import type { AuthMode } from "../../auth/types.js";
 import { SampleWorlds, useSampleLevels } from "../library/SampleWorlds.js";
 import { GiantButton, TinyExplorer } from "../components/Scenery.js";
+import { useInView } from "../components/useInView.js";
 
 const SampleWorldPreview = lazy(() => import("../components/SampleWorldPreview.js"));
 
@@ -44,6 +45,8 @@ export function StartScreen({
   authError = null,
 }: StartScreenProps) {
   const { samples: sampleLevels, error: sampleError } = useSampleLevels();
+  const finaleRef = useRef<HTMLDivElement>(null);
+  const finaleView = useInView(finaleRef);
   const signInLabel = authMode === "supabase" ? "Continue with Google" : "Sign in";
 
   return (
@@ -183,8 +186,9 @@ export function StartScreen({
             </div>
           </div>
         </section>
-        {/* The close: back to the ordinary room, with the tiny explorer
-            standing in a pool of light on its floor. */}
+        {/* The close: the ordinary room, then the same sofa in the game with
+            the explorer standing on it. The photo slowly dissolves into the
+            real render and back; see welcome.css for the timing. */}
         <section className="wk-section wk-finale" aria-labelledby="finale-heading">
           <div className="oq-kit-container wk-finale__inner">
             <div className="wk-finale__copy">
@@ -195,12 +199,13 @@ export function StartScreen({
                 <Button variant="ghost" disabled={!sampleLevels?.[0]} onClick={() => { if (sampleLevels?.[0]) onPlaySample(sampleLevels[0]); }}><Icon name="play" />Play a sample</Button>
               </div>
             </div>
-            <div className="wk-finale__frame" aria-hidden="true">
-              <div className="wk-finale__scene">
-                <img src="/samples/photo-1.jpg" alt="" loading="lazy" />
-                <TinyExplorer className="wk-finale__explorer" />
+            <figure className="wk-finale__frame">
+              <div className="wk-finale__scene" ref={finaleRef} data-playing={finaleView.active}>
+                <img className="wk-finale__render" src="/landing/finale-sofa.webp" alt="In the game: the tiny explorer standing on the sofa seat, with the desk and laptop beyond" loading="lazy" />
+                <p className="wk-finale__pill">Your explorer starts right here</p>
+                <img className="wk-finale__photo" src="/samples/photo-4.jpg" alt="" loading="lazy" />
               </div>
-            </div>
+            </figure>
           </div>
         </section>
         <div className="oq-kit-container wk-welcome-foot">

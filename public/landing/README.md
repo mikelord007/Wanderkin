@@ -19,4 +19,6 @@ and encoded to WebP with Chrome's own encoder.
 | `library-alpine.webp` | 960×720 (4:3 crop) | The explorer under the sofa among snowy pines; the front print on the landing's "Your worlds" card | The desk & sofa adventure, Snowy Alpine look |
 | `library-autumn.webp` | 960×720 (4:3 crop) | The explorer between a mossy rock and a red autumn tree; the back print on the same card | A different perspective (Tripo), Autumn Forest look |
 
-The two `library-*` renders were captured 2026-09-26 with the same harness to replace the old standalone arch illustration. Total about 171 KB. The landing labels the cards shown in a theme look.
+| `finale-sofa.webp` | 800×1000 (4:5 crop) | The explorer standing on the sofa seat, the sofa back and the desk with its laptop beyond; the final call to action dissolves the room photo into it | The desk & sofa adventure, Original look (spawn moved to the sofa-seat checkpoint in the capture harness only) |
+
+The two `library-*` renders were captured 2026-09-26 with the same harness to replace the old standalone arch illustration; `finale-sofa.webp` was captured the same day with `capture-sofa.mjs`. Total about 185 KB. The landing labels the cards shown in a theme look.

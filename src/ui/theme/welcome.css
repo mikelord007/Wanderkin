@@ -275,16 +275,26 @@
 .wk-finale__copy { display: grid; gap: var(--wk-gap); justify-items: start; }
 .wk-finale__copy h2 { font-size: clamp(2.4rem, 1.3rem + 3.8vw, 4.6rem); font-weight: 300; letter-spacing: -.045em; line-height: .98; max-inline-size: 12ch; }
 .wk-finale__copy p { color: var(--wk-text-2); font-size: var(--wk-type-lede); max-inline-size: 40ch; }
-/* A white frame holding the one dark picture on the page: a real room at
-   night, and the tiny explorer standing in a pool of light on its floor. */
-.wk-finale__frame { justify-self: center; width: min(100%, 460px); padding: 12px; background: var(--wk-surface); border: 1px solid var(--wk-border); border-radius: var(--wk-r-stage); box-shadow: var(--wk-shadow-lg); }
-.wk-finale__scene { position: relative; aspect-ratio: 4 / 5; border-radius: var(--wk-r-card); overflow: hidden; background: var(--wk-cinema); }
-.wk-finale__scene img { width: 100%; height: 100%; object-fit: cover; filter: saturate(.6) brightness(.55); }
-.wk-finale__scene::before { content: ""; position: absolute; inset: 0; z-index: 1; background: #3b1f9a; mix-blend-mode: multiply; opacity: .45; }
-/* The floor glow is centred on the explorer's feet (13% up the picture). */
-.wk-finale__scene::after { content: ""; position: absolute; z-index: 1; left: 24%; right: 24%; bottom: 6%; height: 14%; border-radius: 50%; background: radial-gradient(closest-side, #f4eeffcc, #b79cff66 40%, #8b6cff22 70%, transparent); }
-.wk-finale__explorer { position: absolute; z-index: 3; width: 76px; height: auto; left: calc(50% - 21px); bottom: calc(13% - 3px); }
-.wk-finale__scene .wk-explorer { --wk-explorer-shadow: #05010f; }
+/* A white frame holding the room, then the same sofa in the game: the photo
+   lies on top of a real render and slowly dissolves into it and back. One
+   8s loop, 2s fades: photo 1s, fade, render 2s, fade, photo 1s. It runs only
+   while on screen (data-playing, from useInView); under reduced motion the
+   render shows alone. The pill sits under the photo, so it shows with the
+   render. */
+.wk-finale__frame { justify-self: center; width: min(100%, 460px); margin: 0; padding: 12px; background: var(--wk-surface); border: 1px solid var(--wk-border); border-radius: var(--wk-r-stage); box-shadow: var(--wk-shadow-lg); }
+.wk-finale__scene { position: relative; aspect-ratio: 4 / 5; border-radius: var(--wk-r-card); overflow: hidden; background: var(--wk-tint); }
+.wk-finale__scene img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.wk-finale__photo { object-position: 70% center; animation: wk-finale-dissolve 8s ease-in-out infinite paused; }
+.wk-finale__scene[data-playing="true"] .wk-finale__photo { animation-play-state: running; }
+@keyframes wk-finale-dissolve {
+  0%, 12.5% { opacity: 1; }
+  37.5%, 62.5% { opacity: 0; }
+  87.5%, 100% { opacity: 1; }
+}
+.wk-finale__pill {
+  position: absolute; left: 14px; bottom: 14px; margin: 0; padding: 6px 13px; border-radius: 999px;
+  background: #ffffffeb; color: var(--wk-text); font-size: var(--wk-type-small); font-weight: 600; box-shadow: var(--wk-shadow-sm);
+}
 
 /* === Import + footer. Quiet by design. ================================= */
 .wk-welcome-foot { padding-bottom: var(--oq-space-7); }
@@ -336,6 +346,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .oq-welcome__band::before { animation: none; }
+  .wk-finale__photo { animation: none; opacity: 0; }
   .wk-world, .wk-tile, .wk-world__media img, .wk-tile__image img { transition: none; }
   .wk-world:hover, .wk-world:focus-within, .wk-tile:hover, .wk-tile:focus-within { transform: none; }
   .wk-world:hover .wk-world__media img, .wk-world:focus-within .wk-world__media img,
