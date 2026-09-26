@@ -2,14 +2,14 @@ import type { StyleId } from "@shared/index.js";
 import "./kit.css";
 
 /**
- * The fixed illustrative style example.
+ * The fixed illustrative style examples.
  *
- * All four pictures are the same photograph of the same room: one untouched
- * reference and three genuine restyles of it, generated once at build time and
- * committed to `public/style-previews/` (see `provenance.json` there for the
- * model, prompts, and hashes). Nothing here is a filter, and nothing here is a
- * preview of the person's own object — choosing a look only moves a radio
- * button, it never calls a provider.
+ * All three pictures are genuine restyles of the same photograph of the same
+ * room, generated once at build time and committed to `public/style-previews/`
+ * (see `provenance.json` there for the source photo, model, prompts, and
+ * hashes). Nothing here is a filter, and nothing here is a preview of the
+ * person's own object — choosing a look only moves a radio button, it never
+ * calls a provider.
  */
 export interface StyleExampleEntry {
   id: StyleId;
@@ -18,11 +18,6 @@ export interface StyleExampleEntry {
   src: string;
   alt: string;
 }
-
-export const STYLE_REFERENCE = {
-  src: "/style-previews/room-photo.jpg",
-  alt: "The reference photograph: a small room with a wooden desk, a laptop, and a dark fabric sofa",
-} as const;
 
 export const STYLE_EXAMPLES: readonly StyleExampleEntry[] = [
   {
@@ -47,22 +42,3 @@ export const STYLE_EXAMPLES: readonly StyleExampleEntry[] = [
     alt: "The same room as a watercolor: translucent washes, soft bleeds, and visible paper grain",
   },
 ];
-
-/**
- * The reference half of the example: the untouched photo, captioned so nobody
- * can mistake it for their own upload.
- */
-export function StyleReference() {
-  return (
-    <figure className="oq-style-example">
-      <img src={STYLE_REFERENCE.src} alt={STYLE_REFERENCE.alt} loading="lazy" width={1120} height={630} />
-      <figcaption>
-        <strong>An example photo, styled three ways.</strong>
-        <span>
-          Each look below is this exact photograph, redrawn. Your own object gets
-          the same treatment on the next step.
-        </span>
-      </figcaption>
-    </figure>
-  );
-}

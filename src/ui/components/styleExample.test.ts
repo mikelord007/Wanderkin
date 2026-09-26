@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { readFileSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
-import { STYLE_EXAMPLES, STYLE_REFERENCE } from "./StyleExample.js";
+import { STYLE_EXAMPLES } from "./StyleExample.js";
 
 /**
- * The Look step promises something specific: one real photograph and three
- * genuine restyles OF THAT SAME PHOTOGRAPH. That promise is easy to break by
+ * The Look step promises something specific: three genuine restyles OF ONE
+ * REAL PHOTOGRAPH. That promise is easy to break by
  * accident — a broken path, a stray stock image, a CSS filter standing in for
  * a real render — and none of those break the type checker. These tests hold
  * the promise to the bytes on disk and to the recorded provenance.
@@ -36,23 +36,21 @@ describe("style example assets", () => {
   });
 
   it("ships every image it references, and none of them are empty", () => {
-    for (const webPath of [STYLE_REFERENCE.src, ...STYLE_EXAMPLES.map((e) => e.src)]) {
+    for (const webPath of STYLE_EXAMPLES.map((e) => e.src)) {
       const file = publicFile(webPath);
       expect(statSync(file).size, `${webPath} should be a real image`).toBeGreaterThan(1024);
     }
   });
 
-  it("uses a distinct image for the reference and for each look", () => {
-    const digests = [STYLE_REFERENCE.src, ...STYLE_EXAMPLES.map((e) => e.src)].map((webPath) =>
-      sha256(publicFile(webPath)),
-    );
-    expect(new Set(digests).size).toBe(4);
+  it("uses a distinct image for each look", () => {
+    const digests = STYLE_EXAMPLES.map((e) => sha256(publicFile(e.src)));
+    expect(new Set(digests).size).toBe(3);
   });
 
   it("describes every image for screen readers without reusing one description", () => {
-    const alts = [STYLE_REFERENCE.alt, ...STYLE_EXAMPLES.map((e) => e.alt)];
+    const alts = STYLE_EXAMPLES.map((e) => e.alt);
     expect(alts.every((alt) => alt.length > 20)).toBe(true);
-    expect(new Set(alts).size).toBe(4);
+    expect(new Set(alts).size).toBe(3);
   });
 });
 
@@ -86,8 +84,5 @@ describe("style example provenance", () => {
       const variant = provenance.variants.find((entry) => entry.id === example.id);
       expect(variant?.web, example.id).toBe(`public${example.src}`);
     }
-    expect(
-      provenance.variants.find((variant) => variant.id === "reference")?.web,
-    ).toBe(`public${STYLE_REFERENCE.src}`);
   });
 });

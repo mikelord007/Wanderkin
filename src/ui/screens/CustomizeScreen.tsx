@@ -1,6 +1,6 @@
 import type { GameModeId, StyleId } from "@shared/index.js";
 import type { CreationSelection } from "../creationFlow.js";
-import { Button, ChoiceTiles, StyleReference, STYLE_EXAMPLES, TextField } from "../components/index.js";
+import { Button, ChoiceTiles, STYLE_EXAMPLES, TextField } from "../components/index.js";
 import { CreationFrame } from "./CreationFrame.js";
 
 const ADVENTURES = [
@@ -24,9 +24,9 @@ export function CustomizeScreen({ selection, onChange, onPreview, onBack, submit
           gave each one a shadowed card, which made three stacked boxes that
           all shouted equally and left no room to breathe between them. */}
       <section className="oq-customize__group">
-        <StyleReference />
         <ChoiceTiles<StyleId>
           legend="Look"
+          hint="Pick the look for your world. Each example shows the same room in that style."
           value={selection.style}
           onChange={style => onChange({ ...selection, style })}
           options={STYLE_EXAMPLES.map(example => ({

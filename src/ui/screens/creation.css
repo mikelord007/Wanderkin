@@ -96,20 +96,6 @@
 .oq-customize .oq-kit-choice__image { aspect-ratio: 4 / 3; border-radius: var(--wk-r-inner); }
 .oq-customize .oq-kit-choice input:checked + .oq-kit-choice__body { box-shadow: 0 0 0 4px var(--wk-glow); }
 
-/* The fixed illustrative example: a reference plate, not a choice. Neutral on
-   purpose, so it never retints with the chosen look. */
-.oq-style-example {
-  display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
-  gap: var(--wk-gap); align-items: center;
-  padding: var(--oq-space-3); border: 1px solid var(--wk-border);
-  border-radius: var(--wk-r-card); background: var(--wk-surface); box-shadow: var(--wk-shadow-sm);
-}
-/* `height: auto` is load-bearing: the img carries width/height attributes, and
-   without it the intrinsic height wins over aspect-ratio. */
-.oq-style-example img { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; border-radius: var(--wk-r-inner); }
-.oq-style-example figcaption { display: grid; gap: var(--oq-space-2); padding-right: var(--oq-space-2); }
-.oq-style-example strong { font-weight: 600; }
-.oq-style-example span { color: var(--wk-text-2); font-size: .9375rem; max-inline-size: 46ch; }
 .oq-customize__count { text-align: right; color: var(--wk-text-3); font-size: var(--wk-type-small); font-variant-numeric: tabular-nums; }
 .oq-customize__error { display: grid; gap: 4px; padding: 14px 16px; border: 1px solid #f2c3bf; border-radius: var(--wk-r-inner); background: var(--oq-error-wash); }
 /* Primary action last, so the eye lands on it after reading the choices. */
@@ -172,8 +158,6 @@
 
 /* --- Widths -------------------------------------------------------------- */
 @media (max-width: 760px) {
-  .oq-style-example { grid-template-columns: 1fr; }
-  .oq-style-example figcaption { padding: 0 var(--oq-space-2) var(--oq-space-2); }
 }
 @media (max-width: 699px) {
   .oq-creation__container { padding: var(--oq-space-3) var(--wk-page-x) var(--oq-space-8); }
